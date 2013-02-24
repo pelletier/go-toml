@@ -10,14 +10,13 @@ import (
 	"unicode/utf8"
 )
 
-
 var dateRegexp *regexp.Regexp
 
 // Define tokens
 type tokenType int
 
 const (
-	eof = - (iota + 1)
+	eof = -(iota + 1)
 )
 
 const (
@@ -44,7 +43,6 @@ type token struct {
 	val string
 }
 
-
 func (i token) String() string {
 	switch i.typ {
 	case tokenEOF:
@@ -54,11 +52,10 @@ func (i token) String() string {
 	}
 
 	if len(i.val) > 10 {
-		return fmt.Sprintf("%.10q...", i.val);
+		return fmt.Sprintf("%.10q...", i.val)
 	}
 	return fmt.Sprintf("%q", i.val)
 }
-
 
 func isSpace(r rune) bool {
 	return r == ' ' || r == '\t'
@@ -72,22 +69,20 @@ func isDigit(r rune) bool {
 	return r >= '0' && r <= '9'
 }
 
-
 // Define lexer
 type lexer struct {
-	input string
-	start int
-	pos int
-	width int
+	input  string
+	start  int
+	pos    int
+	width  int
 	tokens chan token
 }
-
 
 func (l *lexer) run() {
 	for state := lexVoid; state != nil; {
 		state = state(l)
 	}
-	close (l.tokens)
+	close(l.tokens)
 }
 
 func (l *lexer) emit(t tokenType) {
@@ -100,8 +95,7 @@ func (l *lexer) emitWithValue(t tokenType, value string) {
 	l.start = l.pos
 }
 
-
-func (l *lexer) next() (rune) {
+func (l *lexer) next() rune {
 	if l.pos >= len(l.input) {
 		l.width = 0
 		return eof
@@ -146,7 +140,6 @@ func (l *lexer) follow(next string) bool {
 	return strings.HasPrefix(l.input[l.pos:], next)
 }
 
-
 // Define state functions
 type stateFn func(*lexer) stateFn
 
@@ -170,7 +163,9 @@ func lexVoid(l *lexer) stateFn {
 			l.ignore()
 		}
 
-		if l.next() == eof { break }
+		if l.next() == eof {
+			break
+		}
 	}
 
 	l.emit(tokenEOF)
@@ -222,7 +217,9 @@ func lexRvalue(l *lexer) stateFn {
 			l.ignore()
 		}
 
-		if l.next() == eof { break }
+		if l.next() == eof {
+			break
+		}
 	}
 
 	l.emit(tokenEOF)
@@ -311,7 +308,9 @@ func lexString(l *lexer) stateFn {
 			growing_string += string(l.peek())
 		}
 
-		if l.next() == eof { break }
+		if l.next() == eof {
+			break
+		}
 	}
 
 	return l.errorf("unclosed string")
@@ -336,7 +335,9 @@ func lexInsideKeyGroup(l *lexer) stateFn {
 			return lexVoid
 		}
 
-		if l.next() == eof { break }
+		if l.next() == eof {
+			break
+		}
 	}
 	return l.errorf("unclosed key group")
 }
@@ -350,13 +351,17 @@ func lexRightBracket(l *lexer) stateFn {
 
 func lexNumber(l *lexer) stateFn {
 	l.ignore()
-	if !l.accept("+") { l.accept("-") }
+	if !l.accept("+") {
+		l.accept("-")
+	}
 	point_seen := false
 	digit_seen := false
 	for {
 		next := l.next()
-		if next == '.' { point_seen = true
-		} else if isDigit(next) { digit_seen = true
+		if next == '.' {
+			point_seen = true
+		} else if isDigit(next) {
+			digit_seen = true
 		} else {
 			l.backup()
 			break
@@ -378,11 +383,10 @@ func init() {
 	dateRegexp = regexp.MustCompile("^\\d{1,4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")
 }
 
-
 // Entry point
 func lex(input string) (*lexer, chan token) {
-	l := &lexer {
-		input: input,
+	l := &lexer{
+		input:  input,
 		tokens: make(chan token),
 	}
 	go l.run()

@@ -8,10 +8,9 @@ import (
 	"time"
 )
 
-
 type parser struct {
-	flow chan token
-	tree *TomlTree
+	flow         chan token
+	tree         *TomlTree
 	tokensBuffer []token
 	currentGroup string
 }
@@ -29,7 +28,7 @@ func (p *parser) peek() *token {
 		return &(p.tokensBuffer[0])
 	}
 
-	tok, ok := <- p.flow
+	tok, ok := <-p.flow
 	if !ok {
 		return nil
 	}
@@ -53,7 +52,7 @@ func (p *parser) getToken() *token {
 		p.tokensBuffer = p.tokensBuffer[1:]
 		return &tok
 	}
-	tok, ok := <- p.flow
+	tok, ok := <-p.flow
 	if !ok {
 		return nil
 	}
@@ -120,15 +119,21 @@ func parseRvalue(p *parser) interface{} {
 		return false
 	case tokenInteger:
 		val, err := strconv.ParseInt(tok.val, 10, 64)
-		if err != nil { panic(err) }
+		if err != nil {
+			panic(err)
+		}
 		return val
 	case tokenFloat:
 		val, err := strconv.ParseFloat(tok.val, 64)
-		if err != nil { panic(err) }
+		if err != nil {
+			panic(err)
+		}
 		return val
 	case tokenDate:
 		val, err := time.Parse(time.RFC3339, tok.val)
-		if err != nil { panic(err) }
+		if err != nil {
+			panic(err)
+		}
 		return val
 	case tokenLeftBracket:
 		return parseArray(p)
@@ -143,7 +148,9 @@ func parseArray(p *parser) []interface{} {
 	array := make([]interface{}, 0)
 	for {
 		follow := p.peek()
-		if follow == nil { panic("unterminated array") }
+		if follow == nil {
+			panic("unterminated array")
+		}
 		if follow.typ == tokenRightBracket {
 			p.getToken()
 			return array
@@ -151,7 +158,9 @@ func parseArray(p *parser) []interface{} {
 		val := parseRvalue(p)
 		array = append(array, val)
 		follow = p.peek()
-		if follow == nil { panic("unterminated array") }
+		if follow == nil {
+			panic("unterminated array")
+		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
 			panic("missing comma")
 		}
@@ -162,12 +171,11 @@ func parseArray(p *parser) []interface{} {
 	return array
 }
 
-
 func parse(flow chan token) *TomlTree {
 	result := make(TomlTree)
-	parser := &parser {
-		flow: flow,
-		tree: &result,
+	parser := &parser{
+		flow:         flow,
+		tree:         &result,
 		tokensBuffer: make([]token, 0),
 		currentGroup: "",
 	}

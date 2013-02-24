@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 func assertTree(t *testing.T, tree *TomlTree, ref map[string]interface{}) {
 	for k, v := range ref {
 		if fmt.Sprintf("%v", tree.Get(k)) != fmt.Sprintf("%v", v) {
@@ -24,7 +23,6 @@ func TestCreateSubTree(t *testing.T) {
 		t.Fail()
 	}
 }
-
 
 func TestSimpleKV(t *testing.T) {
 	tree := Load("a = 42")
@@ -81,18 +79,18 @@ func TestNestedKeys(t *testing.T) {
 func TestArraySimple(t *testing.T) {
 	tree := Load("a = [42, 21, 10]")
 	assertTree(t, tree, map[string]interface{}{
-		"a": []int64{int64(42), int64(21), int64(10),},
+		"a": []int64{int64(42), int64(21), int64(10)},
 	})
 
 	tree = Load("a = [42, 21, 10,]")
 	assertTree(t, tree, map[string]interface{}{
-		"a": []int64{int64(42), int64(21), int64(10),},
+		"a": []int64{int64(42), int64(21), int64(10)},
 	})
 }
 
 func TestArrayNested(t *testing.T) {
 	tree := Load("a = [[42, 21], [10]]")
 	assertTree(t, tree, map[string]interface{}{
-		"a": [][]int64{[]int64{int64(42), int64(21),}, []int64{int64(10),},},
+		"a": [][]int64{[]int64{int64(42), int64(21)}, []int64{int64(10)}},
 	})
 }

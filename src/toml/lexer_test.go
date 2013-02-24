@@ -5,7 +5,7 @@ import "testing"
 func testFlow(t *testing.T, input string, expectedFlow []token) {
 	_, ch := lex(input)
 	for _, expected := range expectedFlow {
-		token := <- ch
+		token := <-ch
 		if token != expected {
 			t.Log("compared", token, "to", expected)
 			t.Log(token.val, "<->", expected.val)
@@ -14,10 +14,10 @@ func testFlow(t *testing.T, input string, expectedFlow []token) {
 		}
 	}
 
-	tok, ok := <- ch
+	tok, ok := <-ch
 	if ok {
 		t.Log("channel is not closed!")
-		t.Log(len(ch) + 1, "tokens remaining:")
+		t.Log(len(ch)+1, "tokens remaining:")
 
 		t.Log("token ->", tok)
 		for token := range ch {
@@ -42,7 +42,6 @@ func TestUnclosedKeyGroup(t *testing.T) {
 		token{tokenError, "unclosed key group"},
 	})
 }
-
 
 func TestComment(t *testing.T) {
 	testFlow(t, "# blahblah", []token{

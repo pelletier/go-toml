@@ -30,7 +30,7 @@ func (t *TomlTree) Get(key string) interface{} {
 		}
 		subtree = (*subtree)[intermediate_key].(*TomlTree)
 	}
-	return (*subtree)[keys[len(keys) - 1]]
+	return (*subtree)[keys[len(keys)-1]]
 }
 
 // Set an element in the tree.
@@ -46,7 +46,7 @@ func (t *TomlTree) Set(key string, value interface{}) {
 		}
 		subtree = (*subtree)[intermediate_key].(*TomlTree)
 	}
-	(*subtree)[keys[len(keys) - 1]] = value
+	(*subtree)[keys[len(keys)-1]] = value
 }
 
 // createSubTree takes a tree and a key andcreate the necessary intermediate
@@ -65,7 +65,6 @@ func (t *TomlTree) createSubTree(key string) {
 		subtree = ((*subtree)[intermediate_key]).(*TomlTree)
 	}
 }
-
 
 func Load(content string) *TomlTree {
 	_, flow := lex(content)
