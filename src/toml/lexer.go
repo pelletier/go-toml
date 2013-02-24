@@ -20,7 +20,7 @@ var dateRegexp *regexp.Regexp
 type tokenType int
 
 const (
-	EOF = - (iota + 1)
+	eof = - (iota + 1)
 )
 
 const (
@@ -108,7 +108,7 @@ func (l *lexer) emitWithValue(t tokenType, value string) {
 func (l *lexer) next() (rune) {
 	if l.pos >= len(l.input) {
 		l.width = 0
-		return EOF
+		return eof
 	}
 	var r rune
 	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
@@ -174,7 +174,7 @@ func lexVoid(l *lexer) stateFn {
 			l.ignore()
 		}
 
-		if l.next() == EOF { break }
+		if l.next() == eof { break }
 	}
 
 	l.emit(tokenEOF)
@@ -223,7 +223,7 @@ func lexRvalue(l *lexer) stateFn {
 			l.ignore()
 		}
 
-		if l.next() == EOF { break }
+		if l.next() == eof { break }
 	}
 
 	l.emit(tokenEOF)
@@ -276,7 +276,7 @@ func lexKey(l *lexer) stateFn {
 func lexComment(l *lexer) stateFn {
 	for {
 		next := l.next()
-		if next == '\n' || next == EOF {
+		if next == '\n' || next == eof {
 			break
 		}
 	}
@@ -313,7 +313,7 @@ func lexString(l *lexer) stateFn {
 			growing_string += string(l.peek())
 		}
 
-		if l.next() == EOF { break }
+		if l.next() == eof { break }
 	}
 
 	return l.errorf("unclosed string")
@@ -338,7 +338,7 @@ func lexInsideKeyGroup(l *lexer) stateFn {
 			return lexVoid
 		}
 
-		if l.next() == EOF { break }
+		if l.next() == eof { break }
 	}
 	return l.errorf("unclosed key group")
 }

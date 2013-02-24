@@ -6,24 +6,24 @@ import (
 	"strings"
 )
 
-// Given a tree and a key, create the necessary intermediate subtrees to create
-// a subtree at that point. In-place.
+// createSubTree takes a tree and a key andcreate the necessary intermediate
+// subtrees to create a subtree at that point. In-place.
 //
 // e.g. passing a.b.c will create (assuming tree is empty) tree[a], tree[a][b]
 // and tree[a][b][c]
-func createSubTree(tree *tomlTree, key string) {
+func createSubTree(tree *TomlTree, key string) {
 	subtree := tree
 	for _, intermediate_key := range strings.Split(key, ".") {
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
-			(*subtree)[intermediate_key] = make(tomlTree)
+			(*subtree)[intermediate_key] = make(TomlTree)
 		}
-		subtree = (*subtree)[intermediate_key].(*tomlTree)
+		subtree = (*subtree)[intermediate_key].(*TomlTree)
 	}
 }
 
 
-func parse(chan token) *tomlTree {
-	result := make(tomlTree)
+func parse(chan token) *TomlTree {
+	result := make(TomlTree)
 	return &result
 }
