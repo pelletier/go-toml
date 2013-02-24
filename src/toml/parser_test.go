@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -8,7 +9,7 @@ import (
 
 func assertTree(t *testing.T, tree *TomlTree, ref map[string]interface{}) {
 	for k, v := range ref {
-		if tree.Get(k) != v {
+		if fmt.Sprintf("%v", tree.Get(k)) != fmt.Sprintf("%v", v) {
 			t.Log("was expecting", v, "at", k, "but got", tree.Get(k))
 			t.Fail()
 		}
@@ -74,5 +75,24 @@ func TestNestedKeys(t *testing.T) {
 	tree := Load("[a.b.c]\nd = 42")
 	assertTree(t, tree, map[string]interface{}{
 		"a.b.c.d": int64(42),
+	})
+}
+
+func TestArraySimple(t *testing.T) {
+	tree := Load("a = [42, 21, 10]")
+	assertTree(t, tree, map[string]interface{}{
+		"a": []int64{int64(42), int64(21), int64(10),},
+	})
+
+	tree = Load("a = [42, 21, 10,]")
+	assertTree(t, tree, map[string]interface{}{
+		"a": []int64{int64(42), int64(21), int64(10),},
+	})
+}
+
+func TestArrayNested(t *testing.T) {
+	tree := Load("a = [[42, 21], [10]]")
+	assertTree(t, tree, map[string]interface{}{
+		"a": [][]int64{[]int64{int64(42), int64(21),}, []int64{int64(10),},},
 	})
 }

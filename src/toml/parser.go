@@ -135,6 +135,8 @@ func parseRvalue(p *parser) interface{} {
 		return parseArray(p)
 	}
 
+	println(tok.typ)
+	println(tok.val)
 	panic("never reached")
 
 	return nil
@@ -152,9 +154,15 @@ func parseArray(p *parser) []interface{} {
 		val := parseRvalue(p)
 		array = append(array, val)
 		follow = p.peek()
+		fmt.Println("Added to array:", val)
+		fmt.Println("Follow", follow)
+		fmt.Println("Follow", follow.typ)
 		if follow == nil { panic("unterminated array") }
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
 			panic("missing comma")
+		}
+		if follow.typ == tokenComma {
+			p.getToken()
 		}
 	}
 	return array
