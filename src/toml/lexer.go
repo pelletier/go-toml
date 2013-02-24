@@ -39,6 +39,7 @@ const (
 	tokenDate
 	tokenKeyGroup
 	tokenComma
+	tokenEOL
 )
 
 type token struct {
@@ -196,6 +197,9 @@ func lexRvalue(l *lexer) stateFn {
 		case ',':
 			return lexComma
 		case '\n':
+			l.ignore()
+			l.pos += 1
+			l.emit(tokenEOF)
 			return lexVoid
 		}
 
