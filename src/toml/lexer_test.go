@@ -218,3 +218,15 @@ func TestKeyEqualNumber(t *testing.T) {
 		token{tokenEOF, ""},
 	})
 }
+
+func TestMultiline(t *testing.T) {
+	testFlow(t, "foo = 42\nbar=21", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenInteger, "42"},
+		token{tokenKey, "bar"},
+		token{tokenEqual, "="},
+		token{tokenInteger, "21"},
+		token{tokenEOF, ""},
+	})
+}

@@ -9,6 +9,17 @@ import (
 // This is the result of the parsing of a TOML file.
 type TomlTree map[string]interface{}
 
+// Keys returns the keys of the toplevel tree.
+// Warning: this is a costly operation.
+func (t *TomlTree) Keys() []string {
+	keys := make([]string, 0)
+	mp := (map[string]interface{})(*t)
+	for k, _ := range mp {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // Get an element from the tree.
 // If the path described by the key does not exist, nil is returned.
 func (t *TomlTree) Get(key string) interface{} {
@@ -32,11 +43,12 @@ func (t *TomlTree) Set(key string, value interface{}) {
 	for _, intermediate_key := range keys[:len(keys)-1] {
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
-			(*subtree)[intermediate_key] = make(TomlTree)
+			var new_tree TomlTree = make(TomlTree)
+			(*subtree)[intermediate_key] = &new_tree
 		}
 		subtree = (*subtree)[intermediate_key].(*TomlTree)
 	}
-	(*subtree)[keys[len(key) - 1]] = value
+	(*subtree)[keys[len(keys) - 1]] = value
 }
 
 // createSubTree takes a tree and a key andcreate the necessary intermediate
@@ -49,9 +61,10 @@ func (t *TomlTree) createSubTree(key string) {
 	for _, intermediate_key := range strings.Split(key, ".") {
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
-			(*subtree)[intermediate_key] = make(TomlTree)
+			var new_tree TomlTree = make(TomlTree)
+			(*subtree)[intermediate_key] = &new_tree
 		}
-		subtree = (*subtree)[intermediate_key].(*TomlTree)
+		subtree = ((*subtree)[intermediate_key]).(*TomlTree)
 	}
 }
 

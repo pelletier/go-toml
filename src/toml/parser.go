@@ -73,6 +73,8 @@ func parseStart(p *parser) parserStateFn {
 		return parseGroup
 	case tokenKey:
 		return parseAssign
+	case tokenEOF:
+		return nil
 	default:
 		panic("unexpected token")
 	}
@@ -95,7 +97,12 @@ func parseAssign(p *parser) parserStateFn {
 	key := p.getToken()
 	p.assume(tokenEqual)
 	value := parseRvalue(p)
-	p.tree.Set(key.val, value)
+	final_key := key.val
+	if p.currentGroup != "" {
+		final_key = p.currentGroup + "." + key.val
+	}
+	fmt.Println("Setting k:", final_key, "val:", value)
+	p.tree.Set(final_key, value)
 	return parseStart(p)
 }
 

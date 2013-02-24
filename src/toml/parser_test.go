@@ -12,7 +12,7 @@ func assertTree(t *testing.T, tree *TomlTree, ref map[string]interface{}) {
 	}
 }
 
-func testCreateSubTree(t *testing.T) {
+func TestCreateSubTree(t *testing.T) {
 	tree := make(TomlTree)
 	tree.createSubTree("a.b.c")
 	tree.Set("a.b.c", 42)
@@ -22,25 +22,32 @@ func testCreateSubTree(t *testing.T) {
 }
 
 
-func testSimpleKV(t *testing.T) {
+func TestSimpleKV(t *testing.T) {
 	tree := Load("a = 42")
 	assertTree(t, tree, map[string]interface{}{
-		"a": 42,
+		"a": int64(42),
 	})
 
 	tree = Load("a = 42\nb = 21")
 	assertTree(t, tree, map[string]interface{}{
-		"a": 42,
-		"b": 21,
+		"a": int64(42),
+		"b": int64(21),
 	})
 }
 
-func testSimpleIntegers(t *testing.T) {
+func TestSimpleNumbers(t *testing.T) {
 	tree := Load("a = +42\nb = -21\nc = +4.2\nd = -2.1")
 	assertTree(t, tree, map[string]interface{}{
-		"a": 42,
-		"b": -21,
-		"c": 4.2,
-		"d": -4.2,
+		"a": int64(42),
+		"b": int64(-21),
+		"c": float64(4.2),
+		"d": float64(-2.1),
 	})
 }
+
+/*func TestSimpleDate(t *testing.T) {*/
+	/*tree := Load("a = 12")*/
+	/*assertTree(t, tree, map[string]interface{}{*/
+		/*"a": 42,*/
+	/*})*/
+/*}*/

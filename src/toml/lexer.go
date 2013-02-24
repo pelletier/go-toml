@@ -199,7 +199,7 @@ func lexRvalue(l *lexer) stateFn {
 		case '\n':
 			l.ignore()
 			l.pos += 1
-			l.emit(tokenEOF)
+			/*l.emit(tokenEOF)*/
 			return lexVoid
 		}
 
@@ -270,6 +270,7 @@ func lexComma(l *lexer) stateFn {
 }
 
 func lexKey(l *lexer) stateFn {
+	l.ignore()
 	for isAlpha(l.next()) {
 	}
 	l.backup()
@@ -363,12 +364,16 @@ func lexNumber(l *lexer) stateFn {
 		next := l.next()
 		if next == '.' { point_seen = true
 		} else if isDigit(next) { digit_seen = true
-		} else { break }
+		} else {
+			l.backup()
+			break
+		}
 	}
 
 	if !digit_seen {
 		return l.errorf("no digit in that number")
 	}
+	fmt.Println("-->", l.input[l.pos:])
 	if point_seen {
 		l.emit(tokenFloat)
 	} else {
