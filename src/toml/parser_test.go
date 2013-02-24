@@ -88,6 +88,13 @@ func TestArraySimple(t *testing.T) {
 	})
 }
 
+func TestArrayMultiline(t *testing.T) {
+	tree := Load("a = [42,\n21, 10,]")
+	assertTree(t, tree, map[string]interface{}{
+		"a": []int64{int64(42), int64(21), int64(10)},
+	})
+}
+
 func TestArrayNested(t *testing.T) {
 	tree := Load("a = [[42, 21], [10]]")
 	assertTree(t, tree, map[string]interface{}{

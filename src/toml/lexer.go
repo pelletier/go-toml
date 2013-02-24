@@ -76,6 +76,7 @@ type lexer struct {
 	pos    int
 	width  int
 	tokens chan token
+	depth  int
 }
 
 func (l *lexer) run() {
@@ -177,8 +178,10 @@ func lexRvalue(l *lexer) stateFn {
 		next := l.peek()
 		switch next {
 		case '[':
+			l.depth += 1
 			return lexLeftBracket
 		case ']':
+			l.depth -= 1
 			return lexRightBracket
 		case '#':
 			return lexComment
@@ -189,8 +192,11 @@ func lexRvalue(l *lexer) stateFn {
 		case '\n':
 			l.ignore()
 			l.pos += 1
-			/*l.emit(tokenEOF)*/
-			return lexVoid
+			if l.depth == 0 {
+				return lexVoid
+			} else {
+				return lexRvalue
+			}
 		}
 
 		if l.follow("true") {
