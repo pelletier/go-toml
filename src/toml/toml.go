@@ -20,8 +20,6 @@ func (t *TomlTree) Keys() []string {
 	return keys
 }
 
-// Get an element from the tree.
-// If the path described by the key does not exist, nil is returned.
 func (t *TomlTree) Get(key string) interface{} {
 	subtree := t
 	keys := strings.Split(key, ".")

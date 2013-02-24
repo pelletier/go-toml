@@ -69,3 +69,10 @@ func TestBools(t *testing.T) {
 		"b": false,
 	})
 }
+
+func TestNestedKeys(t *testing.T) {
+	tree := Load("[a.b.c]\nd = 42")
+	assertTree(t, tree, map[string]interface{}{
+		"a.b.c.d": int64(42),
+	})
+}

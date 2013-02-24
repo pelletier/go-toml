@@ -84,8 +84,8 @@ func parseStart(p *parser) parserStateFn {
 func parseGroup(p *parser) parserStateFn {
 	p.getToken() // discard the [
 	key := p.getToken()
-	if key.typ != tokenKey {
-		panic(fmt.Sprintf("unexpected token %s, was expecting a key", key))
+	if key.typ != tokenKeyGroup {
+		panic(fmt.Sprintf("unexpected token %s, was expecting a key group", key))
 	}
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
