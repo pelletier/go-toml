@@ -5,10 +5,7 @@ package toml
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
-	"runtime"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -88,10 +85,8 @@ type lexer struct {
 
 func (l *lexer) run() {
 	for state := lexVoid; state != nil; {
-		fmt.Println("going in state", runtime.FuncForPC(reflect.ValueOf(state).Pointer()).Name())
 		state = state(l)
 	}
-	fmt.Println("closing...")
 	close (l.tokens)
 }
 
@@ -302,7 +297,6 @@ func lexString(l *lexer) stateFn {
 	growing_string := ""
 
 	for {
-		fmt.Println("peek:", strconv.QuoteRune(l.peek()))
 		if l.peek() == '"' {
 			l.emitWithValue(tokenString, growing_string)
 			l.pos += 1
@@ -311,7 +305,6 @@ func lexString(l *lexer) stateFn {
 		}
 
 		if l.follow("\\\"") {
-			fmt.Println("follow")
 			l.pos += 1
 			growing_string += "\""
 		} else {
@@ -373,7 +366,6 @@ func lexNumber(l *lexer) stateFn {
 	if !digit_seen {
 		return l.errorf("no digit in that number")
 	}
-	fmt.Println("-->", l.input[l.pos:])
 	if point_seen {
 		l.emit(tokenFloat)
 	} else {

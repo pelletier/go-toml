@@ -101,7 +101,6 @@ func parseAssign(p *parser) parserStateFn {
 	if p.currentGroup != "" {
 		final_key = p.currentGroup + "." + key.val
 	}
-	fmt.Println("Setting k:", final_key, "val:", value)
 	p.tree.Set(final_key, value)
 	return parseStart(p)
 }
@@ -135,8 +134,6 @@ func parseRvalue(p *parser) interface{} {
 		return parseArray(p)
 	}
 
-	println(tok.typ)
-	println(tok.val)
 	panic("never reached")
 
 	return nil
@@ -154,9 +151,6 @@ func parseArray(p *parser) []interface{} {
 		val := parseRvalue(p)
 		array = append(array, val)
 		follow = p.peek()
-		fmt.Println("Added to array:", val)
-		fmt.Println("Follow", follow)
-		fmt.Println("Follow", follow.typ)
 		if follow == nil { panic("unterminated array") }
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
 			panic("missing comma")
