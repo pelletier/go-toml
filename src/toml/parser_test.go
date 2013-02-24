@@ -1,6 +1,9 @@
 package toml
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 
 func assertTree(t *testing.T, tree *TomlTree, ref map[string]interface{}) {
@@ -45,9 +48,24 @@ func TestSimpleNumbers(t *testing.T) {
 	})
 }
 
-/*func TestSimpleDate(t *testing.T) {*/
-	/*tree := Load("a = 12")*/
-	/*assertTree(t, tree, map[string]interface{}{*/
-		/*"a": 42,*/
-	/*})*/
-/*}*/
+func TestSimpleDate(t *testing.T) {
+	tree := Load("a = 1979-05-27T07:32:00Z")
+	assertTree(t, tree, map[string]interface{}{
+		"a": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+	})
+}
+
+func TestSimpleString(t *testing.T) {
+	tree := Load("a = \"hello world\"")
+	assertTree(t, tree, map[string]interface{}{
+		"a": "hello world",
+	})
+}
+
+func TestBools(t *testing.T) {
+	tree := Load("a = true\nb = false")
+	assertTree(t, tree, map[string]interface{}{
+		"a": true,
+		"b": false,
+	})
+}
