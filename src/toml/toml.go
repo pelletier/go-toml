@@ -1,4 +1,7 @@
 // TOML markup language parser.
+//
+// This version supports the specification as described in
+// https://github.com/mojombo/toml/tree/e3656ad493400895f4460f1244a25f8f8e31a32a
 package toml
 
 import (
@@ -20,6 +23,9 @@ func (t *TomlTree) Keys() []string {
 	return keys
 }
 
+// Get the value at key in the TomlTree.
+// Key is a dot-separated path (e.g. a.b.c).
+// Returns nil if the path does not exist in the tree.
 func (t *TomlTree) Get(key string) interface{} {
 	subtree := t
 	keys := strings.Split(key, ".")
@@ -34,6 +40,7 @@ func (t *TomlTree) Get(key string) interface{} {
 }
 
 // Set an element in the tree.
+// Key is a dot-separated path (e.g. a.b.c).
 // Creates all necessary intermediates trees, if needed.
 func (t *TomlTree) Set(key string, value interface{}) {
 	subtree := t
@@ -66,6 +73,7 @@ func (t *TomlTree) createSubTree(key string) {
 	}
 }
 
+// Create a TomlTree from a string.
 func Load(content string) *TomlTree {
 	_, flow := lex(content)
 	return parse(flow)
