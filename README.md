@@ -11,7 +11,7 @@ This library supports TOML version [e3656ad493400895f4460f1244a25f8f8e31a32a](ht
 ## Documentation
 
 The documentation is available at
-[godoc.org](http://godoc.org/github.com/pelletier/go-toml/src/toml).
+[godoc.org](http://godoc.org/github.com/pelletier/go-toml).
 
 ## Contribute
 
