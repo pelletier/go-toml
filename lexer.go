@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -61,12 +62,12 @@ func isSpace(r rune) bool {
 	return r == ' ' || r == '\t'
 }
 
-func isAlpha(r rune) bool {
-	return r >= 'a' && r <= 'z'
+func isAlphanumeric(r rune) bool {
+	return unicode.IsLetter(r) || r == '_'
 }
 
 func isDigit(r rune) bool {
-	return r >= '0' && r <= '9'
+	return unicode.IsNumber(r)
 }
 
 // Define lexer
@@ -156,7 +157,7 @@ func lexVoid(l *lexer) stateFn {
 			return lexEqual
 		}
 
-		if isAlpha(next) {
+		if isAlphanumeric(next) {
 			return lexKey
 		}
 
@@ -207,7 +208,7 @@ func lexRvalue(l *lexer) stateFn {
 			return lexFalse
 		}
 
-		if isAlpha(next) {
+		if isAlphanumeric(next) {
 			return lexKey
 		}
 
@@ -269,7 +270,7 @@ func lexComma(l *lexer) stateFn {
 
 func lexKey(l *lexer) stateFn {
 	l.ignore()
-	for isAlpha(l.next()) {
+	for isAlphanumeric(l.next()) {
 	}
 	l.backup()
 	l.emit(tokenKey)

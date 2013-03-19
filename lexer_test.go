@@ -77,6 +77,27 @@ func TestBasicKey(t *testing.T) {
 	})
 }
 
+func TestBasicKeyWithUnderscore(t *testing.T) {
+	testFlow(t, "hello_hello", []token{
+		token{tokenKey, "hello_hello"},
+		token{tokenEOF, ""},
+	})
+}
+
+func TestBasicKeyWithUppercaseMix(t *testing.T) {
+	testFlow(t, "helloHELLOHello", []token{
+		token{tokenKey, "helloHELLOHello"},
+		token{tokenEOF, ""},
+	})
+}
+
+func TestBasicKeyWithInternationalCharacters(t *testing.T) {
+	testFlow(t, "héllÖ", []token{
+		token{tokenKey, "héllÖ"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestBasicKeyAndEqual(t *testing.T) {
 	testFlow(t, "hello =", []token{
 		token{tokenKey, "hello"},
