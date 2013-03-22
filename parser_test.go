@@ -76,6 +76,20 @@ func TestNestedKeys(t *testing.T) {
 	})
 }
 
+func TestArrayOne(t *testing.T) {
+	tree, _ := Load("a = [1]")
+	assertTree(t, tree, map[string]interface{}{
+		"a": []int64{int64(1)},
+	})
+}
+
+func TestArrayZero(t *testing.T) {
+	tree, _ := Load("a = []")
+	assertTree(t, tree, map[string]interface{}{
+		"a": []interface{}{},
+	})
+}
+
 func TestArraySimple(t *testing.T) {
 	tree, _ := Load("a = [42, 21, 10]")
 	assertTree(t, tree, map[string]interface{}{
