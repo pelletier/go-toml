@@ -5,6 +5,7 @@
 package toml
 
 import (
+	"errors"
 	"runtime"
 	"strings"
 )
@@ -81,7 +82,7 @@ func Load(content string) (tree *TomlTree, err error) {
 			if _, ok := r.(runtime.Error); ok {
 				panic(r)
 			}
-			err = r.(error)
+			err = errors.New(r.(string))
 		}
 	}()
 	_, flow := lex(content)

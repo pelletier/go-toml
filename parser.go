@@ -106,7 +106,7 @@ func parseAssign(p *parser) parserStateFn {
 
 func parseRvalue(p *parser) interface{} {
 	tok := p.getToken()
-	if tok == nil {
+	if tok == nil || tok.typ == tokenEOF {
 		panic("expecting a value")
 	}
 
@@ -148,7 +148,7 @@ func parseArray(p *parser) []interface{} {
 	array := make([]interface{}, 0)
 	for {
 		follow := p.peek()
-		if follow == nil {
+		if follow == nil || follow.typ == tokenEOF {
 			panic("unterminated array")
 		}
 		if follow.typ == tokenRightBracket {

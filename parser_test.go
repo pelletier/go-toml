@@ -101,3 +101,17 @@ func TestArrayNested(t *testing.T) {
 		"a": [][]int64{[]int64{int64(42), int64(21)}, []int64{int64(10)}},
 	})
 }
+
+func TestMissingValue(t *testing.T) {
+	_, err := Load("a = ")
+	if (err.Error() != "expecting a value") {
+		t.Error("Bad error message:", err.Error());
+	}
+}
+
+func TestUnterminatedArray(t *testing.T) {
+	_, err := Load("a = [1,")
+	if (err.Error() != "unterminated array") {
+		t.Error("Bad error message:", err.Error());
+	}
+}
