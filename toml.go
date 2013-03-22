@@ -5,6 +5,7 @@
 package toml
 
 import (
+	"runtime"
 	"strings"
 )
 
@@ -56,7 +57,7 @@ func (t *TomlTree) Set(key string, value interface{}) {
 	(*subtree)[keys[len(keys)-1]] = value
 }
 
-// createSubTree takes a tree and a key andcreate the necessary intermediate
+// createSubTree takes a tree and a key and create the necessary intermediate
 // subtrees to create a subtree at that point. In-place.
 //
 // e.g. passing a.b.c will create (assuming tree is empty) tree[a], tree[a][b]
@@ -74,7 +75,16 @@ func (t *TomlTree) createSubTree(key string) {
 }
 
 // Create a TomlTree from a string.
-func Load(content string) *TomlTree {
+func Load(content string) (tree *TomlTree, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
 	_, flow := lex(content)
-	return parse(flow)
+	tree = parse(flow)
+	return
 }
