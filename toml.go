@@ -6,6 +6,7 @@ package toml
 
 import (
 	"errors"
+	"io/ioutil"
 	"runtime"
 	"strings"
 )
@@ -87,5 +88,18 @@ func Load(content string) (tree *TomlTree, err error) {
 	}()
 	_, flow := lex(content)
 	tree = parse(flow)
+	return
+}
+
+// Create a TomlTree from a file.
+func LoadFile(path string) (tree *TomlTree, err error) {
+	buff, ferr := ioutil.ReadFile(path)
+	if (ferr != nil) {
+		err = ferr
+	} else {
+		s := string(buff)
+		tree, err = Load(s)
+	}
+
 	return
 }

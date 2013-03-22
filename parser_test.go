@@ -119,13 +119,30 @@ func TestArrayNested(t *testing.T) {
 func TestMissingValue(t *testing.T) {
 	_, err := Load("a = ")
 	if (err.Error() != "expecting a value") {
-		t.Error("Bad error message:", err.Error());
+		t.Error("Bad error message:", err.Error())
 	}
 }
 
 func TestUnterminatedArray(t *testing.T) {
 	_, err := Load("a = [1,")
 	if (err.Error() != "unterminated array") {
-		t.Error("Bad error message:", err.Error());
+		t.Error("Bad error message:", err.Error())
 	}
+}
+
+func TestMissingFile(t *testing.T) {
+	_, err := LoadFile("foo.toml")
+	if (err.Error() != "open foo.toml: no such file or directory") {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestParseFile(t *testing.T) {
+	tree, err := LoadFile("example.toml")
+	if (err != nil) {
+		t.Fatal("Non-nil error:", err.Error())
+	}
+	assertTree(t, tree, map[string]interface{}{
+		"a": [][]int64{[]int64{int64(42), int64(21)}, []int64{int64(10)}},
+	})
 }
