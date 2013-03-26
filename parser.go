@@ -162,6 +162,8 @@ func parseArray(p *parser) []interface{} {
 			panic("unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
+			fmt.Println(follow.typ)
+			fmt.Println(follow.val)
 			panic("missing comma")
 		}
 		if follow.typ == tokenComma {

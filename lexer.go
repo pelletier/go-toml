@@ -305,7 +305,7 @@ func lexString(l *lexer) stateFn {
 			l.emitWithValue(tokenString, growing_string)
 			l.pos += 1
 			l.ignore()
-			return lexVoid
+			return lexRvalue
 		}
 
 		if l.follow("\\\"") {

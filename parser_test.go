@@ -6,7 +6,11 @@ import (
 	"time"
 )
 
-func assertTree(t *testing.T, tree *TomlTree, ref map[string]interface{}) {
+func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interface{}) {
+	if (err != nil) {
+		t.Fatal("Non-nil error:", err.Error())
+		return
+	}
 	for k, v := range ref {
 		if fmt.Sprintf("%v", tree.Get(k)) != fmt.Sprintf("%v", v) {
 			t.Log("was expecting", v, "at", k, "but got", tree.Get(k))
@@ -25,21 +29,21 @@ func TestCreateSubTree(t *testing.T) {
 }
 
 func TestSimpleKV(t *testing.T) {
-	tree, _ := Load("a = 42")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = 42")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": int64(42),
 	})
 
 	tree, _ = Load("a = 42\nb = 21")
-	assertTree(t, tree, map[string]interface{}{
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": int64(42),
 		"b": int64(21),
 	})
 }
 
 func TestSimpleNumbers(t *testing.T) {
-	tree, _ := Load("a = +42\nb = -21\nc = +4.2\nd = -2.1")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = +42\nb = -21\nc = +4.2\nd = -2.1")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": int64(42),
 		"b": int64(-21),
 		"c": float64(4.2),
@@ -48,71 +52,79 @@ func TestSimpleNumbers(t *testing.T) {
 }
 
 func TestSimpleDate(t *testing.T) {
-	tree, _ := Load("a = 1979-05-27T07:32:00Z")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = 1979-05-27T07:32:00Z")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
 	})
 }
 
 func TestSimpleString(t *testing.T) {
-	tree, _ := Load("a = \"hello world\"")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = \"hello world\"")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": "hello world",
 	})
 }
 
 func TestBools(t *testing.T) {
-	tree, _ := Load("a = true\nb = false")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = true\nb = false")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": true,
 		"b": false,
 	})
 }
 
 func TestNestedKeys(t *testing.T) {
-	tree, _ := Load("[a.b.c]\nd = 42")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("[a.b.c]\nd = 42")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a.b.c.d": int64(42),
 	})
 }
 
 func TestArrayOne(t *testing.T) {
-	tree, _ := Load("a = [1]")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = [1]")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(1)},
 	})
 }
 
 func TestArrayZero(t *testing.T) {
-	tree, _ := Load("a = []")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = []")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": []interface{}{},
 	})
 }
 
 func TestArraySimple(t *testing.T) {
-	tree, _ := Load("a = [42, 21, 10]")
-	assertTree(t, tree, map[string]interface{}{
+	fmt.Println("test")
+	tree, err := Load("a = [42, 21, 10]")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(42), int64(21), int64(10)},
 	})
-
+	fmt.Println("blah")
 	tree, _ = Load("a = [42, 21, 10,]")
-	assertTree(t, tree, map[string]interface{}{
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(42), int64(21), int64(10)},
 	})
 }
 
 func TestArrayMultiline(t *testing.T) {
-	tree, _ := Load("a = [42,\n21, 10,]")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = [42,\n21, 10,]")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(42), int64(21), int64(10)},
 	})
 }
 
 func TestArrayNested(t *testing.T) {
-	tree, _ := Load("a = [[42, 21], [10]]")
-	assertTree(t, tree, map[string]interface{}{
+	tree, err := Load("a = [[42, 21], [10]]")
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": [][]int64{[]int64{int64(42), int64(21)}, []int64{int64(10)}},
+	})
+}
+
+func TestArrayNestedStrings(t *testing.T) {
+	tree, err := Load("data = [ [\"gamma\", \"delta\"] ]")
+	assertTree(t, tree, err, map[string]interface{}{
+		"data": [][]string{[]string{"gamma", "delta"}},
 	})
 }
 
@@ -139,10 +151,8 @@ func TestMissingFile(t *testing.T) {
 
 func TestParseFile(t *testing.T) {
 	tree, err := LoadFile("example.toml")
-	if (err != nil) {
-		t.Fatal("Non-nil error:", err.Error())
-	}
-	assertTree(t, tree, map[string]interface{}{
+
+	assertTree(t, tree, err, map[string]interface{}{
 		"a": [][]int64{[]int64{int64(42), int64(21)}, []int64{int64(10)}},
 	})
 }

@@ -150,6 +150,56 @@ func TestKeyEqualFalse(t *testing.T) {
 	})
 }
 
+func TestArrayNestedString(t *testing.T) {
+	testFlow(t, "a = [ [\"hello\", \"world\"] ]", []token{
+		token{tokenKey, "a"},
+		token{tokenEqual, "="},
+		token{tokenLeftBracket, "["},
+		token{tokenLeftBracket, "["},
+		token{tokenString, "hello"},
+		token{tokenComma, ","},
+		token{tokenString, "world"},
+		token{tokenRightBracket, "]"},
+		token{tokenRightBracket, "]"},
+		token{tokenEOF, ""},
+	})
+}
+
+func TestArrayNestedInts(t *testing.T) {
+	testFlow(t, "a = [ [42, 21], [10] ]", []token{
+		token{tokenKey, "a"},
+		token{tokenEqual, "="},
+		token{tokenLeftBracket, "["},
+		token{tokenLeftBracket, "["},
+		token{tokenInteger, "42"},
+		token{tokenComma, ","},
+		token{tokenInteger, "21"},
+		token{tokenRightBracket, "]"},
+		token{tokenComma, ","},
+		token{tokenLeftBracket, "["},
+		token{tokenInteger, "10"},
+		token{tokenRightBracket, "]"},
+		token{tokenRightBracket, "]"},
+		token{tokenEOF, ""},
+	})
+}
+
+func TestArrayInts(t *testing.T) {
+	testFlow(t, "a = [ 42, 21, 10, ]", []token{
+		token{tokenKey, "a"},
+		token{tokenEqual, "="},
+		token{tokenLeftBracket, "["},
+		token{tokenInteger, "42"},
+		token{tokenComma, ","},
+		token{tokenInteger, "21"},
+		token{tokenComma, ","},
+		token{tokenInteger, "10"},
+		token{tokenComma, ","},
+		token{tokenRightBracket, "]"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestKeyEqualArrayBools(t *testing.T) {
 	testFlow(t, "foo = [true, false, true]", []token{
 		token{tokenKey, "foo"},
