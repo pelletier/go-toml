@@ -8,13 +8,13 @@ import (
 
 func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interface{}) {
 	if (err != nil) {
-		t.Fatal("Non-nil error:", err.Error())
+		t.Error("Non-nil error:", err.Error())
 		return
 	}
 	for k, v := range ref {
 		if fmt.Sprintf("%v", tree.Get(k)) != fmt.Sprintf("%v", v) {
 			t.Log("was expecting", v, "at", k, "but got", tree.Get(k))
-			t.Fail()
+			t.Error()
 		}
 	}
 }
@@ -122,9 +122,9 @@ func TestArrayNested(t *testing.T) {
 }
 
 func TestArrayNestedStrings(t *testing.T) {
-	tree, err := Load("data = [ [\"gamma\", \"delta\"] ]")
+	tree, err := Load("data = [ [\"gamma\", \"delta\"], [\"Foo\"] ]")
 	assertTree(t, tree, err, map[string]interface{}{
-		"data": [][]string{[]string{"gamma", "delta"}},
+		"data": [][]string{[]string{"gamma", "delta"}, []string{"Foo"}},
 	})
 }
 
@@ -153,6 +153,19 @@ func TestParseFile(t *testing.T) {
 	tree, err := LoadFile("example.toml")
 
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": [][]int64{[]int64{int64(42), int64(21)}, []int64{int64(10)}},
+		"title": "TOML Example",
+		"owner.name": "Tom Preston-Werner",
+		"owner.organization": "GitHub",
+		"owner.bio": "GitHub Cofounder & CEO\nLikes tater tots and bee.",
+		"owner.dob": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+		"database.server": "192.168.1.1",
+		"database.ports": []int64{8001, 8001, 8002},
+		"database.connection_max": 5000,
+		"database.enabled": true,
+		"servers.alpha.ip": "10.0.0.1",
+		"servers.alpha.dc": "eqdc10",
+		"servers.beta.ip": "10.0.0.2",
+		"servers.beta.dc": "eqdc10",
+		"clients.data": []interface{}{[]string{"gamma", "delta"}, []int64{1, 2}},
 	})
 }
