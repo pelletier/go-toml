@@ -311,6 +311,18 @@ func lexString(l *lexer) stateFn {
 		if l.follow("\\\"") {
 			l.pos += 1
 			growing_string += "\""
+		} else if l.follow("\\n") {
+			l.pos += 1
+			growing_string += "\n"
+		} else if l.follow("\\t") {
+			l.pos += 1
+			growing_string += "\t"
+		} else if l.follow("\\r") {
+			l.pos += 1
+			growing_string += "\r"
+		} else if l.follow("\\\\") {
+			l.pos += 1
+			growing_string += "\\"
 		} else {
 			growing_string += string(l.peek())
 		}

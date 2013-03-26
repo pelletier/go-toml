@@ -65,6 +65,28 @@ func TestSimpleString(t *testing.T) {
 	})
 }
 
+func TestStringEscapables(t *testing.T) {
+	tree, err := Load("a = \"a \\n b\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": "a \n b",
+	})
+
+	tree, err = Load("a = \"a \\t b\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": "a \t b",
+	})
+
+	tree, err = Load("a = \"a \\r b\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": "a \r b",
+	})
+
+	tree, err = Load("a = \"a \\\\ b\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": "a \\ b",
+	})
+}
+
 func TestBools(t *testing.T) {
 	tree, err := Load("a = true\nb = false")
 	assertTree(t, tree, err, map[string]interface{}{
@@ -95,12 +117,11 @@ func TestArrayZero(t *testing.T) {
 }
 
 func TestArraySimple(t *testing.T) {
-	fmt.Println("test")
 	tree, err := Load("a = [42, 21, 10]")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(42), int64(21), int64(10)},
 	})
-	fmt.Println("blah")
+
 	tree, _ = Load("a = [42, 21, 10,]")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(42), int64(21), int64(10)},
@@ -156,7 +177,7 @@ func TestParseFile(t *testing.T) {
 		"title": "TOML Example",
 		"owner.name": "Tom Preston-Werner",
 		"owner.organization": "GitHub",
-		"owner.bio": "GitHub Cofounder & CEO\nLikes tater tots and bee.",
+		"owner.bio": "GitHub Cofounder & CEO\nLikes tater tots and beer.",
 		"owner.dob": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
 		"database.server": "192.168.1.1",
 		"database.ports": []int64{8001, 8001, 8002},
