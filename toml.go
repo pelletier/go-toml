@@ -94,7 +94,7 @@ func Load(content string) (tree *TomlTree, err error) {
 // Create a TomlTree from a file.
 func LoadFile(path string) (tree *TomlTree, err error) {
 	buff, ferr := ioutil.ReadFile(path)
-	if (ferr != nil) {
+	if ferr != nil {
 		err = ferr
 	} else {
 		s := string(buff)

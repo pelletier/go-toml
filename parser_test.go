@@ -7,7 +7,7 @@ import (
 )
 
 func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interface{}) {
-	if (err != nil) {
+	if err != nil {
 		t.Error("Non-nil error:", err.Error())
 		return
 	}
@@ -151,14 +151,14 @@ func TestArrayNestedStrings(t *testing.T) {
 
 func TestMissingValue(t *testing.T) {
 	_, err := Load("a = ")
-	if (err.Error() != "expecting a value") {
+	if err.Error() != "expecting a value" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
 
 func TestUnterminatedArray(t *testing.T) {
 	_, err := Load("a = [1,")
-	if (err.Error() != "unterminated array") {
+	if err.Error() != "unterminated array" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -172,7 +172,7 @@ func TestNewlinesInArrays(t *testing.T) {
 
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
-	if (err.Error() != "open foo.toml: no such file or directory") {
+	if err.Error() != "open foo.toml: no such file or directory" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -181,19 +181,19 @@ func TestParseFile(t *testing.T) {
 	tree, err := LoadFile("example.toml")
 
 	assertTree(t, tree, err, map[string]interface{}{
-		"title": "TOML Example",
-		"owner.name": "Tom Preston-Werner",
-		"owner.organization": "GitHub",
-		"owner.bio": "GitHub Cofounder & CEO\nLikes tater tots and beer.",
-		"owner.dob": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
-		"database.server": "192.168.1.1",
-		"database.ports": []int64{8001, 8001, 8002},
+		"title":                   "TOML Example",
+		"owner.name":              "Tom Preston-Werner",
+		"owner.organization":      "GitHub",
+		"owner.bio":               "GitHub Cofounder & CEO\nLikes tater tots and beer.",
+		"owner.dob":               time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+		"database.server":         "192.168.1.1",
+		"database.ports":          []int64{8001, 8001, 8002},
 		"database.connection_max": 5000,
-		"database.enabled": true,
-		"servers.alpha.ip": "10.0.0.1",
-		"servers.alpha.dc": "eqdc10",
-		"servers.beta.ip": "10.0.0.2",
-		"servers.beta.dc": "eqdc10",
-		"clients.data": []interface{}{[]string{"gamma", "delta"}, []int64{1, 2}},
+		"database.enabled":        true,
+		"servers.alpha.ip":        "10.0.0.1",
+		"servers.alpha.dc":        "eqdc10",
+		"servers.beta.ip":         "10.0.0.2",
+		"servers.beta.dc":         "eqdc10",
+		"clients.data":            []interface{}{[]string{"gamma", "delta"}, []int64{1, 2}},
 	})
 }
