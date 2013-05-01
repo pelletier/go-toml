@@ -42,6 +42,15 @@ func (t *TomlTree) Get(key string) interface{} {
 	return (*subtree)[keys[len(keys)-1]]
 }
 
+// Same as Get but with a default value
+func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
+    val := t.Get(key)
+    if val == nil {
+        return def
+    }
+    return val;
+}
+
 // Set an element in the tree.
 // Key is a dot-separated path (e.g. a.b.c).
 // Creates all necessary intermediates trees, if needed.
