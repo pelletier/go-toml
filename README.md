@@ -10,6 +10,34 @@ This library supports TOML version [e3656ad493400895f4460f1244a25f8f8e31a32a](ht
 
     import "github.com/pelletier/go-toml"
 
+## Usage
+
+Say you have a TOML file that looks like this:
+
+```toml
+[postgres]
+user = "pelletier"
+password = "mypassword"
+```
+
+Read the username and password like this:
+
+```go
+import (
+    "fmt"
+    "github.com/pelletier/go-toml"
+)
+
+config, err := toml.LoadFile("config.toml")
+if err != nil {
+    fmt.Println("Error ", err.Error())
+}
+configTree := config.Get("postgres").(*toml.TomlTree)
+user := configTree.Get("user").(string)
+password := configTree.Get("password").(string)
+fmt.Println("User is ", user, ". Password is ", password)
+```
+
 ## Documentation
 
 The documentation is available at
