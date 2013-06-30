@@ -31,11 +31,17 @@ import (
 config, err := toml.LoadFile("config.toml")
 if err != nil {
     fmt.Println("Error ", err.Error())
+} else {
+    // retrieve data directly
+    user := config.Get("postgres.user").(string)
+    password := config.Get("postgres.password").(string)
+
+    // or using an intermediate object
+    configTree := config.Get("postgres").(*toml.TomlTree)
+    user = configTree.Get("user").(string)
+    password = configTree.Get("password").(string)
+    fmt.Println("User is ", user, ". Password is ", password)
 }
-configTree := config.Get("postgres").(*toml.TomlTree)
-user := configTree.Get("user").(string)
-password := configTree.Get("password").(string)
-fmt.Println("User is ", user, ". Password is ", password)
 ```
 
 ## Documentation
