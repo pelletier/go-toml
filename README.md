@@ -2,7 +2,8 @@
 
 Go library for the [TOML](https://github.com/mojombo/toml) format.
 
-This library supports TOML version [e3656ad493400895f4460f1244a25f8f8e31a32a](https://github.com/mojombo/toml/tree/e3656ad493400895f4460f1244a25f8f8e31a32a)
+This library supports TOML version
+[v0.1.0](https://github.com/mojombo/toml/blob/master/versions/toml-v0.1.0.md)
 
 [![Build Status](https://travis-ci.org/pelletier/go-toml.png?branch=master)](https://travis-ci.org/pelletier/go-toml)
 
