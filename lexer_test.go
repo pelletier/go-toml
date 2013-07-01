@@ -309,3 +309,12 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 		token{tokenEOF, ""},
 	})
 }
+
+func TestUnicodeString(t *testing.T) {
+	testFlow(t, "foo = \"hello ♥ world\"", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenString, "hello ♥ world"},
+		token{tokenEOF, ""},
+	})
+}
