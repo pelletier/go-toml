@@ -6,6 +6,7 @@ package toml
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -68,6 +69,11 @@ func isAlphanumeric(r rune) bool {
 
 func isDigit(r rune) bool {
 	return unicode.IsNumber(r)
+}
+
+func isHexDigit(r rune) bool {
+	return isDigit(r) ||
+		r == 'A' || r == 'B' || r == 'C' || r == 'D' || r == 'E' || r == 'F'
 }
 
 // Define lexer
@@ -323,6 +329,23 @@ func lexString(l *lexer) stateFn {
 		} else if l.follow("\\\\") {
 			l.pos += 1
 			growing_string += "\\"
+		} else if l.follow("\\u") {
+			l.pos += 2
+			code := ""
+			for i := 0; i < 4; i++ {
+				c := l.peek()
+				l.pos += 1
+				if !isHexDigit(c) {
+					return l.errorf("unfinished unicode escape")
+				}
+				code = code + string(c)
+			}
+			l.pos -= 1
+			intcode, err := strconv.ParseInt(code, 16, 32)
+			if err != nil {
+				return l.errorf("invalid unicode escape: \\u" + code)
+			}
+			growing_string += string(rune(intcode))
 		} else {
 			growing_string += string(l.peek())
 		}

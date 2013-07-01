@@ -300,3 +300,12 @@ func TestMultiline(t *testing.T) {
 		token{tokenEOF, ""},
 	})
 }
+
+func TestKeyEqualStringUnicodeEscape(t *testing.T) {
+	testFlow(t, "foo = \"hello \\u2665\"", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenString, "hello ♥"},
+		token{tokenEOF, ""},
+	})
+}
