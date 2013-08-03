@@ -20,7 +20,8 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 }
 
 func TestCreateSubTree(t *testing.T) {
-	tree := make(TomlTree)
+	tree := TomlTree{}
+	tree.Init()
 	tree.createSubTree("a.b.c")
 	tree.Set("a.b.c", 42)
 	if tree.Get("a.b.c") != 42 {
@@ -172,8 +173,10 @@ func TestNewlinesInArrays(t *testing.T) {
 
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
-	if err.Error() != "open foo.toml: no such file or directory" {
-		t.Error("Bad error message:", err.Error())
+	str := err.Error()
+	if str != "open foo.toml: no such file or directory" &&
+		str != "open foo.toml: The system cannot find the file specified." {
+		t.Error("Bad error message:", str)
 	}
 }
 

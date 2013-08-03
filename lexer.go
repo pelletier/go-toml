@@ -284,13 +284,14 @@ func lexKey(l *lexer) stateFn {
 }
 
 func lexComment(l *lexer) stateFn {
+	l.ignore()
 	for {
 		next := l.next()
 		if next == '\n' || next == eof {
 			break
 		}
 	}
-	l.ignore()
+	l.emit(tokenComment)
 	return lexVoid
 }
 
