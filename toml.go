@@ -6,16 +6,22 @@ package toml
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"os"
+	"reflect"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Definition of a TomlTree.
 // This is the result of the parsing of a TOML file.
 type TomlTree struct {
-	Values   map[string]interface{}
-	Comments map[string]Comment
+	FileName         string
+	Values           map[string]interface{}
+	Comments         map[string]Comment
+	groupidx, keyidx []string
 }
 
 // Definition for comment
@@ -27,6 +33,8 @@ type Comment struct {
 func (t *TomlTree) Init() {
 	t.Values = make(map[string]interface{})
 	t.Comments = make(map[string]Comment)
+	t.groupidx = []string{}
+	t.keyidx = []string{}
 }
 
 // Keys returns the keys of the toplevel tree.
@@ -76,6 +84,10 @@ func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
 func (t *TomlTree) Set(key string, value interface{}) {
 	//subtree := t
 	subtree := t.Values
+	_, exists := subtree[key]
+	if !exists {
+		t.keyidx = append(t.keyidx, key)
+	}
 	keys := strings.Split(key, ".")
 	for _, intermediate_key := range keys[:len(keys)-1] {
 		//_, exists := (*subtree)[intermediate_key]
@@ -134,6 +146,10 @@ func (t *TomlTree) GetComment(key string) Comment {
 func (t *TomlTree) createSubTree(key string) {
 	//subtree := t
 	subtree := t.Values
+	_, exists := subtree[key]
+	if !exists {
+		t.groupidx = append(t.groupidx, key)
+	}
 	for _, intermediate_key := range strings.Split(key, ".") {
 		//_, exists := (*subtree)[intermediate_key]
 		_, exists := subtree[intermediate_key]
@@ -147,6 +163,131 @@ func (t *TomlTree) createSubTree(key string) {
 		//subtree = (*subtree)[intermediate_key].(*TomlTree)
 		subtree = subtree[intermediate_key].(*TomlTree).Values
 	}
+}
+
+// SaveToFile writes Toml document to local file system
+func (t *TomlTree) SaveToFile() error {
+	w, err := os.Create(t.FileName)
+	if err != nil {
+		return err
+	}
+	defer func() { w.Close() }()
+	t.string(func(ss ...string) {
+		if err != nil {
+			return
+		}
+		for _, s := range ss {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+			if s[0] == '[' || s[0] == '#' {
+				_, err = w.WriteString("\n" + s + "\n")
+			} else {
+				_, err = w.WriteString(s + "\n")
+			}
+		}
+	})
+	return err
+}
+
+// String reassembles the TomlTree into a valid TOML document string.
+func (t *TomlTree) String() string {
+	lines := ""
+	t.string(func(ss ...string) {
+		for _, s := range ss {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				lines += s + "\n"
+			}
+		}
+	})
+	return lines
+}
+
+func (t *TomlTree) string(write func(...string)) {
+	keyidx := make([]string, len(t.keyidx))
+	copy(keyidx, t.keyidx)
+	for idx, key := range keyidx {
+		i := t.Values[key]
+		if i == nil {
+			continue
+		}
+		keyidx[idx] = ""
+		_, ok := i.(*TomlTree)
+		if ok {
+			continue
+		}
+		comment := t.GetComment(key)
+		write(comment.Multiline...)
+		if comment.EndOfLine == "" {
+			write(key + " = " + toString(i))
+		} else {
+			write(key + " = " + toString(i) + " " + comment.EndOfLine)
+		}
+	}
+	groupidx := make([]string, len(t.groupidx))
+	copy(groupidx, t.groupidx)
+	for _, group := range groupidx {
+		i := t.Get(group)
+		if i == nil {
+			continue
+		}
+		tree, ok := i.(*TomlTree)
+		if !ok {
+			continue
+		}
+		comment := t.GetComment(group)
+		write(comment.Multiline...)
+		if comment.EndOfLine == "" {
+			write("[" + group + "]")
+		} else {
+			write("[" + group + "] " + comment.EndOfLine)
+		}
+		prefix := group + "."
+		for idx, key := range keyidx {
+			if key == "" || !strings.HasPrefix(key, prefix) {
+				continue
+			}
+			i, _ := tree.Values[key[len(prefix):]]
+			if i == nil {
+				continue
+			}
+			keyidx[idx] = ""
+			_, ok = i.(*TomlTree)
+			if ok {
+				continue
+			}
+			comment := t.GetComment(key)
+			write(comment.Multiline...)
+			if comment.EndOfLine == "" {
+				write(key[len(prefix):] + " = " + toString(i))
+			} else {
+				write(key[len(prefix):] + " = " + toString(i) + " " + comment.EndOfLine)
+			}
+		}
+	}
+}
+
+func toString(i interface{}) string {
+	date, ok := i.(time.Time)
+	if ok {
+		return date.Format(time.RFC3339)
+	}
+	v := reflect.ValueOf(i)
+	if v.Kind() != reflect.Slice {
+		return fmt.Sprintf("%#v", i)
+	}
+	s := "["
+	comma := ""
+	for j := 0; j < v.Len(); j++ {
+		s += comma + toString(v.Index(j).Interface())
+		if comma == "" {
+			comma = ", "
+		}
+	}
+	s += "]"
+	return s
 }
 
 // Create a TomlTree from a string.
@@ -173,6 +314,6 @@ func LoadFile(path string) (tree *TomlTree, err error) {
 		s := string(buff)
 		tree, err = Load(s)
 	}
-
+	tree.FileName = path
 	return
 }

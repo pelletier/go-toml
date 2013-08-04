@@ -115,6 +115,7 @@ func parseGroup(p *parser) parserStateFn {
 	p.assume(tokenRightBracket)
 	saveComments(p, key.val)
 	p.currentGroup = key.val
+	p.commentkey = key.val
 	return parseStart(p)
 }
 
