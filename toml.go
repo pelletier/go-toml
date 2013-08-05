@@ -41,8 +41,6 @@ func (t *TomlTree) Init() {
 // Warning: this is a costly operation.
 func (t *TomlTree) Keys() []string {
 	keys := make([]string, 0)
-	//mp := (map[string]interface{})(*t)
-	//for k, _ := range mp {
 	for k, _ := range t.Values {
 		keys = append(keys, k)
 	}
@@ -57,15 +55,12 @@ func (t *TomlTree) Get(key string) interface{} {
 	subtree := t.Values
 	keys := strings.Split(key, ".")
 	for _, intermediate_key := range keys[:len(keys)-1] {
-		//_, exists := (*subtree)[intermediate_key]
 		_, exists := subtree[intermediate_key]
 		if !exists {
 			return nil
 		}
-		//subtree = (*subtree)[intermediate_key].(*TomlTree)
 		subtree = subtree[intermediate_key].(*TomlTree).Values
 	}
-	//return (*subtree)[keys[len(keys)-1]]
 	return subtree[keys[len(keys)-1]]
 }
 
@@ -90,19 +85,14 @@ func (t *TomlTree) Set(key string, value interface{}) {
 	}
 	keys := strings.Split(key, ".")
 	for _, intermediate_key := range keys[:len(keys)-1] {
-		//_, exists := (*subtree)[intermediate_key]
 		_, exists := subtree[intermediate_key]
 		if !exists {
-			//var new_tree TomlTree = make(TomlTree)
-			//(*subtree)[intermediate_key] = &new_tree
 			var new_tree TomlTree = TomlTree{}
 			new_tree.Init()
 			subtree[intermediate_key] = &new_tree
 		}
-		//subtree = (*subtree)[intermediate_key].(*TomlTree)
 		subtree = subtree[intermediate_key].(*TomlTree).Values
 	}
-	//(*subtree)[keys[len(keys)-1]] = value
 	subtree[keys[len(keys)-1]] = value
 }
 
@@ -112,6 +102,9 @@ func (t *TomlTree) SetComments(key string, multiline ...string) {
 	c, exists := t.Comments[key]
 	if !exists {
 		c = Comment{}
+	}
+	for i, s := range multiline {
+		multiline[i] = strings.TrimSpace(s)
 	}
 	c.Multiline = multiline
 	t.Comments[key] = c
@@ -124,7 +117,7 @@ func (t *TomlTree) SetComment(key string, endofline string) {
 	if !exists {
 		c = Comment{}
 	}
-	c.EndOfLine = endofline
+	c.EndOfLine = strings.TrimSpace(endofline)
 	t.Comments[key] = c
 }
 
@@ -151,16 +144,12 @@ func (t *TomlTree) createSubTree(key string) {
 		t.groupidx = append(t.groupidx, key)
 	}
 	for _, intermediate_key := range strings.Split(key, ".") {
-		//_, exists := (*subtree)[intermediate_key]
 		_, exists := subtree[intermediate_key]
 		if !exists {
-			//var new_tree TomlTree = make(TomlTree)
-			//(*subtree)[intermediate_key] = &new_tree
 			var new_tree TomlTree = TomlTree{}
 			new_tree.Init()
 			subtree[intermediate_key] = &new_tree
 		}
-		//subtree = (*subtree)[intermediate_key].(*TomlTree)
 		subtree = subtree[intermediate_key].(*TomlTree).Values
 	}
 }
@@ -197,7 +186,12 @@ func (t *TomlTree) String() string {
 	t.string(func(ss ...string) {
 		for _, s := range ss {
 			s = strings.TrimSpace(s)
-			if s != "" {
+			if s == "" {
+				continue
+			}
+			if s[0] == '[' || s[0] == '#' {
+				lines += "\n" + s + "\n"
+			} else {
 				lines += s + "\n"
 			}
 		}
@@ -314,6 +308,8 @@ func LoadFile(path string) (tree *TomlTree, err error) {
 		s := string(buff)
 		tree, err = Load(s)
 	}
-	tree.FileName = path
+	if err == nil {
+		tree.FileName = path
+	}
 	return
 }

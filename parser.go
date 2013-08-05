@@ -203,7 +203,6 @@ func parseArray(p *parser) []interface{} {
 }
 
 func parse(flow chan token) *TomlTree {
-	//result := make(TomlTree)
 	result := TomlTree{}
 	result.Init()
 	parser := &parser{
