@@ -78,10 +78,18 @@ func parseStart(p *parser) parserStateFn {
 		return nil
 	case tokenComment:
 		return parseComment
+	case tokenNewLine:
+		return parseNewLine
 	default:
 		panic("unexpected token")
 	}
 	return nil
+}
+
+func parseNewLine(p *parser) parserStateFn {
+	p.getToken()
+	p.commentkey = ""
+	return parseStart(p)
 }
 
 func parseComment(p *parser) parserStateFn {
@@ -114,8 +122,8 @@ func parseGroup(p *parser) parserStateFn {
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
 	saveComments(p, key.val)
-	p.currentGroup = key.val
 	p.commentkey = key.val
+	p.currentGroup = key.val
 	return parseStart(p)
 }
 
@@ -167,7 +175,6 @@ func parseRvalue(p *parser) interface{} {
 	case tokenLeftBracket:
 		return parseArray(p)
 	}
-
 	panic("never reached")
 
 	return nil

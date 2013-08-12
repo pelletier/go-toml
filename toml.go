@@ -18,10 +18,10 @@ import (
 // Definition of a TomlTree.
 // This is the result of the parsing of a TOML file.
 type TomlTree struct {
-	FileName         string
-	Values           map[string]interface{}
-	Comments         map[string]Comment
-	groupidx, keyidx []string
+	FileName string
+	Values   map[string]interface{}
+	Comments map[string]Comment
+	keyorder []string
 }
 
 // Definition for comment
@@ -33,8 +33,7 @@ type Comment struct {
 func (t *TomlTree) Init() {
 	t.Values = make(map[string]interface{})
 	t.Comments = make(map[string]Comment)
-	t.groupidx = []string{}
-	t.keyidx = []string{}
+	t.keyorder = []string{}
 }
 
 // Keys returns the keys of the toplevel tree.
@@ -77,21 +76,23 @@ func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
 // Key is a dot-separated path (e.g. a.b.c).
 // Creates all necessary intermediates trees, if needed.
 func (t *TomlTree) Set(key string, value interface{}) {
-	//subtree := t
+	parent := t
 	subtree := t.Values
-	_, exists := subtree[key]
-	if !exists {
-		t.keyidx = append(t.keyidx, key)
-	}
 	keys := strings.Split(key, ".")
 	for _, intermediate_key := range keys[:len(keys)-1] {
 		_, exists := subtree[intermediate_key]
 		if !exists {
-			var new_tree TomlTree = TomlTree{}
+			parent.keyorder = append(parent.keyorder, intermediate_key)
+			new_tree := new(TomlTree)
 			new_tree.Init()
-			subtree[intermediate_key] = &new_tree
+			subtree[intermediate_key] = new_tree
 		}
-		subtree = subtree[intermediate_key].(*TomlTree).Values
+		parent = subtree[intermediate_key].(*TomlTree)
+		subtree = parent.Values
+	}
+	_, exists := subtree[keys[len(keys)-1]]
+	if !exists {
+		parent.keyorder = append(parent.keyorder, keys[len(keys)-1])
 	}
 	subtree[keys[len(keys)-1]] = value
 }
@@ -99,31 +100,71 @@ func (t *TomlTree) Set(key string, value interface{}) {
 // Set Multi-line comment by key
 // Key is a dot-separated path (e.g. a.b.c).
 func (t *TomlTree) SetComments(key string, multiline ...string) {
-	c, exists := t.Comments[key]
+	parent := t
+	subtree := t.Values
+	keys := strings.Split(key, ".")
+	for _, intermediate_key := range keys[:len(keys)-1] {
+		_, exists := subtree[intermediate_key]
+		if !exists {
+			new_tree := new(TomlTree)
+			new_tree.Init()
+			subtree[intermediate_key] = new_tree
+		}
+		parent = subtree[intermediate_key].(*TomlTree)
+		subtree = parent.Values
+	}
+	key = keys[len(keys)-1]
+	c, exists := parent.Comments[key]
 	if !exists {
 		c = Comment{}
 	}
+	c.Multiline = make([]string, len(multiline))
 	for i, s := range multiline {
-		multiline[i] = strings.TrimSpace(s)
+		c.Multiline[i] = strings.TrimSpace(s)
 	}
-	c.Multiline = multiline
-	t.Comments[key] = c
+	parent.Comments[key] = c
 }
 
 // Set End-Of-Line comment by key
 // Key is a dot-separated path (e.g. a.b.c).
 func (t *TomlTree) SetComment(key string, endofline string) {
-	c, exists := t.Comments[key]
+	parent := t
+	subtree := t.Values
+	keys := strings.Split(key, ".")
+	for _, intermediate_key := range keys[:len(keys)-1] {
+		_, exists := subtree[intermediate_key]
+		if !exists {
+			new_tree := new(TomlTree)
+			new_tree.Init()
+			subtree[intermediate_key] = new_tree
+		}
+		parent = subtree[intermediate_key].(*TomlTree)
+		subtree = parent.Values
+	}
+	key = keys[len(keys)-1]
+	c, exists := parent.Comments[key]
 	if !exists {
 		c = Comment{}
 	}
 	c.EndOfLine = strings.TrimSpace(endofline)
-	t.Comments[key] = c
+	parent.Comments[key] = c
 }
 
 // Get Comment by key
 // Key is a dot-separated path (e.g. a.b.c).
 func (t *TomlTree) GetComment(key string) Comment {
+	parent := t
+	subtree := t.Values
+	keys := strings.Split(key, ".")
+	for _, intermediate_key := range keys[:len(keys)-1] {
+		_, exists := subtree[intermediate_key]
+		if !exists {
+			return Comment{}
+		}
+		parent = subtree[intermediate_key].(*TomlTree)
+		subtree = parent.Values
+	}
+	key = keys[len(keys)-1]
 	c, exists := t.Comments[key]
 	if !exists {
 		return Comment{}
@@ -137,20 +178,18 @@ func (t *TomlTree) GetComment(key string) Comment {
 // e.g. passing a.b.c will create (assuming tree is empty) tree[a], tree[a][b]
 // and tree[a][b][c]
 func (t *TomlTree) createSubTree(key string) {
-	//subtree := t
+	parent := t
 	subtree := t.Values
-	_, exists := subtree[key]
-	if !exists {
-		t.groupidx = append(t.groupidx, key)
-	}
 	for _, intermediate_key := range strings.Split(key, ".") {
 		_, exists := subtree[intermediate_key]
 		if !exists {
-			var new_tree TomlTree = TomlTree{}
+			parent.keyorder = append(parent.keyorder, intermediate_key)
+			new_tree := new(TomlTree)
 			new_tree.Init()
-			subtree[intermediate_key] = &new_tree
+			subtree[intermediate_key] = new_tree
 		}
-		subtree = subtree[intermediate_key].(*TomlTree).Values
+		parent = subtree[intermediate_key].(*TomlTree)
+		subtree = parent.Values
 	}
 }
 
@@ -161,7 +200,7 @@ func (t *TomlTree) SaveToFile() error {
 		return err
 	}
 	defer func() { w.Close() }()
-	t.string(func(ss ...string) {
+	t.string(func(indent int, ss ...string) {
 		if err != nil {
 			return
 		}
@@ -170,96 +209,53 @@ func (t *TomlTree) SaveToFile() error {
 			if s == "" {
 				continue
 			}
-			if s[0] == '[' || s[0] == '#' {
-				_, err = w.WriteString("\n" + s + "\n")
-			} else {
-				_, err = w.WriteString(s + "\n")
-			}
+			_, err = w.WriteString(strings.Repeat("\t", indent) + s + "\n")
 		}
-	})
+	}, 0, "")
 	return err
 }
 
 // String reassembles the TomlTree into a valid TOML document string.
 func (t *TomlTree) String() string {
 	lines := ""
-	t.string(func(ss ...string) {
+	t.string(func(indent int, ss ...string) {
 		for _, s := range ss {
 			s = strings.TrimSpace(s)
 			if s == "" {
 				continue
 			}
-			if s[0] == '[' || s[0] == '#' {
-				lines += "\n" + s + "\n"
-			} else {
-				lines += s + "\n"
-			}
+			lines += strings.Repeat("\t", indent) + s + "\n"
 		}
-	})
+	}, 0, "")
 	return lines
 }
 
-func (t *TomlTree) string(write func(...string)) {
-	keyidx := make([]string, len(t.keyidx))
-	copy(keyidx, t.keyidx)
-	for idx, key := range keyidx {
-		i := t.Values[key]
-		if i == nil {
-			continue
-		}
-		keyidx[idx] = ""
-		_, ok := i.(*TomlTree)
-		if ok {
-			continue
-		}
-		comment := t.GetComment(key)
-		write(comment.Multiline...)
-		if comment.EndOfLine == "" {
-			write(key + " = " + toString(i))
-		} else {
-			write(key + " = " + toString(i) + " " + comment.EndOfLine)
-		}
-	}
-	groupidx := make([]string, len(t.groupidx))
-	copy(groupidx, t.groupidx)
-	for _, group := range groupidx {
-		i := t.Get(group)
+func (t *TomlTree) string(write func(int, ...string), indent int, prefix string) {
+	for _, key := range t.keyorder {
+		i := t.Get(key)
 		if i == nil {
 			continue
 		}
 		tree, ok := i.(*TomlTree)
 		if !ok {
+			comment := t.GetComment(key)
+			write(indent, comment.Multiline...)
+			if comment.EndOfLine == "" {
+				write(indent, key+" = "+toString(i))
+			} else {
+				write(indent, key+" = "+toString(i)+" "+comment.EndOfLine)
+			}
 			continue
 		}
-		comment := t.GetComment(group)
-		write(comment.Multiline...)
+
+		comment := t.GetComment(key)
+		write(indent, comment.Multiline...)
 		if comment.EndOfLine == "" {
-			write("[" + group + "]")
+			write(indent, "["+prefix+key+"]")
 		} else {
-			write("[" + group + "] " + comment.EndOfLine)
+			write(indent, "["+prefix+key+"] "+comment.EndOfLine)
 		}
-		prefix := group + "."
-		for idx, key := range keyidx {
-			if key == "" || !strings.HasPrefix(key, prefix) {
-				continue
-			}
-			i, _ := tree.Values[key[len(prefix):]]
-			if i == nil {
-				continue
-			}
-			keyidx[idx] = ""
-			_, ok = i.(*TomlTree)
-			if ok {
-				continue
-			}
-			comment := t.GetComment(key)
-			write(comment.Multiline...)
-			if comment.EndOfLine == "" {
-				write(key[len(prefix):] + " = " + toString(i))
-			} else {
-				write(key[len(prefix):] + " = " + toString(i) + " " + comment.EndOfLine)
-			}
-		}
+		tree.string(write, indent+1, prefix+key+".")
 	}
 }
 

@@ -37,6 +37,7 @@ const (
 	tokenDate
 	tokenKeyGroup
 	tokenComma
+	tokenNewLine
 	tokenEOL
 )
 
@@ -61,6 +62,10 @@ func (i token) String() string {
 
 func isSpace(r rune) bool {
 	return r == ' ' || r == '\t'
+}
+
+func isNewLine(r rune) bool {
+	return r == '\r' || r == '\n'
 }
 
 func isAlphanumeric(r rune) bool {
@@ -171,6 +176,11 @@ func lexVoid(l *lexer) stateFn {
 			l.ignore()
 		}
 
+		if isNewLine(next) {
+			l.pos += 1
+			l.ignore()
+			return lexNewLine
+		}
 		if l.next() == eof {
 			break
 		}
@@ -196,14 +206,16 @@ func lexRvalue(l *lexer) stateFn {
 			return lexString
 		case ',':
 			return lexComma
-		case '\n':
-			l.ignore()
+		}
+
+		if isNewLine(next) {
 			l.pos += 1
+			l.ignore()
 			if l.depth == 0 {
-				return lexVoid
-			} else {
-				return lexRvalue
+				return lexNewLine
 			}
+
+			return lexRvalue
 		}
 
 		if l.follow("true") {
@@ -285,13 +297,24 @@ func lexKey(l *lexer) stateFn {
 
 func lexComment(l *lexer) stateFn {
 	l.ignore()
+	var next rune
 	for {
-		next := l.next()
-		if next == '\n' || next == eof {
+		next = l.next()
+		if isNewLine(next) || next == eof {
 			break
 		}
 	}
+	l.backup()
 	l.emit(tokenComment)
+	return lexVoid
+}
+
+func lexNewLine(l *lexer) stateFn {
+	for isNewLine(l.next()) {
+	}
+	l.backup()
+	l.ignore()
+	l.emit(tokenNewLine)
 	return lexVoid
 }
 
