@@ -45,6 +45,7 @@ func TestUnclosedKeyGroup(t *testing.T) {
 
 func TestComment(t *testing.T) {
 	testFlow(t, "# blahblah", []token{
+		token{tokenComment, "# blahblah"},
 		token{tokenEOF, ""},
 	})
 }
@@ -54,6 +55,7 @@ func TestKeyGroupComment(t *testing.T) {
 		token{tokenLeftBracket, "["},
 		token{tokenKeyGroup, "hello world"},
 		token{tokenRightBracket, "]"},
+		token{tokenComment, "# blahblah"},
 		token{tokenEOF, ""},
 	})
 }
@@ -63,6 +65,8 @@ func TestMultipleKeyGroupsComment(t *testing.T) {
 		token{tokenLeftBracket, "["},
 		token{tokenKeyGroup, "hello world"},
 		token{tokenRightBracket, "]"},
+		token{tokenComment, "# blahblah"},
+		token{tokenNewLine, ""},
 		token{tokenLeftBracket, "["},
 		token{tokenKeyGroup, "test"},
 		token{tokenRightBracket, "]"},
@@ -226,6 +230,7 @@ func TestKeyEqualArrayBoolsWithComments(t *testing.T) {
 		token{tokenComma, ","},
 		token{tokenTrue, "true"},
 		token{tokenRightBracket, "]"},
+		token{tokenComment, "# YEAH"},
 		token{tokenEOF, ""},
 	})
 }
@@ -294,6 +299,7 @@ func TestMultiline(t *testing.T) {
 		token{tokenKey, "foo"},
 		token{tokenEqual, "="},
 		token{tokenInteger, "42"},
+		token{tokenNewLine, ""},
 		token{tokenKey, "bar"},
 		token{tokenEqual, "="},
 		token{tokenInteger, "21"},

@@ -13,6 +13,8 @@ type parser struct {
 	tree         *TomlTree
 	tokensBuffer []token
 	currentGroup string
+	comments     []string
+	commentkey   string
 }
 
 type parserStateFn func(*parser) parserStateFn
@@ -74,10 +76,41 @@ func parseStart(p *parser) parserStateFn {
 		return parseAssign
 	case tokenEOF:
 		return nil
+	case tokenComment:
+		return parseComment
+	case tokenNewLine:
+		return parseNewLine
 	default:
 		panic("unexpected token")
 	}
 	return nil
+}
+
+func parseNewLine(p *parser) parserStateFn {
+	p.getToken()
+	p.commentkey = ""
+	return parseStart(p)
+}
+
+func parseComment(p *parser) parserStateFn {
+	tok := p.getToken()
+	if p.commentkey != "" {
+		p.tree.SetComment(p.commentkey, tok.val)
+		p.commentkey = ""
+		p.comments = p.comments[0:0]
+	} else {
+		p.comments = append(p.comments, tok.val)
+	}
+	return parseStart(p)
+}
+
+func saveComments(p *parser, key string) {
+	p.commentkey = ""
+	if len(p.comments) == 0 {
+		return
+	}
+	p.tree.SetComments(key, p.comments...)
+	p.comments = p.comments[0:0]
 }
 
 func parseGroup(p *parser) parserStateFn {
@@ -88,6 +121,8 @@ func parseGroup(p *parser) parserStateFn {
 	}
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
+	saveComments(p, key.val)
+	p.commentkey = key.val
 	p.currentGroup = key.val
 	return parseStart(p)
 }
@@ -101,6 +136,8 @@ func parseAssign(p *parser) parserStateFn {
 		final_key = p.currentGroup + "." + key.val
 	}
 	p.tree.Set(final_key, value)
+	saveComments(p, final_key)
+	p.commentkey = final_key
 	return parseStart(p)
 }
 
@@ -138,7 +175,6 @@ func parseRvalue(p *parser) interface{} {
 	case tokenLeftBracket:
 		return parseArray(p)
 	}
-
 	panic("never reached")
 
 	return nil
@@ -174,7 +210,8 @@ func parseArray(p *parser) []interface{} {
 }
 
 func parse(flow chan token) *TomlTree {
-	result := make(TomlTree)
+	result := TomlTree{}
+	result.Init()
 	parser := &parser{
 		flow:         flow,
 		tree:         &result,
