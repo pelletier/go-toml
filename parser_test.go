@@ -170,6 +170,20 @@ func TestNewlinesInArrays(t *testing.T) {
 	})
 }
 
+func TestArrayWithExtraComma(t *testing.T) {
+	tree, err := Load("a = [1,\n2,\n3,\n]")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": []int64{int64(1), int64(2), int64(3)},
+	})
+}
+
+func TestArrayWithExtraCommaComment(t *testing.T) {
+	tree, err := Load("a = [1, # wow\n2, # such items\n3, # so array\n]")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": []int64{int64(1), int64(2), int64(3)},
+	})
+}
+
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
 	if err.Error() != "open foo.toml: no such file or directory" {
