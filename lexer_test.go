@@ -207,6 +207,22 @@ func TestArrayInts(t *testing.T) {
 	})
 }
 
+func TestMultilineArrayComments(t *testing.T) {
+	testFlow(t, "a = [1, # wow\n2, # such items\n3, # so array\n]", []token{
+		token{tokenKey, "a"},
+		token{tokenEqual, "="},
+		token{tokenLeftBracket, "["},
+		token{tokenInteger, "1"},
+		token{tokenComma, ","},
+		token{tokenInteger, "2"},
+		token{tokenComma, ","},
+		token{tokenInteger, "3"},
+		token{tokenComma, ","},
+		token{tokenRightBracket, "]"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestKeyEqualArrayBools(t *testing.T) {
 	testFlow(t, "foo = [true, false, true]", []token{
 		token{tokenKey, "foo"},
