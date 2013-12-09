@@ -84,6 +84,13 @@ func TestBasicKeyWithUnderscore(t *testing.T) {
 	})
 }
 
+func TestBasicKeyWithDash(t *testing.T) {
+	testFlow(t, "hello-world", []token{
+		token{tokenKey, "hello-world"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestBasicKeyWithUppercaseMix(t *testing.T) {
 	testFlow(t, "helloHELLOHello", []token{
 		token{tokenKey, "helloHELLOHello"},

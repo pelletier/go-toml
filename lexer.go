@@ -67,6 +67,10 @@ func isAlphanumeric(r rune) bool {
 	return unicode.IsLetter(r) || r == '_'
 }
 
+func isKeyChar(r rune) bool {
+	return isAlphanumeric(r) || r == '-'
+}
+
 func isDigit(r rune) bool {
 	return unicode.IsNumber(r)
 }
@@ -276,7 +280,7 @@ func lexComma(l *lexer) stateFn {
 
 func lexKey(l *lexer) stateFn {
 	l.ignore()
-	for isAlphanumeric(l.next()) {
+	for isKeyChar(l.next()) {
 	}
 	l.backup()
 	l.emit(tokenKey)
