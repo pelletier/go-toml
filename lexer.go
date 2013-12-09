@@ -175,6 +175,10 @@ func lexVoid(l *lexer) stateFn {
 			l.ignore()
 		}
 
+		if l.depth > 0 {
+			return lexRvalue
+		}
+
 		if l.next() == eof {
 			break
 		}
