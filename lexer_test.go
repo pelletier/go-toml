@@ -284,6 +284,14 @@ func TestFloatWithTwoDots(t *testing.T) {
 	})
 }
 
+func TestDoubleEqualKey(t *testing.T) {
+	testFlow(t, "foo= = 2", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "cannot have multiple equals for the same key"},
+	})
+}
+
 func TestKeyEqualNumber(t *testing.T) {
 	testFlow(t, "foo = 42", []token{
 		token{tokenKey, "foo"},

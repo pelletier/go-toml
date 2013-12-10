@@ -192,6 +192,10 @@ func lexRvalue(l *lexer) stateFn {
 	for {
 		next := l.peek()
 		switch next {
+		case '.':
+			return l.errorf("cannot start float with a dot")
+		case '=':
+			return l.errorf("cannot have multiple equals for the same key")
 		case '[':
 			l.depth += 1
 			return lexLeftBracket
@@ -232,10 +236,6 @@ func lexRvalue(l *lexer) stateFn {
 
 		if next == '+' || next == '-' || isDigit(next) {
 			return lexNumber
-		}
-
-		if next == '.' {
-			return l.errorf("cannot start float with a dot")
 		}
 
 		if isSpace(next) {
