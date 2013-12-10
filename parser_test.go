@@ -12,9 +12,15 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 		return
 	}
 	for k, v := range ref {
-		if fmt.Sprintf("%v", tree.Get(k)) != fmt.Sprintf("%v", v) {
-			t.Log("was expecting", v, "at", k, "but got", tree.Get(k))
-			t.Error()
+		node := tree.Get(k)
+		switch node.(type) {
+		case *TomlTree:
+			assertTree(t, node.(*TomlTree), err, v.(map[string]interface{}))
+		default:
+			if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", v) {
+				t.Log("was expecting", v, "at", k, "but got", node)
+				t.Error()
+			}
 		}
 	}
 }
@@ -223,6 +229,20 @@ func TestEmptyIntermediateTable(t *testing.T) {
 	if err.Error() != "empty intermediate table" {
 		t.Error("Bad error message:", err.Error())
 	}
+}
+
+func TestImplicitDeclarationBefore(t *testing.T) {
+	tree, err := Load("[a.b.c]\nanswer = 42\n[a]\nbetter = 43")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": map[string]interface{}{
+				"c": map[string]interface{}{
+					"answer": int64(42),
+				},
+			},
+			"better": int64(43),
+		},
+	})
 }
 
 func TestFloatsWithoutLeadingZeros(t *testing.T) {

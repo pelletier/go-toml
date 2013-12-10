@@ -10,10 +10,11 @@ import (
 )
 
 type parser struct {
-	flow         chan token
-	tree         *TomlTree
-	tokensBuffer []token
-	currentGroup string
+	flow          chan token
+	tree          *TomlTree
+	tokensBuffer  []token
+	currentGroup  string
+	seenGroupKeys []string
 }
 
 type parserStateFn func(*parser) parserStateFn
@@ -87,9 +88,12 @@ func parseGroup(p *parser) parserStateFn {
 	if key.typ != tokenKeyGroup {
 		panic(fmt.Sprintf("unexpected token %s, was expecting a key group", key))
 	}
-	if p.tree.Has(key.val) {
-		panic("duplicated tables")
+	for _, item := range p.seenGroupKeys {
+		if item == key.val {
+			panic("duplicated tables")
+		}
 	}
+	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
 	p.currentGroup = key.val
@@ -192,10 +196,11 @@ func parseArray(p *parser) []interface{} {
 func parse(flow chan token) *TomlTree {
 	result := make(TomlTree)
 	parser := &parser{
-		flow:         flow,
-		tree:         &result,
-		tokensBuffer: make([]token, 0),
-		currentGroup: "",
+		flow:          flow,
+		tree:          &result,
+		tokensBuffer:  make([]token, 0),
+		currentGroup:  "",
+		seenGroupKeys: make([]string, 0),
 	}
 	parser.run()
 	return parser.tree
