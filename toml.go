@@ -88,6 +88,9 @@ func (t *TomlTree) Set(key string, value interface{}) {
 func (t *TomlTree) createSubTree(key string) {
 	subtree := t
 	for _, intermediate_key := range strings.Split(key, ".") {
+		if intermediate_key == "" {
+			panic("empty intermediate table")
+		}
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
 			var new_tree TomlTree = make(TomlTree)
@@ -121,6 +124,5 @@ func LoadFile(path string) (tree *TomlTree, err error) {
 		s := string(buff)
 		tree, err = Load(s)
 	}
-
 	return
 }

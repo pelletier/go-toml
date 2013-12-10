@@ -203,6 +203,13 @@ func TestDuplicateGroups(t *testing.T) {
 	}
 }
 
+func TestEmptyIntermediateTable(t *testing.T) {
+	_, err := Load("[foo..bar]")
+	if err.Error() != "empty intermediate table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
 	if err.Error() != "open foo.toml: no such file or directory" {
