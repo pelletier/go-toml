@@ -292,6 +292,14 @@ func TestDoubleEqualKey(t *testing.T) {
 	})
 }
 
+func TestInvalidEsquapeSequence(t *testing.T) {
+	testFlow(t, "foo = \"\\x\"", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "invalid escape sequence: \\x"},
+	})
+}
+
 func TestKeyEqualNumber(t *testing.T) {
 	testFlow(t, "foo = 42", []token{
 		token{tokenKey, "foo"},

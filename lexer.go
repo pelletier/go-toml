@@ -358,6 +358,9 @@ func lexString(l *lexer) stateFn {
 				return l.errorf("invalid unicode escape: \\u" + code)
 			}
 			growing_string += string(rune(intcode))
+		} else if l.follow("\\") {
+			l.pos += 1
+			return l.errorf("invalid escape sequence: \\" + string(l.peek()))
 		} else {
 			growing_string += string(l.peek())
 		}
