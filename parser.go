@@ -141,6 +141,8 @@ func parseRvalue(p *parser) interface{} {
 		return val
 	case tokenLeftBracket:
 		return parseArray(p)
+	case tokenError:
+		panic(tok.val)
 	}
 
 	panic("never reached")

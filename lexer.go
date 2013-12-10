@@ -234,6 +234,10 @@ func lexRvalue(l *lexer) stateFn {
 			return lexNumber
 		}
 
+		if next == '.' {
+			return l.errorf("cannot start float with a dot")
+		}
+
 		if isSpace(next) {
 			l.ignore()
 		}
@@ -415,6 +419,9 @@ func lexNumber(l *lexer) stateFn {
 		} else {
 			l.backup()
 			break
+		}
+		if point_seen && !digit_seen {
+			return l.errorf("cannot start float with a dot")
 		}
 	}
 

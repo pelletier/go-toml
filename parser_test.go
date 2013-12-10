@@ -210,6 +210,18 @@ func TestEmptyIntermediateTable(t *testing.T) {
 	}
 }
 
+func TestFloatsWithoutLeadingZeros(t *testing.T) {
+	_, err := Load("a = .42")
+	if err.Error() != "cannot start float with a dot" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a = -.42")
+	if err.Error() != "cannot start float with a dot" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
 	if err.Error() != "open foo.toml: no such file or directory" {
