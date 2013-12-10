@@ -142,6 +142,18 @@ func TestArrayNested(t *testing.T) {
 	})
 }
 
+func TestArrayMixedTypes(t *testing.T) {
+	_, err := Load("a = [42, 16.0]")
+	if err.Error() != "mixed types in array" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a = [42, \"hello\"]")
+	if err.Error() != "mixed types in array" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestArrayNestedStrings(t *testing.T) {
 	tree, err := Load("data = [ [\"gamma\", \"delta\"], [\"Foo\"] ]")
 	assertTree(t, tree, err, map[string]interface{}{

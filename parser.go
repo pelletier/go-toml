@@ -4,6 +4,7 @@ package toml
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -146,6 +147,7 @@ func parseRvalue(p *parser) interface{} {
 
 func parseArray(p *parser) []interface{} {
 	array := make([]interface{}, 0)
+	arrayType := reflect.TypeOf(nil)
 	for {
 		follow := p.peek()
 		if follow == nil || follow.typ == tokenEOF {
@@ -156,6 +158,12 @@ func parseArray(p *parser) []interface{} {
 			return array
 		}
 		val := parseRvalue(p)
+		if arrayType == nil {
+			arrayType = reflect.TypeOf(val)
+		}
+		if reflect.TypeOf(val) != arrayType {
+			panic("mixed types in array")
+		}
 		array = append(array, val)
 		follow = p.peek()
 		if follow == nil {
