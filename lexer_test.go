@@ -113,6 +113,23 @@ func TestBasicKeyAndEqual(t *testing.T) {
 	})
 }
 
+func TestKeyWithSharpAndEqual(t *testing.T) {
+	testFlow(t, "key#name = 5", []token{
+		token{tokenKey, "key#name"},
+		token{tokenEqual, "="},
+		token{tokenInteger, "5"},
+		token{tokenEOF, ""},
+	})
+}
+func TestKeyWithSymbolsAndEqual(t *testing.T) {
+	testFlow(t, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
+		token{tokenKey, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:'"},
+		token{tokenEqual, "="},
+		token{tokenInteger, "5"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestKeyEqualStringEscape(t *testing.T) {
 	testFlow(t, "foo = \"hello\\\"\"", []token{
 		token{tokenKey, "foo"},
@@ -264,6 +281,52 @@ func TestKeyEqualDate(t *testing.T) {
 		token{tokenKey, "foo"},
 		token{tokenEqual, "="},
 		token{tokenDate, "1979-05-27T07:32:00Z"},
+		token{tokenEOF, ""},
+	})
+}
+
+func TestFloatEndingWithDot(t *testing.T) {
+	testFlow(t, "foo = 42.", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "float cannot end with a dot"},
+	})
+}
+
+func TestFloatWithTwoDots(t *testing.T) {
+	testFlow(t, "foo = 4.2.", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "cannot have two dots in one float"},
+	})
+}
+
+func TestDoubleEqualKey(t *testing.T) {
+	testFlow(t, "foo= = 2", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "cannot have multiple equals for the same key"},
+	})
+}
+
+func TestInvalidEsquapeSequence(t *testing.T) {
+	testFlow(t, "foo = \"\\x\"", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "invalid escape sequence: \\x"},
+	})
+}
+
+func TestNestedArrays(t *testing.T) {
+	testFlow(t, "foo = [[[]]]", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenLeftBracket, "["},
+		token{tokenLeftBracket, "["},
+		token{tokenLeftBracket, "["},
+		token{tokenRightBracket, "]"},
+		token{tokenRightBracket, "]"},
+		token{tokenRightBracket, "]"},
 		token{tokenEOF, ""},
 	})
 }

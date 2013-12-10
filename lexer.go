@@ -68,7 +68,9 @@ func isAlphanumeric(r rune) bool {
 }
 
 func isKeyChar(r rune) bool {
-	return isAlphanumeric(r) || r == '-'
+	// "Keys start with the first non-whitespace character and end with the last
+	// non-whitespace character before the equals sign."
+	return !(isSpace(r) || r == '\n' || r == eof || r == '=')
 }
 
 func isDigit(r rune) bool {
@@ -167,16 +169,16 @@ func lexVoid(l *lexer) stateFn {
 			return lexEqual
 		}
 
-		if isAlphanumeric(next) {
-			return lexKey
-		}
-
 		if isSpace(next) {
 			l.ignore()
 		}
 
 		if l.depth > 0 {
 			return lexRvalue
+		}
+
+		if isKeyChar(next) {
+			return lexKey
 		}
 
 		if l.next() == eof {
@@ -192,6 +194,10 @@ func lexRvalue(l *lexer) stateFn {
 	for {
 		next := l.peek()
 		switch next {
+		case '.':
+			return l.errorf("cannot start float with a dot")
+		case '=':
+			return l.errorf("cannot have multiple equals for the same key")
 		case '[':
 			l.depth += 1
 			return lexLeftBracket
@@ -328,6 +334,15 @@ func lexString(l *lexer) stateFn {
 		} else if l.follow("\\n") {
 			l.pos += 1
 			growing_string += "\n"
+		} else if l.follow("\\b") {
+			l.pos += 1
+			growing_string += "\b"
+		} else if l.follow("\\f") {
+			l.pos += 1
+			growing_string += "\f"
+		} else if l.follow("\\/") {
+			l.pos += 1
+			growing_string += "/"
 		} else if l.follow("\\t") {
 			l.pos += 1
 			growing_string += "\t"
@@ -354,6 +369,9 @@ func lexString(l *lexer) stateFn {
 				return l.errorf("invalid unicode escape: \\u" + code)
 			}
 			growing_string += string(rune(intcode))
+		} else if l.follow("\\") {
+			l.pos += 1
+			return l.errorf("invalid escape sequence: \\" + string(l.peek()))
 		} else {
 			growing_string += string(l.peek())
 		}
@@ -409,12 +427,21 @@ func lexNumber(l *lexer) stateFn {
 	for {
 		next := l.next()
 		if next == '.' {
+			if point_seen {
+				return l.errorf("cannot have two dots in one float")
+			}
+			if !isDigit(l.peek()) {
+				return l.errorf("float cannot end with a dot")
+			}
 			point_seen = true
 		} else if isDigit(next) {
 			digit_seen = true
 		} else {
 			l.backup()
 			break
+		}
+		if point_seen && !digit_seen {
+			return l.errorf("cannot start float with a dot")
 		}
 	}
 

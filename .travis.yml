@@ -1,4 +1,5 @@
 language: go
+script: "./test.sh"
 go:
     - 1.0
     - 1.1

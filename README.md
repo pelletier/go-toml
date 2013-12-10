@@ -56,6 +56,14 @@ Feel free to report bugs and patches using GitHub's pull requests system on
 [pelletier/go-toml](https://github.com/pelletier/go-toml). Any feedback would be
 much appreciated!
 
+### Run tests
+
+You have to make sure two kind of tests run:
+
+1. The Go unit tests: `go test`
+2. The TOML examples base: `./test_program/go-test.sh`
+
+You can run both of them using `./test.sh`.
 
 ## License
 
