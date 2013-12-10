@@ -113,6 +113,15 @@ func TestBasicKeyAndEqual(t *testing.T) {
 	})
 }
 
+func TestKeyWithSharpAndEqual(t *testing.T) {
+	testFlow(t, "key#name = 5", []token{
+		token{tokenKey, "key#name"},
+		token{tokenEqual, "="},
+		token{tokenInteger, "5"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestKeyEqualStringEscape(t *testing.T) {
 	testFlow(t, "foo = \"hello\\\"\"", []token{
 		token{tokenKey, "foo"},

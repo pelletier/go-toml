@@ -68,7 +68,9 @@ func isAlphanumeric(r rune) bool {
 }
 
 func isKeyChar(r rune) bool {
-	return isAlphanumeric(r) || r == '-'
+	// "Keys start with the first non-whitespace character and end with the last
+	// non-whitespace character before the equals sign."
+	return !(isSpace(r) || r == '\n' || r == eof || r == '=')
 }
 
 func isDigit(r rune) bool {
