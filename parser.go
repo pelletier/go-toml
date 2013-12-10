@@ -104,6 +104,9 @@ func parseAssign(p *parser) parserStateFn {
 	if p.currentGroup != "" {
 		final_key = p.currentGroup + "." + key.val
 	}
+	if p.tree.Get(final_key) != nil {
+		panic(fmt.Sprintf("the following key was defined twice: %s", final_key))
+	}
 	p.tree.Set(final_key, value)
 	return parseStart(p)
 }

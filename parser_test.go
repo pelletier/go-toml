@@ -149,6 +149,7 @@ func TestNestedEmptyArrays(t *testing.T) {
 	})
 }
 
+
 func TestArrayMixedTypes(t *testing.T) {
 	_, err := Load("a = [42, 16.0]")
 	if err.Error() != "mixed types in array" {
@@ -206,6 +207,13 @@ func TestArrayWithExtraCommaComment(t *testing.T) {
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
 	if err.Error() != "duplicated tables" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestDuplicateKeys(t *testing.T) {
+	_, err := Load("foo = 2\nfoo = 3")
+	if err.Error() != "the following key was defined twice: foo" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
