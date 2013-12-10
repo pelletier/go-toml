@@ -15,6 +15,18 @@ import (
 // This is the result of the parsing of a TOML file.
 type TomlTree map[string]interface{}
 
+// Has returns a boolean indicating if the toplevel tree contains the given
+// key.
+func (t *TomlTree) Has(key string) bool {
+	mp := (map[string]interface{})(*t)
+	for k, _ := range mp {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
 // Keys returns the keys of the toplevel tree.
 // Warning: this is a costly operation.
 func (t *TomlTree) Keys() []string {

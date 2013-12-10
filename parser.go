@@ -87,6 +87,9 @@ func parseGroup(p *parser) parserStateFn {
 	if key.typ != tokenKeyGroup {
 		panic(fmt.Sprintf("unexpected token %s, was expecting a key group", key))
 	}
+	if p.tree.Has(key.val) {
+		panic("duplicated tables")
+	}
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
 	p.currentGroup = key.val

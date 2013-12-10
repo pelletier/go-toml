@@ -196,6 +196,13 @@ func TestArrayWithExtraCommaComment(t *testing.T) {
 	})
 }
 
+func TestDuplicateGroups(t *testing.T) {
+	_, err := Load("[foo]\na=2\n[foo]b=3")
+	if err.Error() != "duplicated tables" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
 	if err.Error() != "open foo.toml: no such file or directory" {
