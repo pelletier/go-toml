@@ -4,15 +4,18 @@ package toml
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type parser struct {
-	flow         chan token
-	tree         *TomlTree
-	tokensBuffer []token
-	currentGroup string
+	flow          chan token
+	tree          *TomlTree
+	tokensBuffer  []token
+	currentGroup  []string
+	seenGroupKeys []string
 }
 
 type parserStateFn func(*parser) parserStateFn
@@ -86,9 +89,15 @@ func parseGroup(p *parser) parserStateFn {
 	if key.typ != tokenKeyGroup {
 		panic(fmt.Sprintf("unexpected token %s, was expecting a key group", key))
 	}
+	for _, item := range p.seenGroupKeys {
+		if item == key.val {
+			panic("duplicated tables")
+		}
+	}
+	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
-	p.currentGroup = key.val
+	p.currentGroup = strings.Split(key.val, ".")
 	return parseStart(p)
 }
 
@@ -96,11 +105,17 @@ func parseAssign(p *parser) parserStateFn {
 	key := p.getToken()
 	p.assume(tokenEqual)
 	value := parseRvalue(p)
-	final_key := key.val
-	if p.currentGroup != "" {
-		final_key = p.currentGroup + "." + key.val
+	var final_key []string
+	if len(p.currentGroup) > 0 {
+		final_key = p.currentGroup
+	} else {
+		final_key = make([]string, 0)
 	}
-	p.tree.Set(final_key, value)
+	final_key = append(final_key, key.val)
+	if p.tree.GetPath(final_key) != nil {
+		panic(fmt.Sprintf("the following key was defined twice: %s", strings.Join(final_key, ".")))
+	}
+	p.tree.SetPath(final_key, value)
 	return parseStart(p)
 }
 
@@ -137,6 +152,8 @@ func parseRvalue(p *parser) interface{} {
 		return val
 	case tokenLeftBracket:
 		return parseArray(p)
+	case tokenError:
+		panic(tok.val)
 	}
 
 	panic("never reached")
@@ -146,6 +163,7 @@ func parseRvalue(p *parser) interface{} {
 
 func parseArray(p *parser) []interface{} {
 	array := make([]interface{}, 0)
+	arrayType := reflect.TypeOf(nil)
 	for {
 		follow := p.peek()
 		if follow == nil || follow.typ == tokenEOF {
@@ -156,14 +174,18 @@ func parseArray(p *parser) []interface{} {
 			return array
 		}
 		val := parseRvalue(p)
+		if arrayType == nil {
+			arrayType = reflect.TypeOf(val)
+		}
+		if reflect.TypeOf(val) != arrayType {
+			panic("mixed types in array")
+		}
 		array = append(array, val)
 		follow = p.peek()
 		if follow == nil {
 			panic("unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
-			fmt.Println(follow.typ)
-			fmt.Println(follow.val)
 			panic("missing comma")
 		}
 		if follow.typ == tokenComma {
@@ -176,10 +198,11 @@ func parseArray(p *parser) []interface{} {
 func parse(flow chan token) *TomlTree {
 	result := make(TomlTree)
 	parser := &parser{
-		flow:         flow,
-		tree:         &result,
-		tokensBuffer: make([]token, 0),
-		currentGroup: "",
+		flow:          flow,
+		tree:          &result,
+		tokensBuffer:  make([]token, 0),
+		currentGroup:  make([]string, 0),
+		seenGroupKeys: make([]string, 0),
 	}
 	parser.run()
 	return parser.tree

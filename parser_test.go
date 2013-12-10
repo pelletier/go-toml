@@ -12,9 +12,15 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 		return
 	}
 	for k, v := range ref {
-		if fmt.Sprintf("%v", tree.Get(k)) != fmt.Sprintf("%v", v) {
-			t.Log("was expecting", v, "at", k, "but got", tree.Get(k))
-			t.Error()
+		node := tree.Get(k)
+		switch node.(type) {
+		case *TomlTree:
+			assertTree(t, node.(*TomlTree), err, v.(map[string]interface{}))
+		default:
+			if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", v) {
+				t.Log("was expecting", v, "at", k, "but got", node)
+				t.Error()
+			}
 		}
 	}
 }
@@ -142,6 +148,26 @@ func TestArrayNested(t *testing.T) {
 	})
 }
 
+func TestNestedEmptyArrays(t *testing.T) {
+	tree, err := Load("a = [[[]]]")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": [][][]interface{}{[][]interface{}{[]interface{}{}}},
+	})
+}
+
+
+func TestArrayMixedTypes(t *testing.T) {
+	_, err := Load("a = [42, 16.0]")
+	if err.Error() != "mixed types in array" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a = [42, \"hello\"]")
+	if err.Error() != "mixed types in array" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestArrayNestedStrings(t *testing.T) {
 	tree, err := Load("data = [ [\"gamma\", \"delta\"], [\"Foo\"] ]")
 	assertTree(t, tree, err, map[string]interface{}{
@@ -182,6 +208,53 @@ func TestArrayWithExtraCommaComment(t *testing.T) {
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": []int64{int64(1), int64(2), int64(3)},
 	})
+}
+
+func TestDuplicateGroups(t *testing.T) {
+	_, err := Load("[foo]\na=2\n[foo]b=3")
+	if err.Error() != "duplicated tables" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestDuplicateKeys(t *testing.T) {
+	_, err := Load("foo = 2\nfoo = 3")
+	if err.Error() != "the following key was defined twice: foo" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestEmptyIntermediateTable(t *testing.T) {
+	_, err := Load("[foo..bar]")
+	if err.Error() != "empty intermediate table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestImplicitDeclarationBefore(t *testing.T) {
+	tree, err := Load("[a.b.c]\nanswer = 42\n[a]\nbetter = 43")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": map[string]interface{}{
+				"c": map[string]interface{}{
+					"answer": int64(42),
+				},
+			},
+			"better": int64(43),
+		},
+	})
+}
+
+func TestFloatsWithoutLeadingZeros(t *testing.T) {
+	_, err := Load("a = .42")
+	if err.Error() != "cannot start float with a dot" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a = -.42")
+	if err.Error() != "cannot start float with a dot" {
+		t.Error("Bad error message:", err.Error())
+	}
 }
 
 func TestMissingFile(t *testing.T) {
