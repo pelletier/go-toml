@@ -142,6 +142,13 @@ func TestArrayNested(t *testing.T) {
 	})
 }
 
+func TestNestedEmptyArrays(t *testing.T) {
+	tree, err := Load("a = [[[]]]")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": [][][]interface{}{[][]interface{}{[]interface{}{}}},
+	})
+}
+
 func TestArrayMixedTypes(t *testing.T) {
 	_, err := Load("a = [42, 16.0]")
 	if err.Error() != "mixed types in array" {

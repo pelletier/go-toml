@@ -300,6 +300,20 @@ func TestInvalidEsquapeSequence(t *testing.T) {
 	})
 }
 
+func TestNestedArrays(t *testing.T) {
+	testFlow(t, "foo = [[[]]]", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenLeftBracket, "["},
+		token{tokenLeftBracket, "["},
+		token{tokenLeftBracket, "["},
+		token{tokenRightBracket, "]"},
+		token{tokenRightBracket, "]"},
+		token{tokenRightBracket, "]"},
+		token{tokenEOF, ""},
+	})
+}
+
 func TestKeyEqualNumber(t *testing.T) {
 	testFlow(t, "foo = 42", []token{
 		token{tokenKey, "foo"},
