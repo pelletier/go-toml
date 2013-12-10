@@ -121,6 +121,14 @@ func TestKeyWithSharpAndEqual(t *testing.T) {
 		token{tokenEOF, ""},
 	})
 }
+func TestKeyWithSymbolsAndEqual(t *testing.T) {
+	testFlow(t, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
+		token{tokenKey, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:'"},
+		token{tokenEqual, "="},
+		token{tokenInteger, "5"},
+		token{tokenEOF, ""},
+	})
+}
 
 func TestKeyEqualStringEscape(t *testing.T) {
 	testFlow(t, "foo = \"hello\\\"\"", []token{

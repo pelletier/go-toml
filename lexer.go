@@ -169,16 +169,16 @@ func lexVoid(l *lexer) stateFn {
 			return lexEqual
 		}
 
-		if isAlphanumeric(next) {
-			return lexKey
-		}
-
 		if isSpace(next) {
 			l.ignore()
 		}
 
 		if l.depth > 0 {
 			return lexRvalue
+		}
+
+		if isKeyChar(next) {
+			return lexKey
 		}
 
 		if l.next() == eof {

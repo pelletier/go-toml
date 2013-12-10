@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -13,7 +14,7 @@ type parser struct {
 	flow          chan token
 	tree          *TomlTree
 	tokensBuffer  []token
-	currentGroup  string
+	currentGroup  []string
 	seenGroupKeys []string
 }
 
@@ -96,7 +97,7 @@ func parseGroup(p *parser) parserStateFn {
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
 	p.tree.createSubTree(key.val)
 	p.assume(tokenRightBracket)
-	p.currentGroup = key.val
+	p.currentGroup = strings.Split(key.val, ".")
 	return parseStart(p)
 }
 
@@ -104,14 +105,17 @@ func parseAssign(p *parser) parserStateFn {
 	key := p.getToken()
 	p.assume(tokenEqual)
 	value := parseRvalue(p)
-	final_key := key.val
-	if p.currentGroup != "" {
-		final_key = p.currentGroup + "." + key.val
+	var final_key []string
+	if len(p.currentGroup) > 0 {
+		final_key = p.currentGroup
+	} else {
+		final_key = make([]string, 0)
 	}
-	if p.tree.Get(final_key) != nil {
-		panic(fmt.Sprintf("the following key was defined twice: %s", final_key))
+	final_key = append(final_key, key.val)
+	if p.tree.GetPath(final_key) != nil {
+		panic(fmt.Sprintf("the following key was defined twice: %s", strings.Join(final_key, ".")))
 	}
-	p.tree.Set(final_key, value)
+	p.tree.SetPath(final_key, value)
 	return parseStart(p)
 }
 
@@ -182,8 +186,6 @@ func parseArray(p *parser) []interface{} {
 			panic("unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
-			fmt.Println(follow.typ)
-			fmt.Println(follow.val)
 			panic("missing comma")
 		}
 		if follow.typ == tokenComma {
@@ -199,7 +201,7 @@ func parse(flow chan token) *TomlTree {
 		flow:          flow,
 		tree:          &result,
 		tokensBuffer:  make([]token, 0),
-		currentGroup:  "",
+		currentGroup:  make([]string, 0),
 		seenGroupKeys: make([]string, 0),
 	}
 	parser.run()

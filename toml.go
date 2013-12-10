@@ -42,8 +42,11 @@ func (t *TomlTree) Keys() []string {
 // Key is a dot-separated path (e.g. a.b.c).
 // Returns nil if the path does not exist in the tree.
 func (t *TomlTree) Get(key string) interface{} {
+	return t.GetPath(strings.Split(key, "."))
+}
+
+func (t *TomlTree) GetPath(keys []string) interface{} {
 	subtree := t
-	keys := strings.Split(key, ".")
 	for _, intermediate_key := range keys[:len(keys)-1] {
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
@@ -67,8 +70,11 @@ func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
 // Key is a dot-separated path (e.g. a.b.c).
 // Creates all necessary intermediates trees, if needed.
 func (t *TomlTree) Set(key string, value interface{}) {
+	t.SetPath(strings.Split(key, "."), value)
+}
+
+func (t *TomlTree) SetPath(keys []string, value interface{}) {
 	subtree := t
-	keys := strings.Split(key, ".")
 	for _, intermediate_key := range keys[:len(keys)-1] {
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
