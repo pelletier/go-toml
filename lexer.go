@@ -413,6 +413,12 @@ func lexNumber(l *lexer) stateFn {
 	for {
 		next := l.next()
 		if next == '.' {
+			if point_seen {
+				return l.errorf("cannot have two dots in one float")
+			}
+			if !isDigit(l.peek()) {
+				return l.errorf("float cannot end with a dot")
+			}
 			point_seen = true
 		} else if isDigit(next) {
 			digit_seen = true

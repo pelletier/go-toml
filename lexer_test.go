@@ -268,6 +268,22 @@ func TestKeyEqualDate(t *testing.T) {
 	})
 }
 
+func TestFloatEndingWithDot(t *testing.T) {
+	testFlow(t, "foo = 42.", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "float cannot end with a dot"},
+	})
+}
+
+func TestFloatWithTwoDots(t *testing.T) {
+	testFlow(t, "foo = 4.2.", []token{
+		token{tokenKey, "foo"},
+		token{tokenEqual, "="},
+		token{tokenError, "cannot have two dots in one float"},
+	})
+}
+
 func TestKeyEqualNumber(t *testing.T) {
 	testFlow(t, "foo = 42", []token{
 		token{tokenKey, "foo"},
