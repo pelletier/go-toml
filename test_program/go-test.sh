@@ -1,7 +1,6 @@
 #!/bin/bash
 
 go get github.com/BurntSushi/toml-test # install test suite
-go get github.com/BurntSushi/toml/toml-test-go # install my parser
 go build -o test_program_bin github.com/pelletier/go-toml/test_program
 
 toml_test_wrapper() {
