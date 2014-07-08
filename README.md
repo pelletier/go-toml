@@ -67,7 +67,7 @@ You can run both of them using `./test.sh`.
 
 ## License
 
-Copyright (c) 2013 Thomas Pelletier
+Copyright (c) 2013, 2014 Thomas Pelletier, Eric Anderton
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in

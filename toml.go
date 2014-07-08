@@ -6,12 +6,12 @@ package toml
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"runtime"
+	"strconv"
 	"strings"
-  "strconv"
-  "time"
-  "fmt"
+	"time"
 )
 
 // Definition of a TomlTree.
@@ -46,14 +46,18 @@ func (t *TomlTree) Keys() []string {
 // Returns nil if the path does not exist in the tree.
 // If keys is of length zero, the current tree is returned.
 func (t *TomlTree) Get(key string) interface{} {
-  if key == "" { return t }
+	if key == "" {
+		return t
+	}
 	return t.GetPath(strings.Split(key, "."))
 }
 
 // Returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
 func (t *TomlTree) GetPath(keys []string) interface{} {
-  if len(keys) == 0 { return t }
+	if len(keys) == 0 {
+		return t
+	}
 	subtree := t
 	for _, intermediate_key := range keys[:len(keys)-1] {
 		_, exists := (*subtree)[intermediate_key]
@@ -67,11 +71,11 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 
 // Same as Get but with a default value
 func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
-    val := t.Get(key)
-    if val == nil {
-        return def
-    }
-    return val;
+	val := t.Get(key)
+	if val == nil {
+		return def
+	}
+	return val
 }
 
 // Set an element in the tree.
@@ -116,89 +120,100 @@ func (t *TomlTree) createSubTree(key string) {
 
 // encodes a string to a TOML-compliant string value
 func encodeTomlString(value string) string {
-  result := ""
-  for _, rr := range value {
-    int_rr := uint16(rr)
-    switch rr {
-    case '\b': result += "\\b"
-    case '\t': result += "\\t"
-    case '\n': result += "\\n"
-    case '\f': result += "\\f"
-    case '\r': result += "\\r"
-    case '"':  result += "\\\""
-    case '\\': result += "\\\\"
-    default:
-      if int_rr < 0x001F {
-        result += fmt.Sprintf("\\u%0.4X", int_rr)
-      } else {
-        result += string(rr)
-      }
-    }
-  }
-  return result
+	result := ""
+	for _, rr := range value {
+		int_rr := uint16(rr)
+		switch rr {
+		case '\b':
+			result += "\\b"
+		case '\t':
+			result += "\\t"
+		case '\n':
+			result += "\\n"
+		case '\f':
+			result += "\\f"
+		case '\r':
+			result += "\\r"
+		case '"':
+			result += "\\\""
+		case '\\':
+			result += "\\\\"
+		default:
+			if int_rr < 0x001F {
+				result += fmt.Sprintf("\\u%0.4X", int_rr)
+			} else {
+				result += string(rr)
+			}
+		}
+	}
+	return result
 }
 
 // Value print support function for ToString()
 // Outputs the TOML compliant string representation of a value
 func toTomlValue(item interface{}, indent int) string {
-  tab := strings.Repeat(" ", indent)
-  switch value := item.(type) {
-  case int64:
-    return tab + strconv.FormatInt(value, 10)
-  case float64:
-    return tab + strconv.FormatFloat(value, 'f', -1, 64)
-  case string:
-    return tab + "\"" + encodeTomlString(value) + "\""
-  case bool:
-    if value { return "true" } else { return "false" }
-  case time.Time:
-    return tab + value.Format(time.RFC3339)
-  case []interface{}:
-    result := tab + "[\n"
-    for _, item := range value {
-      result += toTomlValue(item, indent + 2) + ",\n"
-    }
-    return result + tab + "]"
-  default:
-    panic(fmt.Sprintf("unsupported value type: %v", value))
-  }
+	tab := strings.Repeat(" ", indent)
+	switch value := item.(type) {
+	case int64:
+		return tab + strconv.FormatInt(value, 10)
+	case float64:
+		return tab + strconv.FormatFloat(value, 'f', -1, 64)
+	case string:
+		return tab + "\"" + encodeTomlString(value) + "\""
+	case bool:
+		if value {
+			return "true"
+		} else {
+			return "false"
+		}
+	case time.Time:
+		return tab + value.Format(time.RFC3339)
+	case []interface{}:
+		result := tab + "[\n"
+		for _, item := range value {
+			result += toTomlValue(item, indent+2) + ",\n"
+		}
+		return result + tab + "]"
+	default:
+		panic(fmt.Sprintf("unsupported value type: %v", value))
+	}
 }
 
 // Recursive support function for ToString()
 // Outputs a tree, using the provided keyspace to prefix group names
 func (t *TomlTree) toToml(keyspace string) string {
-  result := ""
-  for k, v := range (map[string]interface{})(*t) {
-    // figure out the keyspace
-    combined_key := k
-    if keyspace != "" {
-      combined_key = keyspace + "." + combined_key
-    }
-    // output based on type
-    switch node := v.(type) {
-    case []*TomlTree:
-      for _, item := range node {
-        if len(item.Keys()) > 0 {
-          result += fmt.Sprintf("\n[[%s]]\n", combined_key)
-        }
-        result += item.toToml(combined_key)
-      }
-    case *TomlTree:
-      if len(node.Keys()) > 0 {
-        result += fmt.Sprintf("\n[%s]\n", combined_key)
-      }
-      result += node.toToml(combined_key)
-    default:
-      result += fmt.Sprintf("%s = %s\n", k, toTomlValue(node,0))
-    }
-  }
-  return result
+	result := ""
+	for k, v := range (map[string]interface{})(*t) {
+		// figure out the keyspace
+		combined_key := k
+		if keyspace != "" {
+			combined_key = keyspace + "." + combined_key
+		}
+		// output based on type
+		switch node := v.(type) {
+		case []*TomlTree:
+			for _, item := range node {
+				if len(item.Keys()) > 0 {
+					result += fmt.Sprintf("\n[[%s]]\n", combined_key)
+				}
+				result += item.toToml(combined_key)
+			}
+		case *TomlTree:
+			if len(node.Keys()) > 0 {
+				result += fmt.Sprintf("\n[%s]\n", combined_key)
+			}
+			result += node.toToml(combined_key)
+		default:
+			result += fmt.Sprintf("%s = %s\n", k, toTomlValue(node, 0))
+		}
+	}
+	return result
 }
 
 // Generates a human-readable representation of the current tree.
 // Output spans multiple lines, and is suitable for ingest by a TOML parser
 func (t *TomlTree) ToString() string {
-  return t.toToml("")
+	return t.toToml("")
 }
 
 // Create a TomlTree from a string.

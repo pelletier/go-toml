@@ -71,8 +71,8 @@ func parseStart(p *parser) parserStateFn {
 	}
 
 	switch tok.typ {
-  case tokenDoubleLeftBracket:
-    return parseGroupArray
+	case tokenDoubleLeftBracket:
+		return parseGroupArray
 	case tokenLeftBracket:
 		return parseGroup
 	case tokenKey:
@@ -86,33 +86,33 @@ func parseStart(p *parser) parserStateFn {
 }
 
 func parseGroupArray(p *parser) parserStateFn {
-	p.getToken()  // discard the [[
+	p.getToken() // discard the [[
 	key := p.getToken()
 	if key.typ != tokenKeyGroupArray {
 		panic(fmt.Sprintf("unexpected token %s, was expecting a key group array", key))
 	}
 
-  // get or create group array element at the indicated part in the path
-  p.currentGroup = strings.Split(key.val, ".")
-  dest_tree := p.tree.GetPath(p.currentGroup)
-  var array []*TomlTree
-  if dest_tree == nil {
-    array = make([]*TomlTree, 0)
-  } else if dest_tree.([]*TomlTree) != nil {
-    array = dest_tree.([]*TomlTree)
-  } else {
-    panic(fmt.Sprintf("key %s is already assigned and not of type group array", key))
-  }
+	// get or create group array element at the indicated part in the path
+	p.currentGroup = strings.Split(key.val, ".")
+	dest_tree := p.tree.GetPath(p.currentGroup)
+	var array []*TomlTree
+	if dest_tree == nil {
+		array = make([]*TomlTree, 0)
+	} else if dest_tree.([]*TomlTree) != nil {
+		array = dest_tree.([]*TomlTree)
+	} else {
+		panic(fmt.Sprintf("key %s is already assigned and not of type group array", key))
+	}
 
-  // add a new tree to the end of the group array
-  new_tree := make(TomlTree)
-  array = append(array, &new_tree)
-  p.tree.SetPath(p.currentGroup, array)
+	// add a new tree to the end of the group array
+	new_tree := make(TomlTree)
+	array = append(array, &new_tree)
+	p.tree.SetPath(p.currentGroup, array)
 
-  // keep this key name from use by other kinds of assignments
-  p.seenGroupKeys = append(p.seenGroupKeys, key.val)
+	// keep this key name from use by other kinds of assignments
+	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
 
-  // move to next parser state
+	// move to next parser state
 	p.assume(tokenDoubleRightBracket)
 	return parseStart(p)
 }
@@ -146,24 +146,24 @@ func parseAssign(p *parser) parserStateFn {
 		group_key = make([]string, 0)
 	}
 
-  // find the group to assign, looking out for arrays of groups
-  var target_node *TomlTree
-  switch node := p.tree.GetPath(group_key).(type) {
-  case []*TomlTree:
-    target_node = node[len(node)-1]
-  case *TomlTree:
-    target_node = node
-  default:
-    panic(fmt.Sprintf("Unknown group type for path %v", group_key))
-  }
+	// find the group to assign, looking out for arrays of groups
+	var target_node *TomlTree
+	switch node := p.tree.GetPath(group_key).(type) {
+	case []*TomlTree:
+		target_node = node[len(node)-1]
+	case *TomlTree:
+		target_node = node
+	default:
+		panic(fmt.Sprintf("Unknown group type for path %v", group_key))
+	}
 
-  // assign value to the found group
-  local_key := []string{ key.val }
+	// assign value to the found group
+	local_key := []string{key.val}
 	final_key := append(group_key, key.val)
-  if target_node.GetPath(local_key) != nil {
-    panic(fmt.Sprintf("the following key was defined twice: %s", strings.Join(final_key, ".")))
-  }
-  target_node.SetPath(local_key, value)
+	if target_node.GetPath(local_key) != nil {
+		panic(fmt.Sprintf("the following key was defined twice: %s", strings.Join(final_key, ".")))
+	}
+	target_node.SetPath(local_key, value)
 	return parseStart(p)
 }
 

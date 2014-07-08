@@ -38,7 +38,7 @@ const (
 	tokenDoubleRightBracket
 	tokenDate
 	tokenKeyGroup
-  tokenKeyGroupArray
+	tokenKeyGroupArray
 	tokenComma
 	tokenEOL
 )
@@ -389,19 +389,18 @@ func lexString(l *lexer) stateFn {
 
 func lexKeyGroup(l *lexer) stateFn {
 	l.ignore()
-  l.pos += 1
+	l.pos += 1
 
-  if l.peek() == '[' {
-    // token '[[' signifies an array of anonymous key groups
-    l.ignore()
-    l.pos += 1
-	  l.emit(tokenDoubleLeftBracket)
-    return lexInsideKeyGroupArray
-  } else {
-    // vanilla key group
-	  l.emit(tokenLeftBracket)
-    return lexInsideKeyGroup
-  }
+	if l.peek() == '[' {
+		// token '[[' signifies an array of anonymous key groups
+		l.pos += 1
+		l.emit(tokenDoubleLeftBracket)
+		return lexInsideKeyGroupArray
+	} else {
+		// vanilla key group
+		l.emit(tokenLeftBracket)
+		return lexInsideKeyGroup
+	}
 }
 
 func lexInsideKeyGroupArray(l *lexer) stateFn {
@@ -410,12 +409,11 @@ func lexInsideKeyGroupArray(l *lexer) stateFn {
 			if l.pos > l.start {
 				l.emit(tokenKeyGroupArray)
 			}
-      l.ignore()
-			l.pos += 1
-      if l.peek() != ']' {
-        break  // error
-      }
 			l.ignore()
+			l.pos += 1
+			if l.peek() != ']' {
+				break // error
+			}
 			l.pos += 1
 			l.emit(tokenDoubleRightBracket)
 			return lexVoid

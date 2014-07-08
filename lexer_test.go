@@ -404,3 +404,12 @@ func TestUnicodeString(t *testing.T) {
 		token{tokenEOF, ""},
 	})
 }
+
+func TestKeyGroupArray(t *testing.T) {
+	testFlow(t, "[[foo]]", []token{
+		token{tokenDoubleLeftBracket, "[["},
+		token{tokenKeyGroupArray, "foo"},
+		token{tokenDoubleRightBracket, "]]"},
+		token{tokenEOF, ""},
+	})
+}
