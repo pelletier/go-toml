@@ -419,7 +419,7 @@ func lexInsideKeyGroupArray(l *lexer) stateFn {
 			return lexVoid
 		} else if l.peek() == '[' {
 			return l.errorf("group name cannot contain ']'")
-    }
+		}
 
 		if l.next() == eof {
 			break
@@ -440,7 +440,7 @@ func lexInsideKeyGroup(l *lexer) stateFn {
 			return lexVoid
 		} else if l.peek() == '[' {
 			return l.errorf("group name cannot contain ']'")
-    }
+		}
 
 		if l.next() == eof {
 			break

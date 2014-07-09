@@ -1,12 +1,12 @@
 package main
 
 import (
-	"io/ioutil"
-	"os"
-	"github.com/pelletier/go-toml"
 	"encoding/json"
 	"fmt"
+	"github.com/pelletier/go-toml"
+	"io/ioutil"
 	"log"
+	"os"
 	"time"
 )
 
@@ -40,7 +40,7 @@ func translate(tomlData interface{}) interface{} {
 		return typed
 	case *toml.TomlTree:
 		return translate((map[string]interface{})(*orig))
-  case []*toml.TomlTree:
+	case []*toml.TomlTree:
 		typed := make([]map[string]interface{}, len(orig))
 		for i, v := range orig {
 			typed[i] = translate(v).(map[string]interface{})

@@ -64,16 +64,16 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 		if !exists {
 			return nil
 		}
-    switch node := (*subtree)[intermediate_key].(type) {
-    case *TomlTree:
-      subtree = node
-    case []*TomlTree:
-      // go to most recent element
-      if len(node) == 0 {
-        return nil //(*subtree)[intermediate_key] = append(node, &TomlTree{})
-      }
-      subtree = node[len(node)-1]
-    }
+		switch node := (*subtree)[intermediate_key].(type) {
+		case *TomlTree:
+			subtree = node
+		case []*TomlTree:
+			// go to most recent element
+			if len(node) == 0 {
+				return nil //(*subtree)[intermediate_key] = append(node, &TomlTree{})
+			}
+			subtree = node[len(node)-1]
+		}
 	}
 	return (*subtree)[keys[len(keys)-1]]
 }
@@ -102,16 +102,16 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 			var new_tree TomlTree = make(TomlTree)
 			(*subtree)[intermediate_key] = &new_tree
 		}
-    switch node := (*subtree)[intermediate_key].(type) {
-    case *TomlTree:
-      subtree = node
-    case []*TomlTree:
-      // go to most recent element
-      if len(node) == 0 {
-        (*subtree)[intermediate_key] = append(node, &TomlTree{})
-      }
-      subtree = node[len(node)-1]
-    }
+		switch node := (*subtree)[intermediate_key].(type) {
+		case *TomlTree:
+			subtree = node
+		case []*TomlTree:
+			// go to most recent element
+			if len(node) == 0 {
+				(*subtree)[intermediate_key] = append(node, &TomlTree{})
+			}
+			subtree = node[len(node)-1]
+		}
 	}
 	(*subtree)[keys[len(keys)-1]] = value
 }
