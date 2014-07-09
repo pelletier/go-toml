@@ -18,16 +18,37 @@ import (
 // This is the result of the parsing of a TOML file.
 type TomlTree map[string]interface{}
 
-// Has returns a boolean indicating if the toplevel tree contains the given
-// key.
+// Has returns a boolean indicating if the given key exists.
 func (t *TomlTree) Has(key string) bool {
-	mp := (map[string]interface{})(*t)
-	for k, _ := range mp {
-		if k == key {
-			return true
+	if key == "" {
+		return false
+	}
+	return t.HasPath(strings.Split(key, "."))
+}
+
+// Returns true if the given path of keys exists, false otherwise.
+func (t *TomlTree) HasPath(keys []string) bool {
+	if len(keys) == 0 {
+		return false
+	}
+	subtree := t
+	for _, intermediate_key := range keys[:len(keys)-1] {
+		_, exists := (*subtree)[intermediate_key]
+		if !exists {
+			return false
+		}
+		switch node := (*subtree)[intermediate_key].(type) {
+		case *TomlTree:
+			subtree = node
+		case []*TomlTree:
+			// go to most recent element
+			if len(node) == 0 {
+				return false
+			}
+			subtree = node[len(node)-1]
 		}
 	}
-	return false
+	return true
 }
 
 // Keys returns the keys of the toplevel tree.

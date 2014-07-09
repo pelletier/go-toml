@@ -4,6 +4,28 @@ import (
 	"testing"
 )
 
+func TestTomlHas(t *testing.T) {
+	tree, _ := Load(`
+		[test]
+		key = "value"
+	`)
+
+	if !tree.Has("test.key") {
+		t.Errorf("Has - expected test.key to exists")
+	}
+}
+
+func TestTomlHasPath(t *testing.T) {
+	tree, _ := Load(`
+		[test]
+		key = "value"
+	`)
+
+	if !tree.HasPath([]string{"test", "key"}) {
+		t.Errorf("HasPath - expected test.key to exists")
+	}
+}
+
 func TestTomlGetPath(t *testing.T) {
 	node := make(TomlTree)
 	//TODO: set other node data
