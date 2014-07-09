@@ -34,8 +34,11 @@ const (
 	tokenFloat
 	tokenLeftBracket
 	tokenRightBracket
+	tokenDoubleLeftBracket
+	tokenDoubleRightBracket
 	tokenDate
 	tokenKeyGroup
+	tokenKeyGroupArray
 	tokenComma
 	tokenEOL
 )
@@ -387,8 +390,42 @@ func lexString(l *lexer) stateFn {
 func lexKeyGroup(l *lexer) stateFn {
 	l.ignore()
 	l.pos += 1
-	l.emit(tokenLeftBracket)
-	return lexInsideKeyGroup
+
+	if l.peek() == '[' {
+		// token '[[' signifies an array of anonymous key groups
+		l.pos += 1
+		l.emit(tokenDoubleLeftBracket)
+		return lexInsideKeyGroupArray
+	} else {
+		// vanilla key group
+		l.emit(tokenLeftBracket)
+		return lexInsideKeyGroup
+	}
+}
+
+func lexInsideKeyGroupArray(l *lexer) stateFn {
+	for {
+		if l.peek() == ']' {
+			if l.pos > l.start {
+				l.emit(tokenKeyGroupArray)
+			}
+			l.ignore()
+			l.pos += 1
+			if l.peek() != ']' {
+				break // error
+			}
+			l.pos += 1
+			l.emit(tokenDoubleRightBracket)
+			return lexVoid
+		} else if l.peek() == '[' {
+			return l.errorf("group name cannot contain ']'")
+		}
+
+		if l.next() == eof {
+			break
+		}
+	}
+	return l.errorf("unclosed key group array")
 }
 
 func lexInsideKeyGroup(l *lexer) stateFn {
@@ -401,6 +438,8 @@ func lexInsideKeyGroup(l *lexer) stateFn {
 			l.pos += 1
 			l.emit(tokenRightBracket)
 			return lexVoid
+		} else if l.peek() == '[' {
+			return l.errorf("group name cannot contain ']'")
 		}
 
 		if l.next() == eof {

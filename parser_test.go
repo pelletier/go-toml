@@ -13,13 +13,16 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 	}
 	for k, v := range ref {
 		node := tree.Get(k)
-		switch node.(type) {
+		switch cast_node := node.(type) {
+		case []*TomlTree:
+			for idx, item := range cast_node {
+				assertTree(t, item, err, v.([]map[string]interface{})[idx])
+			}
 		case *TomlTree:
-			assertTree(t, node.(*TomlTree), err, v.(map[string]interface{}))
+			assertTree(t, cast_node, err, v.(map[string]interface{}))
 		default:
 			if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", v) {
-				t.Log("was expecting", v, "at", k, "but got", node)
-				t.Error()
+				t.Errorf("was expecting %v at %v but got %v", v, k, node)
 			}
 		}
 	}
@@ -155,7 +158,6 @@ func TestNestedEmptyArrays(t *testing.T) {
 	})
 }
 
-
 func TestArrayMixedTypes(t *testing.T) {
 	_, err := Load("a = [42, 16.0]")
 	if err.Error() != "mixed types in array" {
@@ -283,4 +285,55 @@ func TestParseFile(t *testing.T) {
 		"servers.beta.dc":         "eqdc10",
 		"clients.data":            []interface{}{[]string{"gamma", "delta"}, []int64{1, 2}},
 	})
+}
+
+func TestParseKeyGroupArray(t *testing.T) {
+	tree, err := Load("[[foo.bar]] a = 42\n[[foo.bar]] a = 69")
+	assertTree(t, tree, err, map[string]interface{}{
+		"foo": map[string]interface{}{
+			"bar": []map[string]interface{}{
+				{"a": int64(42)},
+				{"a": int64(69)},
+			},
+		},
+	})
+}
+
+func TestToTomlValue(t *testing.T) {
+	for idx, item := range []struct {
+		Value  interface{}
+		Expect string
+	}{
+		{int64(12345), "12345"},
+		{float64(123.45), "123.45"},
+		{bool(true), "true"},
+		{"hello world", "\"hello world\""},
+		{"\b\t\n\f\r\"\\", "\"\\b\\t\\n\\f\\r\\\"\\\\\""},
+		{"\x05", "\"\\u0005\""},
+		{time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+			"1979-05-27T07:32:00Z"},
+		{[]interface{}{"gamma", "delta"},
+			"[\n  \"gamma\",\n  \"delta\",\n]"},
+	} {
+		result := toTomlValue(item.Value, 0)
+		if result != item.Expect {
+			t.Errorf("Test %d - got '%s', expected '%s'", idx, result, item.Expect)
+		}
+	}
+}
+
+func TestToString(t *testing.T) {
+	tree := &TomlTree{
+		"foo": &TomlTree{
+			"bar": []*TomlTree{
+				{"a": int64(42)},
+				{"a": int64(69)},
+			},
+		},
+	}
+	result := tree.ToString()
+	expected := "\n[foo]\n\n[[foo.bar]]\na = 42\n\n[[foo.bar]]\na = 69\n"
+	if result != expected {
+		t.Errorf("Expected got '%s', expected '%s'", result, expected)
+	}
 }
