@@ -249,12 +249,12 @@ func TestImplicitDeclarationBefore(t *testing.T) {
 
 func TestFloatsWithoutLeadingZeros(t *testing.T) {
 	_, err := Load("a = .42")
-	if err.Error() != "cannot start float with a dot" {
+	if err.Error() != "(1, 4): cannot start float with a dot" {
 		t.Error("Bad error message:", err.Error())
 	}
 
 	_, err = Load("a = -.42")
-	if err.Error() != "cannot start float with a dot" {
+	if err.Error() != "(1, 5): cannot start float with a dot" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
