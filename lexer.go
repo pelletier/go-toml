@@ -64,6 +64,10 @@ func (i token) String() string {
 	return fmt.Sprintf("%q", i.val)
 }
 
+func (i token) Pos() string {
+  return fmt.Sprintf("(%d, %d)", i.line + 1, i.col + 1)
+}
+
 func isSpace(r rune) bool {
 	return r == ' ' || r == '\t'
 }

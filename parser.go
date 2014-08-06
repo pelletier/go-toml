@@ -42,10 +42,10 @@ func (p *parser) peek() *token {
 func (p *parser) assume(typ tokenType) {
 	tok := p.getToken()
 	if tok == nil {
-		panic(fmt.Sprintf("was expecting token %s, but token stream is empty", typ))
+		panic(fmt.Sprintf("%s: was expecting token %s, but token stream is empty", tok.Pos(), typ))
 	}
 	if tok.typ != typ {
-		panic(fmt.Sprintf("was expecting token %s, but got %s", typ, tok.typ))
+		panic(fmt.Sprintf("%s: was expecting token %s, but got %s", tok.Pos(), typ, tok.typ))
 	}
 }
 
@@ -80,7 +80,7 @@ func parseStart(p *parser) parserStateFn {
 	case tokenEOF:
 		return nil
 	default:
-		panic("unexpected token")
+		panic(tok.Pos() + ": unexpected token")
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func parseGroupArray(p *parser) parserStateFn {
 	p.getToken() // discard the [[
 	key := p.getToken()
 	if key.typ != tokenKeyGroupArray {
-		panic(fmt.Sprintf("unexpected token %s, was expecting a key group array", key))
+		panic(fmt.Sprintf("%s: unexpected token %s, was expecting a key group array", key.Pos(), key))
 	}
 
 	// get or create group array element at the indicated part in the path
@@ -101,7 +101,7 @@ func parseGroupArray(p *parser) parserStateFn {
 	} else if dest_tree.([]*TomlTree) != nil {
 		array = dest_tree.([]*TomlTree)
 	} else {
-		panic(fmt.Sprintf("key %s is already assigned and not of type group array", key))
+		panic(fmt.Sprintf("%s: key %s is already assigned and not of type group array", key.Pos(), key))
 	}
 
 	// add a new tree to the end of the group array
@@ -121,11 +121,11 @@ func parseGroup(p *parser) parserStateFn {
 	p.getToken() // discard the [
 	key := p.getToken()
 	if key.typ != tokenKeyGroup {
-		panic(fmt.Sprintf("unexpected token %s, was expecting a key group", key))
+		panic(fmt.Sprintf("%s: unexpected token %s, was expecting a key group", key.Pos(), key))
 	}
 	for _, item := range p.seenGroupKeys {
 		if item == key.val {
-			panic("duplicated tables")
+			panic(key.Pos() + ": duplicated tables")
 		}
 	}
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
@@ -154,14 +154,14 @@ func parseAssign(p *parser) parserStateFn {
 	case *TomlTree:
 		target_node = node
 	default:
-		panic(fmt.Sprintf("Unknown group type for path %v", group_key))
+		panic(fmt.Sprintf("%s: Unknown group type for path %v", key.Pos(), group_key))
 	}
 
 	// assign value to the found group
 	local_key := []string{key.val}
 	final_key := append(group_key, key.val)
 	if target_node.GetPath(local_key) != nil {
-		panic(fmt.Sprintf("the following key was defined twice: %s", strings.Join(final_key, ".")))
+		panic(fmt.Sprintf("%s: the following key was defined twice: %s", key.Pos(), strings.Join(final_key, ".")))
 	}
 	target_node.SetPath(local_key, value)
 	return parseStart(p)
@@ -170,7 +170,7 @@ func parseAssign(p *parser) parserStateFn {
 func parseRvalue(p *parser) interface{} {
 	tok := p.getToken()
 	if tok == nil || tok.typ == tokenEOF {
-		panic("expecting a value")
+		panic(tok.Pos() + ": expecting a value")
 	}
 
 	switch tok.typ {
@@ -204,7 +204,7 @@ func parseRvalue(p *parser) interface{} {
 		panic(tok.val)
 	}
 
-	panic("never reached")
+	panic(tok.Pos() + ": never reached")
 
 	return nil
 }
@@ -215,7 +215,7 @@ func parseArray(p *parser) []interface{} {
 	for {
 		follow := p.peek()
 		if follow == nil || follow.typ == tokenEOF {
-			panic("unterminated array")
+			panic(follow.Pos() + ": unterminated array")
 		}
 		if follow.typ == tokenRightBracket {
 			p.getToken()
@@ -226,15 +226,15 @@ func parseArray(p *parser) []interface{} {
 			arrayType = reflect.TypeOf(val)
 		}
 		if reflect.TypeOf(val) != arrayType {
-			panic("mixed types in array")
+			panic(follow.Pos() + ": mixed types in array")
 		}
 		array = append(array, val)
 		follow = p.peek()
 		if follow == nil {
-			panic("unterminated array")
+			panic(follow.Pos() + ": unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
-			panic("missing comma")
+			panic(follow.Pos() + ": missing comma")
 		}
 		if follow.typ == tokenComma {
 			p.getToken()
