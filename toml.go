@@ -142,11 +142,13 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 //
 // e.g. passing a.b.c will create (assuming tree is empty) tree[a], tree[a][b]
 // and tree[a][b][c]
-func (t *TomlTree) createSubTree(key string) {
+//
+// Returns nil on success, error object on failure
+func (t *TomlTree) createSubTree(key string) error{
 	subtree := t
 	for _, intermediate_key := range strings.Split(key, ".") {
 		if intermediate_key == "" {
-			panic("empty intermediate table")
+			return fmt.Errorf("empty intermediate table")
 		}
 		_, exists := (*subtree)[intermediate_key]
 		if !exists {
@@ -155,6 +157,7 @@ func (t *TomlTree) createSubTree(key string) {
 		}
 		subtree = ((*subtree)[intermediate_key]).(*TomlTree)
 	}
+  return nil
 }
 
 // encodes a string to a TOML-compliant string value

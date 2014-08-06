@@ -134,7 +134,9 @@ func parseGroup(p *parser) parserStateFn {
 		}
 	}
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
-	p.tree.createSubTree(key.val)
+	if err := p.tree.createSubTree(key.val); err != nil {
+    p.raiseError(key, "%s", err)
+  }
 	p.assume(tokenRightBracket)
 	p.currentGroup = strings.Split(key.val, ".")
 	return parseStart(p)
