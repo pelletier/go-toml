@@ -228,7 +228,7 @@ func TestDuplicateKeys(t *testing.T) {
 
 func TestEmptyIntermediateTable(t *testing.T) {
 	_, err := Load("[foo..bar]")
-	if err.Error() != "(1, 2): empty intermediate table" {
+	if err.Error() != "empty intermediate table" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
