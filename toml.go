@@ -144,7 +144,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 // and tree[a][b][c]
 //
 // Returns nil on success, error object on failure
-func (t *TomlTree) createSubTree(key string) error{
+func (t *TomlTree) createSubTree(key string) error {
 	subtree := t
 	for _, intermediate_key := range strings.Split(key, ".") {
 		if intermediate_key == "" {
@@ -157,7 +157,7 @@ func (t *TomlTree) createSubTree(key string) error{
 		}
 		subtree = ((*subtree)[intermediate_key]).(*TomlTree)
 	}
-  return nil
+	return nil
 }
 
 // encodes a string to a TOML-compliant string value

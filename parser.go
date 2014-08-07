@@ -21,8 +21,8 @@ type parser struct {
 type parserStateFn func(*parser) parserStateFn
 
 // Formats and panics an error message based on a token
-func (p *parser) raiseError(tok *token, msg string, args... interface{}) {
-  panic(tok.Pos() + ": " + fmt.Sprintf(msg, args...))
+func (p *parser) raiseError(tok *token, msg string, args ...interface{}) {
+	panic(tok.Pos() + ": " + fmt.Sprintf(msg, args...))
 }
 
 func (p *parser) run() {
@@ -135,8 +135,8 @@ func parseGroup(p *parser) parserStateFn {
 	}
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
 	if err := p.tree.createSubTree(key.val); err != nil {
-    p.raiseError(key, "%s", err)
-  }
+		p.raiseError(key, "%s", err)
+	}
 	p.assume(tokenRightBracket)
 	p.currentGroup = strings.Split(key.val, ".")
 	return parseStart(p)
@@ -211,7 +211,7 @@ func parseRvalue(p *parser) interface{} {
 		p.raiseError(tok, "%s", tok)
 	}
 
-  p.raiseError(tok, "never reached")
+	p.raiseError(tok, "never reached")
 
 	return nil
 }

@@ -44,10 +44,10 @@ const (
 )
 
 type token struct {
-	typ tokenType
-	val string
-  line int
-  col int
+	typ  tokenType
+	val  string
+	line int
+	col  int
 }
 
 func (i token) String() string {
@@ -65,7 +65,7 @@ func (i token) String() string {
 }
 
 func (i token) Pos() string {
-  return fmt.Sprintf("(%d, %d)", i.line + 1, i.col + 1)
+	return fmt.Sprintf("(%d, %d)", i.line+1, i.col+1)
 }
 
 func isSpace(r rune) bool {
@@ -99,8 +99,8 @@ type lexer struct {
 	width  int
 	tokens chan token
 	depth  int
-  line   int
-  col    int
+	line   int
+	col    int
 }
 
 func (l *lexer) run() {
@@ -111,31 +111,31 @@ func (l *lexer) run() {
 }
 
 func (l *lexer) nextStart() {
-  // iterate by runes (utf8 characters)
-  // search for newlines and advance line/col counts
-  for i:=l.start; i<l.pos; {
-	  r, width := utf8.DecodeRuneInString(l.input[i:])
-    if r == '\n' {
-      l.line += 1
-      l.col = 0
-    } else {
-      l.col += 1
-    }
-    i += width
-//    fmt.Printf("'%c'\n", r)
-  }
-  // advance start position to next token
-  l.start = l.pos
+	// iterate by runes (utf8 characters)
+	// search for newlines and advance line/col counts
+	for i := l.start; i < l.pos; {
+		r, width := utf8.DecodeRuneInString(l.input[i:])
+		if r == '\n' {
+			l.line += 1
+			l.col = 0
+		} else {
+			l.col += 1
+		}
+		i += width
+		//    fmt.Printf("'%c'\n", r)
+	}
+	// advance start position to next token
+	l.start = l.pos
 }
 
 func (l *lexer) emit(t tokenType) {
 	l.tokens <- token{t, l.input[l.start:l.pos], l.line, l.col}
-  l.nextStart()
+	l.nextStart()
 }
 
 func (l *lexer) emitWithValue(t tokenType, value string) {
 	l.tokens <- token{t, value, l.line, l.col}
-  l.nextStart()
+	l.nextStart()
 }
 
 func (l *lexer) next() rune {
@@ -150,7 +150,7 @@ func (l *lexer) next() rune {
 }
 
 func (l *lexer) ignore() {
-  l.nextStart()
+	l.nextStart()
 }
 
 func (l *lexer) backup() {
@@ -161,8 +161,8 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	l.tokens <- token{
 		tokenError,
 		fmt.Sprintf(format, args...),
-    l.line,
-    l.col,
+		l.line,
+		l.col,
 	}
 	return nil
 }

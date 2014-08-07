@@ -7,12 +7,12 @@ func testFlow(t *testing.T, input string, expectedFlow []token) {
 	for _, expected := range expectedFlow {
 		token := <-ch
 		if token != expected {
-      t.Log("While testing: ", input)
+			t.Log("While testing: ", input)
 			t.Log("compared", token, "to", expected)
-			t.Log(token.val,  "<->", expected.val)
-			t.Log(token.typ,  "<->", expected.typ)
+			t.Log(token.val, "<->", expected.val)
+			t.Log(token.typ, "<->", expected.typ)
 			t.Log(token.line, "<->", expected.line)
-			t.Log(token.col,  "<->", expected.col)
+			t.Log(token.col, "<->", expected.col)
 			t.FailNow()
 		}
 	}
@@ -125,7 +125,6 @@ func TestKeyWithSharpAndEqual(t *testing.T) {
 	})
 }
 
-
 func TestKeyWithSymbolsAndEqual(t *testing.T) {
 	testFlow(t, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
 		token{tokenKey, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:'", 0, 0},
@@ -139,7 +138,7 @@ func TestKeyEqualStringEscape(t *testing.T) {
 	testFlow(t, `foo = "hello\""`, []token{
 		token{tokenKey, "foo", 0, 0},
 		token{tokenEqual, "=", 0, 4},
-		token{tokenString, "hello\"" ,0, 7},
+		token{tokenString, "hello\"", 0, 7},
 		token{tokenEOF, "", 0, 15},
 	})
 }
