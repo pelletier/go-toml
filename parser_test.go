@@ -160,12 +160,12 @@ func TestNestedEmptyArrays(t *testing.T) {
 
 func TestArrayMixedTypes(t *testing.T) {
 	_, err := Load("a = [42, 16.0]")
-	if err.Error() != "mixed types in array" {
+	if err.Error() != "(1, 10): mixed types in array" {
 		t.Error("Bad error message:", err.Error())
 	}
 
 	_, err = Load("a = [42, \"hello\"]")
-	if err.Error() != "mixed types in array" {
+	if err.Error() != "(1, 11): mixed types in array" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -179,14 +179,14 @@ func TestArrayNestedStrings(t *testing.T) {
 
 func TestMissingValue(t *testing.T) {
 	_, err := Load("a = ")
-	if err.Error() != "expecting a value" {
+	if err.Error() != "(1, 4): expecting a value" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
 
 func TestUnterminatedArray(t *testing.T) {
 	_, err := Load("a = [1,")
-	if err.Error() != "unterminated array" {
+	if err.Error() != "(1, 8): unterminated array" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -214,21 +214,21 @@ func TestArrayWithExtraCommaComment(t *testing.T) {
 
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
-	if err.Error() != "duplicated tables" {
+	if err.Error() != "(3, 2): duplicated tables" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
 
 func TestDuplicateKeys(t *testing.T) {
 	_, err := Load("foo = 2\nfoo = 3")
-	if err.Error() != "the following key was defined twice: foo" {
+	if err.Error() != "(2, 1): the following key was defined twice: foo" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
 
 func TestEmptyIntermediateTable(t *testing.T) {
 	_, err := Load("[foo..bar]")
-	if err.Error() != "empty intermediate table" {
+	if err.Error() != "(1, 2): empty intermediate table" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -249,12 +249,12 @@ func TestImplicitDeclarationBefore(t *testing.T) {
 
 func TestFloatsWithoutLeadingZeros(t *testing.T) {
 	_, err := Load("a = .42")
-	if err.Error() != "cannot start float with a dot" {
+	if err.Error() != "(1, 4): cannot start float with a dot" {
 		t.Error("Bad error message:", err.Error())
 	}
 
 	_, err = Load("a = -.42")
-	if err.Error() != "cannot start float with a dot" {
+	if err.Error() != "(1, 5): cannot start float with a dot" {
 		t.Error("Bad error message:", err.Error())
 	}
 }

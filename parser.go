@@ -20,6 +20,11 @@ type parser struct {
 
 type parserStateFn func(*parser) parserStateFn
 
+// Formats and panics an error message based on a token
+func (p *parser) raiseError(tok *token, msg string, args ...interface{}) {
+	panic(tok.Pos() + ": " + fmt.Sprintf(msg, args...))
+}
+
 func (p *parser) run() {
 	for state := parseStart; state != nil; {
 		state = state(p)
@@ -42,10 +47,10 @@ func (p *parser) peek() *token {
 func (p *parser) assume(typ tokenType) {
 	tok := p.getToken()
 	if tok == nil {
-		panic(fmt.Sprintf("was expecting token %s, but token stream is empty", typ))
+		p.raiseError(tok, "was expecting token %s, but token stream is empty", tok.typ)
 	}
 	if tok.typ != typ {
-		panic(fmt.Sprintf("was expecting token %s, but got %s", typ, tok.typ))
+		p.raiseError(tok, "was expecting token %s, but got %s", typ, tok.typ)
 	}
 }
 
@@ -80,7 +85,7 @@ func parseStart(p *parser) parserStateFn {
 	case tokenEOF:
 		return nil
 	default:
-		panic("unexpected token")
+		p.raiseError(tok, "unexpected token")
 	}
 	return nil
 }
@@ -89,7 +94,7 @@ func parseGroupArray(p *parser) parserStateFn {
 	p.getToken() // discard the [[
 	key := p.getToken()
 	if key.typ != tokenKeyGroupArray {
-		panic(fmt.Sprintf("unexpected token %s, was expecting a key group array", key))
+		p.raiseError(key, "unexpected token %s, was expecting a key group array", key)
 	}
 
 	// get or create group array element at the indicated part in the path
@@ -101,7 +106,7 @@ func parseGroupArray(p *parser) parserStateFn {
 	} else if dest_tree.([]*TomlTree) != nil {
 		array = dest_tree.([]*TomlTree)
 	} else {
-		panic(fmt.Sprintf("key %s is already assigned and not of type group array", key))
+		p.raiseError(key, "key %s is already assigned and not of type group array", key)
 	}
 
 	// add a new tree to the end of the group array
@@ -121,15 +126,17 @@ func parseGroup(p *parser) parserStateFn {
 	p.getToken() // discard the [
 	key := p.getToken()
 	if key.typ != tokenKeyGroup {
-		panic(fmt.Sprintf("unexpected token %s, was expecting a key group", key))
+		p.raiseError(key, "unexpected token %s, was expecting a key group", key)
 	}
 	for _, item := range p.seenGroupKeys {
 		if item == key.val {
-			panic("duplicated tables")
+			p.raiseError(key, "duplicated tables")
 		}
 	}
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
-	p.tree.createSubTree(key.val)
+	if err := p.tree.createSubTree(key.val); err != nil {
+		p.raiseError(key, "%s", err)
+	}
 	p.assume(tokenRightBracket)
 	p.currentGroup = strings.Split(key.val, ".")
 	return parseStart(p)
@@ -154,14 +161,14 @@ func parseAssign(p *parser) parserStateFn {
 	case *TomlTree:
 		target_node = node
 	default:
-		panic(fmt.Sprintf("Unknown group type for path %v", group_key))
+		p.raiseError(key, "Unknown group type for path %s", group_key)
 	}
 
 	// assign value to the found group
 	local_key := []string{key.val}
 	final_key := append(group_key, key.val)
 	if target_node.GetPath(local_key) != nil {
-		panic(fmt.Sprintf("the following key was defined twice: %s", strings.Join(final_key, ".")))
+		p.raiseError(key, "the following key was defined twice: %s", strings.Join(final_key, "."))
 	}
 	target_node.SetPath(local_key, value)
 	return parseStart(p)
@@ -170,7 +177,7 @@ func parseAssign(p *parser) parserStateFn {
 func parseRvalue(p *parser) interface{} {
 	tok := p.getToken()
 	if tok == nil || tok.typ == tokenEOF {
-		panic("expecting a value")
+		p.raiseError(tok, "expecting a value")
 	}
 
 	switch tok.typ {
@@ -183,28 +190,28 @@ func parseRvalue(p *parser) interface{} {
 	case tokenInteger:
 		val, err := strconv.ParseInt(tok.val, 10, 64)
 		if err != nil {
-			panic(err)
+			p.raiseError(tok, "%s", err)
 		}
 		return val
 	case tokenFloat:
 		val, err := strconv.ParseFloat(tok.val, 64)
 		if err != nil {
-			panic(err)
+			p.raiseError(tok, "%s", err)
 		}
 		return val
 	case tokenDate:
 		val, err := time.Parse(time.RFC3339, tok.val)
 		if err != nil {
-			panic(err)
+			p.raiseError(tok, "%s", err)
 		}
 		return val
 	case tokenLeftBracket:
 		return parseArray(p)
 	case tokenError:
-		panic(tok.val)
+		p.raiseError(tok, "%s", tok)
 	}
 
-	panic("never reached")
+	p.raiseError(tok, "never reached")
 
 	return nil
 }
@@ -215,7 +222,7 @@ func parseArray(p *parser) []interface{} {
 	for {
 		follow := p.peek()
 		if follow == nil || follow.typ == tokenEOF {
-			panic("unterminated array")
+			p.raiseError(follow, "unterminated array")
 		}
 		if follow.typ == tokenRightBracket {
 			p.getToken()
@@ -226,15 +233,15 @@ func parseArray(p *parser) []interface{} {
 			arrayType = reflect.TypeOf(val)
 		}
 		if reflect.TypeOf(val) != arrayType {
-			panic("mixed types in array")
+			p.raiseError(follow, "mixed types in array")
 		}
 		array = append(array, val)
 		follow = p.peek()
 		if follow == nil {
-			panic("unterminated array")
+			p.raiseError(follow, "unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
-			panic("missing comma")
+			p.raiseError(follow, "missing comma")
 		}
 		if follow.typ == tokenComma {
 			p.getToken()
