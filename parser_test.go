@@ -299,6 +299,16 @@ func TestParseKeyGroupArray(t *testing.T) {
 	})
 }
 
+func TestParseKeyGroupArraySpec(t *testing.T) {
+	tree, err := Load("[[fruit]]\n name=\"apple\"\n [fruit.physical]\n color=\"red\"\n shape=\"round\"\n [[fruit]]\n name=\"banana\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"fruit": []map[string]interface{}{
+			{"name": "apple", "physical": map[string]interface{}{"color": "red", "shape": "round"}},
+			{"name": "banana"},
+		},
+	})
+}
+
 func TestToTomlValue(t *testing.T) {
 	for idx, item := range []struct {
 		Value  interface{}

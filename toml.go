@@ -155,7 +155,15 @@ func (t *TomlTree) createSubTree(key string) error {
 			var new_tree TomlTree = make(TomlTree)
 			(*subtree)[intermediate_key] = &new_tree
 		}
-		subtree = ((*subtree)[intermediate_key]).(*TomlTree)
+
+		switch node := (*subtree)[intermediate_key].(type) {
+		case []*TomlTree:
+			subtree = node[len(node)-1]
+		case *TomlTree:
+			subtree = node
+		default:
+			return fmt.Errorf("unknown type for path %s", key)
+		}
 	}
 	return nil
 }

@@ -1,4 +1,6 @@
-// TOML lexer.// Written using the principles developped by Rob Pike in
+// TOML lexer.
+//
+// Written using the principles developped by Rob Pike in
 // http://www.youtube.com/watch?v=HxaD_trXwRE
 
 package toml
