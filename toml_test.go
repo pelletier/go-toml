@@ -1,3 +1,5 @@
+// Testing support for go-toml
+
 package toml
 
 import (
@@ -27,16 +29,16 @@ func TestTomlHasPath(t *testing.T) {
 }
 
 func TestTomlGetPath(t *testing.T) {
-	node := make(TomlTree)
+	node := newTomlTree()
 	//TODO: set other node data
 
 	for idx, item := range []struct {
 		Path     []string
-		Expected interface{}
+		Expected *TomlTree
 	}{
 		{ // empty path test
 			[]string{},
-			&node,
+			node,
 		},
 	} {
 		result := node.GetPath(item.Path)

@@ -12,14 +12,15 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 		return
 	}
 	for k, v := range ref {
-		node := tree.Get(k)
-		switch cast_node := node.(type) {
+		// NOTE: directly access key instead of resolve by path
+		// NOTE: see TestSpecialKV
+		switch node := tree.GetPath([]string{k}).(type) {
 		case []*TomlTree:
-			for idx, item := range cast_node {
+			for idx, item := range node {
 				assertTree(t, item, err, v.([]map[string]interface{})[idx])
 			}
 		case *TomlTree:
-			assertTree(t, cast_node, err, v.(map[string]interface{}))
+			assertTree(t, node, err, v.(map[string]interface{}))
 		default:
 			if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", v) {
 				t.Errorf("was expecting %v at %v but got %v", v, k, node)
@@ -29,8 +30,8 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 }
 
 func TestCreateSubTree(t *testing.T) {
-	tree := make(TomlTree)
-	tree.createSubTree("a.b.c")
+	tree := newTomlTree()
+	tree.createSubTree([]string{"a", "b", "c"})
 	tree.Set("a.b.c", 42)
 	if tree.Get("a.b.c") != 42 {
 		t.Fail()
@@ -47,6 +48,15 @@ func TestSimpleKV(t *testing.T) {
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": int64(42),
 		"b": int64(21),
+	})
+}
+
+// NOTE: from the BurntSushi test suite
+// NOTE: this test is pure evil due to the embedded '.'
+func TestSpecialKV(t *testing.T) {
+	tree, err := Load("~!@#$^&*()_+-`1234567890[]\\|/?><.,;: = 1")
+	assertTree(t, tree, err, map[string]interface{}{
+		"~!@#$^&*()_+-`1234567890[]\\|/?><.,;:": int64(1),
 	})
 }
 
@@ -107,7 +117,13 @@ func TestBools(t *testing.T) {
 func TestNestedKeys(t *testing.T) {
 	tree, err := Load("[a.b.c]\nd = 42")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a.b.c.d": int64(42),
+		"a": map[string]interface{}{
+			"b": map[string]interface{}{
+				"c": map[string]interface{}{
+					"d": int64(42),
+				},
+			},
+		},
 	})
 }
 
@@ -221,7 +237,7 @@ func TestDuplicateGroups(t *testing.T) {
 
 func TestDuplicateKeys(t *testing.T) {
 	_, err := Load("foo = 2\nfoo = 3")
-	if err.Error() != "(2, 1): the following key was defined twice: foo" {
+	if err.Error() != "(2, 1): The following key was defined twice: foo" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -270,20 +286,35 @@ func TestParseFile(t *testing.T) {
 	tree, err := LoadFile("example.toml")
 
 	assertTree(t, tree, err, map[string]interface{}{
-		"title":                   "TOML Example",
-		"owner.name":              "Tom Preston-Werner",
-		"owner.organization":      "GitHub",
-		"owner.bio":               "GitHub Cofounder & CEO\nLikes tater tots and beer.",
-		"owner.dob":               time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
-		"database.server":         "192.168.1.1",
-		"database.ports":          []int64{8001, 8001, 8002},
-		"database.connection_max": 5000,
-		"database.enabled":        true,
-		"servers.alpha.ip":        "10.0.0.1",
-		"servers.alpha.dc":        "eqdc10",
-		"servers.beta.ip":         "10.0.0.2",
-		"servers.beta.dc":         "eqdc10",
-		"clients.data":            []interface{}{[]string{"gamma", "delta"}, []int64{1, 2}},
+		"title": "TOML Example",
+		"owner": map[string]interface{}{
+			"name":         "Tom Preston-Werner",
+			"organization": "GitHub",
+			"bio":          "GitHub Cofounder & CEO\nLikes tater tots and beer.",
+			"dob":          time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+		},
+		"database": map[string]interface{}{
+			"server":         "192.168.1.1",
+			"ports":          []int64{8001, 8001, 8002},
+			"connection_max": 5000,
+			"enabled":        true,
+		},
+		"servers": map[string]interface{}{
+			"alpha": map[string]interface{}{
+				"ip": "10.0.0.1",
+				"dc": "eqdc10",
+			},
+			"beta": map[string]interface{}{
+				"ip": "10.0.0.2",
+				"dc": "eqdc10",
+			},
+		},
+		"clients": map[string]interface{}{
+			"data": []interface{}{
+				[]string{"gamma", "delta"},
+				[]int64{1, 2},
+			},
+		},
 	})
 }
 
@@ -333,17 +364,72 @@ func TestToTomlValue(t *testing.T) {
 }
 
 func TestToString(t *testing.T) {
-	tree := &TomlTree{
-		"foo": &TomlTree{
-			"bar": []*TomlTree{
-				{"a": int64(42)},
-				{"a": int64(69)},
-			},
-		},
+	tree, err := Load("[foo]\n\n[[foo.bar]]\na = 42\n\n[[foo.bar]]\na = 69\n")
+	if err != nil {
+		t.Errorf("Test failed to parse: %v", err)
+		return
 	}
 	result := tree.ToString()
-	expected := "\n[foo]\n\n[[foo.bar]]\na = 42\n\n[[foo.bar]]\na = 69\n"
+	expected := "\n[foo]\n\n  [[foo.bar]]\n    a = 42\n\n  [[foo.bar]]\n    a = 69\n"
 	if result != expected {
 		t.Errorf("Expected got '%s', expected '%s'", result, expected)
+	}
+}
+
+func assertPosition(t *testing.T, text string, ref map[string]Position) {
+	tree, err := Load(text)
+	if err != nil {
+		t.Errorf("Error loading document text: `%v`", text)
+		t.Errorf("Error: %v", err)
+	}
+	for path, pos := range ref {
+		testPos := tree.GetPosition(path)
+		if testPos.Invalid() {
+			t.Errorf("Failed to query tree path: %s", path)
+		} else if pos != testPos {
+			t.Errorf("Expected position %v, got %v instead", pos, testPos)
+		}
+	}
+}
+
+func TestDocumentPositions(t *testing.T) {
+	assertPosition(t,
+		"[foo]\nbar=42\nbaz=69",
+		map[string]Position{
+			"foo":     Position{1, 1},
+			"foo.bar": Position{2, 1},
+			"foo.baz": Position{3, 1},
+		})
+}
+
+func TestDocumentPositionsWithSpaces(t *testing.T) {
+	assertPosition(t,
+		"  [foo]\n  bar=42\n  baz=69",
+		map[string]Position{
+			"foo":     Position{1, 3},
+			"foo.bar": Position{2, 3},
+			"foo.baz": Position{3, 3},
+		})
+}
+
+func TestDocumentPositionsWithGroupArray(t *testing.T) {
+	assertPosition(t,
+		"[[foo]]\nbar=42\nbaz=69",
+		map[string]Position{
+			"foo":     Position{1, 1},
+			"foo.bar": Position{2, 1},
+			"foo.baz": Position{3, 1},
+		})
+}
+
+func TestDocumentPositionsEmptyPath(t *testing.T) {
+	text := "[foo]\nbar=42\nbaz=69"
+	tree, err := Load(text)
+	if err != nil {
+		t.Errorf("Error loading document text: `%v`", text)
+		t.Errorf("Error: %v", err)
+	}
+	if pos := tree.GetPosition(""); !pos.Invalid() {
+		t.Errorf("Valid position was returned for empty path")
 	}
 }
