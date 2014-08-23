@@ -6,7 +6,7 @@ This library supports TOML version
 [v0.2.0](https://github.com/mojombo/toml/blob/master/versions/toml-v0.2.0.md)
 
 [![GoDoc](https://godoc.org/github.com/pelletier/go-toml?status.svg)](http://godoc.org/github.com/pelletier/go-toml)
-[![Build Status](https://travis-ci.org/pelletier/go-toml.png?branch=master)](https://travis-ci.org/pelletier/go-toml)
+[![Build Status](https://travis-ci.org/pelletier/go-toml.svg?branch=master)](https://travis-ci.org/pelletier/go-toml)
 
 ## Import
 
