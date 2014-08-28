@@ -1,7 +1,4 @@
 // Position support for go-toml
-//
-// BSD Licensed
-// Copyright 2014 eric.t.anderton@gmail.com
 
 package toml
 
