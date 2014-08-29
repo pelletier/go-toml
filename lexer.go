@@ -45,7 +45,7 @@ const (
 	tokenEOL
 )
 
-var tokenTypeNames []string = []string{
+var tokenTypeNames = []string{
 	"EOF",
 	"Comment",
 	"Key",
@@ -142,10 +142,10 @@ func (l *lexer) nextStart() {
 	for i := l.start; i < l.pos; {
 		r, width := utf8.DecodeRuneInString(l.input[i:])
 		if r == '\n' {
-			l.line += 1
+			l.line++
 			l.col = 1
 		} else {
-			l.col += 1
+			l.col++
 		}
 		i += width
 	}
@@ -262,10 +262,10 @@ func lexRvalue(l *lexer) stateFn {
 		case '=':
 			return l.errorf("cannot have multiple equals for the same key")
 		case '[':
-			l.depth += 1
+			l.depth++
 			return lexLeftBracket
 		case ']':
-			l.depth -= 1
+			l.depth--
 			return lexRightBracket
 		case '#':
 			return lexComment
@@ -275,12 +275,11 @@ func lexRvalue(l *lexer) stateFn {
 			return lexComma
 		case '\n':
 			l.ignore()
-			l.pos += 1
+			l.pos++
 			if l.depth == 0 {
 				return lexVoid
-			} else {
-				return lexRvalue
 			}
+			return lexRvalue
 		}
 
 		if l.follow("true") {
@@ -373,70 +372,70 @@ func lexComment(l *lexer) stateFn {
 
 func lexLeftBracket(l *lexer) stateFn {
 	l.ignore()
-	l.pos += 1
+	l.pos++
 	l.emit(tokenLeftBracket)
 	return lexRvalue
 }
 
 func lexString(l *lexer) stateFn {
-	l.pos += 1
+	l.pos++
 	l.ignore()
-	growing_string := ""
+	growingString := ""
 
 	for {
 		if l.peek() == '"' {
-			l.emitWithValue(tokenString, growing_string)
-			l.pos += 1
+			l.emitWithValue(tokenString, growingString)
+			l.pos++
 			l.ignore()
 			return lexRvalue
 		}
 
 		if l.follow("\\\"") {
-			l.pos += 1
-			growing_string += "\""
+			l.pos++
+			growingString += "\""
 		} else if l.follow("\\n") {
-			l.pos += 1
-			growing_string += "\n"
+			l.pos++
+			growingString += "\n"
 		} else if l.follow("\\b") {
-			l.pos += 1
-			growing_string += "\b"
+			l.pos++
+			growingString += "\b"
 		} else if l.follow("\\f") {
-			l.pos += 1
-			growing_string += "\f"
+			l.pos++
+			growingString += "\f"
 		} else if l.follow("\\/") {
-			l.pos += 1
-			growing_string += "/"
+			l.pos++
+			growingString += "/"
 		} else if l.follow("\\t") {
-			l.pos += 1
-			growing_string += "\t"
+			l.pos++
+			growingString += "\t"
 		} else if l.follow("\\r") {
-			l.pos += 1
-			growing_string += "\r"
+			l.pos++
+			growingString += "\r"
 		} else if l.follow("\\\\") {
-			l.pos += 1
-			growing_string += "\\"
+			l.pos++
+			growingString += "\\"
 		} else if l.follow("\\u") {
 			l.pos += 2
 			code := ""
 			for i := 0; i < 4; i++ {
 				c := l.peek()
-				l.pos += 1
+				l.pos++
 				if !isHexDigit(c) {
 					return l.errorf("unfinished unicode escape")
 				}
 				code = code + string(c)
 			}
-			l.pos -= 1
+			l.pos--
 			intcode, err := strconv.ParseInt(code, 16, 32)
 			if err != nil {
 				return l.errorf("invalid unicode escape: \\u" + code)
 			}
-			growing_string += string(rune(intcode))
+			growingString += string(rune(intcode))
 		} else if l.follow("\\") {
-			l.pos += 1
+			l.pos++
 			return l.errorf("invalid escape sequence: \\" + string(l.peek()))
 		} else {
-			growing_string += string(l.peek())
+			growingString += string(l.peek())
 		}
 
 		if l.next() == eof {
@@ -449,18 +448,17 @@ func lexString(l *lexer) stateFn {
 
 func lexKeyGroup(l *lexer) stateFn {
 	l.ignore()
-	l.pos += 1
+	l.pos++
 
 	if l.peek() == '[' {
 		// token '[[' signifies an array of anonymous key groups
-		l.pos += 1
+		l.pos++
 		l.emit(tokenDoubleLeftBracket)
 		return lexInsideKeyGroupArray
-	} else {
-		// vanilla key group
-		l.emit(tokenLeftBracket)
-		return lexInsideKeyGroup
 	}
+	// vanilla key group
+	l.emit(tokenLeftBracket)
+	return lexInsideKeyGroup
 }
 
 func lexInsideKeyGroupArray(l *lexer) stateFn {
@@ -470,11 +468,11 @@ func lexInsideKeyGroupArray(l *lexer) stateFn {
 				l.emit(tokenKeyGroupArray)
 			}
 			l.ignore()
-			l.pos += 1
+			l.pos++
 			if l.peek() != ']' {
 				break // error
 			}
-			l.pos += 1
+			l.pos++
 			l.emit(tokenDoubleRightBracket)
 			return lexVoid
 		} else if l.peek() == '[' {
@@ -495,7 +493,7 @@ func lexInsideKeyGroup(l *lexer) stateFn {
 				l.emit(tokenKeyGroup)
 			}
 			l.ignore()
-			l.pos += 1
+			l.pos++
 			l.emit(tokenRightBracket)
 			return lexVoid
 		} else if l.peek() == '[' {
@@ -511,7 +509,7 @@ func lexInsideKeyGroup(l *lexer) stateFn {
 
 func lexRightBracket(l *lexer) stateFn {
 	l.ignore()
-	l.pos += 1
+	l.pos++
 	l.emit(tokenRightBracket)
 	return lexRvalue
 }
@@ -521,33 +519,33 @@ func lexNumber(l *lexer) stateFn {
 	if !l.accept("+") {
 		l.accept("-")
 	}
-	point_seen := false
-	digit_seen := false
+	pointSeen := false
+	digitSeen := false
 	for {
 		next := l.next()
 		if next == '.' {
-			if point_seen {
+			if pointSeen {
 				return l.errorf("cannot have two dots in one float")
 			}
 			if !isDigit(l.peek()) {
 				return l.errorf("float cannot end with a dot")
 			}
-			point_seen = true
+			pointSeen = true
 		} else if isDigit(next) {
-			digit_seen = true
+			digitSeen = true
 		} else {
 			l.backup()
 			break
 		}
-		if point_seen && !digit_seen {
+		if pointSeen && !digitSeen {
 			return l.errorf("cannot start float with a dot")
 		}
 	}
 
-	if !digit_seen {
+	if !digitSeen {
 		return l.errorf("no digit in that number")
 	}
-	if point_seen {
+	if pointSeen {
 		l.emit(tokenFloat)
 	} else {
 		l.emit(tokenInteger)

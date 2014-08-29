@@ -1,4 +1,4 @@
-// TOML markup language parser.
+// Package toml is a TOML markup language parser.
 //
 // This version supports the specification as described in
 // https://github.com/toml-lang/toml/blob/master/versions/toml-v0.2.0.md
@@ -19,8 +19,7 @@ type tomlValue struct {
 	position Position
 }
 
-// Definition of a TomlTree.
-// This is the result of the parsing of a TOML file.
+// TomlTree is the result of the parsing of a TOML file.
 type TomlTree struct {
 	values   map[string]interface{}
 	position Position
@@ -41,7 +40,7 @@ func (t *TomlTree) Has(key string) bool {
 	return t.HasPath(strings.Split(key, "."))
 }
 
-// Returns true if the given path of keys exists, false otherwise.
+// HasPath returns true if the given path of keys exists, false otherwise.
 func (t *TomlTree) HasPath(keys []string) bool {
 	return t.GetPath(keys) != nil
 }
@@ -49,8 +48,8 @@ func (t *TomlTree) HasPath(keys []string) bool {
 // Keys returns the keys of the toplevel tree.
 // Warning: this is a costly operation.
 func (t *TomlTree) Keys() []string {
-	keys := make([]string, 0)
-	for k, _ := range t.values {
+	var keys []string
+	for k := range t.values {
 		keys = append(keys, k)
 	}
 	return keys
@@ -67,15 +66,15 @@ func (t *TomlTree) Get(key string) interface{} {
 	return t.GetPath(strings.Split(key, "."))
 }
 
-// Returns the element in the tree indicated by 'keys'.
+// GetPath returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
 func (t *TomlTree) GetPath(keys []string) interface{} {
 	if len(keys) == 0 {
 		return t
 	}
 	subtree := t
-	for _, intermediate_key := range keys[:len(keys)-1] {
-		value, exists := subtree.values[intermediate_key]
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		value, exists := subtree.values[intermediateKey]
 		if !exists {
 			return nil
 		}
@@ -101,6 +100,7 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 	}
 }
 
+// GetPosition returns the position of the given key.
 func (t *TomlTree) GetPosition(key string) Position {
 	if key == "" {
 		return Position{0, 0}
@@ -108,15 +108,15 @@ func (t *TomlTree) GetPosition(key string) Position {
 	return t.GetPositionPath(strings.Split(key, "."))
 }
 
-// Returns the element in the tree indicated by 'keys'.
+// GetPositionPath returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
 func (t *TomlTree) GetPositionPath(keys []string) Position {
 	if len(keys) == 0 {
 		return t.position
 	}
 	subtree := t
-	for _, intermediate_key := range keys[:len(keys)-1] {
-		value, exists := subtree.values[intermediate_key]
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		value, exists := subtree.values[intermediateKey]
 		if !exists {
 			return Position{0, 0}
 		}
@@ -150,7 +150,7 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 	}
 }
 
-// Same as Get but with a default value
+// GetDefault works like Get but with a default value
 func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
 	val := t.Get(key)
 	if val == nil {
@@ -166,16 +166,16 @@ func (t *TomlTree) Set(key string, value interface{}) {
 	t.SetPath(strings.Split(key, "."), value)
 }
 
-// Set an element in the tree.
+// SetPath sets an element in the tree.
 // Keys is an array of path elements (e.g. {"a","b","c"}).
 // Creates all necessary intermediates trees, if needed.
 func (t *TomlTree) SetPath(keys []string, value interface{}) {
 	subtree := t
-	for _, intermediate_key := range keys[:len(keys)-1] {
-		nextTree, exists := subtree.values[intermediate_key]
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
 			nextTree = newTomlTree()
-			subtree.values[intermediate_key] = &nextTree // add new element here
+			subtree.values[intermediateKey] = &nextTree // add new element here
 		}
 		switch node := nextTree.(type) {
 		case *TomlTree:
@@ -184,7 +184,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 			// go to most recent element
 			if len(node) == 0 {
 				// create element if it does not exist
-				subtree.values[intermediate_key] = append(node, newTomlTree())
+				subtree.values[intermediateKey] = append(node, newTomlTree())
 			}
 			subtree = node[len(node)-1]
 		}
@@ -201,14 +201,14 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 // Returns nil on success, error object on failure
 func (t *TomlTree) createSubTree(keys []string) error {
 	subtree := t
-	for _, intermediate_key := range keys {
-		if intermediate_key == "" {
+	for _, intermediateKey := range keys {
+		if intermediateKey == "" {
 			return fmt.Errorf("empty intermediate table")
 		}
-		nextTree, exists := subtree.values[intermediate_key]
+		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
 			nextTree = newTomlTree()
-			subtree.values[intermediate_key] = nextTree
+			subtree.values[intermediateKey] = nextTree
 		}
 
 		switch node := nextTree.(type) {
@@ -218,7 +218,7 @@ func (t *TomlTree) createSubTree(keys []string) error {
 			subtree = node
 		default:
 			return fmt.Errorf("unknown type for path %s (%s)",
-				strings.Join(keys, "."), intermediate_key)
+				strings.Join(keys, "."), intermediateKey)
 		}
 	}
 	return nil
@@ -228,7 +228,7 @@ func (t *TomlTree) createSubTree(keys []string) error {
 func encodeTomlString(value string) string {
 	result := ""
 	for _, rr := range value {
-		int_rr := uint16(rr)
+		intRr := uint16(rr)
 		switch rr {
 		case '\b':
 			result += "\\b"
@@ -245,8 +245,8 @@ func encodeTomlString(value string) string {
 		case '\\':
 			result += "\\\\"
 		default:
-			if int_rr < 0x001F {
-				result += fmt.Sprintf("\\u%0.4X", int_rr)
+			if intRr < 0x001F {
+				result += fmt.Sprintf("\\u%0.4X", intRr)
 			} else {
 				result += string(rr)
 			}
@@ -269,9 +269,8 @@ func toTomlValue(item interface{}, indent int) string {
 	case bool:
 		if value {
 			return "true"
-		} else {
-			return "false"
 		}
+		return "false"
 	case time.Time:
 		return tab + value.Format(time.RFC3339)
 	case []interface{}:
@@ -291,24 +290,24 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 	result := ""
 	for k, v := range t.values {
 		// figure out the keyspace
-		combined_key := k
+		combinedKey := k
 		if keyspace != "" {
-			combined_key = keyspace + "." + combined_key
+			combinedKey = keyspace + "." + combinedKey
 		}
 		// output based on type
 		switch node := v.(type) {
 		case []*TomlTree:
 			for _, item := range node {
 				if len(item.Keys()) > 0 {
-					result += fmt.Sprintf("\n%s[[%s]]\n", indent, combined_key)
+					result += fmt.Sprintf("\n%s[[%s]]\n", indent, combinedKey)
 				}
-				result += item.toToml(indent+"  ", combined_key)
+				result += item.toToml(indent+"  ", combinedKey)
 			}
 		case *TomlTree:
 			if len(node.Keys()) > 0 {
-				result += fmt.Sprintf("\n%s[%s]\n", indent, combined_key)
+				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
 			}
-			result += node.toToml(indent+"  ", combined_key)
+			result += node.toToml(indent+"  ", combinedKey)
 		case *tomlValue:
 			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(node.value, 0))
 		default:
@@ -318,13 +317,13 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 	return result
 }
 
-// Generates a human-readable representation of the current tree.
+// ToString generates a human-readable representation of the current tree.
 // Output spans multiple lines, and is suitable for ingest by a TOML parser
 func (t *TomlTree) ToString() string {
 	return t.toToml("", "")
 }
 
-// Create a TomlTree from a string.
+// Load creates a TomlTree from a string.
 func Load(content string) (tree *TomlTree, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -339,7 +338,7 @@ func Load(content string) (tree *TomlTree, err error) {
 	return
 }
 
-// Create a TomlTree from a file.
+// LoadFile creates a TomlTree from a file.
 func LoadFile(path string) (tree *TomlTree, err error) {
 	buff, ferr := ioutil.ReadFile(path)
 	if ferr != nil {
