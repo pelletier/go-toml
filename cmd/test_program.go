@@ -20,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	typedTree := translate((map[string]interface{})(*tree))
+	typedTree := translate(*tree)
 
 	if err := json.NewEncoder(os.Stdout).Encode(typedTree); err != nil {
 		log.Fatalf("Error encoding JSON: %s", err)
@@ -30,7 +30,6 @@ func main() {
 }
 
 func translate(tomlData interface{}) interface{} {
-
 	switch orig := tomlData.(type) {
 	case map[string]interface{}:
 		typed := make(map[string]interface{}, len(orig))
@@ -39,7 +38,14 @@ func translate(tomlData interface{}) interface{} {
 		}
 		return typed
 	case *toml.TomlTree:
-		return translate((map[string]interface{})(*orig))
+		return translate(*orig)
+	case toml.TomlTree:
+		keys := orig.Keys()
+		typed := make(map[string]interface{}, len(keys))
+		for _, k := range keys {
+			typed[k] = translate(orig.GetPath([]string{k}))
+		}
+		return typed
 	case []*toml.TomlTree:
 		typed := make([]map[string]interface{}, len(orig))
 		for i, v := range orig {

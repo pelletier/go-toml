@@ -45,11 +45,39 @@ const (
 	tokenEOL
 )
 
+var tokenTypeNames []string = []string{
+	"EOF",
+	"Comment",
+	"Key",
+	"=",
+	"\"",
+	"Integer",
+	"True",
+	"False",
+	"Float",
+	"[",
+	"[",
+	"]]",
+	"[[",
+	"Date",
+	"KeyGroup",
+	"KeyGroupArray",
+	",",
+	"EOL",
+}
+
 type token struct {
-	typ  tokenType
-	val  string
-	line int
-	col  int
+	Position
+	typ tokenType
+	val string
+}
+
+func (tt tokenType) String() string {
+	idx := int(tt)
+	if idx < len(tokenTypeNames) {
+		return tokenTypeNames[idx]
+	}
+	return "Unknown"
 }
 
 func (i token) String() string {
@@ -64,10 +92,6 @@ func (i token) String() string {
 		return fmt.Sprintf("%.10q...", i.val)
 	}
 	return fmt.Sprintf("%q", i.val)
-}
-
-func (i token) Pos() string {
-	return fmt.Sprintf("(%d, %d)", i.line+1, i.col+1)
 }
 
 func isSpace(r rune) bool {
@@ -119,24 +143,31 @@ func (l *lexer) nextStart() {
 		r, width := utf8.DecodeRuneInString(l.input[i:])
 		if r == '\n' {
 			l.line += 1
-			l.col = 0
+			l.col = 1
 		} else {
 			l.col += 1
 		}
 		i += width
-		//    fmt.Printf("'%c'\n", r)
 	}
 	// advance start position to next token
 	l.start = l.pos
 }
 
 func (l *lexer) emit(t tokenType) {
-	l.tokens <- token{t, l.input[l.start:l.pos], l.line, l.col}
+	l.tokens <- token{
+		Position: Position{l.line, l.col},
+		typ:      t,
+		val:      l.input[l.start:l.pos],
+	}
 	l.nextStart()
 }
 
 func (l *lexer) emitWithValue(t tokenType, value string) {
-	l.tokens <- token{t, value, l.line, l.col}
+	l.tokens <- token{
+		Position: Position{l.line, l.col},
+		typ:      t,
+		val:      value,
+	}
 	l.nextStart()
 }
 
@@ -161,10 +192,9 @@ func (l *lexer) backup() {
 
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	l.tokens <- token{
-		tokenError,
-		fmt.Sprintf(format, args...),
-		l.line,
-		l.col,
+		Position: Position{l.line, l.col},
+		typ:      tokenError,
+		val:      fmt.Sprintf(format, args...),
 	}
 	return nil
 }
@@ -534,6 +564,8 @@ func lex(input string) (*lexer, chan token) {
 	l := &lexer{
 		input:  input,
 		tokens: make(chan token),
+		line:   1,
+		col:    1,
 	}
 	go l.run()
 	return l, l.tokens
