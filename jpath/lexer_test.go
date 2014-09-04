@@ -1,9 +1,8 @@
-
 package jpath
 
 import (
-  . "github.com/pelletier/go-toml"
-  "testing"
+	. "github.com/pelletier/go-toml"
+	"testing"
 )
 
 func testFlow(t *testing.T, input string, expectedFlow []token) {

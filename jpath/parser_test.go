@@ -2,15 +2,15 @@ package jpath
 
 import (
 	"fmt"
+	. "github.com/pelletier/go-toml"
 	"testing"
-  . "github.com/pelletier/go-toml"
 )
 
 func assertQuery(t *testing.T, toml, query string, ref []interface{}) {
 	tree, err := Load(toml)
 	if err != nil {
 		t.Errorf("Non-nil toml parse error: %v", err)
-    return
+		return
 	}
 	_, flow := lex(query)
 	if err != nil {
@@ -18,65 +18,65 @@ func assertQuery(t *testing.T, toml, query string, ref []interface{}) {
 		return
 	}
 	path := parse(flow)
-  result := processPath(path, tree)
-  assertValue(t, result, ref, "")
+	result := processPath(path, tree)
+	assertValue(t, result, ref, "")
 }
 
 func assertValue(t *testing.T, result, ref interface{}, location string) {
-  switch node := ref.(type) {
-  case []interface{}:
-    if resultNode, ok := result.([]interface{}); !ok {
-      t.Errorf("{%s} result value not of type %T: %T",
-        location, node, resultNode)
-    } else {
-      for i, v := range node {
-        assertValue(t, resultNode[i], v, fmt.Sprintf("%s[%d]", location, i))
-      }
-    }
-  case map[string]interface{}:
-    if resultNode, ok := result.(*TomlTree); !ok {
-      t.Errorf("{%s} result value not of type %T: %T",
-        location, node, resultNode)
-    } else {
-      for k, v := range node {
-        assertValue(t, resultNode.GetPath([]string{k}), v, location + "." + k)
-      }
-    }
-  case int64:
-    if resultNode, ok := result.(int64); !ok {
-      t.Errorf("{%s} result value not of type %T: %T",
-        location, node, resultNode)
-    } else {
-      if node != resultNode {
-        t.Errorf("{%s} result value does not match", location)
-      }
-    }
-  case string:
-    if resultNode, ok := result.(string); !ok {
-      t.Errorf("{%s} result value not of type %T: %T",
-        location, node, resultNode)
-    } else {
-      if node != resultNode {
-        t.Errorf("{%s} result value does not match", location)
-      }
-    }
-  default:
-    if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", ref) {
-      t.Errorf("{%s} result value does not match: %v != %v",
-        location, node, ref)
-    }
-  }
+	switch node := ref.(type) {
+	case []interface{}:
+		if resultNode, ok := result.([]interface{}); !ok {
+			t.Errorf("{%s} result value not of type %T: %T",
+				location, node, resultNode)
+		} else {
+			for i, v := range node {
+				assertValue(t, resultNode[i], v, fmt.Sprintf("%s[%d]", location, i))
+			}
+		}
+	case map[string]interface{}:
+		if resultNode, ok := result.(*TomlTree); !ok {
+			t.Errorf("{%s} result value not of type %T: %T",
+				location, node, resultNode)
+		} else {
+			for k, v := range node {
+				assertValue(t, resultNode.GetPath([]string{k}), v, location+"."+k)
+			}
+		}
+	case int64:
+		if resultNode, ok := result.(int64); !ok {
+			t.Errorf("{%s} result value not of type %T: %T",
+				location, node, resultNode)
+		} else {
+			if node != resultNode {
+				t.Errorf("{%s} result value does not match", location)
+			}
+		}
+	case string:
+		if resultNode, ok := result.(string); !ok {
+			t.Errorf("{%s} result value not of type %T: %T",
+				location, node, resultNode)
+		} else {
+			if node != resultNode {
+				t.Errorf("{%s} result value does not match", location)
+			}
+		}
+	default:
+		if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", ref) {
+			t.Errorf("{%s} result value does not match: %v != %v",
+				location, node, ref)
+		}
+	}
 }
 
 func TestQueryRoot(t *testing.T) {
-  assertQuery(t,
-    "a = 42",
-    "$",
-	  []interface{}{
-      map[string]interface{}{
-		    "a": int64(42),
-	    },
-    })
+	assertQuery(t,
+		"a = 42",
+		"$",
+		[]interface{}{
+			map[string]interface{}{
+				"a": int64(42),
+			},
+		})
 }
 
 /*

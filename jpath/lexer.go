@@ -6,8 +6,8 @@
 package jpath
 
 import (
-  . "github.com/pelletier/go-toml"
 	"fmt"
+	. "github.com/pelletier/go-toml"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,42 +27,42 @@ const (
 const (
 	tokenError tokenType = iota
 	tokenEOF
-  tokenKey
-  tokenString
-  tokenFloat
-  tokenInteger
-  tokenAtCost
-  tokenDollar
-  tokenLBracket
-  tokenRBracket
-  tokenDot
-  tokenDotDot
-  tokenStar
-  tokenComma
-  tokenColon
-  tokenQuestion
-  tokenLParen
-  tokenRParen
+	tokenKey
+	tokenString
+	tokenFloat
+	tokenInteger
+	tokenAtCost
+	tokenDollar
+	tokenLBracket
+	tokenRBracket
+	tokenDot
+	tokenDotDot
+	tokenStar
+	tokenComma
+	tokenColon
+	tokenQuestion
+	tokenLParen
+	tokenRParen
 )
 
 var tokenTypeNames = []string{
 	"EOF",
-  "Key",
-  "String",
-  "Float",
-  "Integer",
-  "@",
-  "$",
-  "[",
-  "]",
-  ".",
-  "..",
-  "*",
-  ",",
-  ":",
-  "?",
-  "(",
-  ")",
+	"Key",
+	"String",
+	"Float",
+	"Integer",
+	"@",
+	"$",
+	"[",
+	"]",
+	".",
+	"..",
+	"*",
+	",",
+	":",
+	"?",
+	"(",
+	")",
 }
 
 type token struct {
@@ -126,7 +126,7 @@ type lexer struct {
 	depth      int
 	line       int
 	col        int
-  stringTerm string
+	stringTerm string
 }
 
 func (l *lexer) run() {
@@ -221,67 +221,67 @@ func (l *lexer) follow(next string) bool {
 type stateFn func(*lexer) stateFn
 
 func lexVoid(l *lexer) stateFn {
-  for {
-    next := l.peek()
-    switch next {
-    case '$':
-      l.pos++
-      l.emit(tokenDollar)
-      continue
-    case '.':
-      if l.follow("..") {
-        l.pos += 2
-        l.emit(tokenDotDot)
-      } else {
-        l.pos++
-        l.emit(tokenDot)
-      }
-      continue
-    case '@':
-      l.pos++
-      l.emit(tokenAtCost)
-      continue
-    case '[':
-      l.pos++
-      l.emit(tokenLBracket)
-      continue
-    case ']':
-      l.pos++
-      l.emit(tokenRBracket)
-      continue
-    case ',':
-      l.pos++
-      l.emit(tokenComma)
-      continue
-    case '*':
-      l.pos++
-      l.emit(tokenStar)
-      continue
-    case '(':
-      l.pos++
-      l.emit(tokenLParen)
-      continue
-    case ')':
-      l.pos++
-      l.emit(tokenRParen)
-      continue
-    case '?':
-      l.pos++
-      l.emit(tokenQuestion)
-      continue
-    case ':':
-      l.pos++
-      l.emit(tokenColon)
-      continue
-    case '\'':
-      l.ignore()
-      l.stringTerm = string(next)
-      return lexString
-    case '"':
-      l.ignore()
-      l.stringTerm = string(next)
-      return lexString
-    }
+	for {
+		next := l.peek()
+		switch next {
+		case '$':
+			l.pos++
+			l.emit(tokenDollar)
+			continue
+		case '.':
+			if l.follow("..") {
+				l.pos += 2
+				l.emit(tokenDotDot)
+			} else {
+				l.pos++
+				l.emit(tokenDot)
+			}
+			continue
+		case '@':
+			l.pos++
+			l.emit(tokenAtCost)
+			continue
+		case '[':
+			l.pos++
+			l.emit(tokenLBracket)
+			continue
+		case ']':
+			l.pos++
+			l.emit(tokenRBracket)
+			continue
+		case ',':
+			l.pos++
+			l.emit(tokenComma)
+			continue
+		case '*':
+			l.pos++
+			l.emit(tokenStar)
+			continue
+		case '(':
+			l.pos++
+			l.emit(tokenLParen)
+			continue
+		case ')':
+			l.pos++
+			l.emit(tokenRParen)
+			continue
+		case '?':
+			l.pos++
+			l.emit(tokenQuestion)
+			continue
+		case ':':
+			l.pos++
+			l.emit(tokenColon)
+			continue
+		case '\'':
+			l.ignore()
+			l.stringTerm = string(next)
+			return lexString
+		case '"':
+			l.ignore()
+			l.stringTerm = string(next)
+			return lexString
+		}
 
 		if isAlphanumeric(next) {
 			return lexKey
@@ -291,7 +291,7 @@ func lexVoid(l *lexer) stateFn {
 			return lexNumber
 		}
 
-    if isAlphanumeric(next) {
+		if isAlphanumeric(next) {
 			return lexKey
 		}
 
@@ -299,28 +299,28 @@ func lexVoid(l *lexer) stateFn {
 			l.ignore()
 		}
 
-    if l.next() == eof {
+		if l.next() == eof {
 			break
-    }
+		}
 
-    return l.errorf("unexpected char: '%v'", next)
-  }
+		return l.errorf("unexpected char: '%v'", next)
+	}
 	l.emit(tokenEOF)
 	return nil
 }
 
 func lexKey(l *lexer) stateFn {
-  for {
-    next := l.peek()
-    if !isAlphanumeric(next) {
-      l.emit(tokenKey)
-      return lexVoid
-    }
+	for {
+		next := l.peek()
+		if !isAlphanumeric(next) {
+			l.emit(tokenKey)
+			return lexVoid
+		}
 
-    if l.next() == eof {
+		if l.next() == eof {
 			break
-    }
-  }
+		}
+	}
 	l.emit(tokenEOF)
 	return nil
 }
