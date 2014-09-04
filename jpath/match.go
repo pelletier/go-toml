@@ -4,38 +4,41 @@ import (
   . "github.com/pelletier/go-toml"
 )
 
-type PathFn func(context interface{}) []interface{}
+type QueryPath []PathFn
+
+type PathFn func(context interface{}, next QueryPath)
+
+func (path QueryPath) Fn(context interface{}) {
+  path[0](context, path[1:])
+}
 
 func treeValue(tree *TomlTree, key string) interface{} {
   return tree.GetPath([]string{key})
 }
 
 func matchKeyFn(name string) PathFn {
-  return func(context interface{}) []interface{} {
+  return func(context interface{}, next QueryPath) {
     if tree, ok := context.(*TomlTree); ok {
       item := treeValue(tree, name)
       if item != nil {
-        return []interface{}{ item }
+        next.Fn(item)
       }
     }
-    return []interface{}{}
   }
 }
 
 func matchIndexFn(idx int) PathFn {
-  return func(context interface{}) []interface{} {
+  return func(context interface{}, next QueryPath) {
     if arr, ok := context.([]interface{}); ok {
       if idx < len(arr) && idx >= 0 {
-        return arr[idx:idx+1]
+        next.Fn(arr[idx])
       }
     }
-    return []interface{}{}
   }
 }
 
 func matchSliceFn(start, end, step int) PathFn {
-  return func(context interface{}) []interface{} {
-    result := []interface{}{}
+  return func(context interface{}, next QueryPath) {
     if arr, ok := context.([]interface{}); ok {
       // adjust indexes for negative values, reverse ordering
       realStart, realEnd := start, end
@@ -50,46 +53,39 @@ func matchSliceFn(start, end, step int) PathFn {
       }
       // loop and gather
       for idx := realStart; idx < realEnd; idx += step {
-         result = append(result, arr[idx])
+        next.Fn(arr[idx])
       }
     }
-    return result
   }
 }
 
 func matchAnyFn() PathFn {
-  return func(context interface{}) []interface{} {
-    result := []interface{}{}
+  return func(context interface{}, next QueryPath) {
     if tree, ok := context.(*TomlTree); ok {
       for _, key := range tree.Keys() {
         item := treeValue(tree, key)
-        result = append(result, item)
+        next.Fn(item)
       }
     }
-    return result
   }
 }
 
-func matchUnionFn(union []PathFn) PathFn {
-  return func(context interface{}) []interface{} {
-    result := []interface{}{}
+func matchUnionFn(union QueryPath) PathFn {
+  return func(context interface{}, next QueryPath) {
     for _, fn := range union {
-      result = append(result, fn(context)...)
+      fn(context, next)
     }
-    return result
   }
 }
 
 func matchRecurseFn() PathFn {
-  return func(context interface{}) []interface{} {
-    result := []interface{}{ context }
-
+  return func(context interface{}, next QueryPath) {
     if tree, ok := context.(*TomlTree); ok {
       var visit func(tree *TomlTree)
       visit = func(tree *TomlTree) {
         for _, key := range tree.Keys() {
           item := treeValue(tree, key)
-          result = append(result, item)
+          next.Fn(item)
           switch node := item.(type) {
           case *TomlTree:
             visit(node)
@@ -102,21 +98,18 @@ func matchRecurseFn() PathFn {
       }
       visit(tree)
     }
-    return result
   }
 }
 
-func processPath(path []PathFn, context interface{}) []interface{} {
-  result := []interface{}{ context }  // start with the root
-  for _, fn := range path {
-    next := []interface{}{}
-    for _, ctx := range result {
-      next = append(next, fn(ctx)...)
-    }
-    if len(next) == 0 {
-      return next // exit if there is nothing more to search
-    }
-    result = next // prep the next iteration
-  }
+
+func processPath(path QueryPath, context interface{}) []interface{} {
+  // terminate the path with a collection funciton
+  result := []interface{}{}
+  newPath := append(path, func(context interface{}, next QueryPath) {
+    result = append(result, context)
+  })
+
+  // execute the path
+  newPath.Fn(context)
   return result
 }
