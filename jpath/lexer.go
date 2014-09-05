@@ -79,18 +79,26 @@ func (tt tokenType) String() string {
 	return "Unknown"
 }
 
-func (i token) String() string {
-	switch i.typ {
+func (t token) Int() int {
+  if result, err := strconv.Atoi(t.val); err != nil {
+    panic(err)
+  } else {
+    return result
+  }
+}
+
+func (t token) String() string {
+	switch t.typ {
 	case tokenEOF:
 		return "EOF"
 	case tokenError:
-		return i.val
+		return t.val
 	}
 
-	if len(i.val) > 10 {
-		return fmt.Sprintf("%.10q...", i.val)
+	if len(t.val) > 10 {
+		return fmt.Sprintf("%.10q...", t.val)
 	}
-	return fmt.Sprintf("%q", i.val)
+	return fmt.Sprintf("%q", t.val)
 }
 
 func isSpace(r rune) bool {
@@ -283,20 +291,18 @@ func lexVoid(l *lexer) stateFn {
 			return lexString
 		}
 
+    if isSpace(next) {
+			l.next()
+      l.ignore()
+      continue
+		}
+
 		if isAlphanumeric(next) {
 			return lexKey
 		}
 
 		if next == '+' || next == '-' || isDigit(next) {
 			return lexNumber
-		}
-
-		if isAlphanumeric(next) {
-			return lexKey
-		}
-
-		if isSpace(next) {
-			l.ignore()
 		}
 
 		if l.next() == eof {

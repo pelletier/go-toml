@@ -29,9 +29,14 @@ func assertValue(t *testing.T, result, ref interface{}, location string) {
 			t.Errorf("{%s} result value not of type %T: %T",
 				location, node, resultNode)
 		} else {
-			for i, v := range node {
-				assertValue(t, resultNode[i], v, fmt.Sprintf("%s[%d]", location, i))
-			}
+      if len(node) != len(resultNode) {
+        t.Errorf("{%s} lengths do not match: %v vs %v",
+          location, node, resultNode)
+      } else {
+        for i, v := range node {
+          assertValue(t, resultNode[i], v, fmt.Sprintf("%s[%d]", location, i))
+        }
+      }
 		}
 	case map[string]interface{}:
 		if resultNode, ok := result.(*TomlTree); !ok {

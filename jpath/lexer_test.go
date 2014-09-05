@@ -54,7 +54,9 @@ func TestLexString(t *testing.T) {
 		token{Position{1, 2}, tokenString, "foo"},
 		token{Position{1, 6}, tokenEOF, ""},
 	})
+}
 
+func TestLexDoubleString(t *testing.T) {
 	testFlow(t, `"bar"`, []token{
 		token{Position{1, 2}, tokenString, "bar"},
 		token{Position{1, 6}, tokenEOF, ""},
@@ -67,3 +69,32 @@ func TestLexKey(t *testing.T) {
 		token{Position{1, 4}, tokenEOF, ""},
 	})
 }
+
+func TestLexRecurse(t *testing.T) {
+	testFlow(t, "$..*", []token{
+		token{Position{1, 1}, tokenDollar, "$"},
+		token{Position{1, 2}, tokenDotDot, ".."},
+		token{Position{1, 4}, tokenStar, "*"},
+		token{Position{1, 5}, tokenEOF, ""},
+	})
+}
+
+func TestLexBracketKey(t *testing.T) {
+	testFlow(t, "$[foo]", []token{
+		token{Position{1, 1}, tokenDollar, "$"},
+		token{Position{1, 2}, tokenLBracket, "["},
+		token{Position{1, 3}, tokenKey, "foo"},
+		token{Position{1, 6}, tokenRBracket, "]"},
+		token{Position{1, 7}, tokenEOF, ""},
+	})
+}
+
+func TestLexSpace(t *testing.T) {
+	testFlow(t, "foo bar baz", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenKey, "bar"},
+		token{Position{1, 9}, tokenKey, "baz"},
+		token{Position{1, 12}, tokenEOF, ""},
+	})
+}
+

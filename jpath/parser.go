@@ -3,13 +3,13 @@ package jpath
 import (
 	"fmt"
 	"math"
-	"strconv"
 )
 
 type parser struct {
 	flow         chan token
 	tokensBuffer []token
 	path         []PathFn
+  union        []PathFn
 }
 
 type parserStateFn func(*parser) parserStateFn
@@ -40,6 +40,27 @@ func (p *parser) peek() *token {
 	}
 	p.backup(&tok)
 	return &tok
+}
+
+func (p *parser) lookahead(types... tokenType) bool {
+  result := true
+  buffer := []token{}
+
+  for _, typ := range types {
+    tok := p.getToken()
+    if tok == nil {
+      result = false
+      break
+    }
+    buffer = append(buffer, *tok)
+    if tok.typ != typ {
+      result = false
+      break
+    }
+  }
+  // add the tokens back to the buffer, and return
+  p.tokensBuffer = append(p.tokensBuffer, buffer...)
+  return result
 }
 
 func (p *parser) getToken() *token {
@@ -73,20 +94,40 @@ func parseStart(p *parser) parserStateFn {
 	return parseMatchExpr
 }
 
+// handle '.' prefix, '[]', and '..'
 func parseMatchExpr(p *parser) parserStateFn {
 	tok := p.getToken()
 	switch tok.typ {
-	case tokenDot:
-		p.appendPath(matchKeyFn(tok.val))
-		return parseMatchExpr
 	case tokenDotDot:
-		p.appendPath(matchRecurseFn())
-		return parseSimpleMatchExpr
+    p.appendPath(&matchRecursiveFn{})
+    // nested parse for '..'
+    tok := p.getToken()
+    switch tok.typ {
+    case tokenKey:
+      p.appendPath(&matchKeyFn{tok.val})
+      return parseMatchExpr
+    case tokenLBracket:
+      return parseBracketExpr
+    case tokenStar:
+      // do nothing - the recursive predicate is enough
+      return parseMatchExpr
+    }
+
+	case tokenDot:
+    // nested parse for '.'
+    tok := p.getToken()
+    switch tok.typ {
+    case tokenKey:
+      p.appendPath(&matchKeyFn{tok.val})
+      return parseMatchExpr
+    case tokenStar:
+      p.appendPath(&matchAnyFn{})
+      return parseMatchExpr
+    }
+
 	case tokenLBracket:
 		return parseBracketExpr
-	case tokenStar:
-		p.appendPath(matchAnyFn())
-		return parseMatchExpr
+
 	case tokenEOF:
 		return nil // allow EOF at this stage
 	}
@@ -94,57 +135,40 @@ func parseMatchExpr(p *parser) parserStateFn {
 	return nil
 }
 
-func parseSimpleMatchExpr(p *parser) parserStateFn {
-	tok := p.getToken()
-	switch tok.typ {
-	case tokenLBracket:
-		return parseBracketExpr
-	case tokenKey:
-		p.appendPath(matchKeyFn(tok.val))
-		return parseMatchExpr
-	case tokenStar:
-		p.appendPath(matchAnyFn())
-		return parseMatchExpr
-	}
-	p.raiseError(tok, "expected match expression")
-	return nil
-}
-
 func parseBracketExpr(p *parser) parserStateFn {
-	tok := p.peek()
-	switch tok.typ {
-	case tokenInteger:
-		// look ahead for a ':'
-		p.getToken()
-		next := p.peek()
-		p.backup(tok)
-		if next.typ == tokenColon {
-			return parseSliceExpr
-		}
-		return parseUnionExpr
-	case tokenColon:
-		return parseSliceExpr
-	}
+  if p.lookahead(tokenInteger, tokenColon) {
+    return parseSliceExpr
+  }
+  if p.peek().typ == tokenColon {
+    return parseSliceExpr
+  }
 	return parseUnionExpr
 }
 
 func parseUnionExpr(p *parser) parserStateFn {
-	union := []PathFn{}
-	for {
+  // this state can be traversed after some sub-expressions
+  // so be careful when setting up state in the parser
+	if p.union == nil {
+    p.union = []PathFn{}
+  }
+
+loop: // labeled loop for easy breaking
+  for {
 		// parse sub expression
 		tok := p.getToken()
 		switch tok.typ {
 		case tokenInteger:
-			idx, _ := strconv.Atoi(tok.val)
-			union = append(union, matchIndexFn(idx))
+			p.union = append(p.union, &matchIndexFn{tok.Int()})
 		case tokenKey:
-			union = append(union, matchKeyFn(tok.val))
+			p.union = append(p.union, &matchKeyFn{tok.val})
+		case tokenString:
+			p.union = append(p.union, &matchKeyFn{tok.val})
 		case tokenQuestion:
 			return parseFilterExpr
 		case tokenLParen:
 			return parseScriptExpr
 		default:
-			p.raiseError(tok, "expected union sub expression")
+			p.raiseError(tok, "expected union sub expression, not '%s'", tok.val)
 		}
 		// parse delimiter or terminator
 		tok = p.getToken()
@@ -152,12 +176,20 @@ func parseUnionExpr(p *parser) parserStateFn {
 		case tokenComma:
 			continue
 		case tokenRBracket:
-			break
+			break loop
 		default:
 			p.raiseError(tok, "expected ',' or ']'")
 		}
 	}
-	p.appendPath(matchUnionFn(union))
+
+  // if there is only one sub-expression, use that instead
+  if len(p.union) == 1 {
+    p.appendPath(p.union[0])
+  }else {
+    p.appendPath(&matchUnionFn{p.union})
+  }
+
+  p.union = nil // clear out state
 	return parseMatchExpr
 }
 
@@ -168,7 +200,7 @@ func parseSliceExpr(p *parser) parserStateFn {
 	// parse optional start
 	tok := p.getToken()
 	if tok.typ == tokenInteger {
-		start, _ = strconv.Atoi(tok.val)
+		start = tok.Int()
 		tok = p.getToken()
 	}
 	if tok.typ != tokenColon {
@@ -178,17 +210,21 @@ func parseSliceExpr(p *parser) parserStateFn {
 	// parse optional end
 	tok = p.getToken()
 	if tok.typ == tokenInteger {
-		end, _ = strconv.Atoi(tok.val)
+		end = tok.Int()
 		tok = p.getToken()
 	}
-	if tok.typ != tokenColon || tok.typ != tokenRBracket {
+  if tok.typ == tokenRBracket {
+	  p.appendPath(&matchSliceFn{start, end, step})
+    return parseMatchExpr
+  }
+  if tok.typ != tokenColon {
 		p.raiseError(tok, "expected ']' or ':'")
 	}
 
 	// parse optional step
 	tok = p.getToken()
 	if tok.typ == tokenInteger {
-		step, _ = strconv.Atoi(tok.val)
+		step = tok.Int()
 		if step < 0 {
 			p.raiseError(tok, "step must be a positive value")
 		}
@@ -198,7 +234,7 @@ func parseSliceExpr(p *parser) parserStateFn {
 		p.raiseError(tok, "expected ']'")
 	}
 
-	p.appendPath(matchSliceFn(start, end, step))
+	p.appendPath(&matchSliceFn{start, end, step})
 	return parseMatchExpr
 }
 
@@ -213,12 +249,11 @@ func parseScriptExpr(p *parser) parserStateFn {
 }
 
 func parse(flow chan token) []PathFn {
-	result := []PathFn{}
 	parser := &parser{
 		flow:         flow,
 		tokensBuffer: []token{},
-		path:         result,
+		path:         []PathFn{},
 	}
 	parser.run()
-	return result
+	return parser.path
 }
