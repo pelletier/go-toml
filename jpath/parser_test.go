@@ -18,7 +18,7 @@ func assertQuery(t *testing.T, toml, query string, ref []interface{}) {
 		return
 	}
 	path := parse(flow)
-	result := processPath(path, tree)
+	result := path.Call(tree)
 	assertValue(t, result, ref, "((" + query + ")) -> ")
 }
 

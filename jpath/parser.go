@@ -1,3 +1,10 @@
+/*
+  Based on the "jsonpath" spec/concept.
+
+  http://goessner.net/articles/JsonPath/
+  https://code.google.com/p/json-path/
+*/
+
 package jpath
 
 import (
@@ -8,7 +15,7 @@ import (
 type parser struct {
 	flow         chan token
 	tokensBuffer []token
-	path         []PathFn
+	path         *QueryPath
   union        []PathFn
 }
 
@@ -76,10 +83,6 @@ func (p *parser) getToken() *token {
 	return &tok
 }
 
-func (p *parser) appendPath(fn PathFn) {
-	p.path = append(p.path, fn)
-}
-
 func parseStart(p *parser) parserStateFn {
 	tok := p.getToken()
 
@@ -99,12 +102,12 @@ func parseMatchExpr(p *parser) parserStateFn {
 	tok := p.getToken()
 	switch tok.typ {
 	case tokenDotDot:
-    p.appendPath(&matchRecursiveFn{})
+    p.path.Append(&matchRecursiveFn{})
     // nested parse for '..'
     tok := p.getToken()
     switch tok.typ {
     case tokenKey:
-      p.appendPath(&matchKeyFn{tok.val})
+      p.path.Append(newMatchKeyFn(tok.val))
       return parseMatchExpr
     case tokenLBracket:
       return parseBracketExpr
@@ -118,10 +121,10 @@ func parseMatchExpr(p *parser) parserStateFn {
     tok := p.getToken()
     switch tok.typ {
     case tokenKey:
-      p.appendPath(&matchKeyFn{tok.val})
+      p.path.Append(newMatchKeyFn(tok.val))
       return parseMatchExpr
     case tokenStar:
-      p.appendPath(&matchAnyFn{})
+      p.path.Append(&matchAnyFn{})
       return parseMatchExpr
     }
 
@@ -158,11 +161,11 @@ loop: // labeled loop for easy breaking
 		tok := p.getToken()
 		switch tok.typ {
 		case tokenInteger:
-			p.union = append(p.union, &matchIndexFn{tok.Int()})
+			p.union = append(p.union, newMatchIndexFn(tok.Int()))
 		case tokenKey:
-			p.union = append(p.union, &matchKeyFn{tok.val})
+			p.union = append(p.union, newMatchKeyFn(tok.val))
 		case tokenString:
-			p.union = append(p.union, &matchKeyFn{tok.val})
+			p.union = append(p.union, newMatchKeyFn(tok.val))
 		case tokenQuestion:
 			return parseFilterExpr
 		case tokenLParen:
@@ -184,9 +187,9 @@ loop: // labeled loop for easy breaking
 
   // if there is only one sub-expression, use that instead
   if len(p.union) == 1 {
-    p.appendPath(p.union[0])
+    p.path.Append(p.union[0])
   }else {
-    p.appendPath(&matchUnionFn{p.union})
+    p.path.Append(&matchUnionFn{p.union})
   }
 
   p.union = nil // clear out state
@@ -214,7 +217,7 @@ func parseSliceExpr(p *parser) parserStateFn {
 		tok = p.getToken()
 	}
   if tok.typ == tokenRBracket {
-	  p.appendPath(&matchSliceFn{start, end, step})
+	  p.path.Append(newMatchSliceFn(start, end, step))
     return parseMatchExpr
   }
   if tok.typ != tokenColon {
@@ -234,7 +237,7 @@ func parseSliceExpr(p *parser) parserStateFn {
 		p.raiseError(tok, "expected ']'")
 	}
 
-	p.appendPath(&matchSliceFn{start, end, step})
+	p.path.Append(newMatchSliceFn(start, end, step))
 	return parseMatchExpr
 }
 
@@ -248,11 +251,11 @@ func parseScriptExpr(p *parser) parserStateFn {
 	return nil
 }
 
-func parse(flow chan token) []PathFn {
+func parse(flow chan token) *QueryPath {
 	parser := &parser{
 		flow:         flow,
 		tokensBuffer: []token{},
-		path:         []PathFn{},
+		path:         newQueryPath(),
 	}
 	parser.run()
 	return parser.path
