@@ -12,14 +12,8 @@ func assertQuery(t *testing.T, toml, query string, ref []interface{}) {
 		t.Errorf("Non-nil toml parse error: %v", err)
 		return
 	}
-	_, flow := lex(query)
-	if err != nil {
-		t.Errorf("Non-nil query lex error: %v", err)
-		return
-	}
-	path := parse(flow)
-	result := path.Call(tree)
-	assertValue(t, result, ref, "((" + query + ")) -> ")
+  results := Compile(query).Execute(tree)
+	assertValue(t, results, ref, "((" + query + ")) -> ")
 }
 
 func assertValue(t *testing.T, result, ref interface{}, location string) {
@@ -231,5 +225,40 @@ func TestQueryRecursionUnionSimple(t *testing.T) {
 		    "a": int64(5),
 		    "b": int64(6),
       },
+	  })
+}
+
+func TestQueryScriptFnLast(t *testing.T) {
+  assertQuery(t,
+    "[foo]\na = [0,1,2,3,4,5,6,7,8,9]",
+    "$.foo.a[(last)]",
+		[]interface{}{
+		  int64(9),
+	  })
+}
+
+func TestQueryFilterFnOdd(t *testing.T) {
+  assertQuery(t,
+    "[foo]\na = [0,1,2,3,4,5,6,7,8,9]",
+    "$.foo.a[?(odd)]",
+		[]interface{}{
+		  int64(1),
+		  int64(3),
+		  int64(5),
+		  int64(7),
+		  int64(9),
+	  })
+}
+
+func TestQueryFilterFnEven(t *testing.T) {
+  assertQuery(t,
+    "[foo]\na = [0,1,2,3,4,5,6,7,8,9]",
+    "$.foo.a[?(even)]",
+		[]interface{}{
+		  int64(0),
+		  int64(2),
+		  int64(4),
+		  int64(6),
+		  int64(8),
 	  })
 }

@@ -15,7 +15,7 @@ import (
 type parser struct {
 	flow         chan token
 	tokensBuffer []token
-	path         *QueryPath
+	path         *Query
   union        []PathFn
 }
 
@@ -102,12 +102,12 @@ func parseMatchExpr(p *parser) parserStateFn {
 	tok := p.getToken()
 	switch tok.typ {
 	case tokenDotDot:
-    p.path.Append(&matchRecursiveFn{})
+    p.path.appendPath(&matchRecursiveFn{})
     // nested parse for '..'
     tok := p.getToken()
     switch tok.typ {
     case tokenKey:
-      p.path.Append(newMatchKeyFn(tok.val))
+      p.path.appendPath(newMatchKeyFn(tok.val))
       return parseMatchExpr
     case tokenLBracket:
       return parseBracketExpr
@@ -121,10 +121,10 @@ func parseMatchExpr(p *parser) parserStateFn {
     tok := p.getToken()
     switch tok.typ {
     case tokenKey:
-      p.path.Append(newMatchKeyFn(tok.val))
+      p.path.appendPath(newMatchKeyFn(tok.val))
       return parseMatchExpr
     case tokenStar:
-      p.path.Append(&matchAnyFn{})
+      p.path.appendPath(&matchAnyFn{})
       return parseMatchExpr
     }
 
@@ -149,6 +149,8 @@ func parseBracketExpr(p *parser) parserStateFn {
 }
 
 func parseUnionExpr(p *parser) parserStateFn {
+  var tok *token
+
   // this state can be traversed after some sub-expressions
   // so be careful when setting up state in the parser
 	if p.union == nil {
@@ -157,8 +159,21 @@ func parseUnionExpr(p *parser) parserStateFn {
 
 loop: // labeled loop for easy breaking
   for {
+    if len(p.union) > 0 {
+      // parse delimiter or terminator
+      tok = p.getToken()
+      switch tok.typ {
+      case tokenComma:
+        // do nothing
+      case tokenRBracket:
+        break loop
+      default:
+        p.raiseError(tok, "expected ',' or ']', not '%s'", tok.val)
+      }
+    }
+
 		// parse sub expression
-		tok := p.getToken()
+		tok = p.getToken()
 		switch tok.typ {
 		case tokenInteger:
 			p.union = append(p.union, newMatchIndexFn(tok.Int()))
@@ -171,25 +186,15 @@ loop: // labeled loop for easy breaking
 		case tokenLParen:
 			return parseScriptExpr
 		default:
-			p.raiseError(tok, "expected union sub expression, not '%s'", tok.val)
-		}
-		// parse delimiter or terminator
-		tok = p.getToken()
-		switch tok.typ {
-		case tokenComma:
-			continue
-		case tokenRBracket:
-			break loop
-		default:
-			p.raiseError(tok, "expected ',' or ']'")
+			p.raiseError(tok, "expected union sub expression, not '%s', %d", tok.val, len(p.union))
 		}
 	}
 
   // if there is only one sub-expression, use that instead
   if len(p.union) == 1 {
-    p.path.Append(p.union[0])
+    p.path.appendPath(p.union[0])
   }else {
-    p.path.Append(&matchUnionFn{p.union})
+    p.path.appendPath(&matchUnionFn{p.union})
   }
 
   p.union = nil // clear out state
@@ -217,7 +222,7 @@ func parseSliceExpr(p *parser) parserStateFn {
 		tok = p.getToken()
 	}
   if tok.typ == tokenRBracket {
-	  p.path.Append(newMatchSliceFn(start, end, step))
+	  p.path.appendPath(newMatchSliceFn(start, end, step))
     return parseMatchExpr
   }
   if tok.typ != tokenColon {
@@ -237,25 +242,47 @@ func parseSliceExpr(p *parser) parserStateFn {
 		p.raiseError(tok, "expected ']'")
 	}
 
-	p.path.Append(newMatchSliceFn(start, end, step))
+	p.path.appendPath(newMatchSliceFn(start, end, step))
 	return parseMatchExpr
 }
 
 func parseFilterExpr(p *parser) parserStateFn {
-	p.raiseError(p.peek(), "filter expressions are unsupported")
-	return nil
+  tok := p.getToken()
+  if tok.typ != tokenLParen {
+    p.raiseError(tok, "expected left-parenthesis for filter expression")
+  }
+  tok = p.getToken()
+  if tok.typ != tokenKey && tok.typ != tokenString {
+    p.raiseError(tok, "expected key or string for filter funciton name")
+  }
+  name := tok.val
+  tok = p.getToken()
+  if tok.typ != tokenRParen {
+    p.raiseError(tok, "expected right-parenthesis for filter expression")
+  }
+	p.union = append(p.union, newMatchFilterFn(name, tok.Position))
+	return parseUnionExpr
 }
 
 func parseScriptExpr(p *parser) parserStateFn {
-	p.raiseError(p.peek(), "script expressions are unsupported")
-	return nil
+  tok := p.getToken()
+  if tok.typ != tokenKey && tok.typ != tokenString {
+    p.raiseError(tok, "expected key or string for script funciton name")
+  }
+  name := tok.val
+  tok = p.getToken()
+  if tok.typ != tokenRParen {
+    p.raiseError(tok, "expected right-parenthesis for script expression")
+  }
+	p.union = append(p.union, newMatchScriptFn(name, tok.Position))
+	return parseUnionExpr
 }
 
-func parse(flow chan token) *QueryPath {
+func parse(flow chan token) *Query {
 	parser := &parser{
 		flow:         flow,
 		tokensBuffer: []token{},
-		path:         newQueryPath(),
+		path:         newQuery(),
 	}
 	parser.run()
 	return parser.path

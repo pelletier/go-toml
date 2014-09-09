@@ -2,61 +2,9 @@ package jpath
 
 import (
 	. "github.com/pelletier/go-toml"
+  "fmt"
 )
 
-// result set for storage of results
-type pathResult struct {
-  Values []interface{}
-}
-
-func newPathResult() *pathResult {
-  return &pathResult {
-    Values: []interface{}{},
-  }
-}
-
-func (r *pathResult) Append(value interface{}) {
-  r.Values = append(r.Values, value)
-}
-
-// generic path functor interface
-type PathFn interface{
-  SetNext(next PathFn)
-  Call(context interface{}, results *pathResult)
-}
-
-// contains a functor chain
-type QueryPath struct {
-  root PathFn
-  tail PathFn
-}
-
-func newQueryPath() *QueryPath {
-  return &QueryPath {
-    root: nil,
-    tail: nil,
-  }
-}
-
-func (path *QueryPath) Append(next PathFn) {
-  if path.root == nil {
-    path.root = next
-  } else {
-    path.tail.SetNext(next)
-  }
-  path.tail = next
-  next.SetNext(newTerminatingFn()) // init the next functor
-}
-
-func (path *QueryPath) Call(context interface{}) []interface{} {
-  results := newPathResult()
-  if path.root == nil {
-    results.Append(context)  // identity query for no predicates
-  } else {
-    path.root.Call(context, results)
-  }
-  return results.Values
-}
 
 // base match
 type matchBase struct {
@@ -80,8 +28,8 @@ func (f *terminatingFn) SetNext(next PathFn) {
   // do nothing
 }
 
-func (f *terminatingFn) Call(context interface{}, results *pathResult) {
-  results.Append(context)
+func (f *terminatingFn) Call(node interface{}, ctx *queryContext) {
+  ctx.appendResult(node)
 }
 
 // shim to ease functor writing
@@ -99,11 +47,11 @@ func newMatchKeyFn(name string) *matchKeyFn {
   return &matchKeyFn{ Name: name }
 }
 
-func (f *matchKeyFn) Call(context interface{}, results *pathResult) {
-  if tree, ok := context.(*TomlTree); ok {
+func (f *matchKeyFn) Call(node interface{}, ctx *queryContext) {
+  if tree, ok := node.(*TomlTree); ok {
     item := treeValue(tree, f.Name)
     if item != nil {
-      f.next.Call(item, results)
+      f.next.Call(item, ctx)
     }
   }
 }
@@ -118,10 +66,10 @@ func newMatchIndexFn(idx int) *matchIndexFn {
   return &matchIndexFn{ Idx: idx }
 }
 
-func (f *matchIndexFn) Call(context interface{}, results *pathResult) {
-  if arr, ok := context.([]interface{}); ok {
+func (f *matchIndexFn) Call(node interface{}, ctx *queryContext) {
+  if arr, ok := node.([]interface{}); ok {
     if f.Idx < len(arr) && f.Idx >= 0 {
-      f.next.Call(arr[f.Idx], results)
+      f.next.Call(arr[f.Idx], ctx)
     }
   }
 }
@@ -136,8 +84,8 @@ func newMatchSliceFn(start, end, step int) *matchSliceFn {
   return &matchSliceFn{ Start: start, End: end, Step: step }
 }
 
-func (f *matchSliceFn) Call(context interface{}, results *pathResult) {
-  if arr, ok := context.([]interface{}); ok {
+func (f *matchSliceFn) Call(node interface{}, ctx *queryContext) {
+  if arr, ok := node.([]interface{}); ok {
     // adjust indexes for negative values, reverse ordering
     realStart, realEnd := f.Start, f.End
     if realStart < 0 {
@@ -151,7 +99,7 @@ func (f *matchSliceFn) Call(context interface{}, results *pathResult) {
     }
     // loop and gather
     for idx := realStart; idx < realEnd; idx += f.Step {
-      f.next.Call(arr[idx], results)
+      f.next.Call(arr[idx], ctx)
     }
   }
 }
@@ -159,18 +107,17 @@ func (f *matchSliceFn) Call(context interface{}, results *pathResult) {
 // match anything
 type matchAnyFn struct {
   matchBase
-  // empty
 }
 
 func newMatchAnyFn() *matchAnyFn {
   return &matchAnyFn{}
 }
 
-func (f *matchAnyFn) Call(context interface{}, results *pathResult) {
-  if tree, ok := context.(*TomlTree); ok {
+func (f *matchAnyFn) Call(node interface{}, ctx *queryContext) {
+  if tree, ok := node.(*TomlTree); ok {
     for _, key := range tree.Keys() {
       item := treeValue(tree, key)
-      f.next.Call(item, results)
+      f.next.Call(item, ctx)
     }
   }
 }
@@ -186,9 +133,9 @@ func (f *matchUnionFn) SetNext(next PathFn) {
   }
 }
 
-func (f *matchUnionFn) Call(context interface{}, results *pathResult) {
+func (f *matchUnionFn) Call(node interface{}, ctx *queryContext) {
   for _, fn := range f.Union {
-    fn.Call(context, results)
+    fn.Call(node, ctx)
   }
 }
 
@@ -201,13 +148,13 @@ func newMatchRecursiveFn() *matchRecursiveFn{
   return &matchRecursiveFn{}
 }
 
-func (f *matchRecursiveFn) Call(context interface{}, results *pathResult) {
-  if tree, ok := context.(*TomlTree); ok {
+func (f *matchRecursiveFn) Call(node interface{}, ctx *queryContext) {
+  if tree, ok := node.(*TomlTree); ok {
     var visit func(tree *TomlTree)
     visit = func(tree *TomlTree) {
       for _, key := range tree.Keys() {
         item := treeValue(tree, key)
-        f.next.Call(item, results)
+        f.next.Call(item, ctx)
         switch node := item.(type) {
         case *TomlTree:
           visit(node)
@@ -219,5 +166,69 @@ func (f *matchRecursiveFn) Call(context interface{}, results *pathResult) {
       }
     }
     visit(tree)
+  }
+}
+
+// match based on an externally provided functional filter
+type matchFilterFn struct {
+  matchBase
+  Pos Position
+  Name string
+}
+
+func newMatchFilterFn(name string, pos Position) *matchFilterFn {
+  return &matchFilterFn{ Name: name, Pos: pos }
+}
+
+func (f *matchFilterFn) Call(node interface{}, ctx *queryContext) {
+  fn, ok := (*ctx.filters)[f.Name]
+  if !ok {
+    panic(fmt.Sprintf("%s: query context does not have filter '%s'",
+      f.Pos, f.Name))
+  }
+  switch castNode := node.(type) {
+  case *TomlTree:
+    for _, k := range castNode.Keys() {
+      v := castNode.GetPath([]string{k})
+      if fn(v) {
+        f.next.Call(v, ctx)
+      }
+    }
+  case []interface{}:
+    for _, v := range castNode {
+      if fn(v) {
+        f.next.Call(v, ctx)
+      }
+    }
+  }
+}
+
+// match based using result of an externally provided functional filter
+type matchScriptFn struct {
+  matchBase
+  Pos Position
+  Name string
+}
+
+func newMatchScriptFn(name string, pos Position) *matchScriptFn {
+  return &matchScriptFn{ Name: name, Pos: pos }
+}
+
+func (f *matchScriptFn) Call(node interface{}, ctx *queryContext) {
+  fn, ok := (*ctx.scripts)[f.Name]
+  if !ok {
+    panic(fmt.Sprintf("%s: query context does not have script '%s'",
+      f.Pos, f.Name))
+  }
+  switch result := fn(node).(type) {
+  case string:
+    nextMatch := newMatchKeyFn(result)
+    nextMatch.SetNext(f.next)
+    nextMatch.Call(node, ctx)
+  case int:
+    nextMatch := newMatchIndexFn(result)
+    nextMatch.SetNext(f.next)
+    nextMatch.Call(node, ctx)
+  //TODO: support other return types?
   }
 }
