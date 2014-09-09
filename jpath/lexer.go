@@ -80,11 +80,11 @@ func (tt tokenType) String() string {
 }
 
 func (t token) Int() int {
-  if result, err := strconv.Atoi(t.val); err != nil {
-    panic(err)
-  } else {
-    return result
-  }
+	if result, err := strconv.Atoi(t.val); err != nil {
+		panic(err)
+	} else {
+		return result
+	}
 }
 
 func (t token) String() string {
@@ -291,10 +291,10 @@ func lexVoid(l *lexer) stateFn {
 			return lexString
 		}
 
-    if isSpace(next) {
+		if isSpace(next) {
 			l.next()
-      l.ignore()
-      continue
+			l.ignore()
+			continue
 		}
 
 		if isAlphanumeric(next) {

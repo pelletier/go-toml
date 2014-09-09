@@ -97,4 +97,3 @@ func TestLexSpace(t *testing.T) {
 		token{Position{1, 12}, tokenEOF, ""},
 	})
 }
-
