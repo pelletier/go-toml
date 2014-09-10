@@ -70,9 +70,6 @@ func (p *parser) getToken() *token {
 func parseStart(p *parser) parserStateFn {
 	tok := p.peek()
 
-	// prime position data with root tree instance
-	p.tree.position = tok.Position
-
 	// end of stream, parsing is finished
 	if tok == nil {
 		return nil
@@ -279,6 +276,7 @@ func parseArray(p *parser) []interface{} {
 
 func parse(flow chan token) *TomlTree {
 	result := newTomlTree()
+  result.position = Position{1,1}
 	parser := &parser{
 		flow:          flow,
 		tree:          result,

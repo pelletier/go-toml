@@ -1,21 +1,44 @@
 package jpath
 
 import (
-	_ "github.com/pelletier/go-toml"
+	. "github.com/pelletier/go-toml"
 )
 
 type nodeFilterFn func(node interface{}) bool
 type nodeFn func(node interface{}) interface{}
 
-// runtime context for executing query paths
-type queryContext struct {
-	filters *map[string]nodeFilterFn
-	scripts *map[string]nodeFn
-	results []interface{}
+type QueryResult struct {
+	items []interface{}
+  positions []Position
 }
 
-func (c *queryContext) appendResult(value interface{}) {
-	c.results = append(c.results, value)
+// TODO: modify after merging with rest of lib
+func (r *QueryResult) appendResult(node interface{}) {
+  r.items = append(r.items, node)
+  switch castNode := node.(type) {
+  case *TomlTree:
+    r.positions = append(r.positions, castNode.GetPosition(""))
+    //r.positions = append(r.positions, castNode.position)
+  //case *tomlValue:
+    //r.positions = append(r.positions, castNode.position)
+  default:
+    r.positions = append(r.positions, Position{})
+  }
+}
+
+func (r *QueryResult) Values() []interface{} {
+  return r.items
+}
+
+func (r *QueryResult) Positions() []Position {
+  return r.positions
+}
+
+// runtime context for executing query paths
+type queryContext struct {
+  result *QueryResult
+	filters *map[string]nodeFilterFn
+	scripts *map[string]nodeFn
 }
 
 // generic path functor interface
@@ -56,17 +79,22 @@ func Compile(path string) *Query {
 	return parse(flow)
 }
 
-func (q *Query) Execute(node interface{}) interface{} {
+func (q *Query) Execute(tree *TomlTree) *QueryResult {
+  result := &QueryResult {
+    items: []interface{}{},
+    positions: []Position{},
+  }
 	if q.root == nil {
-		return []interface{}{node} // identity query for no predicates
-	}
-	ctx := &queryContext{
-		filters: q.filters,
-		scripts: q.scripts,
-		results: []interface{}{},
-	}
-	q.root.Call(node, ctx)
-	return ctx.results
+    result.appendResult(tree)
+	} else {
+    ctx := &queryContext{
+      result: result,
+      filters: q.filters,
+      scripts: q.scripts,
+    }
+    q.root.Call(tree, ctx)
+  }
+	return result
 }
 
 func (q *Query) SetFilter(name string, fn nodeFilterFn) {

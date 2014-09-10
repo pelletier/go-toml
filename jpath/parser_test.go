@@ -4,7 +4,54 @@ import (
 	"fmt"
 	. "github.com/pelletier/go-toml"
 	"testing"
+  "sort"
+  "strings"
 )
+
+func valueString(root interface{}) string {
+  result := "" //fmt.Sprintf("%T:", root)
+	switch node := root.(type) {
+	case []interface{}:
+    items := []string{}
+    for _, v := range node {
+      items = append(items, valueString(v))
+    }
+    sort.Strings(items)
+    result = "[" + strings.Join(items, ", ") + "]"
+	case *TomlTree:
+    // workaround for unreliable map key ordering
+    items := []string{}
+    for _, k := range node.Keys() {
+      v := node.GetPath([]string{k})
+      items = append(items, k + ":" + valueString(v))
+    }
+    sort.Strings(items)
+    result = "{" + strings.Join(items, ", ") + "}"
+	case map[string]interface{}:
+    // workaround for unreliable map key ordering
+    items := []string{}
+    for k, v := range node {
+      items = append(items, k + ":" + valueString(v))
+    }
+    sort.Strings(items)
+    result = "{" + strings.Join(items, ", ") + "}"
+	case int64:
+    result += fmt.Sprintf("%d", node)
+  case string:
+    result += "'" + node + "'"
+  }
+  return result
+}
+
+func assertValue(t *testing.T, result, ref interface{}) {
+  pathStr := valueString(result)
+  refStr := valueString(ref)
+  if pathStr != refStr {
+    t.Errorf("values do not match")
+		t.Log("test:", pathStr)
+		t.Log("ref: ", refStr)
+  }
+}
 
 func assertQuery(t *testing.T, toml, query string, ref []interface{}) {
 	tree, err := Load(toml)
@@ -13,59 +60,9 @@ func assertQuery(t *testing.T, toml, query string, ref []interface{}) {
 		return
 	}
 	results := Compile(query).Execute(tree)
-	assertValue(t, results, ref, "(("+query+")) -> ")
+	assertValue(t, results.Values(), ref)
 }
 
-func assertValue(t *testing.T, result, ref interface{}, location string) {
-	switch node := ref.(type) {
-	case []interface{}:
-		if resultNode, ok := result.([]interface{}); !ok {
-			t.Errorf("{%s} result value not of type %T: %T",
-				location, node, resultNode)
-		} else {
-			if len(node) != len(resultNode) {
-				t.Errorf("{%s} lengths do not match: %v vs %v",
-					location, node, resultNode)
-			} else {
-				for i, v := range node {
-					assertValue(t, resultNode[i], v, fmt.Sprintf("%s[%d]", location, i))
-				}
-			}
-		}
-	case map[string]interface{}:
-		if resultNode, ok := result.(*TomlTree); !ok {
-			t.Errorf("{%s} result value not of type %T: %T",
-				location, node, resultNode)
-		} else {
-			for k, v := range node {
-				assertValue(t, resultNode.GetPath([]string{k}), v, location+"."+k)
-			}
-		}
-	case int64:
-		if resultNode, ok := result.(int64); !ok {
-			t.Errorf("{%s} result value not of type %T: %T",
-				location, node, resultNode)
-		} else {
-			if node != resultNode {
-				t.Errorf("{%s} result value does not match", location)
-			}
-		}
-	case string:
-		if resultNode, ok := result.(string); !ok {
-			t.Errorf("{%s} result value not of type %T: %T",
-				location, node, resultNode)
-		} else {
-			if node != resultNode {
-				t.Errorf("{%s} result value does not match", location)
-			}
-		}
-	default:
-		if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", ref) {
-			t.Errorf("{%s} result value does not match: %v != %v",
-				location, node, ref)
-		}
-	}
-}
 
 func TestQueryRoot(t *testing.T) {
 	assertQuery(t,

@@ -28,7 +28,7 @@ type TomlTree struct {
 func newTomlTree() *TomlTree {
 	return &TomlTree{
 		values:   make(map[string]interface{}),
-		position: Position{0, 0},
+		position: Position{},
 	}
 }
 
@@ -103,7 +103,7 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 // GetPosition returns the position of the given key.
 func (t *TomlTree) GetPosition(key string) Position {
 	if key == "" {
-		return Position{0, 0}
+		return t.position
 	}
 	return t.GetPositionPath(strings.Split(key, "."))
 }

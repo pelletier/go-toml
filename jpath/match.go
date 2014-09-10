@@ -28,7 +28,7 @@ func (f *terminatingFn) SetNext(next PathFn) {
 }
 
 func (f *terminatingFn) Call(node interface{}, ctx *queryContext) {
-	ctx.appendResult(node)
+	ctx.result.appendResult(node)
 }
 
 // shim to ease functor writing
