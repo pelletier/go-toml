@@ -199,7 +199,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 // and tree[a][b][c]
 //
 // Returns nil on success, error object on failure
-func (t *TomlTree) createSubTree(keys []string) error {
+func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 	subtree := t
 	for _, intermediateKey := range keys {
 		if intermediateKey == "" {
@@ -207,8 +207,10 @@ func (t *TomlTree) createSubTree(keys []string) error {
 		}
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
-			nextTree = newTomlTree()
-			subtree.values[intermediateKey] = nextTree
+      tree := newTomlTree()
+      tree.position = pos
+			subtree.values[intermediateKey] = tree
+			nextTree = tree
 		}
 
 		switch node := nextTree.(type) {
@@ -317,6 +319,14 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 	return result
 }
 
+func (t *TomlTree) Query(query string) (*QueryResult, error) {
+  if q, err := Compile(query); err != nil {
+    return nil, err
+  } else {
+    return q.Execute(t), nil
+  }
+}
+
 // ToString generates a human-readable representation of the current tree.
 // Output spans multiple lines, and is suitable for ingest by a TOML parser
 func (t *TomlTree) ToString() string {
@@ -325,27 +335,26 @@ func (t *TomlTree) ToString() string {
 
 // Load creates a TomlTree from a string.
 func Load(content string) (tree *TomlTree, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			if _, ok := r.(runtime.Error); ok {
-				panic(r)
-			}
-			err = errors.New(r.(string))
-		}
-	}()
-	_, flow := lex(content)
-	tree = parse(flow)
-	return
+  defer func() {
+    if r := recover(); r != nil {
+      if _, ok := r.(runtime.Error); ok {
+        panic(r)
+      }
+      err = errors.New(r.(string))
+    }
+  }()
+  tree = parseToml(lexToml(content))
+  return
 }
 
 // LoadFile creates a TomlTree from a file.
 func LoadFile(path string) (tree *TomlTree, err error) {
-	buff, ferr := ioutil.ReadFile(path)
-	if ferr != nil {
-		err = ferr
-	} else {
-		s := string(buff)
-		tree, err = Load(s)
-	}
-	return
+  buff, ferr := ioutil.ReadFile(path)
+  if ferr != nil {
+    err = ferr
+  } else {
+    s := string(buff)
+    tree, err = Load(s)
+  }
+  return
 }

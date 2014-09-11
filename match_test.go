@@ -1,8 +1,7 @@
-package jpath
+package toml
 
 import (
 	"fmt"
-	. "github.com/pelletier/go-toml"
 	"math"
 	"testing"
 )
@@ -58,8 +57,7 @@ func assertPathMatch(t *testing.T, path, ref *Query) bool {
 }
 
 func assertPath(t *testing.T, query string, ref *Query) {
-	_, flow := lex(query)
-	path := parse(flow)
+	path, _:= parseQuery(lexQuery(query))
 	assertPathMatch(t, path, ref)
 }
 

@@ -1,131 +1,22 @@
 // TOML JSONPath lexer.
 //
-// Written using the principles developped by Rob Pike in
+// Written using the principles developed by Rob Pike in
 // http://www.youtube.com/watch?v=HxaD_trXwRE
 
-package jpath
+package toml
 
 import (
 	"fmt"
-	. "github.com/pelletier/go-toml"
-	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
-var dateRegexp *regexp.Regexp
+// Lexer state function
+type queryLexStateFn func() queryLexStateFn
 
-// Define tokens
-type tokenType int
-
-const (
-	eof = -(iota + 1)
-)
-
-const (
-	tokenError tokenType = iota
-	tokenEOF
-	tokenKey
-	tokenString
-	tokenFloat
-	tokenInteger
-	tokenAtCost
-	tokenDollar
-	tokenLBracket
-	tokenRBracket
-	tokenDot
-	tokenDotDot
-	tokenStar
-	tokenComma
-	tokenColon
-	tokenQuestion
-	tokenLParen
-	tokenRParen
-)
-
-var tokenTypeNames = []string{
-	"EOF",
-	"Key",
-	"String",
-	"Float",
-	"Integer",
-	"@",
-	"$",
-	"[",
-	"]",
-	".",
-	"..",
-	"*",
-	",",
-	":",
-	"?",
-	"(",
-	")",
-}
-
-type token struct {
-	Position
-	typ tokenType
-	val string
-}
-
-func (tt tokenType) String() string {
-	idx := int(tt)
-	if idx < len(tokenTypeNames) {
-		return tokenTypeNames[idx]
-	}
-	return "Unknown"
-}
-
-func (t token) Int() int {
-	if result, err := strconv.Atoi(t.val); err != nil {
-		panic(err)
-	} else {
-		return result
-	}
-}
-
-func (t token) String() string {
-	switch t.typ {
-	case tokenEOF:
-		return "EOF"
-	case tokenError:
-		return t.val
-	}
-
-	if len(t.val) > 10 {
-		return fmt.Sprintf("%.10q...", t.val)
-	}
-	return fmt.Sprintf("%q", t.val)
-}
-
-func isSpace(r rune) bool {
-	return r == ' ' || r == '\t'
-}
-
-func isAlphanumeric(r rune) bool {
-	return unicode.IsLetter(r) || r == '_'
-}
-
-func isKeyChar(r rune) bool {
-	// "Keys start with the first non-whitespace character and end with the last
-	// non-whitespace character before the equals sign."
-	return !(isSpace(r) || r == '\r' || r == '\n' || r == eof || r == '=')
-}
-
-func isDigit(r rune) bool {
-	return unicode.IsNumber(r)
-}
-
-func isHexDigit(r rune) bool {
-	return isDigit(r) ||
-		r == 'A' || r == 'B' || r == 'C' || r == 'D' || r == 'E' || r == 'F'
-}
-
-// Define lexer
-type lexer struct {
+// Lexer definition
+type queryLexer struct {
 	input      string
 	start      int
 	pos        int
@@ -137,14 +28,14 @@ type lexer struct {
 	stringTerm string
 }
 
-func (l *lexer) run() {
-	for state := lexVoid; state != nil; {
-		state = state(l)
+func (l *queryLexer) run() {
+	for state := l.lexVoid; state != nil; {
+		state = state()
 	}
 	close(l.tokens)
 }
 
-func (l *lexer) nextStart() {
+func (l *queryLexer) nextStart() {
 	// iterate by runes (utf8 characters)
 	// search for newlines and advance line/col counts
 	for i := l.start; i < l.pos; {
@@ -161,7 +52,7 @@ func (l *lexer) nextStart() {
 	l.start = l.pos
 }
 
-func (l *lexer) emit(t tokenType) {
+func (l *queryLexer) emit(t tokenType) {
 	l.tokens <- token{
 		Position: Position{l.line, l.col},
 		typ:      t,
@@ -170,7 +61,7 @@ func (l *lexer) emit(t tokenType) {
 	l.nextStart()
 }
 
-func (l *lexer) emitWithValue(t tokenType, value string) {
+func (l *queryLexer) emitWithValue(t tokenType, value string) {
 	l.tokens <- token{
 		Position: Position{l.line, l.col},
 		typ:      t,
@@ -179,7 +70,7 @@ func (l *lexer) emitWithValue(t tokenType, value string) {
 	l.nextStart()
 }
 
-func (l *lexer) next() rune {
+func (l *queryLexer) next() rune {
 	if l.pos >= len(l.input) {
 		l.width = 0
 		return eof
@@ -190,15 +81,15 @@ func (l *lexer) next() rune {
 	return r
 }
 
-func (l *lexer) ignore() {
+func (l *queryLexer) ignore() {
 	l.nextStart()
 }
 
-func (l *lexer) backup() {
+func (l *queryLexer) backup() {
 	l.pos -= l.width
 }
 
-func (l *lexer) errorf(format string, args ...interface{}) stateFn {
+func (l *queryLexer) errorf(format string, args ...interface{}) queryLexStateFn {
 	l.tokens <- token{
 		Position: Position{l.line, l.col},
 		typ:      tokenError,
@@ -207,13 +98,13 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	return nil
 }
 
-func (l *lexer) peek() rune {
+func (l *queryLexer) peek() rune {
 	r := l.next()
 	l.backup()
 	return r
 }
 
-func (l *lexer) accept(valid string) bool {
+func (l *queryLexer) accept(valid string) bool {
 	if strings.IndexRune(valid, l.next()) >= 0 {
 		return true
 	}
@@ -221,14 +112,12 @@ func (l *lexer) accept(valid string) bool {
 	return false
 }
 
-func (l *lexer) follow(next string) bool {
+func (l *queryLexer) follow(next string) bool {
 	return strings.HasPrefix(l.input[l.pos:], next)
 }
 
-// Define state functions
-type stateFn func(*lexer) stateFn
 
-func lexVoid(l *lexer) stateFn {
+func (l *queryLexer) lexVoid() queryLexStateFn {
 	for {
 		next := l.peek()
 		switch next {
@@ -245,17 +134,13 @@ func lexVoid(l *lexer) stateFn {
 				l.emit(tokenDot)
 			}
 			continue
-		case '@':
-			l.pos++
-			l.emit(tokenAtCost)
-			continue
 		case '[':
 			l.pos++
-			l.emit(tokenLBracket)
+			l.emit(tokenLeftBracket)
 			continue
 		case ']':
 			l.pos++
-			l.emit(tokenRBracket)
+			l.emit(tokenRightBracket)
 			continue
 		case ',':
 			l.pos++
@@ -267,11 +152,11 @@ func lexVoid(l *lexer) stateFn {
 			continue
 		case '(':
 			l.pos++
-			l.emit(tokenLParen)
+			l.emit(tokenLeftParen)
 			continue
 		case ')':
 			l.pos++
-			l.emit(tokenRParen)
+			l.emit(tokenRightParen)
 			continue
 		case '?':
 			l.pos++
@@ -284,11 +169,11 @@ func lexVoid(l *lexer) stateFn {
 		case '\'':
 			l.ignore()
 			l.stringTerm = string(next)
-			return lexString
+			return l.lexString
 		case '"':
 			l.ignore()
 			l.stringTerm = string(next)
-			return lexString
+			return l.lexString
 		}
 
 		if isSpace(next) {
@@ -298,11 +183,11 @@ func lexVoid(l *lexer) stateFn {
 		}
 
 		if isAlphanumeric(next) {
-			return lexKey
+			return l.lexKey
 		}
 
 		if next == '+' || next == '-' || isDigit(next) {
-			return lexNumber
+			return l.lexNumber
 		}
 
 		if l.next() == eof {
@@ -315,12 +200,12 @@ func lexVoid(l *lexer) stateFn {
 	return nil
 }
 
-func lexKey(l *lexer) stateFn {
+func (l *queryLexer) lexKey() queryLexStateFn {
 	for {
 		next := l.peek()
 		if !isAlphanumeric(next) {
 			l.emit(tokenKey)
-			return lexVoid
+			return l.lexVoid
 		}
 
 		if l.next() == eof {
@@ -331,7 +216,7 @@ func lexKey(l *lexer) stateFn {
 	return nil
 }
 
-func lexString(l *lexer) stateFn {
+func (l *queryLexer) lexString() queryLexStateFn {
 	l.pos++
 	l.ignore()
 	growingString := ""
@@ -341,7 +226,7 @@ func lexString(l *lexer) stateFn {
 			l.emitWithValue(tokenString, growingString)
 			l.pos++
 			l.ignore()
-			return lexVoid
+			return l.lexVoid
 		}
 
 		if l.follow("\\\"") {
@@ -403,7 +288,7 @@ func lexString(l *lexer) stateFn {
 	return l.errorf("unclosed string")
 }
 
-func lexNumber(l *lexer) stateFn {
+func (l *queryLexer) lexNumber() queryLexStateFn {
 	l.ignore()
 	if !l.accept("+") {
 		l.accept("-")
@@ -439,17 +324,17 @@ func lexNumber(l *lexer) stateFn {
 	} else {
 		l.emit(tokenInteger)
 	}
-	return lexVoid
+	return l.lexVoid
 }
 
 // Entry point
-func lex(input string) (*lexer, chan token) {
-	l := &lexer{
+func lexQuery(input string) chan token {
+	l := &queryLexer{
 		input:  input,
 		tokens: make(chan token),
 		line:   1,
 		col:    1,
 	}
 	go l.run()
-	return l, l.tokens
+	return l.tokens
 }

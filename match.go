@@ -1,9 +1,26 @@
-package jpath
+package toml
 
 import (
 	"fmt"
-	. "github.com/pelletier/go-toml"
 )
+
+// support function to set positions for tomlValues
+// NOTE: this is done to allow ctx.lastPosition to indicate the start of any
+// values returned by the query engines
+func tomlValueCheck(node interface{}, ctx *queryContext) interface{} {
+  switch castNode := node.(type) {
+  case *tomlValue:
+    ctx.lastPosition = castNode.position
+    return castNode.value
+  case []*TomlTree:
+    if len(castNode) > 0 {
+      ctx.lastPosition = castNode[0].position
+    }
+    return node
+	default:
+    return node
+  }
+}
 
 // base match
 type matchBase struct {
@@ -28,12 +45,15 @@ func (f *terminatingFn) SetNext(next PathFn) {
 }
 
 func (f *terminatingFn) Call(node interface{}, ctx *queryContext) {
-	ctx.result.appendResult(node)
-}
-
-// shim to ease functor writing
-func treeValue(tree *TomlTree, key string) interface{} {
-	return tree.GetPath([]string{key})
+  switch castNode := node.(type) {
+  case *TomlTree:
+	  ctx.result.appendResult(node, castNode.position)
+  case *tomlValue:
+	  ctx.result.appendResult(node, castNode.position)
+  default:
+    // use last position for scalars
+	  ctx.result.appendResult(node, ctx.lastPosition)
+  }
 }
 
 // match single key
@@ -48,7 +68,7 @@ func newMatchKeyFn(name string) *matchKeyFn {
 
 func (f *matchKeyFn) Call(node interface{}, ctx *queryContext) {
 	if tree, ok := node.(*TomlTree); ok {
-		item := treeValue(tree, f.Name)
+		item := tree.values[f.Name]
 		if item != nil {
 			f.next.Call(item, ctx)
 		}
@@ -66,11 +86,11 @@ func newMatchIndexFn(idx int) *matchIndexFn {
 }
 
 func (f *matchIndexFn) Call(node interface{}, ctx *queryContext) {
-	if arr, ok := node.([]interface{}); ok {
-		if f.Idx < len(arr) && f.Idx >= 0 {
-			f.next.Call(arr[f.Idx], ctx)
-		}
-	}
+  if arr, ok := tomlValueCheck(node, ctx).([]interface{}); ok {
+    if f.Idx < len(arr) && f.Idx >= 0 {
+      f.next.Call(arr[f.Idx], ctx)
+    }
+  }
 }
 
 // filter by slicing
@@ -84,7 +104,7 @@ func newMatchSliceFn(start, end, step int) *matchSliceFn {
 }
 
 func (f *matchSliceFn) Call(node interface{}, ctx *queryContext) {
-	if arr, ok := node.([]interface{}); ok {
+	if arr, ok := tomlValueCheck(node, ctx).([]interface{}); ok {
 		// adjust indexes for negative values, reverse ordering
 		realStart, realEnd := f.Start, f.End
 		if realStart < 0 {
@@ -114,9 +134,8 @@ func newMatchAnyFn() *matchAnyFn {
 
 func (f *matchAnyFn) Call(node interface{}, ctx *queryContext) {
 	if tree, ok := node.(*TomlTree); ok {
-		for _, key := range tree.Keys() {
-			item := treeValue(tree, key)
-			f.next.Call(item, ctx)
+		for _,v := range tree.values {
+			f.next.Call(v, ctx)
 		}
 	}
 }
@@ -151,10 +170,9 @@ func (f *matchRecursiveFn) Call(node interface{}, ctx *queryContext) {
 	if tree, ok := node.(*TomlTree); ok {
 		var visit func(tree *TomlTree)
 		visit = func(tree *TomlTree) {
-			for _, key := range tree.Keys() {
-				item := treeValue(tree, key)
-				f.next.Call(item, ctx)
-				switch node := item.(type) {
+			for _, v := range tree.values {
+				f.next.Call(v, ctx)
+				switch node := v.(type) {
 				case *TomlTree:
 					visit(node)
 				case []*TomlTree:
@@ -185,10 +203,9 @@ func (f *matchFilterFn) Call(node interface{}, ctx *queryContext) {
 		panic(fmt.Sprintf("%s: query context does not have filter '%s'",
 			f.Pos, f.Name))
 	}
-	switch castNode := node.(type) {
+	switch castNode := tomlValueCheck(node, ctx).(type) {
 	case *TomlTree:
-		for _, k := range castNode.Keys() {
-			v := castNode.GetPath([]string{k})
+		for _, v := range castNode.values {
 			if fn(v) {
 				f.next.Call(v, ctx)
 			}
@@ -219,7 +236,7 @@ func (f *matchScriptFn) Call(node interface{}, ctx *queryContext) {
 		panic(fmt.Sprintf("%s: query context does not have script '%s'",
 			f.Pos, f.Name))
 	}
-	switch result := fn(node).(type) {
+	switch result := fn(tomlValueCheck(node, ctx)).(type) {
 	case string:
 		nextMatch := newMatchKeyFn(result)
 		nextMatch.SetNext(f.next)

@@ -3,7 +3,7 @@ package toml
 import "testing"
 
 func testFlow(t *testing.T, input string, expectedFlow []token) {
-	_, ch := lex(input)
+	ch := lexToml(input)
 	for _, expected := range expectedFlow {
 		token := <-ch
 		if token != expected {

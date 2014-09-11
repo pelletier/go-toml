@@ -1,8 +1,4 @@
-package jpath
-
-import (
-	. "github.com/pelletier/go-toml"
-)
+package toml
 
 type nodeFilterFn func(node interface{}) bool
 type nodeFn func(node interface{}) interface{}
@@ -12,18 +8,9 @@ type QueryResult struct {
   positions []Position
 }
 
-// TODO: modify after merging with rest of lib
-func (r *QueryResult) appendResult(node interface{}) {
+func (r *QueryResult) appendResult(node interface{}, pos Position) {
   r.items = append(r.items, node)
-  switch castNode := node.(type) {
-  case *TomlTree:
-    r.positions = append(r.positions, castNode.GetPosition(""))
-    //r.positions = append(r.positions, castNode.position)
-  //case *tomlValue:
-    //r.positions = append(r.positions, castNode.position)
-  default:
-    r.positions = append(r.positions, Position{})
-  }
+  r.positions = append(r.positions, pos)
 }
 
 func (r *QueryResult) Values() []interface{} {
@@ -39,6 +26,7 @@ type queryContext struct {
   result *QueryResult
 	filters *map[string]nodeFilterFn
 	scripts *map[string]nodeFn
+  lastPosition Position
 }
 
 // generic path functor interface
@@ -74,9 +62,9 @@ func (q *Query) appendPath(next PathFn) {
 	next.SetNext(newTerminatingFn()) // init the next functor
 }
 
-func Compile(path string) *Query {
-	_, flow := lex(path)
-	return parse(flow)
+// TODO: return (err,query) instead
+func Compile(path string) (*Query, error) {
+	return parseQuery(lexQuery(path))
 }
 
 func (q *Query) Execute(tree *TomlTree) *QueryResult {
@@ -85,7 +73,7 @@ func (q *Query) Execute(tree *TomlTree) *QueryResult {
     positions: []Position{},
   }
 	if q.root == nil {
-    result.appendResult(tree)
+    result.appendResult(tree, tree.GetPosition(""))
 	} else {
     ctx := &queryContext{
       result: result,

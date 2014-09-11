@@ -21,11 +21,8 @@ go build -o toml-test github.com/BurntSushi/toml-test
 mkdir -p src/github.com/pelletier/go-toml/cmd
 cp *.go *.toml src/github.com/pelletier/go-toml
 cp cmd/*.go src/github.com/pelletier/go-toml/cmd
-mkdir -p src/github.com/pelletier/go-toml/jpath
-cp jpath/*.go src/github.com/pelletier/go-toml/jpath
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
 # Run basic unit tests and then the BurntSushi test suite
-go test -v github.com/pelletier/go-toml/jpath
 go test -v github.com/pelletier/go-toml
 ./toml-test ./test_program_bin | tee test_out

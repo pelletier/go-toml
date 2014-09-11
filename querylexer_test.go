@@ -1,12 +1,11 @@
-package jpath
+package toml
 
 import (
-	. "github.com/pelletier/go-toml"
 	"testing"
 )
 
-func testFlow(t *testing.T, input string, expectedFlow []token) {
-	_, ch := lex(input)
+func testQLFlow(t *testing.T, input string, expectedFlow []token) {
+	ch := lexQuery(input)
 	for idx, expected := range expectedFlow {
 		token := <-ch
 		if token != expected {
@@ -34,15 +33,14 @@ func testFlow(t *testing.T, input string, expectedFlow []token) {
 }
 
 func TestLexSpecialChars(t *testing.T) {
-	testFlow(t, "@.$[]..()?*", []token{
-		token{Position{1, 1}, tokenAtCost, "@"},
+	testQLFlow(t, " .$[]..()?*", []token{
 		token{Position{1, 2}, tokenDot, "."},
 		token{Position{1, 3}, tokenDollar, "$"},
-		token{Position{1, 4}, tokenLBracket, "["},
-		token{Position{1, 5}, tokenRBracket, "]"},
+		token{Position{1, 4}, tokenLeftBracket, "["},
+		token{Position{1, 5}, tokenRightBracket, "]"},
 		token{Position{1, 6}, tokenDotDot, ".."},
-		token{Position{1, 8}, tokenLParen, "("},
-		token{Position{1, 9}, tokenRParen, ")"},
+		token{Position{1, 8}, tokenLeftParen, "("},
+		token{Position{1, 9}, tokenRightParen, ")"},
 		token{Position{1, 10}, tokenQuestion, "?"},
 		token{Position{1, 11}, tokenStar, "*"},
 		token{Position{1, 12}, tokenEOF, ""},
@@ -50,28 +48,28 @@ func TestLexSpecialChars(t *testing.T) {
 }
 
 func TestLexString(t *testing.T) {
-	testFlow(t, "'foo'", []token{
+	testQLFlow(t, "'foo'", []token{
 		token{Position{1, 2}, tokenString, "foo"},
 		token{Position{1, 6}, tokenEOF, ""},
 	})
 }
 
 func TestLexDoubleString(t *testing.T) {
-	testFlow(t, `"bar"`, []token{
+	testQLFlow(t, `"bar"`, []token{
 		token{Position{1, 2}, tokenString, "bar"},
 		token{Position{1, 6}, tokenEOF, ""},
 	})
 }
 
 func TestLexKey(t *testing.T) {
-	testFlow(t, "foo", []token{
+	testQLFlow(t, "foo", []token{
 		token{Position{1, 1}, tokenKey, "foo"},
 		token{Position{1, 4}, tokenEOF, ""},
 	})
 }
 
 func TestLexRecurse(t *testing.T) {
-	testFlow(t, "$..*", []token{
+	testQLFlow(t, "$..*", []token{
 		token{Position{1, 1}, tokenDollar, "$"},
 		token{Position{1, 2}, tokenDotDot, ".."},
 		token{Position{1, 4}, tokenStar, "*"},
@@ -80,17 +78,17 @@ func TestLexRecurse(t *testing.T) {
 }
 
 func TestLexBracketKey(t *testing.T) {
-	testFlow(t, "$[foo]", []token{
+	testQLFlow(t, "$[foo]", []token{
 		token{Position{1, 1}, tokenDollar, "$"},
-		token{Position{1, 2}, tokenLBracket, "["},
+		token{Position{1, 2}, tokenLeftBracket, "["},
 		token{Position{1, 3}, tokenKey, "foo"},
-		token{Position{1, 6}, tokenRBracket, "]"},
+		token{Position{1, 6}, tokenRightBracket, "]"},
 		token{Position{1, 7}, tokenEOF, ""},
 	})
 }
 
 func TestLexSpace(t *testing.T) {
-	testFlow(t, "foo bar baz", []token{
+	testQLFlow(t, "foo bar baz", []token{
 		token{Position{1, 1}, tokenKey, "foo"},
 		token{Position{1, 5}, tokenKey, "bar"},
 		token{Position{1, 9}, tokenKey, "baz"},
