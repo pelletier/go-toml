@@ -15,17 +15,17 @@ import (
 type queryParser struct {
 	flow         chan token
 	tokensBuffer []token
-	query         *Query
+	query        *Query
 	union        []PathFn
-  err          error
+	err          error
 }
 
 type queryParserStateFn func() queryParserStateFn
 
 // Formats and panics an error message based on a token
 func (p *queryParser) parseError(tok *token, msg string, args ...interface{}) queryParserStateFn {
-	p.err = fmt.Errorf(tok.Position.String() + ": " + msg, args...)
-  return nil  // trigger parse to end
+	p.err = fmt.Errorf(tok.Position.String()+": "+msg, args...)
+	return nil // trigger parse to end
 }
 
 func (p *queryParser) run() {

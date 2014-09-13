@@ -8,18 +8,18 @@ import (
 // NOTE: this is done to allow ctx.lastPosition to indicate the start of any
 // values returned by the query engines
 func tomlValueCheck(node interface{}, ctx *queryContext) interface{} {
-  switch castNode := node.(type) {
-  case *tomlValue:
-    ctx.lastPosition = castNode.position
-    return castNode.value
-  case []*TomlTree:
-    if len(castNode) > 0 {
-      ctx.lastPosition = castNode[0].position
-    }
-    return node
+	switch castNode := node.(type) {
+	case *tomlValue:
+		ctx.lastPosition = castNode.position
+		return castNode.value
+	case []*TomlTree:
+		if len(castNode) > 0 {
+			ctx.lastPosition = castNode[0].position
+		}
+		return node
 	default:
-    return node
-  }
+		return node
+	}
 }
 
 // base match
@@ -45,15 +45,15 @@ func (f *terminatingFn) SetNext(next PathFn) {
 }
 
 func (f *terminatingFn) Call(node interface{}, ctx *queryContext) {
-  switch castNode := node.(type) {
-  case *TomlTree:
-	  ctx.result.appendResult(node, castNode.position)
-  case *tomlValue:
-	  ctx.result.appendResult(node, castNode.position)
-  default:
-    // use last position for scalars
-	  ctx.result.appendResult(node, ctx.lastPosition)
-  }
+	switch castNode := node.(type) {
+	case *TomlTree:
+		ctx.result.appendResult(node, castNode.position)
+	case *tomlValue:
+		ctx.result.appendResult(node, castNode.position)
+	default:
+		// use last position for scalars
+		ctx.result.appendResult(node, ctx.lastPosition)
+	}
 }
 
 // match single key
@@ -86,11 +86,11 @@ func newMatchIndexFn(idx int) *matchIndexFn {
 }
 
 func (f *matchIndexFn) Call(node interface{}, ctx *queryContext) {
-  if arr, ok := tomlValueCheck(node, ctx).([]interface{}); ok {
-    if f.Idx < len(arr) && f.Idx >= 0 {
-      f.next.Call(arr[f.Idx], ctx)
-    }
-  }
+	if arr, ok := tomlValueCheck(node, ctx).([]interface{}); ok {
+		if f.Idx < len(arr) && f.Idx >= 0 {
+			f.next.Call(arr[f.Idx], ctx)
+		}
+	}
 }
 
 // filter by slicing
@@ -134,7 +134,7 @@ func newMatchAnyFn() *matchAnyFn {
 
 func (f *matchAnyFn) Call(node interface{}, ctx *queryContext) {
 	if tree, ok := node.(*TomlTree); ok {
-		for _,v := range tree.values {
+		for _, v := range tree.values {
 			f.next.Call(v, ctx)
 		}
 	}

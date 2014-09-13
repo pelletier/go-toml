@@ -4,29 +4,29 @@ type nodeFilterFn func(node interface{}) bool
 type nodeFn func(node interface{}) interface{}
 
 type QueryResult struct {
-	items []interface{}
-  positions []Position
+	items     []interface{}
+	positions []Position
 }
 
 func (r *QueryResult) appendResult(node interface{}, pos Position) {
-  r.items = append(r.items, node)
-  r.positions = append(r.positions, pos)
+	r.items = append(r.items, node)
+	r.positions = append(r.positions, pos)
 }
 
 func (r *QueryResult) Values() []interface{} {
-  return r.items
+	return r.items
 }
 
 func (r *QueryResult) Positions() []Position {
-  return r.positions
+	return r.positions
 }
 
 // runtime context for executing query paths
 type queryContext struct {
-  result *QueryResult
-	filters *map[string]nodeFilterFn
-	scripts *map[string]nodeFn
-  lastPosition Position
+	result       *QueryResult
+	filters      *map[string]nodeFilterFn
+	scripts      *map[string]nodeFn
+	lastPosition Position
 }
 
 // generic path functor interface
@@ -68,20 +68,20 @@ func Compile(path string) (*Query, error) {
 }
 
 func (q *Query) Execute(tree *TomlTree) *QueryResult {
-  result := &QueryResult {
-    items: []interface{}{},
-    positions: []Position{},
-  }
+	result := &QueryResult{
+		items:     []interface{}{},
+		positions: []Position{},
+	}
 	if q.root == nil {
-    result.appendResult(tree, tree.GetPosition(""))
+		result.appendResult(tree, tree.GetPosition(""))
 	} else {
-    ctx := &queryContext{
-      result: result,
-      filters: q.filters,
-      scripts: q.scripts,
-    }
-    q.root.Call(tree, ctx)
-  }
+		ctx := &queryContext{
+			result:  result,
+			filters: q.filters,
+			scripts: q.scripts,
+		}
+		q.root.Call(tree, ctx)
+	}
 	return result
 }
 

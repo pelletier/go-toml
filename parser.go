@@ -154,7 +154,7 @@ func (p *tomlParser) parseGroup() tomlParserStateFn {
 
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
 	keys := strings.Split(key.val, ".")
-	if err := p.tree.createSubTree(keys,startToken.Position); err != nil {
+	if err := p.tree.createSubTree(keys, startToken.Position); err != nil {
 		p.raiseError(key, "%s", err)
 	}
 	p.assume(tokenRightBracket)
@@ -274,7 +274,7 @@ func (p *tomlParser) parseArray() []interface{} {
 
 func parseToml(flow chan token) *TomlTree {
 	result := newTomlTree()
-  result.position = Position{1,1}
+	result.position = Position{1, 1}
 	parser := &tomlParser{
 		flow:          flow,
 		tree:          result,

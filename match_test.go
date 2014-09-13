@@ -57,7 +57,7 @@ func assertPathMatch(t *testing.T, path, ref *Query) bool {
 }
 
 func assertPath(t *testing.T, query string, ref *Query) {
-	path, _:= parseQuery(lexQuery(query))
+	path, _ := parseQuery(lexQuery(query))
 	assertPathMatch(t, path, ref)
 }
 

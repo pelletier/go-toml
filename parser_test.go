@@ -396,7 +396,7 @@ func TestDocumentPositions(t *testing.T) {
 	assertPosition(t,
 		"[foo]\nbar=42\nbaz=69",
 		map[string]Position{
-      "":        Position{1, 1},
+			"":        Position{1, 1},
 			"foo":     Position{1, 1},
 			"foo.bar": Position{2, 1},
 			"foo.baz": Position{3, 1},
@@ -407,7 +407,7 @@ func TestDocumentPositionsWithSpaces(t *testing.T) {
 	assertPosition(t,
 		"  [foo]\n  bar=42\n  baz=69",
 		map[string]Position{
-      "":        Position{1, 1},
+			"":        Position{1, 1},
 			"foo":     Position{1, 3},
 			"foo.bar": Position{2, 3},
 			"foo.baz": Position{3, 3},
@@ -418,7 +418,7 @@ func TestDocumentPositionsWithGroupArray(t *testing.T) {
 	assertPosition(t,
 		"[[foo]]\nbar=42\nbaz=69",
 		map[string]Position{
-      "":        Position{1, 1},
+			"":        Position{1, 1},
 			"foo":     Position{1, 1},
 			"foo.bar": Position{2, 1},
 			"foo.baz": Position{3, 1},
@@ -429,9 +429,9 @@ func TestNestedTreePosition(t *testing.T) {
 	assertPosition(t,
 		"[foo.bar]\na=42\nb=69",
 		map[string]Position{
-      "":        Position{1, 1},
-			"foo":     Position{1, 1},
-			"foo.bar": Position{1, 1},
+			"":          Position{1, 1},
+			"foo":       Position{1, 1},
+			"foo.bar":   Position{1, 1},
 			"foo.bar.a": Position{2, 1},
 			"foo.bar.b": Position{3, 1},
 		})

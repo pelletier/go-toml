@@ -116,7 +116,6 @@ func (l *queryLexer) follow(next string) bool {
 	return strings.HasPrefix(l.input[l.pos:], next)
 }
 
-
 func (l *queryLexer) lexVoid() queryLexStateFn {
 	for {
 		next := l.peek()

@@ -2,7 +2,7 @@ package toml
 
 import (
 	"fmt"
-  "strconv"
+	"strconv"
 	"unicode"
 )
 
@@ -26,18 +26,18 @@ const (
 	tokenEqual
 	tokenLeftBracket
 	tokenRightBracket
-  tokenLeftParen
-  tokenRightParen
+	tokenLeftParen
+	tokenRightParen
 	tokenDoubleLeftBracket
 	tokenDoubleRightBracket
 	tokenDate
 	tokenKeyGroup
 	tokenKeyGroupArray
 	tokenComma
-  tokenColon
+	tokenColon
 	tokenDollar
-  tokenStar
-  tokenQuestion
+	tokenStar
+	tokenQuestion
 	tokenDot
 	tokenDotDot
 	tokenEOL
@@ -55,20 +55,20 @@ var tokenTypeNames = []string{
 	"=",
 	"[",
 	"[",
-  "(",
-  ")",
+	"(",
+	")",
 	"]]",
 	"[[",
 	"Date",
 	"KeyGroup",
 	"KeyGroupArray",
 	",",
-  ":",
-  "$",
-  "*",
-  "?",
-  ".",
-  "..",
+	":",
+	"$",
+	"*",
+	"?",
+	".",
+	"..",
 	"EOL",
 }
 

@@ -207,8 +207,8 @@ func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 		}
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
-      tree := newTomlTree()
-      tree.position = pos
+			tree := newTomlTree()
+			tree.position = pos
 			subtree.values[intermediateKey] = tree
 			nextTree = tree
 		}
@@ -320,11 +320,11 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 }
 
 func (t *TomlTree) Query(query string) (*QueryResult, error) {
-  if q, err := Compile(query); err != nil {
-    return nil, err
-  } else {
-    return q.Execute(t), nil
-  }
+	if q, err := Compile(query); err != nil {
+		return nil, err
+	} else {
+		return q.Execute(t), nil
+	}
 }
 
 // ToString generates a human-readable representation of the current tree.
@@ -335,26 +335,26 @@ func (t *TomlTree) ToString() string {
 
 // Load creates a TomlTree from a string.
 func Load(content string) (tree *TomlTree, err error) {
-  defer func() {
-    if r := recover(); r != nil {
-      if _, ok := r.(runtime.Error); ok {
-        panic(r)
-      }
-      err = errors.New(r.(string))
-    }
-  }()
-  tree = parseToml(lexToml(content))
-  return
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = errors.New(r.(string))
+		}
+	}()
+	tree = parseToml(lexToml(content))
+	return
 }
 
 // LoadFile creates a TomlTree from a file.
 func LoadFile(path string) (tree *TomlTree, err error) {
-  buff, ferr := ioutil.ReadFile(path)
-  if ferr != nil {
-    err = ferr
-  } else {
-    s := string(buff)
-    tree, err = Load(s)
-  }
-  return
+	buff, ferr := ioutil.ReadFile(path)
+	if ferr != nil {
+		err = ferr
+	} else {
+		s := string(buff)
+		tree, err = Load(s)
+	}
+	return
 }
