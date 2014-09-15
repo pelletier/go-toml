@@ -1,22 +1,39 @@
 package toml
 
-type nodeFilterFn func(node interface{}) bool
-type nodeFn func(node interface{}) interface{}
+import (
+	"time"
+)
 
+//  Type of a user-defined filter function, for use with Query.SetFilter().
+//
+//  The return value of the function must indicate if 'node' is to be included
+//  at this stage of the TOML path.  Returning true will include the node, and
+//  returning false will exclude it.
+//
+//  NOTE: Care should be taken to write script callbacks such that they are safe
+//  to use from multiple goroutines.
+type NodeFilterFn func(node interface{}) bool
+
+// The result of Executing a Query
 type QueryResult struct {
 	items     []interface{}
 	positions []Position
 }
 
+// appends a value/position pair to the result set
 func (r *QueryResult) appendResult(node interface{}, pos Position) {
 	r.items = append(r.items, node)
 	r.positions = append(r.positions, pos)
 }
 
+// Set of values within a QueryResult.  The order of values is not guaranteed
+// to be in document order, and may be different each time a query is executed.
 func (r *QueryResult) Values() []interface{} {
 	return r.items
 }
 
+// Set of positions for values within a QueryResult.  Each index in Positions()
+// corresponds to the entry in Value() of the same index.
 func (r *QueryResult) Positions() []Position {
 	return r.positions
 }
@@ -24,23 +41,22 @@ func (r *QueryResult) Positions() []Position {
 // runtime context for executing query paths
 type queryContext struct {
 	result       *QueryResult
-	filters      *map[string]nodeFilterFn
-	scripts      *map[string]nodeFn
+	filters      *map[string]NodeFilterFn
 	lastPosition Position
 }
 
 // generic path functor interface
-type PathFn interface {
-	SetNext(next PathFn)
-	Call(node interface{}, ctx *queryContext)
+type pathFn interface {
+	setNext(next pathFn)
+	call(node interface{}, ctx *queryContext)
 }
 
-// encapsulates a query functor chain and script callbacks
+// A Query is the representation of a compiled TOML path.  A Query is safe
+// for concurrent use by multiple goroutines.
 type Query struct {
-	root    PathFn
-	tail    PathFn
-	filters *map[string]nodeFilterFn
-	scripts *map[string]nodeFn
+	root    pathFn
+	tail    pathFn
+	filters *map[string]NodeFilterFn
 }
 
 func newQuery() *Query {
@@ -48,25 +64,26 @@ func newQuery() *Query {
 		root:    nil,
 		tail:    nil,
 		filters: &defaultFilterFunctions,
-		scripts: &defaultScriptFunctions,
 	}
 }
 
-func (q *Query) appendPath(next PathFn) {
+func (q *Query) appendPath(next pathFn) {
 	if q.root == nil {
 		q.root = next
 	} else {
-		q.tail.SetNext(next)
+		q.tail.setNext(next)
 	}
 	q.tail = next
-	next.SetNext(newTerminatingFn()) // init the next functor
+	next.setNext(newTerminatingFn()) // init the next functor
 }
 
-// TODO: return (err,query) instead
-func Compile(path string) (*Query, error) {
+// Compiles a TOML path expression.  The returned Query can be used to match
+// elements within a TomlTree and its descendants.
+func CompileQuery(path string) (*Query, error) {
 	return parseQuery(lexQuery(path))
 }
 
+// Executes a query against a TomlTree, and returns the result of the query.
 func (q *Query) Execute(tree *TomlTree) *QueryResult {
 	result := &QueryResult{
 		items:     []interface{}{},
@@ -78,17 +95,18 @@ func (q *Query) Execute(tree *TomlTree) *QueryResult {
 		ctx := &queryContext{
 			result:  result,
 			filters: q.filters,
-			scripts: q.scripts,
 		}
-		q.root.Call(tree, ctx)
+		q.root.call(tree, ctx)
 	}
 	return result
 }
 
-func (q *Query) SetFilter(name string, fn nodeFilterFn) {
+// Sets a user-defined filter function.  These may be used inside "?(..)" query
+// expressions to filter TOML document elements within a query.
+func (q *Query) SetFilter(name string, fn NodeFilterFn) {
 	if q.filters == &defaultFilterFunctions {
 		// clone the static table
-		q.filters = &map[string]nodeFilterFn{}
+		q.filters = &map[string]NodeFilterFn{}
 		for k, v := range defaultFilterFunctions {
 			(*q.filters)[k] = v
 		}
@@ -96,37 +114,29 @@ func (q *Query) SetFilter(name string, fn nodeFilterFn) {
 	(*q.filters)[name] = fn
 }
 
-func (q *Query) SetScript(name string, fn nodeFn) {
-	if q.scripts == &defaultScriptFunctions {
-		// clone the static table
-		q.scripts = &map[string]nodeFn{}
-		for k, v := range defaultScriptFunctions {
-			(*q.scripts)[k] = v
-		}
-	}
-	(*q.scripts)[name] = fn
-}
-
-var defaultFilterFunctions = map[string]nodeFilterFn{
-	"odd": func(node interface{}) bool {
-		if ii, ok := node.(int64); ok {
-			return (ii & 1) == 1
-		}
-		return false
+var defaultFilterFunctions = map[string]NodeFilterFn{
+	"tree": func(node interface{}) bool {
+		_, ok := node.(*TomlTree)
+		return ok
 	},
-	"even": func(node interface{}) bool {
-		if ii, ok := node.(int64); ok {
-			return (ii & 1) == 0
-		}
-		return false
+	"int": func(node interface{}) bool {
+		_, ok := node.(int64)
+		return ok
 	},
-}
-
-var defaultScriptFunctions = map[string]nodeFn{
-	"last": func(node interface{}) interface{} {
-		if arr, ok := node.([]interface{}); ok {
-			return len(arr) - 1
-		}
-		return nil
+	"float": func(node interface{}) bool {
+		_, ok := node.(float64)
+		return ok
+	},
+	"string": func(node interface{}) bool {
+		_, ok := node.(string)
+		return ok
+	},
+	"time": func(node interface{}) bool {
+		_, ok := node.(time.Time)
+		return ok
+	},
+	"bool": func(node interface{}) bool {
+		_, ok := node.(bool)
+		return ok
 	},
 }

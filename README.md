@@ -70,6 +70,42 @@ your application. Using positions works much like values:
 * `tree.GetPosition("comma.separated.path")` Returns the position of the given
   path in the source.
 
+### Support for queries
+:
+Go-toml also supports a JSON-Path style syntax for querying a document for
+collections of elements, and more.
+
+```go
+import (
+    "fmt"
+    "github.com/pelletier/go-toml"
+)
+config, err := toml.Load(`
+[[book]]
+title = "The Stand"
+author = "Stephen King"
+[[book]]
+title = "For Whom the Bell Tolls"
+author = "Earnest Hemmingway"
+[[book]]
+title = "Neuromancer"
+author = "William Gibson"
+`)
+
+if err != nil {
+    fmt.Println("Error ", err.Error())
+} else {
+    // find and print all the authors in the document
+    authors := config.Query("$.book.author")
+    for _, name := authors.Value() {
+        fmt.Println(name)
+    }
+}
+```
+
+More information about the format of TOML queries can be found on the
+[godoc page for go-toml](http://godoc.org/github.com/pelletier/go-toml).
+
 ## Documentation
 
 The documentation is available at

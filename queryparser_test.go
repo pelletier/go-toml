@@ -2,9 +2,11 @@ package toml
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 type queryTestNode struct {
@@ -56,6 +58,12 @@ func valueString(root interface{}) string {
 		result += fmt.Sprintf("%d", node)
 	case string:
 		result += "'" + node + "'"
+	case float64:
+		result += fmt.Sprintf("%f", node)
+	case bool:
+		result += fmt.Sprintf("%t", node)
+	case time.Time:
+		result += fmt.Sprintf("'%v'", node)
 	}
 	return result
 }
@@ -76,7 +84,7 @@ func assertQueryPositions(t *testing.T, toml, query string, ref []interface{}) {
 		t.Errorf("Non-nil toml parse error: %v", err)
 		return
 	}
-	q, err := Compile(query)
+	q, err := CompileQuery(query)
 	if err != nil {
 		t.Error(err)
 		return
@@ -223,6 +231,28 @@ func TestQueryRecursionAll(t *testing.T) {
 		[]interface{}{
 			queryTestNode{
 				map[string]interface{}{
+					"foo": map[string]interface{}{
+						"bar": map[string]interface{}{
+							"a": int64(1),
+							"b": int64(2),
+						},
+					},
+					"baz": map[string]interface{}{
+						"foo": map[string]interface{}{
+							"a": int64(3),
+							"b": int64(4),
+						},
+					},
+					"gorf": map[string]interface{}{
+						"foo": map[string]interface{}{
+							"a": int64(5),
+							"b": int64(6),
+						},
+					},
+				}, Position{1, 1},
+			},
+			queryTestNode{
+				map[string]interface{}{
 					"bar": map[string]interface{}{
 						"a": int64(1),
 						"b": int64(2),
@@ -291,8 +321,10 @@ func TestQueryRecursionUnionSimple(t *testing.T) {
 		[]interface{}{
 			queryTestNode{
 				map[string]interface{}{
-					"a": int64(1),
-					"b": int64(2),
+					"bar": map[string]interface{}{
+						"a": int64(1),
+						"b": int64(2),
+					},
 				}, Position{1, 1},
 			},
 			queryTestNode{
@@ -303,6 +335,12 @@ func TestQueryRecursionUnionSimple(t *testing.T) {
 			},
 			queryTestNode{
 				map[string]interface{}{
+					"a": int64(1),
+					"b": int64(2),
+				}, Position{1, 1},
+			},
+			queryTestNode{
+				map[string]interface{}{
 					"a": int64(5),
 					"b": int64(6),
 				}, Position{7, 1},
@@ -310,59 +348,136 @@ func TestQueryRecursionUnionSimple(t *testing.T) {
 		})
 }
 
-func TestQueryScriptFnLast(t *testing.T) {
-	assertQueryPositions(t,
-		"[foo]\na = [0,1,2,3,4,5,6,7,8,9]",
-		"$.foo.a[(last)]",
+func TestQueryFilterFn(t *testing.T) {
+	buff, err := ioutil.ReadFile("example.toml")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assertQueryPositions(t, string(buff),
+		"$..[?(int)]",
 		[]interface{}{
 			queryTestNode{
-				int64(9), Position{2, 1},
+				int64(8001), Position{13, 1},
+			},
+			queryTestNode{
+				int64(8001), Position{13, 1},
+			},
+			queryTestNode{
+				int64(8002), Position{13, 1},
+			},
+			queryTestNode{
+				int64(5000), Position{14, 1},
 			},
 		})
-}
 
-func TestQueryFilterFnOdd(t *testing.T) {
-	assertQueryPositions(t,
-		"[foo]\na = [0,1,2,3,4,5,6,7,8,9]",
-		"$.foo.a[?(odd)]",
+	assertQueryPositions(t, string(buff),
+		"$..[?(string)]",
 		[]interface{}{
 			queryTestNode{
-				int64(1), Position{2, 1},
+				"TOML Example", Position{3, 1},
 			},
 			queryTestNode{
-				int64(3), Position{2, 1},
+				"Tom Preston-Werner", Position{6, 1},
 			},
 			queryTestNode{
-				int64(5), Position{2, 1},
+				"GitHub", Position{7, 1},
 			},
 			queryTestNode{
-				int64(7), Position{2, 1},
+				"GitHub Cofounder & CEO\nLikes tater tots and beer.",
+				Position{8, 1},
 			},
 			queryTestNode{
-				int64(9), Position{2, 1},
+				"192.168.1.1", Position{12, 1},
+			},
+			queryTestNode{
+				"10.0.0.1", Position{21, 3},
+			},
+			queryTestNode{
+				"eqdc10", Position{22, 3},
+			},
+			queryTestNode{
+				"10.0.0.2", Position{25, 3},
+			},
+			queryTestNode{
+				"eqdc10", Position{26, 3},
 			},
 		})
-}
 
-func TestQueryFilterFnEven(t *testing.T) {
-	assertQueryPositions(t,
-		"[foo]\na = [0,1,2,3,4,5,6,7,8,9]",
-		"$.foo.a[?(even)]",
+	assertQueryPositions(t, string(buff),
+		"$..[?(float)]",
+		[]interface{}{
+		// no float values in document
+		})
+
+	tv, _ := time.Parse(time.RFC3339, "1979-05-27T07:32:00Z")
+	assertQueryPositions(t, string(buff),
+		"$..[?(tree)]",
 		[]interface{}{
 			queryTestNode{
-				int64(0), Position{2, 1},
+				map[string]interface{}{
+					"name":         "Tom Preston-Werner",
+					"organization": "GitHub",
+					"bio":          "GitHub Cofounder & CEO\nLikes tater tots and beer.",
+					"dob":          tv,
+				}, Position{5, 1},
 			},
 			queryTestNode{
-				int64(2), Position{2, 1},
+				map[string]interface{}{
+					"server":         "192.168.1.1",
+					"ports":          []interface{}{int64(8001), int64(8001), int64(8002)},
+					"connection_max": int64(5000),
+					"enabled":        true,
+				}, Position{11, 1},
 			},
 			queryTestNode{
-				int64(4), Position{2, 1},
+				map[string]interface{}{
+					"alpha": map[string]interface{}{
+						"ip": "10.0.0.1",
+						"dc": "eqdc10",
+					},
+					"beta": map[string]interface{}{
+						"ip": "10.0.0.2",
+						"dc": "eqdc10",
+					},
+				}, Position{17, 1},
 			},
 			queryTestNode{
-				int64(6), Position{2, 1},
+				map[string]interface{}{
+					"ip": "10.0.0.1",
+					"dc": "eqdc10",
+				}, Position{20, 3},
 			},
 			queryTestNode{
-				int64(8), Position{2, 1},
+				map[string]interface{}{
+					"ip": "10.0.0.2",
+					"dc": "eqdc10",
+				}, Position{24, 3},
+			},
+			queryTestNode{
+				map[string]interface{}{
+					"data": []interface{}{
+						[]interface{}{"gamma", "delta"},
+						[]interface{}{int64(1), int64(2)},
+					},
+				}, Position{28, 1},
+			},
+		})
+
+	assertQueryPositions(t, string(buff),
+		"$..[?(time)]",
+		[]interface{}{
+			queryTestNode{
+				tv, Position{9, 1},
+			},
+		})
+
+	assertQueryPositions(t, string(buff),
+		"$..[?(bool)]",
+		[]interface{}{
+			queryTestNode{
+				true, Position{15, 1},
 			},
 		})
 }

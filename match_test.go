@@ -7,7 +7,7 @@ import (
 )
 
 // dump path tree to a string
-func pathString(root PathFn) string {
+func pathString(root pathFn) string {
 	result := fmt.Sprintf("%T:", root)
 	switch fn := root.(type) {
 	case *terminatingFn:
@@ -37,9 +37,6 @@ func pathString(root PathFn) string {
 	case *matchFilterFn:
 		result += fmt.Sprintf("{%s}", fn.Name)
 		result += pathString(fn.next)
-	case *matchScriptFn:
-		result += fmt.Sprintf("{%s}", fn.Name)
-		result += pathString(fn.next)
 	}
 	return result
 }
@@ -61,7 +58,7 @@ func assertPath(t *testing.T, query string, ref *Query) {
 	assertPathMatch(t, path, ref)
 }
 
-func buildPath(parts ...PathFn) *Query {
+func buildPath(parts ...pathFn) *Query {
 	query := newQuery()
 	for _, v := range parts {
 		query.appendPath(v)
@@ -177,7 +174,7 @@ func TestPathUnion(t *testing.T) {
 	assertPath(t,
 		"$[foo, bar, baz]",
 		buildPath(
-			&matchUnionFn{[]PathFn{
+			&matchUnionFn{[]pathFn{
 				newMatchKeyFn("foo"),
 				newMatchKeyFn("bar"),
 				newMatchKeyFn("baz"),
@@ -197,20 +194,9 @@ func TestPathFilterExpr(t *testing.T) {
 	assertPath(t,
 		"$[?('foo'),?(bar)]",
 		buildPath(
-			&matchUnionFn{[]PathFn{
+			&matchUnionFn{[]pathFn{
 				newMatchFilterFn("foo", Position{}),
 				newMatchFilterFn("bar", Position{}),
-			}},
-		))
-}
-
-func TestPathScriptExpr(t *testing.T) {
-	assertPath(t,
-		"$[('foo'),(bar)]",
-		buildPath(
-			&matchUnionFn{[]PathFn{
-				newMatchScriptFn("foo", Position{}),
-				newMatchScriptFn("bar", Position{}),
 			}},
 		))
 }

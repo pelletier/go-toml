@@ -1,7 +1,3 @@
-// Package toml is a TOML markup language parser.
-//
-// This version supports the specification as described in
-// https://github.com/toml-lang/toml/blob/master/versions/toml-v0.2.0.md
 package toml
 
 import (
@@ -320,7 +316,7 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 }
 
 func (t *TomlTree) Query(query string) (*QueryResult, error) {
-	if q, err := Compile(query); err != nil {
+	if q, err := CompileQuery(query); err != nil {
 		return nil, err
 	} else {
 		return q.Execute(t), nil

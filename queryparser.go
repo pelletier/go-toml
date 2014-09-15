@@ -16,7 +16,7 @@ type queryParser struct {
 	flow         chan token
 	tokensBuffer []token
 	query        *Query
-	union        []PathFn
+	union        []pathFn
 	err          error
 }
 
@@ -156,7 +156,7 @@ func (p *queryParser) parseUnionExpr() queryParserStateFn {
 	// this state can be traversed after some sub-expressions
 	// so be careful when setting up state in the parser
 	if p.union == nil {
-		p.union = []PathFn{}
+		p.union = []pathFn{}
 	}
 
 loop: // labeled loop for easy breaking
@@ -185,8 +185,6 @@ loop: // labeled loop for easy breaking
 			p.union = append(p.union, newMatchKeyFn(tok.val))
 		case tokenQuestion:
 			return p.parseFilterExpr
-		case tokenLeftParen:
-			return p.parseScriptExpr
 		default:
 			return p.parseError(tok, "expected union sub expression, not '%s', %d", tok.val, len(p.union))
 		}
@@ -263,20 +261,6 @@ func (p *queryParser) parseFilterExpr() queryParserStateFn {
 		return p.parseError(tok, "expected right-parenthesis for filter expression")
 	}
 	p.union = append(p.union, newMatchFilterFn(name, tok.Position))
-	return p.parseUnionExpr
-}
-
-func (p *queryParser) parseScriptExpr() queryParserStateFn {
-	tok := p.getToken()
-	if tok.typ != tokenKey && tok.typ != tokenString {
-		return p.parseError(tok, "expected key or string for script funciton name")
-	}
-	name := tok.val
-	tok = p.getToken()
-	if tok.typ != tokenRightParen {
-		return p.parseError(tok, "expected right-parenthesis for script expression")
-	}
-	p.union = append(p.union, newMatchScriptFn(name, tok.Position))
 	return p.parseUnionExpr
 }
 
