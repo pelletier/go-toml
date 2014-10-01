@@ -2,7 +2,9 @@
 
 package toml
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func ExampleNodeFilterFn_filterExample() {
 	tree, _ := Load(`
@@ -47,5 +49,33 @@ func ExampleQuery_queryExample() {
 	authors, _ := config.Query("$.book.author")
 	for _, name := range authors.Values() {
 		fmt.Println(name)
+	}
+}
+
+func Example_comprehensiveExample() {
+	config, err := LoadFile("config.toml")
+
+	if err != nil {
+		fmt.Println("Error ", err.Error())
+	} else {
+		// retrieve data directly
+		user := config.Get("postgres.user").(string)
+		password := config.Get("postgres.password").(string)
+
+		// or using an intermediate object
+		configTree := config.Get("postgres").(*TomlTree)
+		user = configTree.Get("user").(string)
+		password = configTree.Get("password").(string)
+		fmt.Println("User is ", user, ". Password is ", password)
+
+		// show where elements are in the file
+		fmt.Println("User position: %v", configTree.GetPosition("user"))
+		fmt.Println("Password position: %v", configTree.GetPosition("password"))
+
+		// use a query to gather elements without walking the tree
+		results, _ := config.Query("$..[user,password]")
+		for ii, item := range results.Values() {
+			fmt.Println("Query result %d: %v", ii, item)
+		}
 	}
 }
