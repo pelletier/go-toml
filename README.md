@@ -8,6 +8,23 @@ This library supports TOML version
 [![GoDoc](https://godoc.org/github.com/pelletier/go-toml?status.svg)](http://godoc.org/github.com/pelletier/go-toml)
 [![Build Status](https://travis-ci.org/pelletier/go-toml.svg?branch=master)](https://travis-ci.org/pelletier/go-toml)
 
+## Features
+
+Go-toml provides the following features for using data parsed from TOML documents:
+
+* Load TOML documents from files and string data
+* Easily navigate TOML structure using TomlTree
+* Line & column position data for all parsed elements
+* Query support similar to JSON-Path
+* Syntax errors contain line and column numbers
+
+Go-toml is designed to help cover use-cases not covered by reflection-based TOML parsing:
+
+* Semantic evaluation of parsed TOML
+* Informing a user of mistakes in the source document, after it has been parsed
+* Programatic handling of default values on a case-by-case basis
+* Using a TOML document as a flexible data-store
+
 ## Import
 
     import "github.com/pelletier/go-toml"
@@ -45,34 +62,22 @@ if err != nil {
     user = configTree.Get("user").(string)
     password = configTree.Get("password").(string)
     fmt.Println("User is ", user, ". Password is ", password)
+
+    // show where elements are in the file
+    fmt.Println("User position: %v", configTree.GetPosition("user"))
+    fmt.Println("Password position: %v", configTree.GetPosition("password"))
+
+    // use a query to gather elements without walking the tree
+    results, _ := config.Query("$..[user,password]")
+    for ii, item := range results.Values() {
+      fmt.Println("Query result %d: %v", ii, item)
+    }
 }
 ```
 
-### Dealing with values
-
-Here are some important functions you need to know in order to work with the
-values in a TOML tree:
-
-* `tree.Get("comma.separated.path")` Returns the value at the given path in the
-  tree as an `interface{}`. It's up to you to cast the result into the right
-  type.
-* `tree.Set("comma.separated.path", value)` Sets the value at the given path in
-  the tree, creating all necessary intermediate subtrees.
-
-### Dealing with positions
-
-Since
-[e118479061](https://github.com/pelletier/go-toml/commit/e1184790610b20d0541fc9f57c181cc5b1fc78be),
-go-toml supports positions. This feature allows you to track the positions of
-the values inside the source document, for example to provide better feedback in
-your application. Using positions works much like values:
-
-* `tree.GetPosition("comma.separated.path")` Returns the position of the given
-  path in the source.
-
 ## Documentation
 
-The documentation is available at
+The documentation and additional examples are available at
 [godoc.org](http://godoc.org/github.com/pelletier/go-toml).
 
 ## Contribute

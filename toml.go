@@ -1,7 +1,3 @@
-// Package toml is a TOML markup language parser.
-//
-// This version supports the specification as described in
-// https://github.com/toml-lang/toml/blob/master/versions/toml-v0.2.0.md
 package toml
 
 import (
@@ -28,7 +24,7 @@ type TomlTree struct {
 func newTomlTree() *TomlTree {
 	return &TomlTree{
 		values:   make(map[string]interface{}),
-		position: Position{0, 0},
+		position: Position{},
 	}
 }
 
@@ -103,7 +99,7 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 // GetPosition returns the position of the given key.
 func (t *TomlTree) GetPosition(key string) Position {
 	if key == "" {
-		return Position{0, 0}
+		return t.position
 	}
 	return t.GetPositionPath(strings.Split(key, "."))
 }
@@ -199,7 +195,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 // and tree[a][b][c]
 //
 // Returns nil on success, error object on failure
-func (t *TomlTree) createSubTree(keys []string) error {
+func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 	subtree := t
 	for _, intermediateKey := range keys {
 		if intermediateKey == "" {
@@ -207,8 +203,10 @@ func (t *TomlTree) createSubTree(keys []string) error {
 		}
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
-			nextTree = newTomlTree()
-			subtree.values[intermediateKey] = nextTree
+			tree := newTomlTree()
+			tree.position = pos
+			subtree.values[intermediateKey] = tree
+			nextTree = tree
 		}
 
 		switch node := nextTree.(type) {
@@ -317,6 +315,14 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 	return result
 }
 
+func (t *TomlTree) Query(query string) (*QueryResult, error) {
+	if q, err := CompileQuery(query); err != nil {
+		return nil, err
+	} else {
+		return q.Execute(t), nil
+	}
+}
+
 // ToString generates a human-readable representation of the current tree.
 // Output spans multiple lines, and is suitable for ingest by a TOML parser
 func (t *TomlTree) ToString() string {
@@ -333,8 +339,7 @@ func Load(content string) (tree *TomlTree, err error) {
 			err = errors.New(r.(string))
 		}
 	}()
-	_, flow := lex(content)
-	tree = parse(flow)
+	tree = parseToml(lexToml(content))
 	return
 }
 

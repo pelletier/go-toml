@@ -31,7 +31,7 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 
 func TestCreateSubTree(t *testing.T) {
 	tree := newTomlTree()
-	tree.createSubTree([]string{"a", "b", "c"})
+	tree.createSubTree([]string{"a", "b", "c"}, Position{})
 	tree.Set("a.b.c", 42)
 	if tree.Get("a.b.c") != 42 {
 		t.Fail()
@@ -385,7 +385,7 @@ func assertPosition(t *testing.T, text string, ref map[string]Position) {
 	for path, pos := range ref {
 		testPos := tree.GetPosition(path)
 		if testPos.Invalid() {
-			t.Errorf("Failed to query tree path: %s", path)
+			t.Errorf("Failed to query tree path or path has invalid position: %s", path)
 		} else if pos != testPos {
 			t.Errorf("Expected position %v, got %v instead", pos, testPos)
 		}
@@ -396,6 +396,7 @@ func TestDocumentPositions(t *testing.T) {
 	assertPosition(t,
 		"[foo]\nbar=42\nbaz=69",
 		map[string]Position{
+			"":        Position{1, 1},
 			"foo":     Position{1, 1},
 			"foo.bar": Position{2, 1},
 			"foo.baz": Position{3, 1},
@@ -406,6 +407,7 @@ func TestDocumentPositionsWithSpaces(t *testing.T) {
 	assertPosition(t,
 		"  [foo]\n  bar=42\n  baz=69",
 		map[string]Position{
+			"":        Position{1, 1},
 			"foo":     Position{1, 3},
 			"foo.bar": Position{2, 3},
 			"foo.baz": Position{3, 3},
@@ -416,20 +418,21 @@ func TestDocumentPositionsWithGroupArray(t *testing.T) {
 	assertPosition(t,
 		"[[foo]]\nbar=42\nbaz=69",
 		map[string]Position{
+			"":        Position{1, 1},
 			"foo":     Position{1, 1},
 			"foo.bar": Position{2, 1},
 			"foo.baz": Position{3, 1},
 		})
 }
 
-func TestDocumentPositionsEmptyPath(t *testing.T) {
-	text := "[foo]\nbar=42\nbaz=69"
-	tree, err := Load(text)
-	if err != nil {
-		t.Errorf("Error loading document text: `%v`", text)
-		t.Errorf("Error: %v", err)
-	}
-	if pos := tree.GetPosition(""); !pos.Invalid() {
-		t.Errorf("Valid position was returned for empty path")
-	}
+func TestNestedTreePosition(t *testing.T) {
+	assertPosition(t,
+		"[foo.bar]\na=42\nb=69",
+		map[string]Position{
+			"":          Position{1, 1},
+			"foo":       Position{1, 1},
+			"foo.bar":   Position{1, 1},
+			"foo.bar.a": Position{2, 1},
+			"foo.bar.b": Position{3, 1},
+		})
 }
