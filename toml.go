@@ -28,6 +28,12 @@ func newTomlTree() *TomlTree {
 	}
 }
 
+func TreeFromMap(m map[string]interface{}) *TomlTree {
+	return &TomlTree{
+		values: m,
+	}
+}
+
 // Has returns a boolean indicating if the given key exists.
 func (t *TomlTree) Has(key string) bool {
 	if key == "" {
@@ -306,10 +312,17 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
 			}
 			result += node.toToml(indent+"  ", combinedKey)
+		case map[string]interface{}:
+			sub := TreeFromMap(node)
+
+			if len(sub.Keys()) > 0 {
+				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
+			}
+			result += sub.toToml(indent+"  ", combinedKey)
 		case *tomlValue:
 			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(node.value, 0))
 		default:
-			panic(fmt.Sprintf("unsupported node type: %v", node))
+			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(v, 0))
 		}
 	}
 	return result
