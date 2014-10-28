@@ -171,7 +171,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
 			nextTree = newTomlTree()
-			subtree.values[intermediateKey] = &nextTree // add new element here
+			subtree.values[intermediateKey] = nextTree // add new element here
 		}
 		switch node := nextTree.(type) {
 		case *TomlTree:
@@ -185,7 +185,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 			subtree = node[len(node)-1]
 		}
 	}
-	subtree.values[keys[len(keys)-1]] = value
+	subtree.values[keys[len(keys)-1]] = &tomlValue{value: value}
 }
 
 // createSubTree takes a tree and a key and create the necessary intermediate
