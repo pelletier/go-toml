@@ -2,7 +2,6 @@ package toml
 
 import (
 	"fmt"
-	"math"
 	"testing"
 )
 
@@ -110,7 +109,7 @@ func TestPathSliceStart(t *testing.T) {
 	assertPath(t,
 		"$[123:]",
 		buildPath(
-			newMatchSliceFn(123, math.MaxInt64, 1),
+			newMatchSliceFn(123, MaxInt, 1),
 		))
 }
 
@@ -134,7 +133,7 @@ func TestPathSliceStartStep(t *testing.T) {
 	assertPath(t,
 		"$[123::7]",
 		buildPath(
-			newMatchSliceFn(123, math.MaxInt64, 7),
+			newMatchSliceFn(123, MaxInt, 7),
 		))
 }
 
@@ -150,7 +149,7 @@ func TestPathSliceStep(t *testing.T) {
 	assertPath(t,
 		"$[::7]",
 		buildPath(
-			newMatchSliceFn(0, math.MaxInt64, 7),
+			newMatchSliceFn(0, MaxInt, 7),
 		))
 }
 
