@@ -221,8 +221,8 @@ func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 		case *TomlTree:
 			subtree = node
 		default:
-			return fmt.Errorf("unknown type for path %s (%s)",
-				strings.Join(keys, "."), intermediateKey)
+			return fmt.Errorf("unknown type for path %s (%s): %T (%#v)",
+				strings.Join(keys, "."), intermediateKey, nextTree, nextTree)
 		}
 	}
 	return nil
