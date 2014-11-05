@@ -28,6 +28,12 @@ func newTomlTree() *TomlTree {
 	}
 }
 
+func TreeFromMap(m map[string]interface{}) *TomlTree {
+	return &TomlTree{
+		values: m,
+	}
+}
+
 // Has returns a boolean indicating if the given key exists.
 func (t *TomlTree) Has(key string) bool {
 	if key == "" {
@@ -171,7 +177,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
 			nextTree = newTomlTree()
-			subtree.values[intermediateKey] = &nextTree // add new element here
+			subtree.values[intermediateKey] = nextTree // add new element here
 		}
 		switch node := nextTree.(type) {
 		case *TomlTree:
@@ -185,7 +191,21 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 			subtree = node[len(node)-1]
 		}
 	}
-	subtree.values[keys[len(keys)-1]] = value
+
+	var toInsert interface{}
+
+	switch value.(type) {
+	case *TomlTree:
+		toInsert = value
+	case []*TomlTree:
+		toInsert = value
+	case *tomlValue:
+		toInsert = value
+	default:
+		toInsert = &tomlValue{value: value}
+	}
+
+	subtree.values[keys[len(keys)-1]] = toInsert
 }
 
 // createSubTree takes a tree and a key and create the necessary intermediate
@@ -215,8 +235,8 @@ func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 		case *TomlTree:
 			subtree = node
 		default:
-			return fmt.Errorf("unknown type for path %s (%s)",
-				strings.Join(keys, "."), intermediateKey)
+			return fmt.Errorf("unknown type for path %s (%s): %T (%#v)",
+				strings.Join(keys, "."), intermediateKey, nextTree, nextTree)
 		}
 	}
 	return nil
@@ -306,10 +326,17 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
 			}
 			result += node.toToml(indent+"  ", combinedKey)
+		case map[string]interface{}:
+			sub := TreeFromMap(node)
+
+			if len(sub.Keys()) > 0 {
+				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
+			}
+			result += sub.toToml(indent+"  ", combinedKey)
 		case *tomlValue:
 			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(node.value, 0))
 		default:
-			panic(fmt.Sprintf("unsupported node type: %v", node))
+			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(v, 0))
 		}
 	}
 	return result
