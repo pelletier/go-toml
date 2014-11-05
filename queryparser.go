@@ -203,7 +203,7 @@ loop: // labeled loop for easy breaking
 
 func (p *queryParser) parseSliceExpr() queryParserStateFn {
 	// init slice to grab all elements
-	start, end, step := 0, math.MaxInt64, 1
+	start, end, step := 0, math.MaxInt32, 1
 
 	// parse optional start
 	tok := p.getToken()
