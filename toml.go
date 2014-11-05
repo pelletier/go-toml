@@ -191,7 +191,21 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 			subtree = node[len(node)-1]
 		}
 	}
-	subtree.values[keys[len(keys)-1]] = &tomlValue{value: value}
+
+	var toInsert interface{}
+
+	switch value.(type) {
+	case *TomlTree:
+		toInsert = value
+	case []*TomlTree:
+		toInsert = value
+	case *tomlValue:
+		toInsert = value
+	default:
+		toInsert = &tomlValue{value: value}
+	}
+
+	subtree.values[keys[len(keys)-1]] = toInsert
 }
 
 // createSubTree takes a tree and a key and create the necessary intermediate
