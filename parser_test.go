@@ -54,9 +54,9 @@ func TestSimpleKV(t *testing.T) {
 // NOTE: from the BurntSushi test suite
 // NOTE: this test is pure evil due to the embedded '.'
 func TestSpecialKV(t *testing.T) {
-	tree, err := Load("~!@#$^&*()_+-`1234567890[]\\|/?><.,;: = 1")
+	tree, err := Load("~!@$^&*()_+-`1234567890[]\\|/?><.,;: = 1")
 	assertTree(t, tree, err, map[string]interface{}{
-		"~!@#$^&*()_+-`1234567890[]\\|/?><.,;:": int64(1),
+		"~!@$^&*()_+-`1234567890[]\\|/?><.,;:": int64(1),
 	})
 }
 

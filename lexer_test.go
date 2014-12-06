@@ -118,19 +118,16 @@ func TestBasicKeyAndEqual(t *testing.T) {
 
 func TestKeyWithSharpAndEqual(t *testing.T) {
 	testFlow(t, "key#name = 5", []token{
-		token{Position{1, 1}, tokenKey, "key#name"},
-		token{Position{1, 10}, tokenEqual, "="},
-		token{Position{1, 12}, tokenInteger, "5"},
-		token{Position{1, 13}, tokenEOF, ""},
+		token{Position{1, 1}, tokenError, "keys cannot contain # character"},
 	})
 }
 
 func TestKeyWithSymbolsAndEqual(t *testing.T) {
-	testFlow(t, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
-		token{Position{1, 1}, tokenKey, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:'"},
-		token{Position{1, 39}, tokenEqual, "="},
-		token{Position{1, 41}, tokenInteger, "5"},
-		token{Position{1, 42}, tokenEOF, ""},
+	testFlow(t, "~!@$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
+		token{Position{1, 1}, tokenKey, "~!@$^&*()_+-`1234567890[]\\|/?><.,;:'"},
+		token{Position{1, 38}, tokenEqual, "="},
+		token{Position{1, 40}, tokenInteger, "5"},
+		token{Position{1, 41}, tokenEOF, ""},
 	})
 }
 

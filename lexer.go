@@ -138,7 +138,7 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 			return l.lexRvalue
 		}
 
-		if isKeyChar(next) {
+		if isKeyStartChar(next) {
 			return l.lexKey
 		}
 
@@ -250,7 +250,10 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	l.ignore()
-	for isKeyChar(l.next()) {
+	for r := l.next(); isKeyChar(r); r = l.next() {
+		if (r == '#') {
+			return l.errorf("keys cannot contain # character")
+		}
 	}
 	l.backup()
 	l.emit(tokenKey)
