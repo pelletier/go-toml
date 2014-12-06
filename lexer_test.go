@@ -273,7 +273,13 @@ func TestKeyEqualArrayBoolsWithComments(t *testing.T) {
 
 func TestDateRegexp(t *testing.T) {
 	if dateRegexp.FindString("1979-05-27T07:32:00Z") == "" {
-		t.Fail()
+		t.Error("basic lexing")
+	}
+	if dateRegexp.FindString("1979-05-27T00:32:00-07:00") == "" {
+		t.Error("offset lexing")
+	}
+	if dateRegexp.FindString("1979-05-27T00:32:00.999999-07:00") == "" {
+		t.Error("nano precision lexing")
 	}
 }
 
@@ -283,6 +289,18 @@ func TestKeyEqualDate(t *testing.T) {
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{1, 7}, tokenDate, "1979-05-27T07:32:00Z"},
 		token{Position{1, 27}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 1979-05-27T00:32:00-07:00", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenDate, "1979-05-27T00:32:00-07:00"},
+		token{Position{1, 32}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 1979-05-27T00:32:00.999999-07:00", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenDate, "1979-05-27T00:32:00.999999-07:00"},
+		token{Position{1, 39}, tokenEOF, ""},
 	})
 }
 

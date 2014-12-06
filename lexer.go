@@ -192,7 +192,10 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexKey
 		}
 
-		if dateRegexp.FindString(l.input[l.pos:]) != "" {
+		dateMatch := dateRegexp.FindString(l.input[l.pos:])
+		if dateMatch != "" {
+			l.ignore()
+			l.pos += len(dateMatch)
 			return l.lexDate
 		}
 
@@ -214,8 +217,6 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 }
 
 func (l *tomlLexer) lexDate() tomlLexStateFn {
-	l.ignore()
-	l.pos += 20 // Fixed size of a date in TOML
 	l.emit(tokenDate)
 	return l.lexRvalue
 }
@@ -461,7 +462,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 }
 
 func init() {
-	dateRegexp = regexp.MustCompile("^\\d{1,4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")
+	dateRegexp = regexp.MustCompile("^\\d{1,4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})")
 }
 
 // Entry point
