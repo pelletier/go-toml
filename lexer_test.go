@@ -460,6 +460,33 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 	})
 }
 
+func TestLiteralString(t *testing.T) {
+	testFlow(t, `foo = 'C:\Users\nodejs\templates'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `C:\Users\nodejs\templates`},
+		token{Position{1, 34}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = '\\ServerX\admin$\system32\'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `\\ServerX\admin$\system32\`},
+		token{Position{1, 35}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = 'Tom "Dubs" Preston-Werner'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `Tom "Dubs" Preston-Werner`},
+		token{Position{1, 34}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = '<\i\c*\s*>'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `<\i\c*\s*>`},
+		token{Position{1, 19}, tokenEOF, ""},
+	})
+}
+
 func TestUnicodeString(t *testing.T) {
 	testFlow(t, `foo = "hello ♥ world"`, []token{
 		token{Position{1, 1}, tokenKey, "foo"},

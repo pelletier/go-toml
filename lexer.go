@@ -169,6 +169,8 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexComment
 		case '"':
 			return l.lexString
+		case '\'':
+			return l.lexLiteralString
 		case ',':
 			return l.lexComma
 		case '\n':
@@ -277,6 +279,29 @@ func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
 	l.pos++
 	l.emit(tokenLeftBracket)
 	return l.lexRvalue
+}
+
+func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
+	l.pos++
+	l.ignore()
+	growingString := ""
+
+	for {
+		if l.peek() == '\'' {
+			l.emitWithValue(tokenString, growingString)
+			l.pos++
+			l.ignore()
+			return l.lexRvalue
+		}
+
+		growingString += string(l.peek())
+
+		if l.next() == eof {
+			break
+		}
+	}
+
+	return l.errorf("unclosed string")
 }
 
 func (l *tomlLexer) lexString() tomlLexStateFn {
