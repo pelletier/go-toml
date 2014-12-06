@@ -138,7 +138,7 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 			return l.lexRvalue
 		}
 
-		if isKeyChar(next) {
+		if isKeyStartChar(next) {
 			return l.lexKey
 		}
 
@@ -169,6 +169,8 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexComment
 		case '"':
 			return l.lexString
+		case '\'':
+			return l.lexLiteralString
 		case ',':
 			return l.lexComma
 		case '\n':
@@ -192,7 +194,10 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexKey
 		}
 
-		if dateRegexp.FindString(l.input[l.pos:]) != "" {
+		dateMatch := dateRegexp.FindString(l.input[l.pos:])
+		if dateMatch != "" {
+			l.ignore()
+			l.pos += len(dateMatch)
 			return l.lexDate
 		}
 
@@ -214,8 +219,6 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 }
 
 func (l *tomlLexer) lexDate() tomlLexStateFn {
-	l.ignore()
-	l.pos += 20 // Fixed size of a date in TOML
 	l.emit(tokenDate)
 	return l.lexRvalue
 }
@@ -250,7 +253,10 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	l.ignore()
-	for isKeyChar(l.next()) {
+	for r := l.next(); isKeyChar(r); r = l.next() {
+		if (r == '#') {
+			return l.errorf("keys cannot contain # character")
+		}
 	}
 	l.backup()
 	l.emit(tokenKey)
@@ -273,6 +279,29 @@ func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
 	l.pos++
 	l.emit(tokenLeftBracket)
 	return l.lexRvalue
+}
+
+func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
+	l.pos++
+	l.ignore()
+	growingString := ""
+
+	for {
+		if l.peek() == '\'' {
+			l.emitWithValue(tokenString, growingString)
+			l.pos++
+			l.ignore()
+			return l.lexRvalue
+		}
+
+		growingString += string(l.peek())
+
+		if l.next() == eof {
+			break
+		}
+	}
+
+	return l.errorf("unclosed string")
 }
 
 func (l *tomlLexer) lexString() tomlLexStateFn {
@@ -418,6 +447,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 		l.accept("-")
 	}
 	pointSeen := false
+	expSeen := false
 	digitSeen := false
 	for {
 		next := l.next()
@@ -429,6 +459,11 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 				return l.errorf("float cannot end with a dot")
 			}
 			pointSeen = true
+		} else if next == 'e' || next == 'E' {
+			expSeen = true
+			if !l.accept("+") {
+				l.accept("-")
+			}
 		} else if isDigit(next) {
 			digitSeen = true
 		} else {
@@ -443,7 +478,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 	if !digitSeen {
 		return l.errorf("no digit in that number")
 	}
-	if pointSeen {
+	if pointSeen || expSeen {
 		l.emit(tokenFloat)
 	} else {
 		l.emit(tokenInteger)
@@ -452,7 +487,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 }
 
 func init() {
-	dateRegexp = regexp.MustCompile("^\\d{1,4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")
+	dateRegexp = regexp.MustCompile("^\\d{1,4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})")
 }
 
 // Entry point

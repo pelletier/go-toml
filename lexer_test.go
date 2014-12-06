@@ -118,19 +118,16 @@ func TestBasicKeyAndEqual(t *testing.T) {
 
 func TestKeyWithSharpAndEqual(t *testing.T) {
 	testFlow(t, "key#name = 5", []token{
-		token{Position{1, 1}, tokenKey, "key#name"},
-		token{Position{1, 10}, tokenEqual, "="},
-		token{Position{1, 12}, tokenInteger, "5"},
-		token{Position{1, 13}, tokenEOF, ""},
+		token{Position{1, 1}, tokenError, "keys cannot contain # character"},
 	})
 }
 
 func TestKeyWithSymbolsAndEqual(t *testing.T) {
-	testFlow(t, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
-		token{Position{1, 1}, tokenKey, "~!@#$^&*()_+-`1234567890[]\\|/?><.,;:'"},
-		token{Position{1, 39}, tokenEqual, "="},
-		token{Position{1, 41}, tokenInteger, "5"},
-		token{Position{1, 42}, tokenEOF, ""},
+	testFlow(t, "~!@$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
+		token{Position{1, 1}, tokenKey, "~!@$^&*()_+-`1234567890[]\\|/?><.,;:'"},
+		token{Position{1, 38}, tokenEqual, "="},
+		token{Position{1, 40}, tokenInteger, "5"},
+		token{Position{1, 41}, tokenEOF, ""},
 	})
 }
 
@@ -276,7 +273,13 @@ func TestKeyEqualArrayBoolsWithComments(t *testing.T) {
 
 func TestDateRegexp(t *testing.T) {
 	if dateRegexp.FindString("1979-05-27T07:32:00Z") == "" {
-		t.Fail()
+		t.Error("basic lexing")
+	}
+	if dateRegexp.FindString("1979-05-27T00:32:00-07:00") == "" {
+		t.Error("offset lexing")
+	}
+	if dateRegexp.FindString("1979-05-27T00:32:00.999999-07:00") == "" {
+		t.Error("nano precision lexing")
 	}
 }
 
@@ -286,6 +289,18 @@ func TestKeyEqualDate(t *testing.T) {
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{1, 7}, tokenDate, "1979-05-27T07:32:00Z"},
 		token{Position{1, 27}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 1979-05-27T00:32:00-07:00", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenDate, "1979-05-27T00:32:00-07:00"},
+		token{Position{1, 32}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 1979-05-27T00:32:00.999999-07:00", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenDate, "1979-05-27T00:32:00.999999-07:00"},
+		token{Position{1, 39}, tokenEOF, ""},
 	})
 }
 
@@ -302,6 +317,51 @@ func TestFloatWithTwoDots(t *testing.T) {
 		token{Position{1, 1}, tokenKey, "foo"},
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{1, 7}, tokenError, "cannot have two dots in one float"},
+	})
+}
+
+func TestFloatWithExponent1(t *testing.T) {
+	testFlow(t, "a = 5e+22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "5e+22"},
+		token{Position{1, 10}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent2(t *testing.T) {
+	testFlow(t, "a = 5E+22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "5E+22"},
+		token{Position{1, 10}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent3(t *testing.T) {
+	testFlow(t, "a = -5e+22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "-5e+22"},
+		token{Position{1, 11}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent4(t *testing.T) {
+	testFlow(t, "a = -5e-22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "-5e-22"},
+		token{Position{1, 11}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent5(t *testing.T) {
+	testFlow(t, "a = 6.626e-34", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "6.626e-34"},
+		token{Position{1, 14}, tokenEOF, ""},
 	})
 }
 
@@ -397,6 +457,33 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{1, 8}, tokenString, "hello ♥"},
 		token{Position{1, 21}, tokenEOF, ""},
+	})
+}
+
+func TestLiteralString(t *testing.T) {
+	testFlow(t, `foo = 'C:\Users\nodejs\templates'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `C:\Users\nodejs\templates`},
+		token{Position{1, 34}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = '\\ServerX\admin$\system32\'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `\\ServerX\admin$\system32\`},
+		token{Position{1, 35}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = 'Tom "Dubs" Preston-Werner'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `Tom "Dubs" Preston-Werner`},
+		token{Position{1, 34}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = '<\i\c*\s*>'`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, `<\i\c*\s*>`},
+		token{Position{1, 19}, tokenEOF, ""},
 	})
 }
 
