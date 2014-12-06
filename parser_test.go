@@ -70,6 +70,17 @@ func TestSimpleNumbers(t *testing.T) {
 	})
 }
 
+func TestFloatsWithExponents(t *testing.T) {
+	tree, err := Load("a = 5e+22\nb = 5E+22\nc = -5e+22\nd = -5e-22\ne = 6.626e-34")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": float64(5e+22),
+		"b": float64(5E+22),
+		"c": float64(-5e+22),
+		"d": float64(-5e-22),
+		"e": float64(6.626e-34),
+	})
+}
+
 func TestSimpleDate(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T07:32:00Z")
 	assertTree(t, tree, err, map[string]interface{}{

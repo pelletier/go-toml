@@ -418,6 +418,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 		l.accept("-")
 	}
 	pointSeen := false
+	expSeen := false
 	digitSeen := false
 	for {
 		next := l.next()
@@ -429,6 +430,11 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 				return l.errorf("float cannot end with a dot")
 			}
 			pointSeen = true
+		} else if next == 'e' || next == 'E' {
+			expSeen = true
+			if !l.accept("+") {
+				l.accept("-")
+			}
 		} else if isDigit(next) {
 			digitSeen = true
 		} else {
@@ -443,7 +449,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 	if !digitSeen {
 		return l.errorf("no digit in that number")
 	}
-	if pointSeen {
+	if pointSeen || expSeen {
 		l.emit(tokenFloat)
 	} else {
 		l.emit(tokenInteger)

@@ -305,6 +305,51 @@ func TestFloatWithTwoDots(t *testing.T) {
 	})
 }
 
+func TestFloatWithExponent1(t *testing.T) {
+	testFlow(t, "a = 5e+22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "5e+22"},
+		token{Position{1, 10}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent2(t *testing.T) {
+	testFlow(t, "a = 5E+22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "5E+22"},
+		token{Position{1, 10}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent3(t *testing.T) {
+	testFlow(t, "a = -5e+22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "-5e+22"},
+		token{Position{1, 11}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent4(t *testing.T) {
+	testFlow(t, "a = -5e-22", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "-5e-22"},
+		token{Position{1, 11}, tokenEOF, ""},
+	})
+}
+
+func TestFloatWithExponent5(t *testing.T) {
+	testFlow(t, "a = 6.626e-34", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenFloat, "6.626e-34"},
+		token{Position{1, 14}, tokenEOF, ""},
+	})
+}
+
 func TestDoubleEqualKey(t *testing.T) {
 	testFlow(t, "foo= = 2", []token{
 		token{Position{1, 1}, tokenKey, "foo"},
