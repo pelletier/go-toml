@@ -13,10 +13,12 @@ import (
 func main() {
 	bytes, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
+		log.Fatalf("Error during TOML read: %s", err)
 		os.Exit(2)
 	}
 	tree, err := toml.Load(string(bytes))
 	if err != nil {
+		log.Fatalf("Error during TOML load: %s", err)
 		os.Exit(1)
 	}
 
@@ -24,6 +26,7 @@ func main() {
 
 	if err := json.NewEncoder(os.Stdout).Encode(typedTree); err != nil {
 		log.Fatalf("Error encoding JSON: %s", err)
+		os.Exit(3)
 	}
 
 	os.Exit(0)

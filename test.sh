@@ -5,15 +5,26 @@ set -e
 # set the path to the present working directory
 export GOPATH=`pwd`
 
-# Vendorize the BurntSushi test suite
-# NOTE: this gets a specific release to avoid versioning issues
-if [ ! -d 'src/github.com/BurntSushi/toml-test' ]; then
-  mkdir -p src/github.com/BurntSushi
-  git clone https://github.com/BurntSushi/toml-test.git src/github.com/BurntSushi/toml-test
-fi
-pushd src/github.com/BurntSushi/toml-test
-git reset --hard '0.2.0'  # use the released version, NOT tip
-popd
+function git_clone() {
+  path=$1
+  branch=$2
+  version=$3
+  if [ ! -d "src/$path" ]; then
+    mkdir -p src/$path
+    git clone https://$path.git src/$path
+  fi
+  pushd src/$path
+  git checkout "$branch"
+  git reset --hard "$version"
+  popd
+}
+
+# get code for BurntSushi TOML validation
+# pinning all to 'HEAD' for version 0.3.x work (TODO: pin to commit hash when tests stabilize)
+git_clone github.com/BurntSushi/toml master HEAD
+git_clone github.com/BurntSushi/toml-test master HEAD #was: 0.2.0 HEAD
+
+# build the BurntSushi test application
 go build -o toml-test github.com/BurntSushi/toml-test
 
 # vendorize the current lib for testing
@@ -23,6 +34,42 @@ cp *.go *.toml src/github.com/pelletier/go-toml
 cp cmd/*.go src/github.com/pelletier/go-toml/cmd
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
-# Run basic unit tests and then the BurntSushi test suite
+# Run basic unit tests
 go test -v github.com/pelletier/go-toml
-./toml-test ./test_program_bin | tee test_out
+
+# run the entire BurntSushi test suite
+if [[ $# -eq 0 ]] ; then
+  echo "Running all BurntSushi tests"
+  ./toml-test ./test_program_bin | tee test_out
+else
+  # run a specific test
+  test=$1
+  test_path='src/github.com/BurntSushi/toml-test/tests'
+  valid_test="$test_path/valid/$test"
+  invalid_test="$test_path/invalid/$test"
+
+  if [ -e "$valid_test.toml" ]; then
+    echo "Valid Test TOML for $test:"
+    echo "===="
+    cat "$valid_test.toml"
+
+    echo "Valid Test JSON for $test:"
+    echo "===="
+    cat "$valid_test.json"
+
+    echo "Go-TOML Output for $test:"
+    echo "===="
+    cat "$valid_test.toml" | ./test_program_bin
+  fi
+
+  if [ -e "$invalid_test.toml" ]; then
+    echo "Invalid Test TOML for $test:"
+    echo "===="
+    cat "$invalid_test.toml"
+    
+    echo "Go-TOML Output for $test:"
+    echo "===="
+    echo "go-toml Output:"
+    cat "$invalid_test.toml" | ./test_program_bin
+  fi
+fi

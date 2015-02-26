@@ -487,6 +487,45 @@ func TestLiteralString(t *testing.T) {
 	})
 }
 
+func TestMultilineLiteralString(t *testing.T) {
+	testFlow(t, `foo = '''hello 'literal' world'''`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 10}, tokenString, `hello 'literal' world`},
+		token{Position{1, 34}, tokenEOF, ""},
+	})
+
+	testFlow(t, "foo = '''\nhello\n'literal'\nworld'''", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{2, 1}, tokenString, "hello\n'literal'\nworld"},
+		token{Position{4, 9}, tokenEOF, ""},
+	})
+}
+
+func TestMultilineString(t *testing.T) {
+	testFlow(t, `foo = """hello "literal" world"""`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 10}, tokenString, `hello "literal" world`},
+		token{Position{1, 34}, tokenEOF, ""},
+	})
+
+	testFlow(t, "foo = \"\"\"\nhello\n\"literal\"\nworld\"\"\"", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{2, 1}, tokenString, "hello\n\"literal\"\nworld"},
+		token{Position{4, 9}, tokenEOF, ""},
+	})
+
+	testFlow(t, "foo = \"\"\"\\\n    \\\n    \\\n    hello\nmultiline\nworld\"\"\"", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 10}, tokenString, "hello\nmultiline\nworld"},
+		token{Position{6, 9}, tokenEOF, ""},
+	})
+}
+
 func TestUnicodeString(t *testing.T) {
 	testFlow(t, `foo = "hello ♥ world"`, []token{
 		token{Position{1, 1}, tokenKey, "foo"},

@@ -254,7 +254,7 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	l.ignore()
 	for r := l.next(); isKeyChar(r); r = l.next() {
-		if (r == '#') {
+		if r == '#' {
 			return l.errorf("keys cannot contain # character")
 		}
 	}
@@ -286,10 +286,25 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 	l.ignore()
 	growingString := ""
 
-	for {
-		if l.peek() == '\'' {
-			l.emitWithValue(tokenString, growingString)
+	// handle special case for triple-quote
+	terminator := "'"
+	if l.follow("''") {
+		l.pos += 2
+		l.ignore()
+		terminator = "'''"
+
+		// special case: discard leading newline
+		if l.peek() == '\n' {
 			l.pos++
+			l.ignore()
+		}
+	}
+
+	// find end of string
+	for {
+		if l.follow(terminator) {
+			l.emitWithValue(tokenString, growingString)
+			l.pos += len(terminator)
 			l.ignore()
 			return l.lexRvalue
 		}
@@ -309,58 +324,80 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 	l.ignore()
 	growingString := ""
 
-	for {
-		if l.peek() == '"' {
-			l.emitWithValue(tokenString, growingString)
+	// handle special case for triple-quote
+	terminator := "\""
+	if l.follow("\"\"") {
+		l.pos += 2
+		l.ignore()
+		terminator = "\"\"\""
+
+		// special case: discard leading newline
+		if l.peek() == '\n' {
 			l.pos++
+			l.ignore()
+		}
+	}
+
+	for {
+		if l.follow(terminator) {
+			l.emitWithValue(tokenString, growingString)
+			l.pos += len(terminator)
 			l.ignore()
 			return l.lexRvalue
 		}
 
-		if l.follow("\\\"") {
+		if l.follow("\\") {
 			l.pos++
-			growingString += "\""
-		} else if l.follow("\\n") {
-			l.pos++
-			growingString += "\n"
-		} else if l.follow("\\b") {
-			l.pos++
-			growingString += "\b"
-		} else if l.follow("\\f") {
-			l.pos++
-			growingString += "\f"
-		} else if l.follow("\\/") {
-			l.pos++
-			growingString += "/"
-		} else if l.follow("\\t") {
-			l.pos++
-			growingString += "\t"
-		} else if l.follow("\\r") {
-			l.pos++
-			growingString += "\r"
-		} else if l.follow("\\\\") {
-			l.pos++
-			growingString += "\\"
-		} else if l.follow("\\u") {
-			l.pos += 2
-			code := ""
-			for i := 0; i < 4; i++ {
-				c := l.peek()
+			switch l.peek() {
+			case '\r':
+				fallthrough
+			case '\n':
+				fallthrough
+			case '\t':
+				fallthrough
+			case ' ':
+				// skip all whitespace chars following backslash
 				l.pos++
-				if !isHexDigit(c) {
-					return l.errorf("unfinished unicode escape")
+				for strings.ContainsRune("\r\n\t ", l.peek()) {
+					l.pos++
 				}
-				code = code + string(c)
+				l.pos--
+			case '"':
+				growingString += "\""
+			case 'n':
+				growingString += "\n"
+			case 'b':
+				growingString += "\b"
+			case 'f':
+				growingString += "\f"
+			case '/':
+				growingString += "/"
+			case 't':
+				growingString += "\t"
+			case 'r':
+				growingString += "\r"
+			case '\\':
+				growingString += "\\"
+			case 'u':
+				l.pos++
+				code := ""
+				for i := 0; i < 4; i++ {
+					c := l.peek()
+					l.pos++
+					if !isHexDigit(c) {
+						return l.errorf("unfinished unicode escape")
+					}
+					code = code + string(c)
+				}
+				l.pos--
+				intcode, err := strconv.ParseInt(code, 16, 32)
+				if err != nil {
+					return l.errorf("invalid unicode escape: \\u" + code)
+				}
+				growingString += string(rune(intcode))
+			default:
+				return l.errorf("invalid escape sequence: \\" + string(l.peek()))
 			}
-			l.pos--
-			intcode, err := strconv.ParseInt(code, 16, 32)
-			if err != nil {
-				return l.errorf("invalid unicode escape: \\u" + code)
-			}
-			growingString += string(rune(intcode))
-		} else if l.follow("\\") {
-			l.pos++
-			return l.errorf("invalid escape sequence: \\" + string(l.peek()))
 		} else {
 			growingString += string(l.peek())
 		}
