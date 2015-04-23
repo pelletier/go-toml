@@ -91,14 +91,14 @@ func TestSimpleDate(t *testing.T) {
 func TestDateOffset(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T00:32:00-07:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": time.Date(1979, time.May, 27, 0, 32, 0, 0, time.FixedZone("", -7*60*60)),
+		"a": time.Date(1979, time.May, 27, 0, 32, 0, 0, time.FixedZone("PDT", -7*60*60)),
 	})
 }
 
 func TestDateNano(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T00:32:00.999999999-07:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": time.Date(1979, time.May, 27, 0, 32, 0, 999999999, time.FixedZone("", -7*60*60)),
+		"a": time.Date(1979, time.May, 27, 0, 32, 0, 999999999, time.FixedZone("PDT", -7*60*60)),
 	})
 }
 
