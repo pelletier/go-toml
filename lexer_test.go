@@ -458,6 +458,12 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 		token{Position{1, 8}, tokenString, "hello ♥"},
 		token{Position{1, 21}, tokenEOF, ""},
 	})
+	testFlow(t, `foo = "hello \U000003B4"`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, "hello δ"},
+		token{Position{1, 25}, tokenEOF, ""},
+	})
 }
 
 func TestLiteralString(t *testing.T) {
