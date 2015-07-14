@@ -98,7 +98,10 @@ func (p *tomlParser) parseGroupArray() tomlParserStateFn {
 	}
 
 	// get or create group array element at the indicated part in the path
-	keys := strings.Split(key.val, ".")
+	keys, err := parseKey(key.val)
+	if err != nil {
+		p.raiseError(key, "invalid group array key: %s", err)
+	}
 	p.tree.createSubTree(keys[:len(keys)-1], startToken.Position) // create parent entries
 	destTree := p.tree.GetPath(keys)
 	var array []*TomlTree
@@ -153,7 +156,10 @@ func (p *tomlParser) parseGroup() tomlParserStateFn {
 	}
 
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
-	keys := strings.Split(key.val, ".")
+	keys, err := parseKey(key.val)
+	if err != nil {
+		p.raiseError(key, "invalid group array key: %s", err)
+	}
 	if err := p.tree.createSubTree(keys, startToken.Position); err != nil {
 		p.raiseError(key, "%s", err)
 	}

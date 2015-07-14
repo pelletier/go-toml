@@ -461,3 +461,10 @@ func TestNestedTreePosition(t *testing.T) {
 			"foo.bar.b": Position{3, 1},
 		})
 }
+
+func TestInvalidGroupArray(t *testing.T) {
+	_, err := Load("[key#group]\nanswer = 42")
+	if err == nil {
+		t.Error("Should error")
+	}
+}
