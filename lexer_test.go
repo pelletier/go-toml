@@ -555,3 +555,9 @@ func TestQuotedKey(t *testing.T) {
 		token{Position{1, 11}, tokenEOF, ""},
 	})
 }
+
+func TestKeyNewline(t *testing.T) {
+	testFlow(t, "a\n= 4", []token{
+		token{Position{1, 1}, tokenError, "keys cannot contain new lines"},
+	})
+}
