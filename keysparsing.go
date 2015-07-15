@@ -5,6 +5,7 @@ package toml
 import (
 	"bytes"
 	"fmt"
+	"unicode"
 )
 
 func parseKey(key string) ([]string, error) {
@@ -51,5 +52,5 @@ func parseKey(key string) ([]string, error) {
 }
 
 func isValidBareChar(r rune) bool {
-	return isAlphanumeric(r) || r == '-'
+	return isAlphanumeric(r) || r == '-' || unicode.IsNumber(r)
 }

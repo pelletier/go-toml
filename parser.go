@@ -192,13 +192,21 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	}
 
 	// assign value to the found group
-	localKey := []string{key.val}
-	finalKey := append(groupKey, key.val)
+	keyVals, err := parseKey(key.val)
+	if err != nil {
+		p.raiseError(key, "%s", err)
+	}
+	if len(keyVals) != 1 {
+		p.raiseError(key, "Invalid key")
+	}
+	keyVal := keyVals[0]
+	localKey := []string{keyVal}
+	finalKey := append(groupKey, keyVal)
 	if targetNode.GetPath(localKey) != nil {
 		p.raiseError(key, "The following key was defined twice: %s",
 			strings.Join(finalKey, "."))
 	}
-	targetNode.values[key.val] = &tomlValue{value, key.Position}
+	targetNode.values[keyVal] = &tomlValue{value, key.Position}
 	return p.parseStart
 }
 

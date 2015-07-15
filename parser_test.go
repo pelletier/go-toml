@@ -51,12 +51,10 @@ func TestSimpleKV(t *testing.T) {
 	})
 }
 
-// NOTE: from the BurntSushi test suite
-// NOTE: this test is pure evil due to the embedded '.'
-func TestSpecialKV(t *testing.T) {
-	tree, err := Load("~!@$^&*()_+-`1234567890[]\\|/?><.,;: = 1")
+func TestNumberInKey(t *testing.T) {
+	tree, err := Load("hello2 = 42")
 	assertTree(t, tree, err, map[string]interface{}{
-		"~!@$^&*()_+-`1234567890[]\\|/?><.,;:": int64(1),
+		"hello2": int64(42),
 	})
 }
 
@@ -106,6 +104,13 @@ func TestSimpleString(t *testing.T) {
 	tree, err := Load("a = \"hello world\"")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": "hello world",
+	})
+}
+
+func TestSpaceKey(t *testing.T) {
+	tree, err := Load("\"a b\" = \"hello world\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a b": "hello world",
 	})
 }
 
