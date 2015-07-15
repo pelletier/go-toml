@@ -1,5 +1,6 @@
 language: go
 script: "./test.sh"
+sudo: false
 go:
     - 1.1
     - 1.2
