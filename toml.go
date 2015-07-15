@@ -65,7 +65,11 @@ func (t *TomlTree) Get(key string) interface{} {
 	if key == "" {
 		return t
 	}
-	return t.GetPath(strings.Split(key, "."))
+	comps, err := parseKey(key)
+	if err != nil {
+		return nil
+	}
+	return t.GetPath(comps)
 }
 
 // GetPath returns the element in the tree indicated by 'keys'.
