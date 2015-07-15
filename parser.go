@@ -236,7 +236,7 @@ func (p *tomlParser) parseRvalue() interface{} {
 		}
 		return val
 	case tokenDate:
-		val, err := time.Parse(time.RFC3339Nano, tok.val)
+		val, err := time.ParseInLocation(time.RFC3339Nano, tok.val, time.UTC)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
