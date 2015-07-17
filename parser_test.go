@@ -68,6 +68,23 @@ func TestSimpleNumbers(t *testing.T) {
 	})
 }
 
+func TestIntegersWithUnderscores(t *testing.T) {
+	tree, err := Load("a = 1_000")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": int64(1000),
+	})
+
+	tree, err = Load("a = 5_349_221")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": int64(5349221),
+	})
+
+	tree, err = Load("a = 1_2_3_4_5")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": int64(12345),
+	})
+}
+
 func TestFloatsWithExponents(t *testing.T) {
 	tree, err := Load("a = 5e+22\nb = 5E+22\nc = -5e+22\nd = -5e-22\ne = 6.626e-34")
 	assertTree(t, tree, err, map[string]interface{}{
