@@ -51,12 +51,10 @@ func TestSimpleKV(t *testing.T) {
 	})
 }
 
-// NOTE: from the BurntSushi test suite
-// NOTE: this test is pure evil due to the embedded '.'
-func TestSpecialKV(t *testing.T) {
-	tree, err := Load("~!@$^&*()_+-`1234567890[]\\|/?><.,;: = 1")
+func TestNumberInKey(t *testing.T) {
+	tree, err := Load("hello2 = 42")
 	assertTree(t, tree, err, map[string]interface{}{
-		"~!@$^&*()_+-`1234567890[]\\|/?><.,;:": int64(1),
+		"hello2": int64(42),
 	})
 }
 
@@ -91,14 +89,14 @@ func TestSimpleDate(t *testing.T) {
 func TestDateOffset(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T00:32:00-07:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": time.Date(1979, time.May, 27, 0, 32, 0, 0, time.FixedZone("PDT", -7*60*60)),
+		"a": time.Date(1979, time.May, 27, 0, 32, 0, 0, time.FixedZone("", -7*60*60)),
 	})
 }
 
 func TestDateNano(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T00:32:00.999999999-07:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": time.Date(1979, time.May, 27, 0, 32, 0, 999999999, time.FixedZone("PDT", -7*60*60)),
+		"a": time.Date(1979, time.May, 27, 0, 32, 0, 999999999, time.FixedZone("", -7*60*60)),
 	})
 }
 
@@ -106,6 +104,13 @@ func TestSimpleString(t *testing.T) {
 	tree, err := Load("a = \"hello world\"")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": "hello world",
+	})
+}
+
+func TestSpaceKey(t *testing.T) {
+	tree, err := Load("\"a b\" = \"hello world\"")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a b": "hello world",
 	})
 }
 
@@ -460,4 +465,11 @@ func TestNestedTreePosition(t *testing.T) {
 			"foo.bar.a": Position{2, 1},
 			"foo.bar.b": Position{3, 1},
 		})
+}
+
+func TestInvalidGroupArray(t *testing.T) {
+	_, err := Load("[key#group]\nanswer = 42")
+	if err == nil {
+		t.Error("Should error")
+	}
 }

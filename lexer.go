@@ -253,9 +253,16 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	l.ignore()
-	for r := l.next(); isKeyChar(r); r = l.next() {
-		if r == '#' {
-			return l.errorf("keys cannot contain # character")
+	inQuotes := false
+	for r := l.next(); isKeyChar(r) || r == '\n'; r = l.next() {
+		if r == '"' {
+			inQuotes = !inQuotes
+		} else if r == '\n' {
+			return l.errorf("keys cannot contain new lines")
+		} else if isSpace(r) && !inQuotes {
+			break
+		} else if !isValidBareChar(r) && !inQuotes {
+			return l.errorf("keys cannot contain %c character", r)
 		}
 	}
 	l.backup()

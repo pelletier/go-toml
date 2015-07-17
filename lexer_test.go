@@ -124,10 +124,7 @@ func TestKeyWithSharpAndEqual(t *testing.T) {
 
 func TestKeyWithSymbolsAndEqual(t *testing.T) {
 	testFlow(t, "~!@$^&*()_+-`1234567890[]\\|/?><.,;:' = 5", []token{
-		token{Position{1, 1}, tokenKey, "~!@$^&*()_+-`1234567890[]\\|/?><.,;:'"},
-		token{Position{1, 38}, tokenEqual, "="},
-		token{Position{1, 40}, tokenInteger, "5"},
-		token{Position{1, 41}, tokenEOF, ""},
+		token{Position{1, 1}, tokenError, "keys cannot contain ~ character"},
 	})
 }
 
@@ -547,5 +544,20 @@ func TestKeyGroupArray(t *testing.T) {
 		token{Position{1, 3}, tokenKeyGroupArray, "foo"},
 		token{Position{1, 6}, tokenDoubleRightBracket, "]]"},
 		token{Position{1, 8}, tokenEOF, ""},
+	})
+}
+
+func TestQuotedKey(t *testing.T) {
+	testFlow(t, "\"a b\" = 42", []token{
+		token{Position{1, 1}, tokenKey, "\"a b\""},
+		token{Position{1, 7}, tokenEqual, "="},
+		token{Position{1, 9}, tokenInteger, "42"},
+		token{Position{1, 11}, tokenEOF, ""},
+	})
+}
+
+func TestKeyNewline(t *testing.T) {
+	testFlow(t, "a\n= 4", []token{
+		token{Position{1, 1}, tokenError, "keys cannot contain new lines"},
 	})
 }

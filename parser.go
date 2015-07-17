@@ -98,7 +98,10 @@ func (p *tomlParser) parseGroupArray() tomlParserStateFn {
 	}
 
 	// get or create group array element at the indicated part in the path
-	keys := strings.Split(key.val, ".")
+	keys, err := parseKey(key.val)
+	if err != nil {
+		p.raiseError(key, "invalid group array key: %s", err)
+	}
 	p.tree.createSubTree(keys[:len(keys)-1], startToken.Position) // create parent entries
 	destTree := p.tree.GetPath(keys)
 	var array []*TomlTree
@@ -153,7 +156,10 @@ func (p *tomlParser) parseGroup() tomlParserStateFn {
 	}
 
 	p.seenGroupKeys = append(p.seenGroupKeys, key.val)
-	keys := strings.Split(key.val, ".")
+	keys, err := parseKey(key.val)
+	if err != nil {
+		p.raiseError(key, "invalid group array key: %s", err)
+	}
 	if err := p.tree.createSubTree(keys, startToken.Position); err != nil {
 		p.raiseError(key, "%s", err)
 	}
@@ -186,13 +192,21 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	}
 
 	// assign value to the found group
-	localKey := []string{key.val}
-	finalKey := append(groupKey, key.val)
+	keyVals, err := parseKey(key.val)
+	if err != nil {
+		p.raiseError(key, "%s", err)
+	}
+	if len(keyVals) != 1 {
+		p.raiseError(key, "Invalid key")
+	}
+	keyVal := keyVals[0]
+	localKey := []string{keyVal}
+	finalKey := append(groupKey, keyVal)
 	if targetNode.GetPath(localKey) != nil {
 		p.raiseError(key, "The following key was defined twice: %s",
 			strings.Join(finalKey, "."))
 	}
-	targetNode.values[key.val] = &tomlValue{value, key.Position}
+	targetNode.values[keyVal] = &tomlValue{value, key.Position}
 	return p.parseStart
 }
 
@@ -222,7 +236,7 @@ func (p *tomlParser) parseRvalue() interface{} {
 		}
 		return val
 	case tokenDate:
-		val, err := time.Parse(time.RFC3339Nano, tok.val)
+		val, err := time.ParseInLocation(time.RFC3339Nano, tok.val, time.UTC)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
