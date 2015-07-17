@@ -48,6 +48,43 @@ func TestTomlGetPath(t *testing.T) {
 	}
 }
 
+func TestTomlGetGroup(t *testing.T) {
+	tree, err := Load("[[foo]]\nbar=1\n[[foo]]\nbar=2")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	bar := tree.Get("foo.0.bar")
+	if bar == nil {
+		t.Error("Expected index 0 to be non-nil")
+		return
+	}
+	if bar, ok := bar.(int64); !ok {
+		t.Error("Expected index 0 to be int64, but wasn't")
+		return
+	} else if bar != 1 {
+		t.Errorf("Expected index 0 to be 1, but got %d", bar)
+		return
+	}
+	bar = tree.Get("foo.1.bar")
+	if bar == nil {
+		t.Error("Expected index 1 to be non-nil")
+		return
+	}
+	if bar, ok := bar.(int64); !ok {
+		t.Error("Expected index 1 to be int64, but wasn't")
+		return
+	} else if bar != 2 {
+		t.Errorf("Expected index 1 to be 2, but got %d", bar)
+		return
+	}
+	bar = tree.Get("foo.2.bar")
+	if bar != nil {
+		t.Error("Expected index 1 to be nil, but wasn't")
+		return
+	}
+}
+
 func TestTomlQuery(t *testing.T) {
 	tree, err := Load("[foo.bar]\na=1\nb=2\n[baz.foo]\na=3\nb=4\n[gorf.foo]\na=5\nb=6")
 	if err != nil {
