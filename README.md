@@ -7,6 +7,7 @@ This library supports TOML version
 
 [![GoDoc](https://godoc.org/github.com/pelletier/go-toml?status.svg)](http://godoc.org/github.com/pelletier/go-toml)
 [![Build Status](https://travis-ci.org/pelletier/go-toml.svg?branch=master)](https://travis-ci.org/pelletier/go-toml)
+[![Coverage Status](https://coveralls.io/repos/pelletier/go-toml/badge.svg?branch=master&service=github)](https://coveralls.io/github/pelletier/go-toml?branch=master)
 
 ## Features
 
