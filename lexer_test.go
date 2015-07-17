@@ -39,6 +39,15 @@ func TestValidKeyGroup(t *testing.T) {
 	})
 }
 
+func TestNestedQuotedUnicodeKeyGroup(t *testing.T) {
+	testFlow(t, `[ j . "ʞ" . l ]`, []token{
+		token{Position{1, 1}, tokenLeftBracket, "["},
+		token{Position{1, 2}, tokenKeyGroup, ` j . "ʞ" . l `},
+		token{Position{1, 15}, tokenRightBracket, "]"},
+		token{Position{1, 16}, tokenEOF, ""},
+	})
+}
+
 func TestUnclosedKeyGroup(t *testing.T) {
 	testFlow(t, "[hello world", []token{
 		token{Position{1, 1}, tokenLeftBracket, "["},

@@ -157,6 +157,41 @@ func TestNestedKeys(t *testing.T) {
 	})
 }
 
+func TestNestedQuotedUnicodeKeys(t *testing.T) {
+	tree, err := Load("[ j . \"ʞ\" . l ]\nd = 42")
+	assertTree(t, tree, err, map[string]interface{}{
+		"j": map[string]interface{}{
+			"ʞ": map[string]interface{}{
+				"l": map[string]interface{}{
+					"d": int64(42),
+				},
+			},
+		},
+	})
+
+	tree, err = Load("[ g . h . i ]\nd = 42")
+	assertTree(t, tree, err, map[string]interface{}{
+		"g": map[string]interface{}{
+			"h": map[string]interface{}{
+				"i": map[string]interface{}{
+					"d": int64(42),
+				},
+			},
+		},
+	})
+
+	tree, err = Load("[ d.e.f ]\nk = 42")
+	assertTree(t, tree, err, map[string]interface{}{
+		"d": map[string]interface{}{
+			"e": map[string]interface{}{
+				"f": map[string]interface{}{
+					"k": int64(42),
+				},
+			},
+		},
+	})
+}
+
 func TestArrayOne(t *testing.T) {
 	tree, err := Load("a = [1]")
 	assertTree(t, tree, err, map[string]interface{}{
