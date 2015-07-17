@@ -463,6 +463,19 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 	})
 }
 
+func TestKeyEqualStringNoEscape(t *testing.T) {
+	testFlow(t, "foo = \"hello \u0002\"", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenError, "unescaped control character U+0002"},
+	})
+	testFlow(t, "foo = \"hello \u001F\"", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenError, "unescaped control character U+001F"},
+	})
+}
+
 func TestLiteralString(t *testing.T) {
 	testFlow(t, `foo = 'C:\Users\nodejs\templates'`, []token{
 		token{Position{1, 1}, tokenKey, "foo"},
@@ -514,18 +527,32 @@ func TestMultilineString(t *testing.T) {
 		token{Position{1, 34}, tokenEOF, ""},
 	})
 
-	testFlow(t, "foo = \"\"\"\nhello\n\"literal\"\nworld\"\"\"", []token{
+	testFlow(t, "foo = \"\"\"\nhello\\\n\"literal\"\\\nworld\"\"\"", []token{
 		token{Position{1, 1}, tokenKey, "foo"},
 		token{Position{1, 5}, tokenEqual, "="},
-		token{Position{2, 1}, tokenString, "hello\n\"literal\"\nworld"},
+		token{Position{2, 1}, tokenString, "hello\"literal\"world"},
 		token{Position{4, 9}, tokenEOF, ""},
 	})
 
-	testFlow(t, "foo = \"\"\"\\\n    \\\n    \\\n    hello\nmultiline\nworld\"\"\"", []token{
+	testFlow(t, "foo = \"\"\"\\\n    \\\n    \\\n    hello\\\nmultiline\\\nworld\"\"\"", []token{
 		token{Position{1, 1}, tokenKey, "foo"},
 		token{Position{1, 5}, tokenEqual, "="},
-		token{Position{1, 10}, tokenString, "hello\nmultiline\nworld"},
+		token{Position{1, 10}, tokenString, "hellomultilineworld"},
 		token{Position{6, 9}, tokenEOF, ""},
+	})
+
+	testFlow(t, "key2 = \"\"\"\nThe quick brown \\\n\n\n  fox jumps over \\\n    the lazy dog.\"\"\"", []token{
+		token{Position{1, 1}, tokenKey, "key2"},
+		token{Position{1, 6}, tokenEqual, "="},
+		token{Position{2, 1}, tokenString, "The quick brown fox jumps over the lazy dog."},
+		token{Position{6, 21}, tokenEOF, ""},
+	})
+
+	testFlow(t, "key2 = \"\"\"\\\n       The quick brown \\\n       fox jumps over \\\n       the lazy dog.\\\n       \"\"\"", []token{
+		token{Position{1, 1}, tokenKey, "key2"},
+		token{Position{1, 6}, tokenEqual, "="},
+		token{Position{1, 11}, tokenString, "The quick brown fox jumps over the lazy dog."},
+		token{Position{5, 11}, tokenEOF, ""},
 	})
 }
 

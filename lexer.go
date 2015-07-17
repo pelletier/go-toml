@@ -423,7 +423,11 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 				return l.errorf("invalid escape sequence: \\" + string(l.peek()))
 			}
 		} else {
-			growingString += string(l.peek())
+			r := l.peek()
+			if 0x00 <= r && r <= 0x1F {
+				return l.errorf("unescaped control character %U", r)
+			}
+			growingString += string(r)
 		}
 
 		if l.next() == eof {
