@@ -224,7 +224,8 @@ func (p *tomlParser) parseRvalue() interface{} {
 	case tokenFalse:
 		return false
 	case tokenInteger:
-		val, err := strconv.ParseInt(tok.val, 10, 64)
+		cleanedVal := strings.Replace(tok.val, "_", "", -1)
+		val, err := strconv.ParseInt(cleanedVal, 10, 64)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}

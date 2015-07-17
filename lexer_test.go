@@ -443,6 +443,27 @@ func TestKeyEqualNumber(t *testing.T) {
 		token{Position{1, 7}, tokenFloat, "-4.2"},
 		token{Position{1, 11}, tokenEOF, ""},
 	})
+
+	testFlow(t, "foo = 1_000", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenInteger, "1_000"},
+		token{Position{1, 12}, tokenEOF, ""},
+	})
+
+	testFlow(t, "foo = 5_349_221", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenInteger, "5_349_221"},
+		token{Position{1, 16}, tokenEOF, ""},
+	})
+
+	testFlow(t, "foo = 1_2_3_4_5", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenInteger, "1_2_3_4_5"},
+		token{Position{1, 16}, tokenEOF, ""},
+	})
 }
 
 func TestMultiline(t *testing.T) {
