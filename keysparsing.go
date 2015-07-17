@@ -13,7 +13,16 @@ func parseKey(key string) ([]string, error) {
 	var buffer bytes.Buffer
 	inQuotes := false
 	escapeNext := false
+	ignoreSpace := true
+	expectDot := false
+
 	for _, char := range key {
+		if ignoreSpace {
+			if char == ' ' {
+				continue
+			}
+			ignoreSpace = false
+		}
 		if escapeNext {
 			buffer.WriteRune(char)
 			escapeNext = false
@@ -25,18 +34,31 @@ func parseKey(key string) ([]string, error) {
 			continue
 		case '"':
 			inQuotes = !inQuotes
+			expectDot = false
 		case '.':
 			if inQuotes {
 				buffer.WriteRune(char)
 			} else {
 				groups = append(groups, buffer.String())
 				buffer.Reset()
+				ignoreSpace = true
+				expectDot = false
+			}
+		case ' ':
+			if inQuotes {
+				buffer.WriteRune(char)
+			} else {
+				expectDot = true
 			}
 		default:
 			if !inQuotes && !isValidBareChar(char) {
 				return nil, fmt.Errorf("invalid bare character: %c", char)
 			}
+			if !inQuotes && expectDot {
+				return nil, fmt.Errorf("what?")
+			}
 			buffer.WriteRune(char)
+			expectDot = false
 		}
 	}
 	if inQuotes {
