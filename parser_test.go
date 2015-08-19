@@ -310,6 +310,52 @@ func TestArrayWithExtraCommaComment(t *testing.T) {
 	})
 }
 
+func TestSimpleInlineGroup(t *testing.T) {
+	tree, err := Load("key = {a = 42}")
+	assertTree(t, tree, err, map[string]interface{}{
+		"key": map[string]interface{}{
+			"a": int64(42),
+		},
+	})
+}
+
+func TestDoubleInlineGroup(t *testing.T) {
+	tree, err := Load("key = {a = 42, b = \"foo\"}")
+	assertTree(t, tree, err, map[string]interface{}{
+		"key": map[string]interface{}{
+			"a": int64(42),
+			"b": "foo",
+		},
+	})
+}
+
+func TestExampleInlineGroup(t *testing.T) {
+	tree, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
+point = { x = 1, y = 2 }`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"name": map[string]interface{}{
+			"first": "Tom",
+			"last":  "Preston-Werner",
+		},
+		"point": map[string]interface{}{
+			"x": int64(1),
+			"y": int64(2),
+		},
+	})
+}
+
+func TestExampleInlineGroupInArray(t *testing.T) {
+	tree, err := Load(`points = [{ x = 1, y = 2 }]`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"points": []map[string]interface{}{
+			map[string]interface{}{
+				"x": int64(1),
+				"y": int64(2),
+			},
+		},
+	})
+}
+
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
 	if err.Error() != "(3, 2): duplicated tables" {

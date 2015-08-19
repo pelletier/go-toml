@@ -26,6 +26,8 @@ const (
 	tokenEqual
 	tokenLeftBracket
 	tokenRightBracket
+	tokenLeftCurlyBrace
+	tokenRightCurlyBrace
 	tokenLeftParen
 	tokenRightParen
 	tokenDoubleLeftBracket
@@ -44,6 +46,7 @@ const (
 )
 
 var tokenTypeNames = []string{
+	"Error",
 	"EOF",
 	"Comment",
 	"Key",
@@ -54,7 +57,9 @@ var tokenTypeNames = []string{
 	"Float",
 	"=",
 	"[",
-	"[",
+	"]",
+	"{",
+	"}",
 	"(",
 	")",
 	"]]",

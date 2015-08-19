@@ -8,11 +8,12 @@ func testFlow(t *testing.T, input string, expectedFlow []token) {
 		token := <-ch
 		if token != expected {
 			t.Log("While testing: ", input)
+			t.Log("compared (got)", token, "to (expected)", expected)
+			t.Log("\tvalue:", token.val, "<->", expected.val)
+			t.Log("\ttype:", token.typ.String(), "<->", expected.typ.String())
+			t.Log("\tline:", token.Line, "<->", expected.Line)
+			t.Log("\tcolumn:", token.Col, "<->", expected.Col)
 			t.Log("compared", token, "to", expected)
-			t.Log(token.val, "<->", expected.val)
-			t.Log(token.typ, "<->", expected.typ)
-			t.Log(token.Line, "<->", expected.Line)
-			t.Log(token.Col, "<->", expected.Col)
 			t.FailNow()
 		}
 	}
@@ -368,14 +369,6 @@ func TestFloatWithExponent5(t *testing.T) {
 		token{Position{1, 3}, tokenEqual, "="},
 		token{Position{1, 5}, tokenFloat, "6.626e-34"},
 		token{Position{1, 14}, tokenEOF, ""},
-	})
-}
-
-func TestDoubleEqualKey(t *testing.T) {
-	testFlow(t, "foo= = 2", []token{
-		token{Position{1, 1}, tokenKey, "foo"},
-		token{Position{1, 4}, tokenEqual, "="},
-		token{Position{1, 5}, tokenError, "cannot have multiple equals for the same key"},
 	})
 }
 
