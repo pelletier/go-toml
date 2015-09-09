@@ -264,7 +264,7 @@ func (p *tomlParser) parseArray() []interface{} {
 		}
 		if follow.typ == tokenRightBracket {
 			p.getToken()
-			return array
+			break
 		}
 		val := p.parseRvalue()
 		if arrayType == nil {
@@ -275,7 +275,7 @@ func (p *tomlParser) parseArray() []interface{} {
 		}
 		array = append(array, val)
 		follow = p.peek()
-		if follow == nil {
+		if follow == nil || follow.typ == tokenEOF {
 			p.raiseError(follow, "unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {

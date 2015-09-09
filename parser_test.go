@@ -297,6 +297,16 @@ func TestUnterminatedArray(t *testing.T) {
 	if err.Error() != "(1, 8): unterminated array" {
 		t.Error("Bad error message:", err.Error())
 	}
+
+	_, err = Load("a = [1")
+	if err.Error() != "(1, 7): unterminated array" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a = [1 2")
+	if err.Error() != "(1, 8): missing comma" {
+		t.Error("Bad error message:", err.Error())
+	}
 }
 
 func TestNewlinesInArrays(t *testing.T) {
