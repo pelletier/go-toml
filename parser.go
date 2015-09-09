@@ -312,6 +312,10 @@ func (p *tomlParser) parseArray() interface{} {
 		}
 		if follow.typ == tokenRightBracket {
 			p.getToken()
+			// An array of TomlTrees is actually an array of inline
+			// tables, which is a shorthand for a table array. If the
+			// array was not converted from []interface{} to []*TomlTree,
+			// the two notations would not be equivalent.
 			if arrayType == reflect.TypeOf(newTomlTree()) {
 				tomlArray := make([]*TomlTree, len(array))
 				for i, v := range array {
