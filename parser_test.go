@@ -376,6 +376,34 @@ func TestExampleInlineGroupInArray(t *testing.T) {
 	})
 }
 
+func TestInlineTableUnterminated(t *testing.T) {
+	_, err := Load("foo = {")
+	if err.Error() != "(1, 8): unterminated inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestInlineTableCommaExpected(t *testing.T) {
+	_, err := Load("foo = {hello = 53 test = foo}")
+	if err.Error() != "(1, 19): comma expected between fields in inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestInlineTableCommaStart(t *testing.T) {
+	_, err := Load("foo = {, hello = 53}")
+	if err.Error() != "(1, 8): inline table cannot start with a comma" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestInlineTableDoubleComma(t *testing.T) {
+	_, err := Load("foo = {hello = 53,, foo = 17}")
+	if err.Error() != "(1, 19): need field between two commas in inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
 	if err.Error() != "(3, 2): duplicated tables" {
