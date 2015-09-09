@@ -457,6 +457,13 @@ func TestKeyEqualNumber(t *testing.T) {
 		token{Position{1, 7}, tokenInteger, "1_2_3_4_5"},
 		token{Position{1, 16}, tokenEOF, ""},
 	})
+
+	testFlow(t, "flt8 = 9_224_617.445_991_228_313", []token{
+		token{Position{1, 1}, tokenKey, "flt8"},
+		token{Position{1, 6}, tokenEqual, "="},
+		token{Position{1, 8}, tokenFloat, "9_224_617.445_991_228_313"},
+		token{Position{1, 33}, tokenEOF, ""},
+	})
 }
 
 func TestMultiline(t *testing.T) {

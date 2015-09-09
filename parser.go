@@ -232,7 +232,8 @@ func (p *tomlParser) parseRvalue() interface{} {
 		}
 		return val
 	case tokenFloat:
-		val, err := strconv.ParseFloat(tok.val, 64)
+		cleanedVal := strings.Replace(tok.val, "_", "", -1)
+		val, err := strconv.ParseFloat(cleanedVal, 64)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
@@ -312,18 +313,7 @@ func (p *tomlParser) parseArray() interface{} {
 		}
 		if follow.typ == tokenRightBracket {
 			p.getToken()
-			// An array of TomlTrees is actually an array of inline
-			// tables, which is a shorthand for a table array. If the
-			// array was not converted from []interface{} to []*TomlTree,
-			// the two notations would not be equivalent.
-			if arrayType == reflect.TypeOf(newTomlTree()) {
-				tomlArray := make([]*TomlTree, len(array))
-				for i, v := range array {
-					tomlArray[i] = v.(*TomlTree)
-				}
-				return tomlArray
-			}
-			return array
+			break
 		}
 		val := p.parseRvalue()
 		if arrayType == nil {
@@ -334,7 +324,7 @@ func (p *tomlParser) parseArray() interface{} {
 		}
 		array = append(array, val)
 		follow = p.peek()
-		if follow == nil {
+		if follow == nil || follow.typ == tokenEOF {
 			p.raiseError(follow, "unterminated array")
 		}
 		if follow.typ != tokenRightBracket && follow.typ != tokenComma {
@@ -343,6 +333,17 @@ func (p *tomlParser) parseArray() interface{} {
 		if follow.typ == tokenComma {
 			p.getToken()
 		}
+	}
+	// An array of TomlTrees is actually an array of inline
+	// tables, which is a shorthand for a table array. If the
+	// array was not converted from []interface{} to []*TomlTree,
+	// the two notations would not be equivalent.
+	if arrayType == reflect.TypeOf(newTomlTree()) {
+		tomlArray := make([]*TomlTree, len(array))
+		for i, v := range array {
+			tomlArray[i] = v.(*TomlTree)
+		}
+		return tomlArray
 	}
 	return array
 }
