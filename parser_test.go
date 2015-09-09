@@ -571,3 +571,10 @@ func TestInvalidGroupArray(t *testing.T) {
 		t.Error("Should error")
 	}
 }
+
+func TestDoubleEqual(t *testing.T) {
+	_, err := Load("foo= = 2")
+	if err.Error() != "(1, 6): cannot have multiple equals for the same key" {
+		t.Error("Bad error message:", err.Error())
+	}
+}

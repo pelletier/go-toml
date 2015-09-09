@@ -171,6 +171,7 @@ func (p *tomlParser) parseGroup() tomlParserStateFn {
 func (p *tomlParser) parseAssign() tomlParserStateFn {
 	key := p.getToken()
 	p.assume(tokenEqual)
+
 	value := p.parseRvalue()
 	var groupKey []string
 	if len(p.currentGroup) > 0 {
@@ -246,6 +247,8 @@ func (p *tomlParser) parseRvalue() interface{} {
 		return p.parseArray()
 	case tokenLeftCurlyBrace:
 		return p.parseInlineTable()
+	case tokenEqual:
+		p.raiseError(tok, "cannot have multiple equals for the same key")
 	case tokenError:
 		p.raiseError(tok, "%s", tok)
 	}
