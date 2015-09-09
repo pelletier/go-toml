@@ -68,7 +68,7 @@ func TestSimpleNumbers(t *testing.T) {
 	})
 }
 
-func TestIntegersWithUnderscores(t *testing.T) {
+func TestNumbersWithUnderscores(t *testing.T) {
 	tree, err := Load("a = 1_000")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": int64(1000),
@@ -82,6 +82,16 @@ func TestIntegersWithUnderscores(t *testing.T) {
 	tree, err = Load("a = 1_2_3_4_5")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": int64(12345),
+	})
+
+	tree, err = Load("flt8 = 9_224_617.445_991_228_313")
+	assertTree(t, tree, err, map[string]interface{}{
+		"flt8": float64(9224617.445991228313),
+	})
+
+	tree, err = Load("flt9 = 1e1_00")
+	assertTree(t, tree, err, map[string]interface{}{
+		"flt9": float64(1e100),
 	})
 }
 

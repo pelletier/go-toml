@@ -231,7 +231,8 @@ func (p *tomlParser) parseRvalue() interface{} {
 		}
 		return val
 	case tokenFloat:
-		val, err := strconv.ParseFloat(tok.val, 64)
+		cleanedVal := strings.Replace(tok.val, "_", "", -1)
+		val, err := strconv.ParseFloat(cleanedVal, 64)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
