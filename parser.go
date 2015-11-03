@@ -171,6 +171,7 @@ func (p *tomlParser) parseGroup() tomlParserStateFn {
 func (p *tomlParser) parseAssign() tomlParserStateFn {
 	key := p.getToken()
 	p.assume(tokenEqual)
+
 	value := p.parseRvalue()
 	var groupKey []string
 	if len(p.currentGroup) > 0 {
@@ -245,6 +246,10 @@ func (p *tomlParser) parseRvalue() interface{} {
 		return val
 	case tokenLeftBracket:
 		return p.parseArray()
+	case tokenLeftCurlyBrace:
+		return p.parseInlineTable()
+	case tokenEqual:
+		p.raiseError(tok, "cannot have multiple equals for the same key")
 	case tokenError:
 		p.raiseError(tok, "%s", tok)
 	}
@@ -254,7 +259,51 @@ func (p *tomlParser) parseRvalue() interface{} {
 	return nil
 }
 
-func (p *tomlParser) parseArray() []interface{} {
+func tokenIsComma(t *token) bool {
+	return t != nil && t.typ == tokenComma
+}
+
+func (p *tomlParser) parseInlineTable() *TomlTree {
+	tree := newTomlTree()
+	var previous *token
+Loop:
+	for {
+		follow := p.peek()
+		if follow == nil || follow.typ == tokenEOF {
+			p.raiseError(follow, "unterminated inline table")
+		}
+		switch follow.typ {
+		case tokenRightCurlyBrace:
+			p.getToken()
+			break Loop
+		case tokenKey:
+			if !tokenIsComma(previous) && previous != nil {
+				p.raiseError(follow, "comma expected between fields in inline table")
+			}
+			key := p.getToken()
+			p.assume(tokenEqual)
+			value := p.parseRvalue()
+			tree.Set(key.val, value)
+		case tokenComma:
+			if previous == nil {
+				p.raiseError(follow, "inline table cannot start with a comma")
+			}
+			if tokenIsComma(previous) {
+				p.raiseError(follow, "need field between two commas in inline table")
+			}
+			p.getToken()
+		default:
+			p.raiseError(follow, "unexpected token type in inline table: %s", follow.typ.String())
+		}
+		previous = follow
+	}
+	if tokenIsComma(previous) {
+		p.raiseError(previous, "trailing comma at the end of inline table")
+	}
+	return tree
+}
+
+func (p *tomlParser) parseArray() interface{} {
 	var array []interface{}
 	arrayType := reflect.TypeOf(nil)
 	for {
@@ -284,6 +333,17 @@ func (p *tomlParser) parseArray() []interface{} {
 		if follow.typ == tokenComma {
 			p.getToken()
 		}
+	}
+	// An array of TomlTrees is actually an array of inline
+	// tables, which is a shorthand for a table array. If the
+	// array was not converted from []interface{} to []*TomlTree,
+	// the two notations would not be equivalent.
+	if arrayType == reflect.TypeOf(newTomlTree()) {
+		tomlArray := make([]*TomlTree, len(array))
+		for i, v := range array {
+			tomlArray[i] = v.(*TomlTree)
+		}
+		return tomlArray
 	}
 	return array
 }

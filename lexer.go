@@ -158,13 +158,17 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 		case '.':
 			return l.errorf("cannot start float with a dot")
 		case '=':
-			return l.errorf("cannot have multiple equals for the same key")
+			return l.lexEqual
 		case '[':
 			l.depth++
 			return l.lexLeftBracket
 		case ']':
 			l.depth--
 			return l.lexRightBracket
+		case '{':
+			return l.lexLeftCurlyBrace
+		case '}':
+			return l.lexRightCurlyBrace
 		case '#':
 			return l.lexComment
 		case '"':
@@ -216,6 +220,20 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 
 	l.emit(tokenEOF)
 	return nil
+}
+
+func (l *tomlLexer) lexLeftCurlyBrace() tomlLexStateFn {
+	l.ignore()
+	l.pos++
+	l.emit(tokenLeftCurlyBrace)
+	return l.lexRvalue
+}
+
+func (l *tomlLexer) lexRightCurlyBrace() tomlLexStateFn {
+	l.ignore()
+	l.pos++
+	l.emit(tokenRightCurlyBrace)
+	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexDate() tomlLexStateFn {

@@ -330,6 +330,80 @@ func TestArrayWithExtraCommaComment(t *testing.T) {
 	})
 }
 
+func TestSimpleInlineGroup(t *testing.T) {
+	tree, err := Load("key = {a = 42}")
+	assertTree(t, tree, err, map[string]interface{}{
+		"key": map[string]interface{}{
+			"a": int64(42),
+		},
+	})
+}
+
+func TestDoubleInlineGroup(t *testing.T) {
+	tree, err := Load("key = {a = 42, b = \"foo\"}")
+	assertTree(t, tree, err, map[string]interface{}{
+		"key": map[string]interface{}{
+			"a": int64(42),
+			"b": "foo",
+		},
+	})
+}
+
+func TestExampleInlineGroup(t *testing.T) {
+	tree, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
+point = { x = 1, y = 2 }`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"name": map[string]interface{}{
+			"first": "Tom",
+			"last":  "Preston-Werner",
+		},
+		"point": map[string]interface{}{
+			"x": int64(1),
+			"y": int64(2),
+		},
+	})
+}
+
+func TestExampleInlineGroupInArray(t *testing.T) {
+	tree, err := Load(`points = [{ x = 1, y = 2 }]`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"points": []map[string]interface{}{
+			map[string]interface{}{
+				"x": int64(1),
+				"y": int64(2),
+			},
+		},
+	})
+}
+
+func TestInlineTableUnterminated(t *testing.T) {
+	_, err := Load("foo = {")
+	if err.Error() != "(1, 8): unterminated inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestInlineTableCommaExpected(t *testing.T) {
+	_, err := Load("foo = {hello = 53 test = foo}")
+	if err.Error() != "(1, 19): comma expected between fields in inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestInlineTableCommaStart(t *testing.T) {
+	_, err := Load("foo = {, hello = 53}")
+	if err.Error() != "(1, 8): inline table cannot start with a comma" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestInlineTableDoubleComma(t *testing.T) {
+	_, err := Load("foo = {hello = 53,, foo = 17}")
+	if err.Error() != "(1, 19): need field between two commas in inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
 	if err.Error() != "(3, 2): duplicated tables" {
@@ -543,5 +617,12 @@ func TestInvalidGroupArray(t *testing.T) {
 	_, err := Load("[key#group]\nanswer = 42")
 	if err == nil {
 		t.Error("Should error")
+	}
+}
+
+func TestDoubleEqual(t *testing.T) {
+	_, err := Load("foo= = 2")
+	if err.Error() != "(1, 6): cannot have multiple equals for the same key" {
+		t.Error("Bad error message:", err.Error())
 	}
 }
