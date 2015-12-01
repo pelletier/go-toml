@@ -626,3 +626,10 @@ func TestDoubleEqual(t *testing.T) {
 		t.Error("Bad error message:", err.Error())
 	}
 }
+
+func TestGroupArrayReassign(t *testing.T) {
+	_, err := Load("[hello]\n[[hello]]")
+	if err.Error() != "(2, 3): key \"hello\" is already assigned and not of type group array" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
