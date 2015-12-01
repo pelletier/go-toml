@@ -184,6 +184,8 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 				return l.lexVoid
 			}
 			return l.lexRvalue
+		case '_':
+			return l.errorf("cannot start number with underscore")
 		}
 
 		if l.follow("true") {
@@ -550,7 +552,6 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 		} else if isDigit(next) {
 			digitSeen = true
 		} else if next == '_' {
-			l.pos++
 		} else {
 			l.backup()
 			break

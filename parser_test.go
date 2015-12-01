@@ -633,3 +633,25 @@ func TestGroupArrayReassign(t *testing.T) {
 		t.Error("Bad error message:", err.Error())
 	}
 }
+
+func TestInvalidFloatParsing(t *testing.T) {
+	_, err := Load("a=1e_2")
+	if err.Error() != "(1, 3): invalid use of _ in number" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a=1e2_")
+	if err.Error() != "(1, 3): invalid use of _ in number" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a=1__2")
+	if err.Error() != "(1, 3): invalid use of _ in number" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("a=_1_2")
+	if err.Error() != "(1, 3): cannot start number with underscore" {
+		t.Error("Bad error message:", err.Error())
+	}
+}

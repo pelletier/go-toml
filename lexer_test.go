@@ -618,3 +618,12 @@ func TestKeyNewline(t *testing.T) {
 		token{Position{1, 1}, tokenError, "keys cannot contain new lines"},
 	})
 }
+
+func TestInvalidFloat(t *testing.T) {
+	testFlow(t, "a=7e1_", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 2}, tokenEqual, "="},
+		token{Position{1, 3}, tokenFloat, "7e1_"},
+		token{Position{1, 7}, tokenEOF, ""},
+	})
+}
