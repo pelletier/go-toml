@@ -79,7 +79,12 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 		return t
 	}
 	subtree := t
-	for _, intermediateKey := range keys[:len(keys)-1] {
+	skip := false
+	for keyNum, intermediateKey := range keys[:len(keys)-1] {
+		if skip {
+			skip = false
+			continue
+		}
 		value, exists := subtree.values[intermediateKey]
 		if !exists {
 			return nil
@@ -88,11 +93,15 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 		case *TomlTree:
 			subtree = node
 		case []*TomlTree:
-			// go to most recent element
 			if len(node) == 0 {
 				return nil
 			}
-			subtree = node[len(node)-1]
+			if index, e := strconv.Atoi(keys[keyNum+1]); e != nil {
+				return nil
+			} else if index >= 0 && index < len(node) {
+				subtree = node[index]
+				skip = true
+			}
 		default:
 			return nil // cannot naigate through other node types
 		}

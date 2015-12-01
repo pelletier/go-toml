@@ -107,8 +107,8 @@ func (p *tomlParser) parseGroupArray() tomlParserStateFn {
 	var array []*TomlTree
 	if destTree == nil {
 		array = make([]*TomlTree, 0)
-	} else if destTree.([]*TomlTree) != nil {
-		array = destTree.([]*TomlTree)
+	} else if oldarray, ok := destTree.([]*TomlTree); ok && oldarray != nil {
+		array = oldarray
 	} else {
 		p.raiseError(key, "key %s is already assigned and not of type group array", key)
 	}
