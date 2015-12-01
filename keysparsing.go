@@ -70,6 +70,9 @@ func parseKey(key string) ([]string, error) {
 	if buffer.Len() > 0 {
 		groups = append(groups, buffer.String())
 	}
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("empty key")
+	}
 	return groups, nil
 }
 

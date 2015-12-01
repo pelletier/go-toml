@@ -42,3 +42,8 @@ func TestDottedKeyBasic(t *testing.T) {
 func TestBaseKeyPound(t *testing.T) {
 	testError(t, "hello#world", "invalid bare character: #")
 }
+
+func TestEmptyKey(t *testing.T) {
+	testError(t, "", "empty key")
+	testError(t, " ", "empty key")
+}
