@@ -3,7 +3,8 @@ package toml
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -360,8 +361,8 @@ func (t *TomlTree) ToString() string {
 	return t.toToml("", "")
 }
 
-// Load creates a TomlTree from a string.
-func Load(content string) (tree *TomlTree, err error) {
+// LoadReader creates a TomlTree from any io.Reader.
+func LoadReader(reader io.Reader) (tree *TomlTree, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -370,18 +371,21 @@ func Load(content string) (tree *TomlTree, err error) {
 			err = errors.New(r.(string))
 		}
 	}()
-	tree = parseToml(lexToml(content))
+	tree = parseToml(lexToml(reader))
 	return
+}
+
+// Load creates a TomlTree from a string.
+func Load(content string) (tree *TomlTree, err error) {
+	return LoadReader(strings.NewReader(content))
 }
 
 // LoadFile creates a TomlTree from a file.
 func LoadFile(path string) (tree *TomlTree, err error) {
-	buff, ferr := ioutil.ReadFile(path)
-	if ferr != nil {
-		err = ferr
-	} else {
-		s := string(buff)
-		tree, err = Load(s)
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
-	return
+	defer file.Close()
+	return LoadReader(file)
 }

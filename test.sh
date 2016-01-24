@@ -19,6 +19,8 @@ function git_clone() {
   popd
 }
 
+go get github.com/pelletier/go-buffruneio
+
 # get code for BurntSushi TOML validation
 # pinning all to 'HEAD' for version 0.3.x work (TODO: pin to commit hash when tests stabilize)
 git_clone github.com/BurntSushi/toml master HEAD
@@ -66,7 +68,7 @@ else
     echo "Invalid Test TOML for $test:"
     echo "===="
     cat "$invalid_test.toml"
-    
+
     echo "Go-TOML Output for $test:"
     echo "===="
     echo "go-toml Output:"
