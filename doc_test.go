@@ -69,13 +69,13 @@ func Example_comprehensiveExample() {
 		fmt.Println("User is ", user, ". Password is ", password)
 
 		// show where elements are in the file
-		fmt.Println("User position: %v", configTree.GetPosition("user"))
-		fmt.Println("Password position: %v", configTree.GetPosition("password"))
+		fmt.Printf("User position: %v\n", configTree.GetPosition("user"))
+		fmt.Printf("Password position: %v\n", configTree.GetPosition("password"))
 
 		// use a query to gather elements without walking the tree
 		results, _ := config.Query("$..[user,password]")
 		for ii, item := range results.Values() {
-			fmt.Println("Query result %d: %v", ii, item)
+			fmt.Printf("Query result %d: %v\n", ii, item)
 		}
 	}
 }

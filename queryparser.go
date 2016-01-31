@@ -138,7 +138,6 @@ func (p *queryParser) parseMatchExpr() queryParserStateFn {
 		return nil // allow EOF at this stage
 	}
 	return p.parseError(tok, "expected match expression")
-	return nil
 }
 
 func (p *queryParser) parseBracketExpr() queryParserStateFn {

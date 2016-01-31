@@ -202,7 +202,7 @@ func (f *matchFilterFn) call(node interface{}, ctx *queryContext) {
 	fn, ok := (*ctx.filters)[f.Name]
 	if !ok {
 		panic(fmt.Sprintf("%s: query context does not have filter '%s'",
-			f.Pos, f.Name))
+			f.Pos.String(), f.Name))
 	}
 	switch castNode := tomlValueCheck(node, ctx).(type) {
 	case *TomlTree:

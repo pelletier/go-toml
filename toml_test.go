@@ -65,7 +65,7 @@ func TestTomlQuery(t *testing.T) {
 	}
 
 	if tt, ok := values[0].(*TomlTree); !ok {
-		t.Errorf("Expected type of TomlTree: %T Tv", values[0], values[0])
+		t.Errorf("Expected type of TomlTree: %T", values[0])
 	} else if tt.Get("a") != int64(1) {
 		t.Errorf("Expected 'a' with a value 1: %v", tt.Get("a"))
 	} else if tt.Get("b") != int64(2) {
