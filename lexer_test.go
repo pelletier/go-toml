@@ -1,15 +1,19 @@
 package toml
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func testFlow(t *testing.T, input string, expectedFlow []token) {
-	ch := lexToml(input)
+	ch := lexToml(strings.NewReader(input))
 	for _, expected := range expectedFlow {
 		token := <-ch
 		if token != expected {
 			t.Log("While testing: ", input)
 			t.Log("compared (got)", token, "to (expected)", expected)
 			t.Log("\tvalue:", token.val, "<->", expected.val)
+			t.Log("\tvalue as bytes:", []byte(token.val), "<->", []byte(expected.val))
 			t.Log("\ttype:", token.typ.String(), "<->", expected.typ.String())
 			t.Log("\tline:", token.Line, "<->", expected.Line)
 			t.Log("\tcolumn:", token.Col, "<->", expected.Col)

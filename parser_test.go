@@ -287,7 +287,7 @@ func TestArrayNestedStrings(t *testing.T) {
 
 func TestMissingValue(t *testing.T) {
 	_, err := Load("a = ")
-	if err.Error() != "(1, 4): expecting a value" {
+	if err.Error() != "(1, 5): expecting a value" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -441,7 +441,7 @@ func TestImplicitDeclarationBefore(t *testing.T) {
 
 func TestFloatsWithoutLeadingZeros(t *testing.T) {
 	_, err := Load("a = .42")
-	if err.Error() != "(1, 4): cannot start float with a dot" {
+	if err.Error() != "(1, 5): cannot start float with a dot" {
 		t.Error("Bad error message:", err.Error())
 	}
 
