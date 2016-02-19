@@ -87,6 +87,19 @@ func TestMultipleKeyGroupsComment(t *testing.T) {
 	})
 }
 
+
+func TestSimpleWindowsCRLF(t *testing.T) {
+	testFlow(t, "a=4\r\nb=2", []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 2}, tokenEqual, "="},
+		token{Position{1, 3}, tokenInteger, "4"},
+		token{Position{2, 1}, tokenKey, "b"},
+		token{Position{2, 2}, tokenEqual, "="},
+		token{Position{2, 3}, tokenInteger, "2"},
+		token{Position{2, 4}, tokenEOF, ""},
+	})
+}
+
 func TestBasicKey(t *testing.T) {
 	testFlow(t, "hello", []token{
 		token{Position{1, 1}, tokenKey, "hello"},
