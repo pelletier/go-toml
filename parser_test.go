@@ -494,6 +494,42 @@ func TestParseFile(t *testing.T) {
 	})
 }
 
+func TestParseFileCRLF(t *testing.T) {
+	tree, err := LoadFile("example-crlf.toml")
+
+	assertTree(t, tree, err, map[string]interface{}{
+		"title": "TOML Example",
+		"owner": map[string]interface{}{
+			"name":         "Tom Preston-Werner",
+			"organization": "GitHub",
+			"bio":          "GitHub Cofounder & CEO\nLikes tater tots and beer.",
+			"dob":          time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+		},
+		"database": map[string]interface{}{
+			"server":         "192.168.1.1",
+			"ports":          []int64{8001, 8001, 8002},
+			"connection_max": 5000,
+			"enabled":        true,
+		},
+		"servers": map[string]interface{}{
+			"alpha": map[string]interface{}{
+				"ip": "10.0.0.1",
+				"dc": "eqdc10",
+			},
+			"beta": map[string]interface{}{
+				"ip": "10.0.0.2",
+				"dc": "eqdc10",
+			},
+		},
+		"clients": map[string]interface{}{
+			"data": []interface{}{
+				[]string{"gamma", "delta"},
+				[]int64{1, 2},
+			},
+		},
+	})
+}
+
 func TestParseKeyGroupArray(t *testing.T) {
 	tree, err := Load("[[foo.bar]] a = 42\n[[foo.bar]] a = 69")
 	assertTree(t, tree, err, map[string]interface{}{

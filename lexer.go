@@ -132,6 +132,8 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 			return l.lexComment
 		case '=':
 			return l.lexEqual
+		case '\r':
+			fallthrough
 		case '\n':
 			l.skip()
 			continue
@@ -185,6 +187,8 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexLiteralString
 		case ',':
 			return l.lexComma
+		case '\r':
+			fallthrough
 		case '\n':
 			l.skip()
 			if l.depth == 0 {
@@ -277,7 +281,7 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	inQuotes := false
-	for r := l.peek(); isKeyChar(r) || r == '\n'; r = l.peek() {
+	for r := l.peek(); isKeyChar(r) || r == '\n' || r == '\r'; r = l.peek() {
 		if r == '"' {
 			inQuotes = !inQuotes
 		} else if r == '\n' {
@@ -295,6 +299,9 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 
 func (l *tomlLexer) lexComment() tomlLexStateFn {
 	for next := l.peek(); next != '\n' && next != eof; next = l.peek() {
+		if (next == '\r' && l.follow("\r\n")) {
+			break
+		}
 		l.next()
 	}
 	l.ignore()
@@ -319,7 +326,10 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 		terminator = "'''"
 
 		// special case: discard leading newline
-		if l.peek() == '\n' {
+		if l.follow("\r\n") {
+			l.skip()
+			l.skip()
+		} else if l.peek() == '\n' {
 			l.skip()
 		}
 	}
@@ -355,7 +365,10 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 		terminator = "\"\"\""
 
 		// special case: discard leading newline
-		if l.peek() == '\n' {
+		if l.follow("\r\n") {
+			l.skip()
+			l.skip()
+		} else if l.peek() == '\n' {
 			l.skip()
 		}
 	}
