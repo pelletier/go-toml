@@ -542,6 +542,28 @@ func TestParseKeyGroupArray(t *testing.T) {
 	})
 }
 
+func TestParseKeyGroupArrayQueryExample(t *testing.T) {
+	tree, err := Load(`
+      [[book]]
+      title = "The Stand"
+      author = "Stephen King"
+      [[book]]
+      title = "For Whom the Bell Tolls"
+      author = "Ernest Hemmingway"
+      [[book]]
+      title = "Neuromancer"
+      author = "William Gibson"
+    `)
+
+	assertTree(t, tree, err, map[string]interface{}{
+		"book": []map[string]interface{}{
+			{"title": "The Stand", "author": "Stephen King"},
+			{"title": "For Whom the Bell Tolls", "author": "Ernest Hemmingway"},
+			{"title": "Neuromancer", "author": "William Gibson"},
+		},
+	})
+}
+
 func TestParseKeyGroupArraySpec(t *testing.T) {
 	tree, err := Load("[[fruit]]\n name=\"apple\"\n [fruit.physical]\n color=\"red\"\n shape=\"round\"\n [[fruit]]\n name=\"banana\"")
 	assertTree(t, tree, err, map[string]interface{}{

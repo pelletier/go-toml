@@ -67,7 +67,14 @@ func newMatchKeyFn(name string) *matchKeyFn {
 }
 
 func (f *matchKeyFn) call(node interface{}, ctx *queryContext) {
-	if tree, ok := node.(*TomlTree); ok {
+	if array, ok := node.([]*TomlTree); ok {
+		for _, tree := range array {
+			item := tree.values[f.Name]
+			if item != nil {
+				f.next.call(item, ctx)
+			}
+		}
+	} else if tree, ok := node.(*TomlTree); ok {
 		item := tree.values[f.Name]
 		if item != nil {
 			f.next.call(item, ctx)
