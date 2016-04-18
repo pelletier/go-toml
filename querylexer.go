@@ -105,7 +105,7 @@ func (l *queryLexer) peek() rune {
 }
 
 func (l *queryLexer) accept(valid string) bool {
-	if strings.IndexRune(valid, l.next()) >= 0 {
+	if strings.ContainsRune(valid, l.next()) {
 		return true
 	}
 	l.backup()
