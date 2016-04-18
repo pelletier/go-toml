@@ -87,7 +87,6 @@ func TestMultipleKeyGroupsComment(t *testing.T) {
 	})
 }
 
-
 func TestSimpleWindowsCRLF(t *testing.T) {
 	testFlow(t, "a=4\r\nb=2", []token{
 		token{Position{1, 1}, tokenKey, "a"},

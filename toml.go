@@ -29,6 +29,7 @@ func newTomlTree() *TomlTree {
 	}
 }
 
+// TreeFromMap initializes a new TomlTree object using the given map.
 func TreeFromMap(m map[string]interface{}) *TomlTree {
 	return &TomlTree{
 		values: m,
@@ -347,12 +348,13 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 	return result
 }
 
+// Query compiles and executes a query on a tree and returns the query result.
 func (t *TomlTree) Query(query string) (*QueryResult, error) {
-	if q, err := CompileQuery(query); err != nil {
+	q, err := CompileQuery(query)
+	if err != nil {
 		return nil, err
-	} else {
-		return q.Execute(t), nil
 	}
+	return q.Execute(t), nil
 }
 
 // ToString generates a human-readable representation of the current tree.
