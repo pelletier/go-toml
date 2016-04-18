@@ -57,3 +57,14 @@ password = "mypassword"
 	}
 	assertArrayContainsInAnyOrder(t, values, "pelletier", "mypassword")
 }
+
+func TestQueryPathNotPresent(t *testing.T) {
+	config, _ := Load(`a = "hello"`)
+	results, err := config.Query("$.foo.bar")
+	if err != nil {
+		t.Fatalf("err should be nil. got %s instead", err)
+	}
+	if len(results.items) != 0 {
+		t.Fatalf("no items should be matched. %d matched instead", len(results.items))
+	}
+}

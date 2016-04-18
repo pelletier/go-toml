@@ -83,9 +83,9 @@
 // The idea behind a query path is to allow quick access to any element, or set
 // of elements within TOML document, with a single expression.
 //
-//   result := tree.Query("$.foo.bar.baz")  // result is 'nil' if the path is not present
+//   result, err := tree.Query("$.foo.bar.baz")
 //
-// This is equivalent to:
+// This is roughly equivalent to:
 //
 //   next := tree.Get("foo")
 //   if next != nil {
@@ -95,6 +95,11 @@
 //     }
 //   }
 //   result := next
+//
+// err is nil if any parsing exception occurs.
+//
+// If no node in the tree matches the query, result will simply contain an empty list of
+// items.
 //
 // As illustrated above, the query path is much more efficient, especially since
 // the structure of the TOML file can vary.  Rather than making assumptions about
