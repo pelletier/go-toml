@@ -15,6 +15,10 @@ func TestTomlHas(t *testing.T) {
 	if !tree.Has("test.key") {
 		t.Errorf("Has - expected test.key to exists")
 	}
+
+	if tree.Has("") {
+		t.Errorf("Should return false if the key is not provided")
+	}
 }
 
 func TestTomlHasPath(t *testing.T) {
@@ -70,5 +74,13 @@ func TestTomlQuery(t *testing.T) {
 		t.Errorf("Expected 'a' with a value 1: %v", tt.Get("a"))
 	} else if tt.Get("b") != int64(2) {
 		t.Errorf("Expected 'b' with a value 2: %v", tt.Get("b"))
+	}
+}
+
+func TestTomlFromMap(t *testing.T) {
+	simpleMap := map[string]interface{}{"hello": 42}
+	tree := TreeFromMap(simpleMap)
+	if tree.Get("hello") != 42 {
+		t.Fatal("hello should be 42, not", tree.Get("hello"))
 	}
 }
