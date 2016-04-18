@@ -299,7 +299,7 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 
 func (l *tomlLexer) lexComment() tomlLexStateFn {
 	for next := l.peek(); next != '\n' && next != eof; next = l.peek() {
-		if (next == '\r' && l.follow("\r\n")) {
+		if next == '\r' && l.follow("\r\n") {
 			break
 		}
 		l.next()

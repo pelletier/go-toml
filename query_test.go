@@ -5,7 +5,7 @@ import (
 )
 
 func assertArrayContainsInAnyOrder(t *testing.T, array []interface{}, objects ...interface{}) {
-	if (len(array) != len(objects)) {
+	if len(array) != len(objects) {
 		t.Fatalf("array contains %d objects but %d are expected", len(array), len(objects))
 	}
 
@@ -23,7 +23,7 @@ func assertArrayContainsInAnyOrder(t *testing.T, array []interface{}, objects ..
 	}
 }
 
-func TestQueryExample(t *testing.T)  {
+func TestQueryExample(t *testing.T) {
 	config, _ := Load(`
       [[book]]
       title = "The Stand"

@@ -4,30 +4,32 @@ import (
 	"time"
 )
 
-//  Type of a user-defined filter function, for use with Query.SetFilter().
+// NodeFilterFn represents a user-defined filter function, for use with
+// Query.SetFilter().
 //
-//  The return value of the function must indicate if 'node' is to be included
-//  at this stage of the TOML path.  Returning true will include the node, and
-//  returning false will exclude it.
+// The return value of the function must indicate if 'node' is to be included
+// at this stage of the TOML path.  Returning true will include the node, and
+// returning false will exclude it.
 //
-//  NOTE: Care should be taken to write script callbacks such that they are safe
-//  to use from multiple goroutines.
+// NOTE: Care should be taken to write script callbacks such that they are safe
+// to use from multiple goroutines.
 type NodeFilterFn func(node interface{}) bool
 
-// The result of Executing a Query
+// QueryResult is the result of Executing a Query.
 type QueryResult struct {
 	items     []interface{}
 	positions []Position
 }
 
-// appends a value/position pair to the result set
+// appends a value/position pair to the result set.
 func (r *QueryResult) appendResult(node interface{}, pos Position) {
 	r.items = append(r.items, node)
 	r.positions = append(r.positions, pos)
 }
 
-// Set of values within a QueryResult.  The order of values is not guaranteed
-// to be in document order, and may be different each time a query is executed.
+// Values is a set of values within a QueryResult.  The order of values is not
+// guaranteed to be in document order, and may be different each time a query is
+// executed.
 func (r *QueryResult) Values() []interface{} {
 	values := make([]interface{}, len(r.items))
 	for i, v := range r.items {
@@ -41,8 +43,8 @@ func (r *QueryResult) Values() []interface{} {
 	return values
 }
 
-// Set of positions for values within a QueryResult.  Each index in Positions()
-// corresponds to the entry in Value() of the same index.
+// Positions is a set of positions for values within a QueryResult.  Each index
+// in Positions() corresponds to the entry in Value() of the same index.
 func (r *QueryResult) Positions() []Position {
 	return r.positions
 }
@@ -86,13 +88,13 @@ func (q *Query) appendPath(next pathFn) {
 	next.setNext(newTerminatingFn()) // init the next functor
 }
 
-// Compiles a TOML path expression.  The returned Query can be used to match
-// elements within a TomlTree and its descendants.
+// CompileQuery compiles a TOML path expression.  The returned Query can be used
+// to match elements within a TomlTree and its descendants.
 func CompileQuery(path string) (*Query, error) {
 	return parseQuery(lexQuery(path))
 }
 
-// Executes a query against a TomlTree, and returns the result of the query.
+// Execute executes a query against a TomlTree, and returns the result of the query.
 func (q *Query) Execute(tree *TomlTree) *QueryResult {
 	result := &QueryResult{
 		items:     []interface{}{},
@@ -110,8 +112,8 @@ func (q *Query) Execute(tree *TomlTree) *QueryResult {
 	return result
 }
 
-// Sets a user-defined filter function.  These may be used inside "?(..)" query
-// expressions to filter TOML document elements within a query.
+// SetFilter sets a user-defined filter function.  These may be used inside
+// "?(..)" query expressions to filter TOML document elements within a query.
 func (q *Query) SetFilter(name string, fn NodeFilterFn) {
 	if q.filters == &defaultFilterFunctions {
 		// clone the static table
