@@ -2,10 +2,10 @@
 package toml
 
 import (
-	"strings"
-	"strconv"
-	"time"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // encodes a string to a TOML-compliant string value
