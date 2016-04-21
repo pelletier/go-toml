@@ -600,6 +600,20 @@ func TestMultilineString(t *testing.T) {
 		token{Position{1, 11}, tokenString, "The quick brown fox jumps over the lazy dog."},
 		token{Position{5, 11}, tokenEOF, ""},
 	})
+
+	testFlow(t, `key2 = "Roses are red\nViolets are blue"`, []token{
+		token{Position{1, 1}, tokenKey, "key2"},
+		token{Position{1, 6}, tokenEqual, "="},
+		token{Position{1, 9}, tokenString, "Roses are red\nViolets are blue"},
+		token{Position{1, 41}, tokenEOF, ""},
+	})
+
+	testFlow(t, "key2 = \"\"\"\nRoses are red\nViolets are blue\"\"\"", []token{
+		token{Position{1, 1}, tokenKey, "key2"},
+		token{Position{1, 6}, tokenEqual, "="},
+		token{Position{2, 1}, tokenString, "Roses are red\nViolets are blue"},
+		token{Position{3, 20}, tokenEOF, ""},
+	})
 }
 
 func TestUnicodeString(t *testing.T) {
