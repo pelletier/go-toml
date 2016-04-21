@@ -3,7 +3,7 @@ script: "./test.sh"
 go:
     - 1.4.3
     - 1.5.4
-    - 1.6.1
+    - 1.6.2
     - tip
 before_install:
   - go get github.com/axw/gocov/gocov
