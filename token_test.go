@@ -55,7 +55,7 @@ func TestTokenString(t *testing.T) {
 		{token{Position{1, 1}, tokenEOF, ""}, "EOF"},
 		{token{Position{1, 1}, tokenError, "Δt"}, "Δt"},
 		{token{Position{1, 1}, tokenString, "bar"}, `"bar"`},
-		{token{Position{1, 1}, tokenString, "123456789012345"}, `"1234567890"...`},
+		{token{Position{1, 1}, tokenString, "123456789012345"}, `"123456789012345"`},
 	}
 
 	for i, test := range tests {

@@ -6,12 +6,14 @@
 package toml
 
 import (
+	"errors"
 	"fmt"
-	"github.com/pelletier/go-buffruneio"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pelletier/go-buffruneio"
 )
 
 var dateRegexp *regexp.Regexp
@@ -280,20 +282,29 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 }
 
 func (l *tomlLexer) lexKey() tomlLexStateFn {
-	inQuotes := false
+	growingString := ""
+
 	for r := l.peek(); isKeyChar(r) || r == '\n' || r == '\r'; r = l.peek() {
 		if r == '"' {
-			inQuotes = !inQuotes
+			l.next()
+			str, err := l.lexStringAsString(`"`, false, true)
+			if err != nil {
+				return l.errorf(err.Error())
+			}
+			growingString += `"` + str + `"`
+			l.next()
+			continue
 		} else if r == '\n' {
 			return l.errorf("keys cannot contain new lines")
-		} else if isSpace(r) && !inQuotes {
+		} else if isSpace(r) {
 			break
-		} else if !isValidBareChar(r) && !inQuotes {
+		} else if !isValidBareChar(r) {
 			return l.errorf("keys cannot contain %c character", r)
 		}
+		growingString += string(r)
 		l.next()
 	}
-	l.emit(tokenKey)
+	l.emitWithValue(tokenKey, growingString)
 	return l.lexVoid
 }
 
@@ -314,18 +325,10 @@ func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
 	return l.lexRvalue
 }
 
-func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
-	l.skip()
+func (l *tomlLexer) lexLiteralStringAsString(terminator string, discardLeadingNewLine bool) (string, error) {
 	growingString := ""
 
-	// handle special case for triple-quote
-	terminator := "'"
-	if l.follow("''") {
-		l.skip()
-		l.skip()
-		terminator = "'''"
-
-		// special case: discard leading newline
+	if discardLeadingNewLine {
 		if l.follow("\r\n") {
 			l.skip()
 			l.skip()
@@ -337,10 +340,7 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 	// find end of string
 	for {
 		if l.follow(terminator) {
-			l.emitWithValue(tokenString, growingString)
-			l.fastForward(len(terminator))
-			l.ignore()
-			return l.lexRvalue
+			return growingString, nil
 		}
 
 		next := l.peek()
@@ -350,21 +350,40 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 		growingString += string(l.next())
 	}
 
-	return l.errorf("unclosed string")
+	return "", errors.New("unclosed string")
 }
 
-func (l *tomlLexer) lexString() tomlLexStateFn {
+func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 	l.skip()
-	growingString := ""
 
 	// handle special case for triple-quote
-	terminator := "\""
-	if l.follow("\"\"") {
+	terminator := "'"
+	discardLeadingNewLine := false
+	if l.follow("''") {
 		l.skip()
 		l.skip()
-		terminator = "\"\"\""
+		terminator = "'''"
+		discardLeadingNewLine = true
+	}
 
-		// special case: discard leading newline
+	str, err := l.lexLiteralStringAsString(terminator, discardLeadingNewLine)
+	if err != nil {
+		return l.errorf(err.Error())
+	}
+
+	l.emitWithValue(tokenString, str)
+	l.fastForward(len(terminator))
+	l.ignore()
+	return l.lexRvalue
+}
+
+// Lex a string and return the results as a string.
+// Terminator is the substring indicating the end of the token.
+// The resulting string does not include the terminator.
+func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, acceptNewLines bool) (string, error) {
+	growingString := ""
+
+	if discardLeadingNewLine {
 		if l.follow("\r\n") {
 			l.skip()
 			l.skip()
@@ -375,10 +394,7 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 
 	for {
 		if l.follow(terminator) {
-			l.emitWithValue(tokenString, growingString)
-			l.fastForward(len(terminator))
-			l.ignore()
-			return l.lexRvalue
+			return growingString, nil
 		}
 
 		if l.follow("\\") {
@@ -425,14 +441,14 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 				for i := 0; i < 4; i++ {
 					c := l.peek()
 					if !isHexDigit(c) {
-						return l.errorf("unfinished unicode escape")
+						return "", errors.New("unfinished unicode escape")
 					}
 					l.next()
 					code = code + string(c)
 				}
 				intcode, err := strconv.ParseInt(code, 16, 32)
 				if err != nil {
-					return l.errorf("invalid unicode escape: \\u" + code)
+					return "", errors.New("invalid unicode escape: \\u" + code)
 				}
 				growingString += string(rune(intcode))
 			case 'U':
@@ -441,23 +457,24 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 				for i := 0; i < 8; i++ {
 					c := l.peek()
 					if !isHexDigit(c) {
-						return l.errorf("unfinished unicode escape")
+						return "", errors.New("unfinished unicode escape")
 					}
 					l.next()
 					code = code + string(c)
 				}
 				intcode, err := strconv.ParseInt(code, 16, 64)
 				if err != nil {
-					return l.errorf("invalid unicode escape: \\U" + code)
+					return "", errors.New("invalid unicode escape: \\U" + code)
 				}
 				growingString += string(rune(intcode))
 			default:
-				return l.errorf("invalid escape sequence: \\" + string(l.peek()))
+				return "", errors.New("invalid escape sequence: \\" + string(l.peek()))
 			}
 		} else {
 			r := l.peek()
-			if 0x00 <= r && r <= 0x1F {
-				return l.errorf("unescaped control character %U", r)
+
+			if 0x00 <= r && r <= 0x1F && !(acceptNewLines && (r == '\n' || r == '\r')) {
+				return "", fmt.Errorf("unescaped control character %U", r)
 			}
 			l.next()
 			growingString += string(r)
@@ -468,7 +485,34 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 		}
 	}
 
-	return l.errorf("unclosed string")
+	return "", errors.New("unclosed string")
+}
+
+func (l *tomlLexer) lexString() tomlLexStateFn {
+	l.skip()
+
+	// handle special case for triple-quote
+	terminator := `"`
+	discardLeadingNewLine := false
+	acceptNewLines := false
+	if l.follow(`""`) {
+		l.skip()
+		l.skip()
+		terminator = `"""`
+		discardLeadingNewLine = true
+		acceptNewLines = true
+	}
+
+	str, err := l.lexStringAsString(terminator, discardLeadingNewLine, acceptNewLines)
+
+	if err != nil {
+		return l.errorf(err.Error())
+	}
+
+	l.emitWithValue(tokenString, str)
+	l.fastForward(len(terminator))
+	l.ignore()
+	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexKeyGroup() tomlLexStateFn {
