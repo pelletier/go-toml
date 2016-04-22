@@ -6,6 +6,28 @@ import (
 	"time"
 )
 
+func TestTomlTreeConversionToString(t *testing.T) {
+	toml, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
+points = { x = 1, y = 2 }`)
+
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	reparsedTree, err := Load(toml.ToString())
+
+	assertTree(t, reparsedTree, err, map[string]interface{}{
+		"name": map[string]interface{}{
+			"first": "Tom",
+			"last":  "Preston-Werner",
+		},
+		"points": map[string]interface{}{
+			"x": int64(1),
+			"y": int64(2),
+		},
+	})
+}
+
 func testMaps(t *testing.T, actual, expected map[string]interface{}) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatal("trees aren't equal.\n", "Expected:\n", expected, "\nActual:\n", actual)
