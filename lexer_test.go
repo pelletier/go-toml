@@ -480,6 +480,12 @@ func TestKeyEqualNumber(t *testing.T) {
 		token{Position{1, 8}, tokenFloat, "9_224_617.445_991_228_313"},
 		token{Position{1, 33}, tokenEOF, ""},
 	})
+
+	testFlow(t, "foo = +", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 7}, tokenError, "no digit in that number"},
+	})
 }
 
 func TestMultiline(t *testing.T) {
@@ -506,6 +512,16 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{1, 8}, tokenString, "hello δ"},
 		token{Position{1, 25}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = "\u2"`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenError, "unfinished unicode escape"},
+	})
+	testFlow(t, `foo = "\U2"`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenError, "unfinished unicode escape"},
 	})
 }
 
@@ -547,6 +563,11 @@ func TestLiteralString(t *testing.T) {
 		token{Position{1, 8}, tokenString, `<\i\c*\s*>`},
 		token{Position{1, 19}, tokenEOF, ""},
 	})
+	testFlow(t, `foo = 'C:\Users\nodejs\unfinis`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenError, "unclosed string"},
+	})
 }
 
 func TestMultilineLiteralString(t *testing.T) {
@@ -563,6 +584,12 @@ func TestMultilineLiteralString(t *testing.T) {
 		token{Position{2, 1}, tokenString, "hello\n'literal'\nworld"},
 		token{Position{4, 9}, tokenEOF, ""},
 	})
+	testFlow(t, "foo = '''\r\nhello\r\n'literal'\r\nworld'''", []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{2, 1}, tokenString, "hello\r\n'literal'\r\nworld"},
+		token{Position{4, 9}, tokenEOF, ""},
+	})
 }
 
 func TestMultilineString(t *testing.T) {
@@ -573,7 +600,7 @@ func TestMultilineString(t *testing.T) {
 		token{Position{1, 34}, tokenEOF, ""},
 	})
 
-	testFlow(t, "foo = \"\"\"\nhello\\\n\"literal\"\\\nworld\"\"\"", []token{
+	testFlow(t, "foo = \"\"\"\r\nhello\\\r\n\"literal\"\\\nworld\"\"\"", []token{
 		token{Position{1, 1}, tokenKey, "foo"},
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{2, 1}, tokenString, "hello\"literal\"world"},
@@ -622,6 +649,14 @@ func TestUnicodeString(t *testing.T) {
 		token{Position{1, 5}, tokenEqual, "="},
 		token{Position{1, 8}, tokenString, "hello ♥ world"},
 		token{Position{1, 22}, tokenEOF, ""},
+	})
+}
+func TestEscapeInString(t *testing.T) {
+	testFlow(t, `foo = "\b\f\/"`, []token{
+		token{Position{1, 1}, tokenKey, "foo"},
+		token{Position{1, 5}, tokenEqual, "="},
+		token{Position{1, 8}, tokenString, "\b\f/"},
+		token{Position{1, 15}, tokenEOF, ""},
 	})
 }
 

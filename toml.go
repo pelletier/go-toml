@@ -94,7 +94,7 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 			}
 			subtree = node[len(node)-1]
 		default:
-			return nil // cannot naigate through other node types
+			return nil // cannot navigate through other node types
 		}
 	}
 	// branch based on final node type
