@@ -2,31 +2,45 @@ package toml
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
-func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interface{}) {
+func assertSubTree(t *testing.T, path []string, tree *TomlTree, err error, ref map[string]interface{}) {
 	if err != nil {
 		t.Error("Non-nil error:", err.Error())
 		return
 	}
 	for k, v := range ref {
+		nextPath := append(path, k)
+		t.Log("asserting path", nextPath)
 		// NOTE: directly access key instead of resolve by path
 		// NOTE: see TestSpecialKV
 		switch node := tree.GetPath([]string{k}).(type) {
 		case []*TomlTree:
+			t.Log("\tcomparing key", nextPath, "by array iteration")
 			for idx, item := range node {
-				assertTree(t, item, err, v.([]map[string]interface{})[idx])
+				assertSubTree(t, nextPath, item, err, v.([]map[string]interface{})[idx])
 			}
 		case *TomlTree:
-			assertTree(t, node, err, v.(map[string]interface{}))
+			t.Log("\tcomparing key", nextPath, "by subtree assestion")
+			assertSubTree(t, nextPath, node, err, v.(map[string]interface{}))
 		default:
+			t.Log("\tcomparing key", nextPath, "by string representation because it's of type", reflect.TypeOf(node))
 			if fmt.Sprintf("%v", node) != fmt.Sprintf("%v", v) {
 				t.Errorf("was expecting %v at %v but got %v", v, k, node)
 			}
 		}
 	}
+}
+
+func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interface{}) {
+	t.Log("Asserting tree:\n", spew.Sdump(tree))
+	assertSubTree(t, []string{}, tree, err, ref)
+	t.Log("Finished tree assertion.")
 }
 
 func TestCreateSubTree(t *testing.T) {
