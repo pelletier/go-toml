@@ -21,6 +21,43 @@ func TestTomlHas(t *testing.T) {
 	}
 }
 
+func TestTomlGet(t *testing.T) {
+	tree, _ := Load(`
+		[test]
+		key = "value"
+	`)
+
+	if tree.Get("") != tree {
+		t.Errorf("Get should return the tree itself when given an empty path")
+	}
+
+	if tree.Get("test.key") != "value" {
+		t.Errorf("Get should return the value")
+	}
+	if tree.Get(`\`) != nil {
+		t.Errorf("should return nil when the key is malformed")
+	}
+}
+
+func TestTomlGetDefault(t *testing.T) {
+	tree, _ := Load(`
+		[test]
+		key = "value"
+	`)
+
+	if tree.GetDefault("", "hello") != tree {
+		t.Error("GetDefault should return the tree itself when given an empty path")
+	}
+
+	if tree.GetDefault("test.key", "hello") != "value" {
+		t.Error("Get should return the value")
+	}
+
+	if tree.GetDefault("whatever", "hello") != "hello" {
+		t.Error("GetDefault should return the default value if the key does not exist")
+	}
+}
+
 func TestTomlHasPath(t *testing.T) {
 	tree, _ := Load(`
 		[test]
@@ -49,6 +86,11 @@ func TestTomlGetPath(t *testing.T) {
 		if result != item.Expected {
 			t.Errorf("GetPath[%d] %v - expected %v, got %v instead.", idx, item.Path, item.Expected, result)
 		}
+	}
+
+	tree, _ := Load("[foo.bar]\na=1\nb=2\n[baz.foo]\na=3\nb=4\n[gorf.foo]\na=5\nb=6")
+	if tree.GetPath([]string{"whatever"}) != nil {
+		t.Error("GetPath should return nil when the key does not exist")
 	}
 }
 

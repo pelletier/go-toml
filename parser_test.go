@@ -556,6 +556,18 @@ func TestParseKeyGroupArray(t *testing.T) {
 	})
 }
 
+func TestParseKeyGroupArrayUnfinished(t *testing.T) {
+	_, err := Load("[[foo.bar]\na = 42")
+	if err.Error() != "(1, 10): was expecting token [[, but got unclosed key group array instead" {
+		t.Error("Bad error message:", err.Error())
+	}
+
+	_, err = Load("[[foo.[bar]\na = 42")
+	if err.Error() != "(1, 3): unexpected token group name cannot contain ']', was expecting a key group array" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestParseKeyGroupArrayQueryExample(t *testing.T) {
 	tree, err := Load(`
       [[book]]
@@ -689,6 +701,11 @@ func TestInvalidGroupArray(t *testing.T) {
 	_, err := Load("[key#group]\nanswer = 42")
 	if err == nil {
 		t.Error("Should error")
+	}
+
+	_, err = Load("[foo.[bar]\na = 42")
+	if err.Error() != "(1, 2): unexpected token group name cannot contain ']', was expecting a key group" {
+		t.Error("Bad error message:", err.Error())
 	}
 }
 
