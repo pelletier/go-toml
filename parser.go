@@ -208,7 +208,15 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 		p.raiseError(key, "The following key was defined twice: %s",
 			strings.Join(finalKey, "."))
 	}
-	targetNode.values[keyVal] = &tomlValue{value, key.Position}
+	var toInsert interface{}
+
+	switch value.(type) {
+	case *TomlTree:
+		toInsert = value
+	default:
+		toInsert = &tomlValue{value, key.Position}
+	}
+	targetNode.values[keyVal] = toInsert
 	return p.parseStart
 }
 
