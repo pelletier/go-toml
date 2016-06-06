@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,6 +11,17 @@ import (
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, `tomll can be used in two ways:
+Writing to STDIN and reading from STDOUT:
+  cat file.toml | tomll > file.toml
+
+Reading and updating a list of files:
+  tomll a.toml b.toml c.toml
+
+When given a list of files, tomll will modify all files in place without asking.
+`)
+	}
 	flag.Parse()
 	// read from stdin and print to stdout
 	if flag.NArg() == 0 {
