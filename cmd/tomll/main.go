@@ -19,16 +19,16 @@ func main() {
 			os.Exit(-1)
 		}
 		io.WriteString(os.Stdout, s)
-		os.Exit(0)
-	}
-	// otherwise modify a list of files
-	for _, filename := range flag.Args() {
-		s, err := lintFile(filename)
-		if err != nil {
-			io.WriteString(os.Stderr, err.Error())
-			os.Exit(-1)
+	} else {
+		// otherwise modify a list of files
+		for _, filename := range flag.Args() {
+			s, err := lintFile(filename)
+			if err != nil {
+				io.WriteString(os.Stderr, err.Error())
+				os.Exit(-1)
+			}
+			ioutil.WriteFile(filename, []byte(s), 0644)
 		}
-		ioutil.WriteFile(filename, []byte(s), 0644)
 	}
 }
 
