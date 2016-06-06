@@ -108,9 +108,14 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 	return result
 }
 
+// ToString is an alias for String
+func (t *TomlTree) ToString() string {
+	return t.String()
+}
+
 // ToString generates a human-readable representation of the current tree.
 // Output spans multiple lines, and is suitable for ingest by a TOML parser
-func (t *TomlTree) ToString() string {
+func (t *TomlTree) String() string {
 	return t.toToml("", "")
 }
 
