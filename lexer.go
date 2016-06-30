@@ -234,6 +234,7 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexKey
 		}
 
+		return l.errorf("no value can start with %c", next)
 	}
 
 	l.emit(tokenEOF)

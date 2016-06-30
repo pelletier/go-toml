@@ -299,6 +299,18 @@ func TestArrayNestedStrings(t *testing.T) {
 	})
 }
 
+func TestParseUnknownRvalue(t *testing.T) {
+	_, err := Load("a = !bssss")
+	if err == nil {
+		t.Error("Expecting a parse error")
+	}
+
+	_, err = Load("a = /b")
+	if err == nil {
+		t.Error("Expecting a parse error")
+	}
+}
+
 func TestMissingValue(t *testing.T) {
 	_, err := Load("a = ")
 	if err.Error() != "(1, 5): expecting a value" {

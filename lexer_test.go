@@ -692,3 +692,17 @@ func TestInvalidFloat(t *testing.T) {
 		token{Position{1, 7}, tokenEOF, ""},
 	})
 }
+
+func TestLexUnknownRvalue(t *testing.T) {
+	testFlow(t, `a = !b`, []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenError, "no value can start with !"},
+	})
+
+	testFlow(t, `a = \b`, []token{
+		token{Position{1, 1}, tokenKey, "a"},
+		token{Position{1, 3}, tokenEqual, "="},
+		token{Position{1, 5}, tokenError, `no value can start with \`},
+	})
+}
