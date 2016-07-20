@@ -52,7 +52,7 @@ func (r QueryResult) Positions() []Position {
 // runtime context for executing query paths
 type queryContext struct {
 	result       *QueryResult
-	filters      map[string]NodeFilterFn
+	filters      *map[string]NodeFilterFn
 	lastPosition Position
 }
 
@@ -67,7 +67,7 @@ type pathFn interface {
 type Query struct {
 	root    pathFn
 	tail    pathFn
-	filters map[string]NodeFilterFn
+	filters *map[string]NodeFilterFn
 }
 
 func newQuery() *Query {
