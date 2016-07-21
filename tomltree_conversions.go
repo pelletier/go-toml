@@ -113,7 +113,7 @@ func (t *TomlTree) ToString() string {
 	return t.String()
 }
 
-// ToString generates a human-readable representation of the current tree.
+// String generates a human-readable representation of the current tree.
 // Output spans multiple lines, and is suitable for ingest by a TOML parser
 func (t *TomlTree) String() string {
 	return t.toToml("", "")
