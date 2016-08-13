@@ -128,7 +128,12 @@ func (t *TomlTree) ToMap() map[string]interface{} {
 		case []*TomlTree:
 			result[k] = make([]interface{}, 0)
 			for _, item := range node {
-				result[k] = item.ToMap()
+				if _, ok := result[k]; ok {
+					slice := result[k].([]interface{})
+					result[k] = append(slice, item.ToMap())
+				} else {
+					result[k] = item.ToMap()
+				}
 			}
 		case *TomlTree:
 			result[k] = node.ToMap()
