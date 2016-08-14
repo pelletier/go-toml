@@ -38,7 +38,8 @@ cp cmd/*.go src/github.com/pelletier/go-toml/cmd
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
 # Run basic unit tests
-go test -v github.com/pelletier/go-toml
+go test github.com/pelletier/go-toml \
+        github.com/pelletier/go-toml/cmd/tomljson
 
 # run the entire BurntSushi test suite
 if [[ $# -eq 0 ]] ; then
