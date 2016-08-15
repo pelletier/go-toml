@@ -126,15 +126,11 @@ func (t *TomlTree) ToMap() map[string]interface{} {
 	for k, v := range t.values {
 		switch node := v.(type) {
 		case []*TomlTree:
-			result[k] = make([]interface{}, 0)
+			array := make([]interface{}, 0)
 			for _, item := range node {
-				if _, ok := result[k]; ok {
-					slice := result[k].([]interface{})
-					result[k] = append(slice, item.ToMap())
-				} else {
-					result[k] = item.ToMap()
-				}
+				array = append(array, item.ToMap())
 			}
+			result[k] = array
 		case *TomlTree:
 			result[k] = node.ToMap()
 		case map[string]interface{}:
