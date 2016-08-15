@@ -81,6 +81,23 @@ if err != nil {
 The documentation and additional examples are available at
 [godoc.org](http://godoc.org/github.com/pelletier/go-toml).
 
+## Tools
+
+Go-toml provides two handy command line tools:
+
+* `tomll`: Reads TOML files and lint them.
+
+    ```
+    go install github.com/pelletier/go-toml/cmd/tomll
+    tomll --help
+    ```
+* `tomljson`: Reads a TOML file and outputs its JSON representation.
+
+    ```
+    go install github.com/pelletier/go-toml/cmd/tomjson
+    tomljson --help
+    ```
+
 ## Contribute
 
 Feel free to report bugs and patches using GitHub's pull requests system on
