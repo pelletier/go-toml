@@ -80,3 +80,25 @@ func TestTomlTreeConversionToMapExampleFile(t *testing.T) {
 	}
 	testMaps(t, tree.ToMap(), expected)
 }
+
+func TestTomlTreeConversionToMapWithTablesInMultipleChunks(t *testing.T) {
+	tree, _ := Load(`
+	[[menu.main]]
+        a = "menu 1"
+        b = "menu 2"
+        [[menu.main]]
+        c = "menu 3"
+        d = "menu 4"`)
+	expected := map[string]interface{}{
+		"menu": map[string]interface{}{
+			"main": []interface{}{
+				map[string]interface{}{"a": "menu 1", "b": "menu 2", },
+				map[string]interface{}{"c": "menu 3", "d": "menu 4", },
+			},
+		},
+	}
+	treeMap := tree.ToMap()
+
+
+	testMaps(t, treeMap, expected)
+}
