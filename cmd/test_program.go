@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pelletier/go-toml"
 	"io/ioutil"
 	"log"
 	"os"
 	"time"
+
+	"github.com/pelletier/go-toml"
 )
 
 func main() {

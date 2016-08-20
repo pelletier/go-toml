@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/pelletier/go-toml"
-	"io"
-	"os"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"encoding/json"
+	"io"
+	"os"
+
+	"github.com/pelletier/go-toml"
 )
 
 func main() {
@@ -40,12 +41,12 @@ func processMain(files []string, defaultInput io.Reader, output io.Writer, error
 		printError(err, errorOutput)
 		return -1
 	}
-	io.WriteString(output, s + "\n")
+	io.WriteString(output, s+"\n")
 	return 0
 }
 
 func printError(err error, output io.Writer) {
-	io.WriteString(output, err.Error() + "\n")
+	io.WriteString(output, err.Error()+"\n")
 }
 
 func reader(r io.Reader) (string, error) {
@@ -53,10 +54,10 @@ func reader(r io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return mapToJson(tree)
+	return mapToJSON(tree)
 }
 
-func mapToJson(tree *toml.TomlTree) (string, error) {
+func mapToJSON(tree *toml.TomlTree) (string, error) {
 	treeMap := tree.ToMap()
 	bytes, err := json.MarshalIndent(treeMap, "", "  ")
 	if err != nil {
