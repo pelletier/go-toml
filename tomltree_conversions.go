@@ -1,5 +1,6 @@
-// Tools to convert a TomlTree to different representations
 package toml
+
+// Tools to convert a TomlTree to different representations
 
 import (
 	"fmt"
@@ -126,7 +127,7 @@ func (t *TomlTree) ToMap() map[string]interface{} {
 	for k, v := range t.values {
 		switch node := v.(type) {
 		case []*TomlTree:
-			array := make([]interface{}, 0)
+			var array []interface{}
 			for _, item := range node {
 				array = append(array, item.ToMap())
 			}

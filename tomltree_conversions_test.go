@@ -92,13 +92,12 @@ func TestTomlTreeConversionToMapWithTablesInMultipleChunks(t *testing.T) {
 	expected := map[string]interface{}{
 		"menu": map[string]interface{}{
 			"main": []interface{}{
-				map[string]interface{}{"a": "menu 1", "b": "menu 2", },
-				map[string]interface{}{"c": "menu 3", "d": "menu 4", },
+				map[string]interface{}{"a": "menu 1", "b": "menu 2"},
+				map[string]interface{}{"c": "menu 3", "d": "menu 4"},
 			},
 		},
 	}
 	treeMap := tree.ToMap()
-
 
 	testMaps(t, treeMap, expected)
 }

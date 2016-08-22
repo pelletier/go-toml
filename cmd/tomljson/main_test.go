@@ -1,11 +1,11 @@
 package main
 
 import (
-	"testing"
-	"strings"
 	"bytes"
-	"os"
 	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
 )
 
 func expectBufferEquality(t *testing.T, name string, buffer *bytes.Buffer, expected string) {
@@ -32,7 +32,6 @@ func expectProcessMainResults(t *testing.T, input string, args []string, exitCod
 	}
 }
 
-
 func TestProcessMainReadFromStdin(t *testing.T) {
 	input := `
 		[mytoml]
@@ -53,7 +52,6 @@ func TestProcessMainReadFromFile(t *testing.T) {
 	input := `
 		[mytoml]
 		a = 42`
-
 
 	tmpfile, err := ioutil.TempFile("", "example.toml")
 	if err != nil {
