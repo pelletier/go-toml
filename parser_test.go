@@ -177,6 +177,16 @@ func TestStringEscapables(t *testing.T) {
 	})
 }
 
+func TestEmptyQuotedString(t *testing.T) {
+	tree, err := Load(`[""]
+"" = 1`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"": map[string]interface{}{
+			"": int64(1),
+		},
+	})
+}
+
 func TestBools(t *testing.T) {
 	tree, err := Load("a = true\nb = false")
 	assertTree(t, tree, err, map[string]interface{}{
@@ -446,7 +456,7 @@ func TestDuplicateKeys(t *testing.T) {
 
 func TestEmptyIntermediateTable(t *testing.T) {
 	_, err := Load("[foo..bar]")
-	if err.Error() != "(1, 2): empty intermediate table" {
+	if err.Error() != "(1, 2): invalid group array key: empty key group" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
