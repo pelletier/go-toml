@@ -5,7 +5,8 @@ package toml
 import (
 	"bytes"
 	"fmt"
-	"unicode"
+
+	"github.com/pelletier/go-toml/lexer"
 )
 
 func parseKey(key string) ([]string, error) {
@@ -63,7 +64,7 @@ func parseKey(key string) ([]string, error) {
 				expectDot = true
 			}
 		default:
-			if !inQuotes && !isValidBareChar(char) {
+			if !inQuotes && !lexer.IsValidBareChar(char) {
 				return nil, fmt.Errorf("invalid bare character: %c", char)
 			}
 			if !inQuotes && expectDot {
@@ -86,8 +87,4 @@ func parseKey(key string) ([]string, error) {
 		return nil, fmt.Errorf("empty key")
 	}
 	return groups, nil
-}
-
-func isValidBareChar(r rune) bool {
-	return isAlphanumeric(r) || r == '-' || unicode.IsNumber(r)
 }

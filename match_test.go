@@ -3,6 +3,8 @@ package toml
 import (
 	"fmt"
 	"testing"
+
+	"github.com/pelletier/go-toml/token"
 )
 
 // dump path tree to a string
@@ -194,8 +196,8 @@ func TestPathFilterExpr(t *testing.T) {
 		"$[?('foo'),?(bar)]",
 		buildPath(
 			&matchUnionFn{[]pathFn{
-				newMatchFilterFn("foo", Position{}),
-				newMatchFilterFn("bar", Position{}),
+				newMatchFilterFn("foo", token.Position{}),
+				newMatchFilterFn("bar", token.Position{}),
 			}},
 		))
 }

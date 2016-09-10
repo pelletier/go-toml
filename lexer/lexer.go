@@ -3,7 +3,7 @@
 // Written using the principles developed by Rob Pike in
 // http://www.youtube.com/watch?v=HxaD_trXwRE
 
-package toml
+package lexer
 
 import (
 	"errors"
@@ -12,8 +12,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/pelletier/go-buffruneio"
+	"github.com/pelletier/go-toml/token"
+)
+
+const (
+	eof = -(iota + 1)
 )
 
 var dateRegexp *regexp.Regexp
@@ -25,7 +31,7 @@ type tomlLexStateFn func() tomlLexStateFn
 type tomlLexer struct {
 	input         *buffruneio.Reader // Textual source
 	buffer        []rune             // Runes composing the current token
-	tokens        chan token
+	tokens        chan token.Token
 	depth         int
 	line          int
 	col           int
@@ -75,16 +81,16 @@ func (l *tomlLexer) fastForward(n int) {
 	}
 }
 
-func (l *tomlLexer) emitWithValue(t tokenType, value string) {
-	l.tokens <- token{
-		Position: Position{l.line, l.col},
-		typ:      t,
-		val:      value,
+func (l *tomlLexer) emitWithValue(t token.Type, value string) {
+	l.tokens <- token.Token{
+		Position: token.Position{l.line, l.col},
+		Typ:      t,
+		Val:      value,
 	}
 	l.ignore()
 }
 
-func (l *tomlLexer) emit(t tokenType) {
+func (l *tomlLexer) emit(t token.Type) {
 	l.emitWithValue(t, string(l.buffer))
 }
 
@@ -114,10 +120,10 @@ func (l *tomlLexer) follow(next string) bool {
 // Error management
 
 func (l *tomlLexer) errorf(format string, args ...interface{}) tomlLexStateFn {
-	l.tokens <- token{
-		Position: Position{l.line, l.col},
-		typ:      tokenError,
-		val:      fmt.Sprintf(format, args...),
+	l.tokens <- token.Token{
+		Position: token.Position{l.line, l.col},
+		Typ:      token.Error,
+		Val:      fmt.Sprintf(format, args...),
 	}
 	return nil
 }
@@ -141,7 +147,7 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 			continue
 		}
 
-		if isSpace(next) {
+		if IsSpace(next) {
 			l.skip()
 		}
 
@@ -149,7 +155,7 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 			return l.lexRvalue
 		}
 
-		if isKeyStartChar(next) {
+		if IsKeyStartChar(next) {
 			return l.lexKey
 		}
 
@@ -159,7 +165,7 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 		}
 	}
 
-	l.emit(tokenEOF)
+	l.emit(token.EOF)
 	return nil
 }
 
@@ -209,7 +215,7 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexFalse
 		}
 
-		if isSpace(next) {
+		if IsSpace(next) {
 			l.skip()
 			continue
 		}
@@ -226,66 +232,66 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexDate
 		}
 
-		if next == '+' || next == '-' || isDigit(next) {
+		if next == '+' || next == '-' || IsDigit(next) {
 			return l.lexNumber
 		}
 
-		if isAlphanumeric(next) {
+		if IsAlphanumeric(next) {
 			return l.lexKey
 		}
 
 		return l.errorf("no value can start with %c", next)
 	}
 
-	l.emit(tokenEOF)
+	l.emit(token.EOF)
 	return nil
 }
 
 func (l *tomlLexer) lexLeftCurlyBrace() tomlLexStateFn {
 	l.next()
-	l.emit(tokenLeftCurlyBrace)
+	l.emit(token.LeftCurlyBrace)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexRightCurlyBrace() tomlLexStateFn {
 	l.next()
-	l.emit(tokenRightCurlyBrace)
+	l.emit(token.RightCurlyBrace)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexDate() tomlLexStateFn {
-	l.emit(tokenDate)
+	l.emit(token.Date)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexTrue() tomlLexStateFn {
 	l.fastForward(4)
-	l.emit(tokenTrue)
+	l.emit(token.True)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexFalse() tomlLexStateFn {
 	l.fastForward(5)
-	l.emit(tokenFalse)
+	l.emit(token.False)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexEqual() tomlLexStateFn {
 	l.next()
-	l.emit(tokenEqual)
+	l.emit(token.Equal)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexComma() tomlLexStateFn {
 	l.next()
-	l.emit(tokenComma)
+	l.emit(token.Comma)
 	return l.lexRvalue
 }
 
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	growingString := ""
 
-	for r := l.peek(); isKeyChar(r) || r == '\n' || r == '\r'; r = l.peek() {
+	for r := l.peek(); IsKeyChar(r) || r == '\n' || r == '\r'; r = l.peek() {
 		if r == '"' {
 			l.next()
 			str, err := l.lexStringAsString(`"`, false, true)
@@ -297,15 +303,15 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 			continue
 		} else if r == '\n' {
 			return l.errorf("keys cannot contain new lines")
-		} else if isSpace(r) {
+		} else if IsSpace(r) {
 			break
-		} else if !isValidBareChar(r) {
+		} else if !IsValidBareChar(r) {
 			return l.errorf("keys cannot contain %c character", r)
 		}
 		growingString += string(r)
 		l.next()
 	}
-	l.emitWithValue(tokenKey, growingString)
+	l.emitWithValue(token.Key, growingString)
 	return l.lexVoid
 }
 
@@ -322,7 +328,7 @@ func (l *tomlLexer) lexComment() tomlLexStateFn {
 
 func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
 	l.next()
-	l.emit(tokenLeftBracket)
+	l.emit(token.LeftBracket)
 	return l.lexRvalue
 }
 
@@ -372,7 +378,7 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 		return l.errorf(err.Error())
 	}
 
-	l.emitWithValue(tokenString, str)
+	l.emitWithValue(token.String, str)
 	l.fastForward(len(terminator))
 	l.ignore()
 	return l.lexRvalue
@@ -441,7 +447,7 @@ func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, 
 				code := ""
 				for i := 0; i < 4; i++ {
 					c := l.peek()
-					if !isHexDigit(c) {
+					if !IsHexDigit(c) {
 						return "", errors.New("unfinished unicode escape")
 					}
 					l.next()
@@ -457,7 +463,7 @@ func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, 
 				code := ""
 				for i := 0; i < 8; i++ {
 					c := l.peek()
-					if !isHexDigit(c) {
+					if !IsHexDigit(c) {
 						return "", errors.New("unfinished unicode escape")
 					}
 					l.next()
@@ -510,7 +516,7 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 		return l.errorf(err.Error())
 	}
 
-	l.emitWithValue(tokenString, str)
+	l.emitWithValue(token.String, str)
 	l.fastForward(len(terminator))
 	l.ignore()
 	return l.lexRvalue
@@ -522,11 +528,11 @@ func (l *tomlLexer) lexKeyGroup() tomlLexStateFn {
 	if l.peek() == '[' {
 		// token '[[' signifies an array of anonymous key groups
 		l.next()
-		l.emit(tokenDoubleLeftBracket)
+		l.emit(token.DoubleLeftBracket)
 		return l.lexInsideKeyGroupArray
 	}
 	// vanilla key group
-	l.emit(tokenLeftBracket)
+	l.emit(token.LeftBracket)
 	return l.lexInsideKeyGroup
 }
 
@@ -535,14 +541,14 @@ func (l *tomlLexer) lexInsideKeyGroupArray() tomlLexStateFn {
 		switch r {
 		case ']':
 			if len(l.buffer) > 0 {
-				l.emit(tokenKeyGroupArray)
+				l.emit(token.KeyGroupArray)
 			}
 			l.next()
 			if l.peek() != ']' {
 				break
 			}
 			l.next()
-			l.emit(tokenDoubleRightBracket)
+			l.emit(token.DoubleRightBracket)
 			return l.lexVoid
 		case '[':
 			return l.errorf("group name cannot contain ']'")
@@ -558,10 +564,10 @@ func (l *tomlLexer) lexInsideKeyGroup() tomlLexStateFn {
 		switch r {
 		case ']':
 			if len(l.buffer) > 0 {
-				l.emit(tokenKeyGroup)
+				l.emit(token.KeyGroup)
 			}
 			l.next()
-			l.emit(tokenRightBracket)
+			l.emit(token.RightBracket)
 			return l.lexVoid
 		case '[':
 			return l.errorf("group name cannot contain ']'")
@@ -574,7 +580,7 @@ func (l *tomlLexer) lexInsideKeyGroup() tomlLexStateFn {
 
 func (l *tomlLexer) lexRightBracket() tomlLexStateFn {
 	l.next()
-	l.emit(tokenRightBracket)
+	l.emit(token.RightBracket)
 	return l.lexRvalue
 }
 
@@ -593,7 +599,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 				return l.errorf("cannot have two dots in one float")
 			}
 			l.next()
-			if !isDigit(l.peek()) {
+			if !IsDigit(l.peek()) {
 				return l.errorf("float cannot end with a dot")
 			}
 			pointSeen = true
@@ -604,7 +610,7 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 			if r == '+' || r == '-' {
 				l.next()
 			}
-		} else if isDigit(next) {
+		} else if IsDigit(next) {
 			digitSeen = true
 			l.next()
 		} else if next == '_' {
@@ -621,9 +627,9 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 		return l.errorf("no digit in that number")
 	}
 	if pointSeen || expSeen {
-		l.emit(tokenFloat)
+		l.emit(token.Float)
 	} else {
-		l.emit(tokenInteger)
+		l.emit(token.Integer)
 	}
 	return l.lexRvalue
 }
@@ -640,11 +646,11 @@ func init() {
 }
 
 // Entry point
-func lexToml(input io.Reader) chan token {
+func New(input io.Reader) chan token.Token {
 	bufferedInput := buffruneio.NewReader(input)
 	l := &tomlLexer{
 		input:         bufferedInput,
-		tokens:        make(chan token),
+		tokens:        make(chan token.Token),
 		line:          1,
 		col:           1,
 		endbufferLine: 1,
@@ -652,4 +658,36 @@ func lexToml(input io.Reader) chan token {
 	}
 	go l.run()
 	return l.tokens
+}
+
+func IsSpace(r rune) bool {
+	return r == ' ' || r == '\t'
+}
+
+func IsAlphanumeric(r rune) bool {
+	return unicode.IsLetter(r) || r == '_'
+}
+
+func IsKeyChar(r rune) bool {
+	// Keys start with the first character that isn't whitespace or [ and end
+	// with the last non-whitespace character before the equals sign. Keys
+	// cannot contain a # character."
+	return !(r == '\r' || r == '\n' || r == eof || r == '=')
+}
+
+func IsKeyStartChar(r rune) bool {
+	return !(IsSpace(r) || r == '\r' || r == '\n' || r == eof || r == '[')
+}
+
+func IsDigit(r rune) bool {
+	return unicode.IsNumber(r)
+}
+
+func IsHexDigit(r rune) bool {
+	return IsDigit(r) ||
+		r == 'A' || r == 'B' || r == 'C' || r == 'D' || r == 'E' || r == 'F'
+}
+
+func IsValidBareChar(r rune) bool {
+	return IsAlphanumeric(r) || r == '-' || unicode.IsNumber(r)
 }

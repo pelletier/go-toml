@@ -7,23 +7,26 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/pelletier/go-toml/lexer"
+	"github.com/pelletier/go-toml/token"
 )
 
 type tomlValue struct {
 	value    interface{}
-	position Position
+	position token.Position
 }
 
 // TomlTree is the result of the parsing of a TOML file.
 type TomlTree struct {
 	values   map[string]interface{}
-	position Position
+	position token.Position
 }
 
 func newTomlTree() *TomlTree {
 	return &TomlTree{
 		values:   make(map[string]interface{}),
-		position: Position{},
+		position: token.Position{},
 	}
 }
 
@@ -107,7 +110,7 @@ func (t *TomlTree) GetPath(keys []string) interface{} {
 }
 
 // GetPosition returns the position of the given key.
-func (t *TomlTree) GetPosition(key string) Position {
+func (t *TomlTree) GetPosition(key string) token.Position {
 	if key == "" {
 		return t.position
 	}
@@ -116,7 +119,7 @@ func (t *TomlTree) GetPosition(key string) Position {
 
 // GetPositionPath returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
-func (t *TomlTree) GetPositionPath(keys []string) Position {
+func (t *TomlTree) GetPositionPath(keys []string) token.Position {
 	if len(keys) == 0 {
 		return t.position
 	}
@@ -124,7 +127,7 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 	for _, intermediateKey := range keys[:len(keys)-1] {
 		value, exists := subtree.values[intermediateKey]
 		if !exists {
-			return Position{0, 0}
+			return token.Position{0, 0}
 		}
 		switch node := value.(type) {
 		case *TomlTree:
@@ -132,11 +135,11 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 		case []*TomlTree:
 			// go to most recent element
 			if len(node) == 0 {
-				return Position{0, 0}
+				return token.Position{0, 0}
 			}
 			subtree = node[len(node)-1]
 		default:
-			return Position{0, 0}
+			return token.Position{0, 0}
 		}
 	}
 	// branch based on final node type
@@ -148,11 +151,11 @@ func (t *TomlTree) GetPositionPath(keys []string) Position {
 	case []*TomlTree:
 		// go to most recent element
 		if len(node) == 0 {
-			return Position{0, 0}
+			return token.Position{0, 0}
 		}
 		return node[len(node)-1].position
 	default:
-		return Position{0, 0}
+		return token.Position{0, 0}
 	}
 }
 
@@ -219,7 +222,7 @@ func (t *TomlTree) SetPath(keys []string, value interface{}) {
 // and tree[a][b][c]
 //
 // Returns nil on success, error object on failure
-func (t *TomlTree) createSubTree(keys []string, pos Position) error {
+func (t *TomlTree) createSubTree(keys []string, pos token.Position) error {
 	subtree := t
 	for _, intermediateKey := range keys {
 		nextTree, exists := subtree.values[intermediateKey]
@@ -262,7 +265,7 @@ func LoadReader(reader io.Reader) (tree *TomlTree, err error) {
 			err = errors.New(r.(string))
 		}
 	}()
-	tree = parseToml(lexToml(reader))
+	tree = parseToml(lexer.New(reader))
 	return
 }
 

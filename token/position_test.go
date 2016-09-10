@@ -1,6 +1,6 @@
 // Testing support for go-toml
 
-package toml
+package token
 
 import (
 	"testing"

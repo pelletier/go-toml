@@ -10,6 +10,13 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/pelletier/go-toml/lexer"
+	"github.com/pelletier/go-toml/token"
+)
+
+const (
+	eof = -(iota + 1)
 )
 
 // Lexer state function
@@ -21,7 +28,7 @@ type queryLexer struct {
 	start      int
 	pos        int
 	width      int
-	tokens     chan token
+	tokens     chan token.Token
 	depth      int
 	line       int
 	col        int
@@ -52,20 +59,20 @@ func (l *queryLexer) nextStart() {
 	l.start = l.pos
 }
 
-func (l *queryLexer) emit(t tokenType) {
-	l.tokens <- token{
-		Position: Position{l.line, l.col},
-		typ:      t,
-		val:      l.input[l.start:l.pos],
+func (l *queryLexer) emit(t token.Type) {
+	l.tokens <- token.Token{
+		Position: token.Position{l.line, l.col},
+		Typ:      t,
+		Val:      l.input[l.start:l.pos],
 	}
 	l.nextStart()
 }
 
-func (l *queryLexer) emitWithValue(t tokenType, value string) {
-	l.tokens <- token{
-		Position: Position{l.line, l.col},
-		typ:      t,
-		val:      value,
+func (l *queryLexer) emitWithValue(t token.Type, value string) {
+	l.tokens <- token.Token{
+		Position: token.Position{l.line, l.col},
+		Typ:      t,
+		Val:      value,
 	}
 	l.nextStart()
 }
@@ -90,10 +97,10 @@ func (l *queryLexer) backup() {
 }
 
 func (l *queryLexer) errorf(format string, args ...interface{}) queryLexStateFn {
-	l.tokens <- token{
-		Position: Position{l.line, l.col},
-		typ:      tokenError,
-		val:      fmt.Sprintf(format, args...),
+	l.tokens <- token.Token{
+		Position: token.Position{l.line, l.col},
+		Typ:      token.Error,
+		Val:      fmt.Sprintf(format, args...),
 	}
 	return nil
 }
@@ -122,48 +129,48 @@ func (l *queryLexer) lexVoid() queryLexStateFn {
 		switch next {
 		case '$':
 			l.pos++
-			l.emit(tokenDollar)
+			l.emit(token.Dollar)
 			continue
 		case '.':
 			if l.follow("..") {
 				l.pos += 2
-				l.emit(tokenDotDot)
+				l.emit(token.DotDot)
 			} else {
 				l.pos++
-				l.emit(tokenDot)
+				l.emit(token.Dot)
 			}
 			continue
 		case '[':
 			l.pos++
-			l.emit(tokenLeftBracket)
+			l.emit(token.LeftBracket)
 			continue
 		case ']':
 			l.pos++
-			l.emit(tokenRightBracket)
+			l.emit(token.RightBracket)
 			continue
 		case ',':
 			l.pos++
-			l.emit(tokenComma)
+			l.emit(token.Comma)
 			continue
 		case '*':
 			l.pos++
-			l.emit(tokenStar)
+			l.emit(token.Star)
 			continue
 		case '(':
 			l.pos++
-			l.emit(tokenLeftParen)
+			l.emit(token.LeftParen)
 			continue
 		case ')':
 			l.pos++
-			l.emit(tokenRightParen)
+			l.emit(token.RightParen)
 			continue
 		case '?':
 			l.pos++
-			l.emit(tokenQuestion)
+			l.emit(token.Question)
 			continue
 		case ':':
 			l.pos++
-			l.emit(tokenColon)
+			l.emit(token.Colon)
 			continue
 		case '\'':
 			l.ignore()
@@ -175,17 +182,17 @@ func (l *queryLexer) lexVoid() queryLexStateFn {
 			return l.lexString
 		}
 
-		if isSpace(next) {
+		if lexer.IsSpace(next) {
 			l.next()
 			l.ignore()
 			continue
 		}
 
-		if isAlphanumeric(next) {
+		if lexer.IsAlphanumeric(next) {
 			return l.lexKey
 		}
 
-		if next == '+' || next == '-' || isDigit(next) {
+		if next == '+' || next == '-' || lexer.IsDigit(next) {
 			return l.lexNumber
 		}
 
@@ -195,15 +202,15 @@ func (l *queryLexer) lexVoid() queryLexStateFn {
 
 		return l.errorf("unexpected char: '%v'", next)
 	}
-	l.emit(tokenEOF)
+	l.emit(token.EOF)
 	return nil
 }
 
 func (l *queryLexer) lexKey() queryLexStateFn {
 	for {
 		next := l.peek()
-		if !isAlphanumeric(next) {
-			l.emit(tokenKey)
+		if !lexer.IsAlphanumeric(next) {
+			l.emit(token.Key)
 			return l.lexVoid
 		}
 
@@ -211,7 +218,7 @@ func (l *queryLexer) lexKey() queryLexStateFn {
 			break
 		}
 	}
-	l.emit(tokenEOF)
+	l.emit(token.EOF)
 	return nil
 }
 
@@ -222,7 +229,7 @@ func (l *queryLexer) lexString() queryLexStateFn {
 
 	for {
 		if l.follow(l.stringTerm) {
-			l.emitWithValue(tokenString, growingString)
+			l.emitWithValue(token.String, growingString)
 			l.pos++
 			l.ignore()
 			return l.lexVoid
@@ -261,7 +268,7 @@ func (l *queryLexer) lexString() queryLexStateFn {
 			for i := 0; i < 4; i++ {
 				c := l.peek()
 				l.pos++
-				if !isHexDigit(c) {
+				if !lexer.IsHexDigit(c) {
 					return l.errorf("unfinished unicode escape")
 				}
 				code = code + string(c)
@@ -278,7 +285,7 @@ func (l *queryLexer) lexString() queryLexStateFn {
 			for i := 0; i < 8; i++ {
 				c := l.peek()
 				l.pos++
-				if !isHexDigit(c) {
+				if !lexer.IsHexDigit(c) {
 					return l.errorf("unfinished unicode escape")
 				}
 				code = code + string(c)
@@ -317,11 +324,11 @@ func (l *queryLexer) lexNumber() queryLexStateFn {
 			if pointSeen {
 				return l.errorf("cannot have two dots in one float")
 			}
-			if !isDigit(l.peek()) {
+			if !lexer.IsDigit(l.peek()) {
 				return l.errorf("float cannot end with a dot")
 			}
 			pointSeen = true
-		} else if isDigit(next) {
+		} else if lexer.IsDigit(next) {
 			digitSeen = true
 		} else {
 			l.backup()
@@ -336,18 +343,18 @@ func (l *queryLexer) lexNumber() queryLexStateFn {
 		return l.errorf("no digit in that number")
 	}
 	if pointSeen {
-		l.emit(tokenFloat)
+		l.emit(token.Float)
 	} else {
-		l.emit(tokenInteger)
+		l.emit(token.Integer)
 	}
 	return l.lexVoid
 }
 
 // Entry point
-func lexQuery(input string) chan token {
+func lexQuery(input string) chan token.Token {
 	l := &queryLexer{
 		input:  input,
-		tokens: make(chan token),
+		tokens: make(chan token.Token),
 		line:   1,
 		col:    1,
 	}

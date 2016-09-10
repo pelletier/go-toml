@@ -2,6 +2,8 @@ package toml
 
 import (
 	"time"
+
+	"github.com/pelletier/go-toml/token"
 )
 
 // NodeFilterFn represents a user-defined filter function, for use with
@@ -18,11 +20,11 @@ type NodeFilterFn func(node interface{}) bool
 // QueryResult is the result of Executing a Query.
 type QueryResult struct {
 	items     []interface{}
-	positions []Position
+	positions []token.Position
 }
 
 // appends a value/position pair to the result set.
-func (r *QueryResult) appendResult(node interface{}, pos Position) {
+func (r *QueryResult) appendResult(node interface{}, pos token.Position) {
 	r.items = append(r.items, node)
 	r.positions = append(r.positions, pos)
 }
@@ -45,7 +47,7 @@ func (r QueryResult) Values() []interface{} {
 
 // Positions is a set of positions for values within a QueryResult.  Each index
 // in Positions() corresponds to the entry in Value() of the same index.
-func (r QueryResult) Positions() []Position {
+func (r QueryResult) Positions() []token.Position {
 	return r.positions
 }
 
@@ -53,7 +55,7 @@ func (r QueryResult) Positions() []Position {
 type queryContext struct {
 	result       *QueryResult
 	filters      *map[string]NodeFilterFn
-	lastPosition Position
+	lastPosition token.Position
 }
 
 // generic path functor interface
@@ -98,7 +100,7 @@ func CompileQuery(path string) (*Query, error) {
 func (q *Query) Execute(tree *TomlTree) *QueryResult {
 	result := &QueryResult{
 		items:     []interface{}{},
-		positions: []Position{},
+		positions: []token.Position{},
 	}
 	if q.root == nil {
 		result.appendResult(tree, tree.GetPosition(""))

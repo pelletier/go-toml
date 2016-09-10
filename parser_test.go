@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/pelletier/go-toml/token"
 )
 
 func assertSubTree(t *testing.T, path []string, tree *TomlTree, err error, ref map[string]interface{}) {
@@ -45,7 +46,7 @@ func assertTree(t *testing.T, tree *TomlTree, err error, ref map[string]interfac
 
 func TestCreateSubTree(t *testing.T) {
 	tree := newTomlTree()
-	tree.createSubTree([]string{"a", "b", "c"}, Position{})
+	tree.createSubTree([]string{"a", "b", "c"}, token.Position{})
 	tree.Set("a.b.c", 42)
 	if tree.Get("a.b.c") != 42 {
 		t.Fail()
@@ -658,7 +659,7 @@ func TestToString(t *testing.T) {
 	}
 }
 
-func assertPosition(t *testing.T, text string, ref map[string]Position) {
+func assertPosition(t *testing.T, text string, ref map[string]token.Position) {
 	tree, err := Load(text)
 	if err != nil {
 		t.Errorf("Error loading document text: `%v`", text)
@@ -677,7 +678,7 @@ func assertPosition(t *testing.T, text string, ref map[string]Position) {
 func TestDocumentPositions(t *testing.T) {
 	assertPosition(t,
 		"[foo]\nbar=42\nbaz=69",
-		map[string]Position{
+		map[string]token.Position{
 			"":        {1, 1},
 			"foo":     {1, 1},
 			"foo.bar": {2, 1},
@@ -688,7 +689,7 @@ func TestDocumentPositions(t *testing.T) {
 func TestDocumentPositionsWithSpaces(t *testing.T) {
 	assertPosition(t,
 		"  [foo]\n  bar=42\n  baz=69",
-		map[string]Position{
+		map[string]token.Position{
 			"":        {1, 1},
 			"foo":     {1, 3},
 			"foo.bar": {2, 3},
@@ -699,7 +700,7 @@ func TestDocumentPositionsWithSpaces(t *testing.T) {
 func TestDocumentPositionsWithGroupArray(t *testing.T) {
 	assertPosition(t,
 		"[[foo]]\nbar=42\nbaz=69",
-		map[string]Position{
+		map[string]token.Position{
 			"":        {1, 1},
 			"foo":     {1, 1},
 			"foo.bar": {2, 1},
@@ -710,7 +711,7 @@ func TestDocumentPositionsWithGroupArray(t *testing.T) {
 func TestNestedTreePosition(t *testing.T) {
 	assertPosition(t,
 		"[foo.bar]\na=42\nb=69",
-		map[string]Position{
+		map[string]token.Position{
 			"":          {1, 1},
 			"foo":       {1, 1},
 			"foo.bar":   {1, 1},
