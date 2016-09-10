@@ -35,6 +35,7 @@ go build -o toml-test github.com/BurntSushi/toml-test
 mkdir -p src/github.com/pelletier/go-toml/cmd
 cp *.go *.toml src/github.com/pelletier/go-toml
 cp -R cmd/* src/github.com/pelletier/go-toml/cmd
+cp -R token lexer src/github.com/pelletier/go-toml/
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
 # Run basic unit tests

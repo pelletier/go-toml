@@ -9,13 +9,15 @@ package toml
 
 import (
 	"fmt"
+
+	"github.com/pelletier/go-toml/token"
 )
 
 const maxInt = int(^uint(0) >> 1)
 
 type queryParser struct {
-	flow         chan token
-	tokensBuffer []token
+	flow         chan token.Token
+	tokensBuffer []token.Token
 	query        *Query
 	union        []pathFn
 	err          error
@@ -24,7 +26,7 @@ type queryParser struct {
 type queryParserStateFn func() queryParserStateFn
 
 // Formats and panics an error message based on a token
-func (p *queryParser) parseError(tok *token, msg string, args ...interface{}) queryParserStateFn {
+func (p *queryParser) parseError(tok *token.Token, msg string, args ...interface{}) queryParserStateFn {
 	p.err = fmt.Errorf(tok.Position.String()+": "+msg, args...)
 	return nil // trigger parse to end
 }
@@ -35,11 +37,11 @@ func (p *queryParser) run() {
 	}
 }
 
-func (p *queryParser) backup(tok *token) {
+func (p *queryParser) backup(tok *token.Token) {
 	p.tokensBuffer = append(p.tokensBuffer, *tok)
 }
 
-func (p *queryParser) peek() *token {
+func (p *queryParser) peek() *token.Token {
 	if len(p.tokensBuffer) != 0 {
 		return &(p.tokensBuffer[0])
 	}
@@ -52,9 +54,9 @@ func (p *queryParser) peek() *token {
 	return &tok
 }
 
-func (p *queryParser) lookahead(types ...tokenType) bool {
+func (p *queryParser) lookahead(types ...token.Type) bool {
 	result := true
-	buffer := []token{}
+	buffer := []token.Token{}
 
 	for _, typ := range types {
 		tok := p.getToken()
@@ -63,7 +65,7 @@ func (p *queryParser) lookahead(types ...tokenType) bool {
 			break
 		}
 		buffer = append(buffer, *tok)
-		if tok.typ != typ {
+		if tok.Typ != typ {
 			result = false
 			break
 		}
@@ -73,7 +75,7 @@ func (p *queryParser) lookahead(types ...tokenType) bool {
 	return result
 }
 
-func (p *queryParser) getToken() *token {
+func (p *queryParser) getToken() *token.Token {
 	if len(p.tokensBuffer) != 0 {
 		tok := p.tokensBuffer[0]
 		p.tokensBuffer = p.tokensBuffer[1:]
@@ -89,11 +91,11 @@ func (p *queryParser) getToken() *token {
 func (p *queryParser) parseStart() queryParserStateFn {
 	tok := p.getToken()
 
-	if tok == nil || tok.typ == tokenEOF {
+	if tok == nil || tok.Typ == token.EOF {
 		return nil
 	}
 
-	if tok.typ != tokenDollar {
+	if tok.Typ != token.Dollar {
 		return p.parseError(tok, "Expected '$' at start of expression")
 	}
 
@@ -103,55 +105,55 @@ func (p *queryParser) parseStart() queryParserStateFn {
 // handle '.' prefix, '[]', and '..'
 func (p *queryParser) parseMatchExpr() queryParserStateFn {
 	tok := p.getToken()
-	switch tok.typ {
-	case tokenDotDot:
+	switch tok.Typ {
+	case token.DotDot:
 		p.query.appendPath(&matchRecursiveFn{})
 		// nested parse for '..'
 		tok := p.getToken()
-		switch tok.typ {
-		case tokenKey:
-			p.query.appendPath(newMatchKeyFn(tok.val))
+		switch tok.Typ {
+		case token.Key:
+			p.query.appendPath(newMatchKeyFn(tok.Val))
 			return p.parseMatchExpr
-		case tokenLeftBracket:
+		case token.LeftBracket:
 			return p.parseBracketExpr
-		case tokenStar:
+		case token.Star:
 			// do nothing - the recursive predicate is enough
 			return p.parseMatchExpr
 		}
 
-	case tokenDot:
+	case token.Dot:
 		// nested parse for '.'
 		tok := p.getToken()
-		switch tok.typ {
-		case tokenKey:
-			p.query.appendPath(newMatchKeyFn(tok.val))
+		switch tok.Typ {
+		case token.Key:
+			p.query.appendPath(newMatchKeyFn(tok.Val))
 			return p.parseMatchExpr
-		case tokenStar:
+		case token.Star:
 			p.query.appendPath(&matchAnyFn{})
 			return p.parseMatchExpr
 		}
 
-	case tokenLeftBracket:
+	case token.LeftBracket:
 		return p.parseBracketExpr
 
-	case tokenEOF:
+	case token.EOF:
 		return nil // allow EOF at this stage
 	}
 	return p.parseError(tok, "expected match expression")
 }
 
 func (p *queryParser) parseBracketExpr() queryParserStateFn {
-	if p.lookahead(tokenInteger, tokenColon) {
+	if p.lookahead(token.Integer, token.Colon) {
 		return p.parseSliceExpr
 	}
-	if p.peek().typ == tokenColon {
+	if p.peek().Typ == token.Colon {
 		return p.parseSliceExpr
 	}
 	return p.parseUnionExpr
 }
 
 func (p *queryParser) parseUnionExpr() queryParserStateFn {
-	var tok *token
+	var tok *token.Token
 
 	// this state can be traversed after some sub-expressions
 	// so be careful when setting up state in the parser
@@ -164,29 +166,29 @@ loop: // labeled loop for easy breaking
 		if len(p.union) > 0 {
 			// parse delimiter or terminator
 			tok = p.getToken()
-			switch tok.typ {
-			case tokenComma:
+			switch tok.Typ {
+			case token.Comma:
 				// do nothing
-			case tokenRightBracket:
+			case token.RightBracket:
 				break loop
 			default:
-				return p.parseError(tok, "expected ',' or ']', not '%s'", tok.val)
+				return p.parseError(tok, "expected ',' or ']', not '%s'", tok.Val)
 			}
 		}
 
 		// parse sub expression
 		tok = p.getToken()
-		switch tok.typ {
-		case tokenInteger:
+		switch tok.Typ {
+		case token.Integer:
 			p.union = append(p.union, newMatchIndexFn(tok.Int()))
-		case tokenKey:
-			p.union = append(p.union, newMatchKeyFn(tok.val))
-		case tokenString:
-			p.union = append(p.union, newMatchKeyFn(tok.val))
-		case tokenQuestion:
+		case token.Key:
+			p.union = append(p.union, newMatchKeyFn(tok.Val))
+		case token.String:
+			p.union = append(p.union, newMatchKeyFn(tok.Val))
+		case token.Question:
 			return p.parseFilterExpr
 		default:
-			return p.parseError(tok, "expected union sub expression, not '%s', %d", tok.val, len(p.union))
+			return p.parseError(tok, "expected union sub expression, not '%s', %d", tok.Val, len(p.union))
 		}
 	}
 
@@ -207,38 +209,38 @@ func (p *queryParser) parseSliceExpr() queryParserStateFn {
 
 	// parse optional start
 	tok := p.getToken()
-	if tok.typ == tokenInteger {
+	if tok.Typ == token.Integer {
 		start = tok.Int()
 		tok = p.getToken()
 	}
-	if tok.typ != tokenColon {
+	if tok.Typ != token.Colon {
 		return p.parseError(tok, "expected ':'")
 	}
 
 	// parse optional end
 	tok = p.getToken()
-	if tok.typ == tokenInteger {
+	if tok.Typ == token.Integer {
 		end = tok.Int()
 		tok = p.getToken()
 	}
-	if tok.typ == tokenRightBracket {
+	if tok.Typ == token.RightBracket {
 		p.query.appendPath(newMatchSliceFn(start, end, step))
 		return p.parseMatchExpr
 	}
-	if tok.typ != tokenColon {
+	if tok.Typ != token.Colon {
 		return p.parseError(tok, "expected ']' or ':'")
 	}
 
 	// parse optional step
 	tok = p.getToken()
-	if tok.typ == tokenInteger {
+	if tok.Typ == token.Integer {
 		step = tok.Int()
 		if step < 0 {
 			return p.parseError(tok, "step must be a positive value")
 		}
 		tok = p.getToken()
 	}
-	if tok.typ != tokenRightBracket {
+	if tok.Typ != token.RightBracket {
 		return p.parseError(tok, "expected ']'")
 	}
 
@@ -248,26 +250,26 @@ func (p *queryParser) parseSliceExpr() queryParserStateFn {
 
 func (p *queryParser) parseFilterExpr() queryParserStateFn {
 	tok := p.getToken()
-	if tok.typ != tokenLeftParen {
+	if tok.Typ != token.LeftParen {
 		return p.parseError(tok, "expected left-parenthesis for filter expression")
 	}
 	tok = p.getToken()
-	if tok.typ != tokenKey && tok.typ != tokenString {
+	if tok.Typ != token.Key && tok.Typ != token.String {
 		return p.parseError(tok, "expected key or string for filter funciton name")
 	}
-	name := tok.val
+	name := tok.Val
 	tok = p.getToken()
-	if tok.typ != tokenRightParen {
+	if tok.Typ != token.RightParen {
 		return p.parseError(tok, "expected right-parenthesis for filter expression")
 	}
 	p.union = append(p.union, newMatchFilterFn(name, tok.Position))
 	return p.parseUnionExpr
 }
 
-func parseQuery(flow chan token) (*Query, error) {
+func parseQuery(flow chan token.Token) (*Query, error) {
 	parser := &queryParser{
 		flow:         flow,
-		tokensBuffer: []token{},
+		tokensBuffer: []token.Token{},
 		query:        newQuery(),
 	}
 	parser.run()

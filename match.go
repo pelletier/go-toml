@@ -2,6 +2,8 @@ package toml
 
 import (
 	"fmt"
+
+	"github.com/pelletier/go-toml/token"
 )
 
 // support function to set positions for tomlValues
@@ -197,11 +199,11 @@ func (f *matchRecursiveFn) call(node interface{}, ctx *queryContext) {
 // match based on an externally provided functional filter
 type matchFilterFn struct {
 	matchBase
-	Pos  Position
+	Pos  token.Position
 	Name string
 }
 
-func newMatchFilterFn(name string, pos Position) *matchFilterFn {
+func newMatchFilterFn(name string, pos token.Position) *matchFilterFn {
 	return &matchFilterFn{Name: name, Pos: pos}
 }
 
