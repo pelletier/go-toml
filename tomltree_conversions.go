@@ -100,11 +100,41 @@ func (t *TomlTree) toToml(indent, keyspace string) string {
 				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
 			}
 			result += sub.toToml(indent+"  ", combinedKey)
+		case map[string]string:
+			sub := TreeFromMap(convertMapStringString(node))
+
+			if len(sub.Keys()) > 0 {
+				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
+			}
+			result += sub.toToml(indent+"  ", combinedKey)
+		case map[interface{}]interface{}:
+			sub := TreeFromMap(convertMapInterfaceInterface(node))
+
+			if len(sub.Keys()) > 0 {
+				result += fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
+			}
+			result += sub.toToml(indent+"  ", combinedKey)
 		case *tomlValue:
 			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(node.value, 0))
 		default:
 			result += fmt.Sprintf("%s%s = %s\n", indent, k, toTomlValue(v, 0))
 		}
+	}
+	return result
+}
+
+func convertMapStringString(in map[string]string) map[string]interface{} {
+	result := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		result[k] = v
+	}
+	return result
+}
+
+func convertMapInterfaceInterface(in map[interface{}]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		result[k.(string)] = v
 	}
 	return result
 }

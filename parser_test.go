@@ -658,6 +658,28 @@ func TestToString(t *testing.T) {
 	}
 }
 
+func TestToStringMapStringString(t *testing.T) {
+	in := map[string]interface{}{"m": map[string]string{"v": "abc"}}
+	want := "\n[m]\n  v = \"abc\"\n"
+	tree := TreeFromMap(in)
+	got := tree.String()
+
+	if got != want {
+		t.Errorf("want:\n%q\ngot:\n%q", want, got)
+	}
+}
+
+func TestToStringMapInterfaceInterface(t *testing.T) {
+	in := map[string]interface{}{"m": map[interface{}]interface{}{"v": "abc"}}
+	want := "\n[m]\n  v = \"abc\"\n"
+	tree := TreeFromMap(in)
+	got := tree.String()
+
+	if got != want {
+		t.Errorf("want:\n%q\ngot:\n%q", want, got)
+	}
+}
+
 func assertPosition(t *testing.T, text string, ref map[string]Position) {
 	tree, err := Load(text)
 	if err != nil {
