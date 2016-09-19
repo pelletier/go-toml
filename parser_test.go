@@ -627,7 +627,17 @@ func TestToTomlValue(t *testing.T) {
 		Value  interface{}
 		Expect string
 	}{
+		{int(1), "1"},
+		{int8(2), "2"},
+		{int16(3), "3"},
+		{int32(4), "4"},
 		{int64(12345), "12345"},
+		{uint(10), "10"},
+		{uint8(20), "20"},
+		{uint16(30), "30"},
+		{uint32(40), "40"},
+		{uint64(50), "50"},
+		{float32(12.456), "12.456"},
 		{float64(123.45), "123.45"},
 		{bool(true), "true"},
 		{"hello world", "\"hello world\""},
