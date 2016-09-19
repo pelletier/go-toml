@@ -64,6 +64,8 @@ func toTomlValue(item interface{}, indent int) string {
 			result += toTomlValue(item, indent+2) + ",\n"
 		}
 		return result + tab + "]"
+	case nil:
+		return ""
 	default:
 		panic(fmt.Sprintf("unsupported value type: %v", value))
 	}
