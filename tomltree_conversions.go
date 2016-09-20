@@ -45,8 +45,28 @@ func encodeTomlString(value string) string {
 func toTomlValue(item interface{}, indent int) string {
 	tab := strings.Repeat(" ", indent)
 	switch value := item.(type) {
+	case int:
+		return tab + strconv.FormatInt(int64(value), 10)
+	case int8:
+		return tab + strconv.FormatInt(int64(value), 10)
+	case int16:
+		return tab + strconv.FormatInt(int64(value), 10)
+	case int32:
+		return tab + strconv.FormatInt(int64(value), 10)
 	case int64:
 		return tab + strconv.FormatInt(value, 10)
+	case uint:
+		return tab + strconv.FormatUint(uint64(value), 10)
+	case uint8:
+		return tab + strconv.FormatUint(uint64(value), 10)
+	case uint16:
+		return tab + strconv.FormatUint(uint64(value), 10)
+	case uint32:
+		return tab + strconv.FormatUint(uint64(value), 10)
+	case uint64:
+		return tab + strconv.FormatUint(value, 10)
+	case float32:
+		return tab + strconv.FormatFloat(float64(value), 'f', -1, 32)
 	case float64:
 		return tab + strconv.FormatFloat(value, 'f', -1, 64)
 	case string:
@@ -65,7 +85,7 @@ func toTomlValue(item interface{}, indent int) string {
 		}
 		return result + tab + "]"
 	default:
-		panic(fmt.Sprintf("unsupported value type: %v", value))
+		panic(fmt.Sprintf("unsupported value type %T: %v", value, value))
 	}
 }
 
