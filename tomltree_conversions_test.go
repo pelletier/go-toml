@@ -101,3 +101,35 @@ func TestTomlTreeConversionToMapWithTablesInMultipleChunks(t *testing.T) {
 
 	testMaps(t, treeMap, expected)
 }
+
+func TestTomlTreeConversionToMapWithArrayOfInlineTables(t *testing.T) {
+	tree, _ := Load(`
+    	[params]
+	language_tabs = [
+    		{ key = "shell", name = "Shell" },
+    		{ key = "ruby", name = "Ruby" },
+    		{ key = "python", name = "Python" }
+	]`)
+
+	expected := map[string]interface{}{
+		"params": map[string]interface{}{
+			"language_tabs": []interface{}{
+				map[string]interface{}{
+					"key": "shell",
+					"name": "Shell",
+				},
+				map[string]interface{}{
+					"key": "ruby",
+					"name": "Ruby",
+				},
+				map[string]interface{}{
+					"key": "python",
+					"name": "Python",
+				},
+			},
+		},
+	}
+
+	treeMap := tree.ToMap()
+	testMaps(t, treeMap, expected)
+}
