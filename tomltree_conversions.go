@@ -92,7 +92,7 @@ func toTomlValue(item interface{}, indent int) string {
 }
 
 // Recursive support function for ToString()
-// Outputs a tree, using the provided keyspace to prefix group names
+// Outputs a tree, using the provided keyspace to prefix table names
 func (t *TomlTree) toToml(indent, keyspace string) string {
 	resultChunks := []string{}
 	for k, v := range t.values {
