@@ -3,6 +3,7 @@
 package toml
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -224,7 +225,7 @@ var numberUnderscoreInvalidRegexp *regexp.Regexp
 
 func cleanupNumberToken(value string) (string, error) {
 	if numberUnderscoreInvalidRegexp.MatchString(value) {
-		return "", fmt.Errorf("invalid use of _ in number")
+		return "", errors.New("invalid use of _ in number")
 	}
 	cleanedVal := strings.Replace(value, "_", "", -1)
 	return cleanedVal, nil
