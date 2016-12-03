@@ -56,7 +56,7 @@ func TestNestedQuotedUnicodeKeyGroup(t *testing.T) {
 func TestUnclosedKeyGroup(t *testing.T) {
 	testFlow(t, "[hello world", []token{
 		{Position{1, 1}, tokenLeftBracket, "["},
-		{Position{1, 2}, tokenError, "unclosed key group"},
+		{Position{1, 2}, tokenError, "unclosed table key"},
 	})
 }
 

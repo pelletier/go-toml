@@ -2,9 +2,9 @@ package toml
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 )
 
 func TestTomlTreeConversionToString(t *testing.T) {
@@ -47,15 +47,14 @@ func TestTomlTreeConversionToStringKeysOrders(t *testing.T) {
 		r := strings.NewReader(stringRepr)
 		toml, err := LoadReader(r)
 
-
 		if err != nil {
 			t.Fatal("Unexpected error:", err)
 		}
 
 		assertTree(t, toml, err, map[string]interface{}{
 			"foobar": true,
-			"bar": "baz",
-			"foo": 1,
+			"bar":    "baz",
+			"foo":    1,
 			"qux": map[string]interface{}{
 				"foo": 1,
 				"bar": "baz2",
@@ -151,15 +150,15 @@ func TestTomlTreeConversionToMapWithArrayOfInlineTables(t *testing.T) {
 		"params": map[string]interface{}{
 			"language_tabs": []interface{}{
 				map[string]interface{}{
-					"key": "shell",
+					"key":  "shell",
 					"name": "Shell",
 				},
 				map[string]interface{}{
-					"key": "ruby",
+					"key":  "ruby",
 					"name": "Ruby",
 				},
 				map[string]interface{}{
-					"key": "python",
+					"key":  "python",
 					"name": "Python",
 				},
 			},

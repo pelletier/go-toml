@@ -47,7 +47,7 @@ func parseKey(key string) ([]string, error) {
 			} else {
 				if !wasInQuotes {
 					if buffer.Len() == 0 {
-						return nil, fmt.Errorf("empty key group")
+						return nil, fmt.Errorf("empty table key")
 					}
 					groups = append(groups, buffer.String())
 					buffer.Reset()
