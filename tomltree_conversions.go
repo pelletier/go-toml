@@ -79,11 +79,11 @@ func toTomlValue(item interface{}, indent int) string {
 	case time.Time:
 		return tab + value.Format(time.RFC3339)
 	case []interface{}:
-		result := tab + "[\n"
+		values := []string{}
 		for _, item := range value {
-			result += toTomlValue(item, indent+2) + ",\n"
+			values = append(values, toTomlValue(item, 0))
 		}
-		return result + tab + "]"
+		return "[" + strings.Join(values, ",") + "]"
 	case nil:
 		return ""
 	default:

@@ -646,7 +646,7 @@ func TestToTomlValue(t *testing.T) {
 		{time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
 			"1979-05-27T07:32:00Z"},
 		{[]interface{}{"gamma", "delta"},
-			"[\n  \"gamma\",\n  \"delta\",\n]"},
+			"[\"gamma\",\"delta\"]"},
 		{nil, ""},
 	} {
 		result := toTomlValue(item.Value, 0)
