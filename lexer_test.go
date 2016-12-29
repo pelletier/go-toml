@@ -264,6 +264,24 @@ func TestMultilineArrayComments(t *testing.T) {
 	})
 }
 
+func TestNestedArraysComment(t *testing.T) {
+	toml := `
+someArray = [
+# does not work
+["entry1"]
+]`
+	testFlow(t, toml, []token{
+		{Position{2, 1}, tokenKey, "someArray"},
+		{Position{2, 11}, tokenEqual, "="},
+		{Position{2, 13}, tokenLeftBracket, "["},
+		{Position{4, 1}, tokenLeftBracket, "["},
+		{Position{4, 3}, tokenString, "entry1"},
+		{Position{4, 10}, tokenRightBracket, "]"},
+		{Position{5, 1}, tokenRightBracket, "]"},
+		{Position{5, 2}, tokenEOF, ""},
+	})
+}
+
 func TestKeyEqualArrayBools(t *testing.T) {
 	testFlow(t, "foo = [true, false, true]", []token{
 		{Position{1, 1}, tokenKey, "foo"},

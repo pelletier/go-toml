@@ -283,6 +283,17 @@ func TestArrayNested(t *testing.T) {
 	})
 }
 
+func TestNestedArrayComment(t *testing.T) {
+	tree, err := Load(`
+someArray = [
+# does not work
+["entry1"]
+]`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"someArray": [][]string{{"entry1"}},
+	})
+}
+
 func TestNestedEmptyArrays(t *testing.T) {
 	tree, err := Load("a = [[[]]]")
 	assertTree(t, tree, err, map[string]interface{}{
