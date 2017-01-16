@@ -673,7 +673,10 @@ func TestToString(t *testing.T) {
 		t.Errorf("Test failed to parse: %v", err)
 		return
 	}
-	result := tree.ToString()
+	result, err := tree.ToString()
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
 	expected := "\n[foo]\n\n  [[foo.bar]]\n    a = 42\n\n  [[foo.bar]]\n    a = 69\n"
 	if result != expected {
 		t.Errorf("Expected got '%s', expected '%s'", result, expected)

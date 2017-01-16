@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,7 +16,8 @@ points = { x = 1, y = 2 }`)
 		t.Fatal("Unexpected error:", err)
 	}
 
-	reparsedTree, err := Load(toml.ToString())
+	tomlString, _ := toml.ToString()
+	reparsedTree, err := Load(tomlString)
 
 	assertTree(t, reparsedTree, err, map[string]interface{}{
 		"name": map[string]interface{}{
@@ -39,7 +41,7 @@ func TestTomlTreeConversionToStringKeysOrders(t *testing.T) {
 		  foo = 1
 		  bar = "baz2"`)
 
-		stringRepr := tree.ToString()
+		stringRepr, _ := tree.ToString()
 
 		t.Log("Intermediate string representation:")
 		t.Log(stringRepr)
@@ -66,6 +68,19 @@ func TestTomlTreeConversionToStringKeysOrders(t *testing.T) {
 func testMaps(t *testing.T, actual, expected map[string]interface{}) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatal("trees aren't equal.\n", "Expected:\n", expected, "\nActual:\n", actual)
+	}
+}
+
+func TestToStringTypeConversionError(t *testing.T) {
+	tree := TomlTree{
+		values: map[string]interface{}{
+			"thing": []string{"unsupported"},
+		},
+	}
+	_, err := tree.ToString()
+	expected := errors.New("unsupported value type []string: [unsupported]")
+	if err.Error() != expected.Error() {
+		t.Errorf("expecting error %s, but got %s instead", expected, err)
 	}
 }
 
