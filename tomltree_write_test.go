@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"testing"
-
-	"github.com/kylelemons/godebug/diff"
 )
 
 func TestTomlTreeWriteExample(t *testing.T) {
@@ -23,9 +21,8 @@ func TestTomlTreeWriteExample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if d := diff.Diff(string(want), buf.String()); d != "" {
-		t.Log("Diff:")
-		t.Fatal(d)
+	if !bytes.Equal(want, buf.Bytes()) {
+		t.Fatalf("Got:\n%s\n\nWant:\n%s", buf.Bytes(), want)
 	}
 }
 
