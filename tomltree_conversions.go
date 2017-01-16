@@ -203,7 +203,7 @@ func (t *TomlTree) String() string {
 
 // ToMap recursively generates a representation of the current tree using map[string]interface{}.
 func (t *TomlTree) ToMap() map[string]interface{} {
-	result := map[string]interface{}{}
+	result := make(map[string]interface{}, len(t.values))
 
 	for k, v := range t.values {
 		switch node := v.(type) {
@@ -220,6 +220,8 @@ func (t *TomlTree) ToMap() map[string]interface{} {
 			result[k] = sub.ToMap()
 		case *tomlValue:
 			result[k] = node.value
+		default:
+			result[k] = node
 		}
 	}
 
