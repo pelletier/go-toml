@@ -165,6 +165,15 @@ func (t *TomlTree) GetDefault(key string, def interface{}) interface{} {
 	return val
 }
 
+// GetDefaultPath works like GetPath but with a default value
+func (t *TomlTree) GetDefaultPath(keys []string, def interface{}) interface{} {
+	val := t.GetPath(keys)
+	if val == nil {
+		return def
+	}
+	return val
+}
+
 // Set an element in the tree.
 // Key is a dot-separated path (e.g. a.b.c).
 // Creates all necessary intermediates trees, if needed.
