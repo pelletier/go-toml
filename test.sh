@@ -19,6 +19,9 @@ function git_clone() {
   popd
 }
 
+# Run go vet
+go vet ./...
+
 go get github.com/pelletier/go-buffruneio
 go get github.com/davecgh/go-spew/spew
 
