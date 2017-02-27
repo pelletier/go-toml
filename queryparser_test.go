@@ -359,16 +359,16 @@ func TestQueryFilterFn(t *testing.T) {
 		"$..[?(int)]",
 		[]interface{}{
 			queryTestNode{
-				int64(8001), Position{13, 1},
+				int64(8001), Position{10, 3},
 			},
 			queryTestNode{
-				int64(8001), Position{13, 1},
+				int64(8001), Position{10, 3},
 			},
 			queryTestNode{
-				int64(8002), Position{13, 1},
+				int64(8002), Position{10, 3},
 			},
 			queryTestNode{
-				int64(5000), Position{14, 1},
+				int64(5000), Position{8, 3},
 			},
 		})
 
@@ -376,32 +376,32 @@ func TestQueryFilterFn(t *testing.T) {
 		"$..[?(string)]",
 		[]interface{}{
 			queryTestNode{
-				"TOML Example", Position{3, 1},
+				"TOML Example", Position{2, 1},
 			},
 			queryTestNode{
-				"Tom Preston-Werner", Position{6, 1},
-			},
-			queryTestNode{
-				"GitHub", Position{7, 1},
+				"192.168.1.1", Position{11, 3},
 			},
 			queryTestNode{
 				"GitHub Cofounder & CEO\nLikes tater tots and beer.",
-				Position{8, 1},
+				Position{14, 3},
 			},
 			queryTestNode{
-				"192.168.1.1", Position{12, 1},
+				"Tom Preston-Werner", Position{16, 3},
 			},
 			queryTestNode{
-				"10.0.0.1", Position{21, 3},
+				"GitHub", Position{17, 3},
 			},
 			queryTestNode{
-				"eqdc10", Position{22, 3},
+				"eqdc10", Position{23, 5},
 			},
 			queryTestNode{
-				"10.0.0.2", Position{25, 3},
+				"10.0.0.1", Position{24, 5},
 			},
 			queryTestNode{
-				"eqdc10", Position{26, 3},
+				"eqdc10", Position{27, 5},
+			},
+			queryTestNode{
+				"10.0.0.2", Position{28, 5},
 			},
 		})
 
@@ -417,11 +417,11 @@ func TestQueryFilterFn(t *testing.T) {
 		[]interface{}{
 			queryTestNode{
 				map[string]interface{}{
-					"name":         "Tom Preston-Werner",
-					"organization": "GitHub",
-					"bio":          "GitHub Cofounder & CEO\nLikes tater tots and beer.",
-					"dob":          tv,
-				}, Position{5, 1},
+					"data": []interface{}{
+						[]interface{}{"gamma", "delta"},
+						[]interface{}{int64(1), int64(2)},
+					},
+				}, Position{4, 1},
 			},
 			queryTestNode{
 				map[string]interface{}{
@@ -429,7 +429,15 @@ func TestQueryFilterFn(t *testing.T) {
 					"ports":          []interface{}{int64(8001), int64(8001), int64(8002)},
 					"connection_max": int64(5000),
 					"enabled":        true,
-				}, Position{11, 1},
+				}, Position{7, 1},
+			},
+			queryTestNode{
+				map[string]interface{}{
+					"name":         "Tom Preston-Werner",
+					"organization": "GitHub",
+					"bio":          "GitHub Cofounder & CEO\nLikes tater tots and beer.",
+					"dob":          tv,
+				}, Position{13, 1},
 			},
 			queryTestNode{
 				map[string]interface{}{
@@ -441,27 +449,19 @@ func TestQueryFilterFn(t *testing.T) {
 						"ip": "10.0.0.2",
 						"dc": "eqdc10",
 					},
-				}, Position{17, 1},
+				}, Position{19, 1},
 			},
 			queryTestNode{
 				map[string]interface{}{
 					"ip": "10.0.0.1",
 					"dc": "eqdc10",
-				}, Position{20, 3},
+				}, Position{22, 3},
 			},
 			queryTestNode{
 				map[string]interface{}{
 					"ip": "10.0.0.2",
 					"dc": "eqdc10",
-				}, Position{24, 3},
-			},
-			queryTestNode{
-				map[string]interface{}{
-					"data": []interface{}{
-						[]interface{}{"gamma", "delta"},
-						[]interface{}{int64(1), int64(2)},
-					},
-				}, Position{28, 1},
+				}, Position{26, 3},
 			},
 		})
 
@@ -469,7 +469,7 @@ func TestQueryFilterFn(t *testing.T) {
 		"$..[?(time)]",
 		[]interface{}{
 			queryTestNode{
-				tv, Position{9, 1},
+				tv, Position{15, 3},
 			},
 		})
 
@@ -477,7 +477,7 @@ func TestQueryFilterFn(t *testing.T) {
 		"$..[?(bool)]",
 		[]interface{}{
 			queryTestNode{
-				true, Position{15, 1},
+				true, Position{9, 3},
 			},
 		})
 }
