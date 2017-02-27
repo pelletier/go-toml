@@ -19,11 +19,11 @@ function git_clone() {
   popd
 }
 
-go get github.com/pelletier/go-buffruneio
-go get github.com/davecgh/go-spew/spew
-
 # Run go vet
 go vet ./...
+
+go get github.com/pelletier/go-buffruneio
+go get github.com/davecgh/go-spew/spew
 
 # get code for BurntSushi TOML validation
 # pinning all to 'HEAD' for version 0.3.x work (TODO: pin to commit hash when tests stabilize)
