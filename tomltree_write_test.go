@@ -1,14 +1,46 @@
 package toml
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestTomlTreeConversionToString(t *testing.T) {
+type failingWriter struct {
+	failAt  int
+	written int
+	buffer  bytes.Buffer
+}
+
+func (f failingWriter) Write(p []byte) (n int, err error) {
+	count := len(p)
+	toWrite := f.failAt - count + f.written
+	if toWrite < 0 {
+		toWrite = 0
+	}
+	if toWrite > count {
+		f.written += count
+		f.buffer.WriteString(string(p))
+		return count, nil
+	}
+
+	f.buffer.WriteString(string(p[:toWrite]))
+	f.written = f.failAt
+	return f.written, fmt.Errorf("failingWriter failed after writting %d bytes", f.written)
+}
+
+func assertErrorString(t *testing.T, expected string, err error) {
+	expectedErr := errors.New(expected)
+	if err.Error() != expectedErr.Error() {
+		t.Errorf("expecting error %s, but got %s instead", expected, err)
+	}
+}
+
+func TestTomlTreeWriteToTomlString(t *testing.T) {
 	toml, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
 points = { x = 1, y = 2 }`)
 
@@ -16,7 +48,7 @@ points = { x = 1, y = 2 }`)
 		t.Fatal("Unexpected error:", err)
 	}
 
-	tomlString, _ := toml.ToString()
+	tomlString, _ := toml.ToTomlString()
 	reparsedTree, err := Load(tomlString)
 
 	assertTree(t, reparsedTree, err, map[string]interface{}{
@@ -31,7 +63,23 @@ points = { x = 1, y = 2 }`)
 	})
 }
 
-func TestTomlTreeConversionToStringKeysOrders(t *testing.T) {
+func TestTomlTreeWriteToTomlStringSimple(t *testing.T) {
+	tree, err := Load("[foo]\n\n[[foo.bar]]\na = 42\n\n[[foo.bar]]\na = 69\n")
+	if err != nil {
+		t.Errorf("Test failed to parse: %v", err)
+		return
+	}
+	result, err := tree.ToTomlString()
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	expected := "\n[foo]\n\n  [[foo.bar]]\n    a = 42\n\n  [[foo.bar]]\n    a = 69\n"
+	if result != expected {
+		t.Errorf("Expected got '%s', expected '%s'", result, expected)
+	}
+}
+
+func TestTomlTreeWriteToTomlStringKeysOrders(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		tree, _ := Load(`
 		foobar = true
@@ -41,7 +89,7 @@ func TestTomlTreeConversionToStringKeysOrders(t *testing.T) {
 		  foo = 1
 		  bar = "baz2"`)
 
-		stringRepr, _ := tree.ToString()
+		stringRepr, _ := tree.ToTomlString()
 
 		t.Log("Intermediate string representation:")
 		t.Log(stringRepr)
@@ -71,20 +119,20 @@ func testMaps(t *testing.T, actual, expected map[string]interface{}) {
 	}
 }
 
-func TestToStringTypeConversionError(t *testing.T) {
+func TestToTomlStringTypeConversionError(t *testing.T) {
 	tree := TomlTree{
 		values: map[string]interface{}{
-			"thing": []string{"unsupported"},
+			"thing": &tomlValue{[]string{"unsupported"}, Position{}},
 		},
 	}
-	_, err := tree.ToString()
+	_, err := tree.ToTomlString()
 	expected := errors.New("unsupported value type []string: [unsupported]")
 	if err.Error() != expected.Error() {
 		t.Errorf("expecting error %s, but got %s instead", expected, err)
 	}
 }
 
-func TestTomlTreeConversionToMapSimple(t *testing.T) {
+func TestTomlTreeWriteToMapSimple(t *testing.T) {
 	tree, _ := Load("a = 42\nb = 17")
 
 	expected := map[string]interface{}{
@@ -95,7 +143,58 @@ func TestTomlTreeConversionToMapSimple(t *testing.T) {
 	testMaps(t, tree.ToMap(), expected)
 }
 
-func TestTomlTreeConversionToMapExampleFile(t *testing.T) {
+func TestTomlTreeWriteToInvalidTreeSimpleValue(t *testing.T) {
+	tree := TomlTree{values: map[string]interface{}{"foo": int8(1)}}
+	_, err := tree.ToTomlString()
+	assertErrorString(t, "invalid key type at foo: int8", err)
+}
+
+func TestTomlTreeWriteToInvalidTreeTomlValue(t *testing.T) {
+	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{int8(1), Position{}}}}
+	_, err := tree.ToTomlString()
+	assertErrorString(t, "unsupported value type int8: 1", err)
+}
+
+func TestTomlTreeWriteToInvalidTreeTomlValueArray(t *testing.T) {
+	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{[]interface{}{int8(1)}, Position{}}}}
+	_, err := tree.ToTomlString()
+	assertErrorString(t, "unsupported value type int8: 1", err)
+}
+
+func TestTomlTreeWriteToFailingWriterInSimpleValue(t *testing.T) {
+	toml, _ := Load(`a = 2`)
+	writer := failingWriter{failAt: 0, written: 0}
+	_, err := toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 0 bytes", err)
+}
+
+func TestTomlTreeWriteToFailingWriterInTable(t *testing.T) {
+	toml, _ := Load(`
+[b]
+a = 2`)
+	writer := failingWriter{failAt: 2, written: 0}
+	_, err := toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 2 bytes", err)
+
+	writer = failingWriter{failAt: 13, written: 0}
+	_, err = toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 13 bytes", err)
+}
+
+func TestTomlTreeWriteToFailingWriterInArray(t *testing.T) {
+	toml, _ := Load(`
+[[b]]
+a = 2`)
+	writer := failingWriter{failAt: 2, written: 0}
+	_, err := toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 2 bytes", err)
+
+	writer = failingWriter{failAt: 15, written: 0}
+	_, err = toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 15 bytes", err)
+}
+
+func TestTomlTreeWriteToMapExampleFile(t *testing.T) {
 	tree, _ := LoadFile("example.toml")
 	expected := map[string]interface{}{
 		"title": "TOML Example",
@@ -131,7 +230,7 @@ func TestTomlTreeConversionToMapExampleFile(t *testing.T) {
 	testMaps(t, tree.ToMap(), expected)
 }
 
-func TestTomlTreeConversionToMapWithTablesInMultipleChunks(t *testing.T) {
+func TestTomlTreeWriteToMapWithTablesInMultipleChunks(t *testing.T) {
 	tree, _ := Load(`
 	[[menu.main]]
         a = "menu 1"
@@ -152,7 +251,7 @@ func TestTomlTreeConversionToMapWithTablesInMultipleChunks(t *testing.T) {
 	testMaps(t, treeMap, expected)
 }
 
-func TestTomlTreeConversionToMapWithArrayOfInlineTables(t *testing.T) {
+func TestTomlTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
 	tree, _ := Load(`
     	[params]
 	language_tabs = [
