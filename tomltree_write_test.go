@@ -28,9 +28,7 @@ func (f failingWriter) Write(p []byte) (n int, err error) {
 		return count, nil
 	}
 
-	fmt.Println("p:", string(p), "size:", len(p), "toWrite:", toWrite)
 	f.buffer.WriteString(string(p[:toWrite]))
-	fmt.Println("BUFFER:", f.buffer.String())
 	f.written = f.failAt
 	return f.written, fmt.Errorf("failingWriter failed after writting %d bytes", f.written)
 }
