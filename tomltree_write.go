@@ -93,7 +93,11 @@ func (t *TomlTree) writeTo(w io.Writer, indent, keyspace string, bytesCount int6
 	sort.Strings(complexValuesKeys)
 
 	for _, k := range simpleValuesKeys {
-		v := t.values[k].(*tomlValue)
+		v, ok := t.values[k].(*tomlValue)
+		if !ok {
+			return bytesCount, fmt.Errorf("invalid key type at %s: %T", k, t.values[k])
+		}
+
 		repr, err := tomlValueStringRepresentation(v.value)
 		if err != nil {
 			return bytesCount, err
@@ -116,6 +120,7 @@ func (t *TomlTree) writeTo(w io.Writer, indent, keyspace string, bytesCount int6
 		}
 
 		switch node := v.(type) {
+		// node has to be of those two types given how keys are sorted above
 		case *TomlTree:
 			tableName := fmt.Sprintf("\n%s[%s]\n", indent, combinedKey)
 			writtenBytesCount, err := w.Write([]byte(tableName))
@@ -143,8 +148,6 @@ func (t *TomlTree) writeTo(w io.Writer, indent, keyspace string, bytesCount int6
 					}
 				}
 			}
-		default:
-			return bytesCount, fmt.Errorf("unhandled key type %T at key %s", v, combinedKey)
 		}
 	}
 

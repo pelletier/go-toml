@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+func assertErrorString(t *testing.T, expected string, err error) {
+	expectedErr := errors.New(expected)
+	if err.Error() != expectedErr.Error() {
+		t.Errorf("expecting error %s, but got %s instead", expected, err)
+	}
+}
+
 func TestTomlTreeWriteToTomlString(t *testing.T) {
 	toml, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
 points = { x = 1, y = 2 }`)
@@ -109,6 +116,24 @@ func TestTomlTreeWriteToMapSimple(t *testing.T) {
 	}
 
 	testMaps(t, tree.ToMap(), expected)
+}
+
+func TestTomlTreeWriteToInvalidTreeSimpleValue(t *testing.T) {
+	tree := TomlTree{values: map[string]interface{}{"foo": int8(1)}}
+	_, err := tree.ToTomlString()
+	assertErrorString(t, "invalid key type at foo: int8", err)
+}
+
+func TestTomlTreeWriteToInvalidTreeTomlValue(t *testing.T) {
+	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{int8(1), Position{}}}}
+	_, err := tree.ToTomlString()
+	assertErrorString(t, "unsupported value type int8: 1", err)
+}
+
+func TestTomlTreeWriteToInvalidTreeTomlValueArray(t *testing.T) {
+	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{[]interface{}{int8(1)}, Position{}}}}
+	_, err := tree.ToTomlString()
+	assertErrorString(t, "unsupported value type int8: 1", err)
 }
 
 func TestTomlTreeWriteToMapExampleFile(t *testing.T) {
