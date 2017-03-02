@@ -1,12 +1,39 @@
 package toml
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+type failingWriter struct {
+	failAt  int
+	written int
+	buffer  bytes.Buffer
+}
+
+func (f failingWriter) Write(p []byte) (n int, err error) {
+	count := len(p)
+	toWrite := f.failAt - count + f.written
+	if toWrite < 0 {
+		toWrite = 0
+	}
+	if toWrite > count {
+		f.written += count
+		f.buffer.WriteString(string(p))
+		return count, nil
+	}
+
+	fmt.Println("p:", string(p), "size:", len(p), "toWrite:", toWrite)
+	f.buffer.WriteString(string(p[:toWrite]))
+	fmt.Println("BUFFER:", f.buffer.String())
+	f.written = f.failAt
+	return f.written, fmt.Errorf("failingWriter failed after writting %d bytes", f.written)
+}
 
 func assertErrorString(t *testing.T, expected string, err error) {
 	expectedErr := errors.New(expected)
@@ -134,6 +161,39 @@ func TestTomlTreeWriteToInvalidTreeTomlValueArray(t *testing.T) {
 	tree := TomlTree{values: map[string]interface{}{"foo": &tomlValue{[]interface{}{int8(1)}, Position{}}}}
 	_, err := tree.ToTomlString()
 	assertErrorString(t, "unsupported value type int8: 1", err)
+}
+
+func TestTomlTreeWriteToFailingWriterInSimpleValue(t *testing.T) {
+	toml, _ := Load(`a = 2`)
+	writer := failingWriter{failAt: 0, written: 0}
+	_, err := toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 0 bytes", err)
+}
+
+func TestTomlTreeWriteToFailingWriterInTable(t *testing.T) {
+	toml, _ := Load(`
+[b]
+a = 2`)
+	writer := failingWriter{failAt: 2, written: 0}
+	_, err := toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 2 bytes", err)
+
+	writer = failingWriter{failAt: 13, written: 0}
+	_, err = toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 13 bytes", err)
+}
+
+func TestTomlTreeWriteToFailingWriterInArray(t *testing.T) {
+	toml, _ := Load(`
+[[b]]
+a = 2`)
+	writer := failingWriter{failAt: 2, written: 0}
+	_, err := toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 2 bytes", err)
+
+	writer = failingWriter{failAt: 15, written: 0}
+	_, err = toml.WriteTo(writer)
+	assertErrorString(t, "failingWriter failed after writting 15 bytes", err)
 }
 
 func TestTomlTreeWriteToMapExampleFile(t *testing.T) {
