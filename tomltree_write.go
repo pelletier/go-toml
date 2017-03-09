@@ -201,9 +201,6 @@ func (t *TomlTree) ToMap() map[string]interface{} {
 			result[k] = array
 		case *TomlTree:
 			result[k] = node.ToMap()
-		case map[string]interface{}:
-			sub := TreeFromMap(node)
-			result[k] = sub.ToMap()
 		case *tomlValue:
 			result[k] = node.value
 		}
