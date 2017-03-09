@@ -37,6 +37,7 @@ func TestTomlTreeCreateToTree(t *testing.T) {
 	data := map[string]interface{}{
 		"a_string": "bar",
 		"an_int":   42,
+		"time":     time.Now(),
 		"int8":     int8(2),
 		"int16":    int16(2),
 		"int32":    int32(2),
@@ -51,6 +52,8 @@ func TestTomlTreeCreateToTree(t *testing.T) {
 		"array":       []string{"a", "b", "c"},
 		"array_uint":  []uint{uint(1), uint(2)},
 		"array_table": []map[string]interface{}{map[string]interface{}{"sub_map": 52}},
+		"array_times": []time.Time{time.Now(), time.Now()},
+		"map_times":   map[string]time.Time{"now": time.Now()},
 	}
 	tree, err := TreeFromMap(data)
 	if err != nil {

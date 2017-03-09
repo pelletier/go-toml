@@ -33,11 +33,7 @@ func TreeFromMap(m map[string]interface{}) (*TomlTree, error) {
 	if err != nil {
 		return nil, err
 	}
-	tomlTree, ok := result.(*TomlTree)
-	if !ok {
-		return nil, fmt.Errorf("top level of a TomlTree needs to be a map")
-	}
-	return tomlTree, nil
+	return result.(*TomlTree), nil
 }
 
 // Has returns a boolean indicating if the given key exists.
