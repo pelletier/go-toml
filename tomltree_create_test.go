@@ -58,3 +58,35 @@ func TestTomlTreeCreateToTree(t *testing.T) {
 	}
 	validateTree(t, tree)
 }
+
+func TestTomlTreeCreateToTreeInvalidLeafType(t *testing.T) {
+	_, err := TreeFromMap(map[string]interface{}{"foo": t})
+	expected := "cannot convert type *testing.T to TomlTree"
+	if err.Error() != expected {
+		t.Fatalf("expected error %s, got %s", expected, err.Error())
+	}
+}
+
+func TestTomlTreeCreateToTreeInvalidMapKeyType(t *testing.T) {
+	_, err := TreeFromMap(map[string]interface{}{"foo": map[int]interface{}{2: 1}})
+	expected := "map key needs to be a string, not int"
+	if err.Error() != expected {
+		t.Fatalf("expected error %s, got %s", expected, err.Error())
+	}
+}
+
+func TestTomlTreeCreateToTreeInvalidArrayMemberType(t *testing.T) {
+	_, err := TreeFromMap(map[string]interface{}{"foo": []*testing.T{t}})
+	expected := "cannot convert type *testing.T to TomlTree"
+	if err.Error() != expected {
+		t.Fatalf("expected error %s, got %s", expected, err.Error())
+	}
+}
+
+func TestTomlTreeCreateToTreeInvalidTableGroupType(t *testing.T) {
+	_, err := TreeFromMap(map[string]interface{}{"foo": []map[string]interface{}{map[string]interface{}{"hello": t}}})
+	expected := "cannot convert type *testing.T to TomlTree"
+	if err.Error() != expected {
+		t.Fatalf("expected error %s, got %s", expected, err.Error())
+	}
+}

@@ -58,14 +58,12 @@ func sliceToTree(object interface{}) (interface{}, error) {
 	// collection of simple values, which is represented by one
 	// *tomlValue, or an array of tables, which is represented by an
 	// array of *TomlTree.
+
+	// holding the assumption that this function is called from toTree only when value.Kind() is Array or Slice
 	value := reflect.ValueOf(object)
-	if value.Kind() != reflect.Slice && value.Kind() != reflect.Array {
-		return nil, fmt.Errorf("type %T is not a slice or an array", object)
-	}
 	insideType := value.Type().Elem()
 	length := value.Len()
-	switch insideType.Kind() {
-	case reflect.Map:
+	if insideType.Kind() == reflect.Map {
 		// this is considered as an array of tables
 		tablesArray := make([]*TomlTree, 0, length)
 		for i := 0; i < length; i++ {
@@ -77,24 +75,24 @@ func sliceToTree(object interface{}) (interface{}, error) {
 			tablesArray = append(tablesArray, tree.(*TomlTree))
 		}
 		return tablesArray, nil
-	case reflect.Bool, reflect.String, reflect.Float32, reflect.Float64,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-
-		arrayValue := reflect.MakeSlice(reflect.SliceOf(kindToTypeMapping[insideType.Kind()]), 0, length)
-
-		for i := 0; i < length; i++ {
-			val := value.Index(i).Interface()
-			simpleValue, err := simpleValueCoercion(val)
-			if err != nil {
-				return nil, err
-			}
-			arrayValue = reflect.Append(arrayValue, reflect.ValueOf(simpleValue))
-		}
-		return &tomlValue{arrayValue.Interface(), Position{}}, nil
-	default:
-		return nil, fmt.Errorf("array cannot contain type %s", insideType)
 	}
+
+	sliceType := kindToTypeMapping[insideType.Kind()]
+	if sliceType == nil {
+		sliceType = insideType
+	}
+
+	arrayValue := reflect.MakeSlice(reflect.SliceOf(sliceType), 0, length)
+
+	for i := 0; i < length; i++ {
+		val := value.Index(i).Interface()
+		simpleValue, err := simpleValueCoercion(val)
+		if err != nil {
+			return nil, err
+		}
+		arrayValue = reflect.Append(arrayValue, reflect.ValueOf(simpleValue))
+	}
+	return &tomlValue{arrayValue.Interface(), Position{}}, nil
 }
 
 func toTree(object interface{}) (interface{}, error) {
