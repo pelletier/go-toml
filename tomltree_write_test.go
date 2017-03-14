@@ -146,7 +146,7 @@ func TestTomlTreeWriteToMapSimple(t *testing.T) {
 func TestTomlTreeWriteToInvalidTreeSimpleValue(t *testing.T) {
 	tree := TomlTree{values: map[string]interface{}{"foo": int8(1)}}
 	_, err := tree.ToTomlString()
-	assertErrorString(t, "invalid key type at foo: int8", err)
+	assertErrorString(t, "invalid value type at foo: int8", err)
 }
 
 func TestTomlTreeWriteToInvalidTreeTomlValue(t *testing.T) {
