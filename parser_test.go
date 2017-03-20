@@ -674,6 +674,27 @@ func TestToStringMapStringString(t *testing.T) {
 	}
 }
 
+func TestToRoundTripArrayOfTables(t *testing.T) {
+	orig := "\n[[stuff]]\n  name = \"foo\"\n"
+	tree, err := Load(orig)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	m := tree.ToMap()
+	tree, err = TreeFromMap(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	want := orig
+	got := tree.String()
+
+	if got != want {
+		t.Errorf("want:\n%q\ngot:\n%q", want, got)
+	}
+}
+
 func assertPosition(t *testing.T, text string, ref map[string]Position) {
 	tree, err := Load(text)
 	if err != nil {
