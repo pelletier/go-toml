@@ -104,9 +104,10 @@ func toTree(object interface{}) (interface{}, error) {
 		values := map[string]interface{}{}
 		keys := value.MapKeys()
 		for _, key := range keys {
-			k, ok := key.Interface().(string)
-			if !ok {
-				return nil, fmt.Errorf("map key needs to be a string, not %T", key.Interface())
+			if key.Kind() != reflect.String {
+				if _, ok := key.Interface().(string); !ok {
+					return nil, fmt.Errorf("map key needs to be a string, not %T (%v)", key.Interface(), key.Kind())
+				}
 			}
 
 			v := value.MapIndex(key)
@@ -114,7 +115,7 @@ func toTree(object interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			values[k] = newValue
+			values[key.String()] = newValue
 		}
 		return &TomlTree{values, Position{}}, nil
 	}
