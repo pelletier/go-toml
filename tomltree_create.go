@@ -48,6 +48,8 @@ func simpleValueCoercion(object interface{}) (interface{}, error) {
 		return uint64(original), nil
 	case float32:
 		return float64(original), nil
+	case fmt.Stringer:
+		return original.String(), nil
 	default:
 		return nil, fmt.Errorf("cannot convert type %T to TomlTree", object)
 	}
