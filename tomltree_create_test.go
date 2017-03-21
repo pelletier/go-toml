@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+type customString string
+
+type stringer struct{}
+
+func (s stringer) String() string {
+	return "stringer"
+}
+
 func validate(t *testing.T, path string, object interface{}) {
 	switch o := object.(type) {
 	case *TomlTree:
@@ -46,14 +54,16 @@ func TestTomlTreeCreateToTree(t *testing.T) {
 		"uint32":   uint32(2),
 		"float32":  float32(2),
 		"a_bool":   false,
+		"stringer": stringer{},
 		"nested": map[string]interface{}{
 			"foo": "bar",
 		},
-		"array":       []string{"a", "b", "c"},
-		"array_uint":  []uint{uint(1), uint(2)},
-		"array_table": []map[string]interface{}{map[string]interface{}{"sub_map": 52}},
-		"array_times": []time.Time{time.Now(), time.Now()},
-		"map_times":   map[string]time.Time{"now": time.Now()},
+		"array":                 []string{"a", "b", "c"},
+		"array_uint":            []uint{uint(1), uint(2)},
+		"array_table":           []map[string]interface{}{map[string]interface{}{"sub_map": 52}},
+		"array_times":           []time.Time{time.Now(), time.Now()},
+		"map_times":             map[string]time.Time{"now": time.Now()},
+		"custom_string_map_key": map[customString]interface{}{customString("custom"): "custom"},
 	}
 	tree, err := TreeFromMap(data)
 	if err != nil {
@@ -72,7 +82,7 @@ func TestTomlTreeCreateToTreeInvalidLeafType(t *testing.T) {
 
 func TestTomlTreeCreateToTreeInvalidMapKeyType(t *testing.T) {
 	_, err := TreeFromMap(map[string]interface{}{"foo": map[int]interface{}{2: 1}})
-	expected := "map key needs to be a string, not int"
+	expected := "map key needs to be a string, not int (int)"
 	if err.Error() != expected {
 		t.Fatalf("expected error %s, got %s", expected, err.Error())
 	}
