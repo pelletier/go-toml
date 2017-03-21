@@ -103,3 +103,25 @@ func TestTomlTreeCreateToTreeInvalidTableGroupType(t *testing.T) {
 		t.Fatalf("expected error %s, got %s", expected, err.Error())
 	}
 }
+
+func TestRoundTripArrayOfTables(t *testing.T) {
+	orig := "\n[[stuff]]\n  name = \"foo\"\n"
+	tree, err := Load(orig)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	m := tree.ToMap()
+
+	tree, err = TreeFromMap(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	want := orig
+	got := tree.String()
+
+	if got != want {
+		t.Errorf("want:\n%q\ngot:\n%q", want, got)
+	}
+}
