@@ -105,7 +105,7 @@ func TestTomlTreeCreateToTreeInvalidTableGroupType(t *testing.T) {
 }
 
 func TestRoundTripArrayOfTables(t *testing.T) {
-	orig := "\n[[stuff]]\n  name = \"foo\"\n"
+	orig := "\n[[stuff]]\n  name = \"foo\"\n  things = [\"a\",\"b\"]\n"
 	tree, err := Load(orig)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -117,11 +117,10 @@ func TestRoundTripArrayOfTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-
 	want := orig
 	got := tree.String()
 
 	if got != want {
-		t.Errorf("want:\n%q\ngot:\n%q", want, got)
+		t.Errorf("want:\n%s\ngot:\n%s", want, got)
 	}
 }
