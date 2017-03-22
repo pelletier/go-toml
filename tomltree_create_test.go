@@ -3,6 +3,7 @@ package toml
 import (
 	"testing"
 	"time"
+	"strconv"
 )
 
 type customString string
@@ -21,20 +22,19 @@ func validate(t *testing.T, path string, object interface{}) {
 		}
 	case []*TomlTree:
 		for index, tree := range o {
-			validate(t, path+"."+string(index), tree)
+			validate(t, path+"."+strconv.Itoa(index), tree)
 		}
 	case *tomlValue:
 		switch o.value.(type) {
 		case int64, uint64, bool, string, float64, time.Time,
 			[]int64, []uint64, []bool, []string, []float64, []time.Time:
-			return // ok
 		default:
 			t.Fatalf("tomlValue at key %s containing incorrect type %T", path, o.value)
 		}
 	default:
 		t.Fatalf("value at key %s is of incorrect type %T", path, object)
 	}
-	t.Log("validation ok", path)
+	t.Logf("validation ok %s as %T", path, object)
 }
 
 func validateTree(t *testing.T, tree *TomlTree) {
