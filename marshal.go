@@ -9,14 +9,12 @@ import (
 
 // Marshal ...
 func Marshal(v interface{}) ([]byte, error) {
-	vt := reflect.TypeOf(v)
-	if vt.Kind() != reflect.Struct {
+	styp := reflect.TypeOf(v)
+	if styp.Kind() != reflect.Struct {
 		return []byte{}, errors.New("Only a Struct can be marshaled to TOML")
 	}
-	vv := reflect.ValueOf(v)
-	t := newTomlTree()
-	path := []string{}
-	err := reflectTreeFromStruct(vt, vv, t, path)
+	sval := reflect.ValueOf(v)
+	t, err := reflectTreeFromStruct(styp, sval)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -24,22 +22,44 @@ func Marshal(v interface{}) ([]byte, error) {
 	return []byte(s), err
 }
 
-func reflectTreeFromStruct(vt reflect.Type, vv reflect.Value, t *TomlTree, path []string) error {
-	for i := 0; i < vt.NumField(); i++ {
-		vtf, vvf := vt.Field(i), vv.Field(i)
-		keys := append(path, tomlName(vtf))
-		err := reflectTreeFromValue(vtf.Type, vvf, t, keys)
+func reflectTreeFromStruct(styp reflect.Type, sval reflect.Value) (*TomlTree, error) {
+	t := newTomlTree()
+	for i := 0; i < styp.NumField(); i++ {
+		stypf, svalf := styp.Field(i), sval.Field(i)
+		val, err := reflectTreeFromValue(stypf.Type, svalf)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		t.Set(tomlName(stypf), val)
 	}
-	return nil
+	return t, nil
 }
 
-func reflectTreeFromValue(vt reflect.Type, vv reflect.Value, t *TomlTree, path []string) error {
-	switch vt.Kind() {
+func reflectTreeFromBasicSlice(styp reflect.Type, sval reflect.Value) ([]interface{}, error) {
+	t := make([]interface{}, sval.Len(), sval.Len())
+	for i := 0; i < sval.Len(); i++ {
+		t[i] = sval.Index(i).Interface()
+	}
+	return t, nil
+}
+
+func reflectTreeFromStructSlice(styp reflect.Type, sval reflect.Value) ([]*TomlTree, error) {
+	t := make([]*TomlTree, sval.Len(), sval.Len())
+	for i := 0; i < sval.Len(); i++ {
+		val, err := reflectTreeFromStruct(styp.Elem(), sval.Index(i))
+		if err != nil {
+			return nil, err
+		}
+		t[i] = val
+	}
+	return t, nil
+}
+
+func reflectTreeFromValue(styp reflect.Type, sval reflect.Value) (interface{}, error) {
+	var val interface{}
+	switch styp.Kind() {
 	case reflect.Bool:
-		t.SetPath(path, vv.Bool())
+		val = sval.Bool()
 	case reflect.Int:
 		fallthrough
 	case reflect.Int8:
@@ -49,7 +69,7 @@ func reflectTreeFromValue(vt reflect.Type, vv reflect.Value, t *TomlTree, path [
 	case reflect.Int32:
 		fallthrough
 	case reflect.Int64:
-		t.SetPath(path, vv.Int())
+		val = sval.Int()
 	case reflect.Uint:
 		fallthrough
 	case reflect.Uint8:
@@ -59,50 +79,55 @@ func reflectTreeFromValue(vt reflect.Type, vv reflect.Value, t *TomlTree, path [
 	case reflect.Uint32:
 		fallthrough
 	case reflect.Uint64:
-		t.SetPath(path, vv.Uint())
+		val = sval.Uint()
 	case reflect.Float32:
 		fallthrough
 	case reflect.Float64:
-		t.SetPath(path, vv.Float())
+		val = sval.Float()
 	case reflect.String:
-		t.SetPath(path, vv.String())
+		val = sval.String()
 	case reflect.Struct:
-		reflectTreeFromStruct(vt, vv, t, path)
-	case reflect.Map:
-		fallthrough
+		return reflectTreeFromStruct(styp, sval)
 	case reflect.Slice:
+		if styp.Elem().Kind() == reflect.Struct {
+			return reflectTreeFromStructSlice(styp, sval)
+		} else {
+			return reflectTreeFromBasicSlice(styp, sval)
+		}
+	case reflect.Map:
 		fallthrough
 	case reflect.Array:
 		fallthrough
 	default:
-		return fmt.Errorf("Marshal can't handle %v(%v)", vt, vt.Kind())
+		return nil, fmt.Errorf("Marshal can't handle %v(%v)", styp, styp.Kind())
 	}
-	return nil
+	return val, nil
 }
 
 //Unmarshal ...
 func Unmarshal(data []byte, v interface{}) error {
-	vt := reflect.TypeOf(v)
-	if vt.Kind() != reflect.Ptr || vt.Elem().Kind() != reflect.Struct {
+	styp := reflect.TypeOf(v)
+	if styp.Kind() != reflect.Ptr || styp.Elem().Kind() != reflect.Struct {
 		return errors.New("Only a pointer to Struct can be unmarshaled from TOML")
 	}
-	vv := reflect.ValueOf(v)
+	sval := reflect.ValueOf(v)
 
 	t, err := Load(string(data))
 	if err != nil {
 		return err
 	}
 
-	return reflectTreeToStruct(vt.Elem(), vv.Elem(), t, []string{})
+	return reflectTreeToStruct(styp.Elem(), sval.Elem(), t)
 }
 
-func reflectTreeToStruct(vt reflect.Type, vv reflect.Value, t *TomlTree, path []string) error {
-	for i := 0; i < vt.NumField(); i++ {
-		vtf, vvf := vt.Field(i), vv.Field(i)
-		keys := append(path, tomlName(vtf))
-		exists := t.HasPath(keys)
+func reflectTreeToStruct(styp reflect.Type, sval reflect.Value, t *TomlTree) error {
+	for i := 0; i < styp.NumField(); i++ {
+		stypf, svalf := styp.Field(i), sval.Field(i)
+		key := tomlName(stypf)
+		exists := t.Has(key)
 		if exists {
-			err := reflectTreeToValue(vtf.Type, vvf, t, keys)
+			val := t.Get(key)
+			err := reflectTreeToValue(stypf.Type, svalf, val)
 			if err != nil {
 				return err
 			}
@@ -111,10 +136,34 @@ func reflectTreeToStruct(vt reflect.Type, vv reflect.Value, t *TomlTree, path []
 	return nil
 }
 
-func reflectTreeToValue(vt reflect.Type, vv reflect.Value, t *TomlTree, path []string) error {
-	switch vt.Kind() {
+func reflectTreeToBasicSlice(styp reflect.Type, sval reflect.Value, slc []interface{}) error {
+	sval.Set(reflect.MakeSlice(styp, len(slc), len(slc)))
+	for i := 0; i < len(slc); i++ {
+		svalf := sval.Index(i)
+		err := reflectTreeToValue(styp.Elem(), svalf, slc[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func reflectTreeToStructSlice(styp reflect.Type, sval reflect.Value, slc []*TomlTree) error {
+	sval.Set(reflect.MakeSlice(styp, len(slc), len(slc)))
+	for i := 0; i < len(slc); i++ {
+		svalf := sval.Index(i)
+		err := reflectTreeToStruct(styp.Elem(), svalf, slc[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func reflectTreeToValue(styp reflect.Type, sval reflect.Value, val interface{}) error {
+	switch styp.Kind() {
 	case reflect.Bool:
-		vv.SetBool(t.GetPath(path).(bool))
+		sval.SetBool(val.(bool))
 	case reflect.Int:
 		fallthrough
 	case reflect.Int8:
@@ -124,7 +173,7 @@ func reflectTreeToValue(vt reflect.Type, vv reflect.Value, t *TomlTree, path []s
 	case reflect.Int32:
 		fallthrough
 	case reflect.Int64:
-		vv.SetInt(t.GetPath(path).(int64))
+		sval.SetInt(val.(int64))
 	case reflect.Uint:
 		fallthrough
 	case reflect.Uint8:
@@ -134,18 +183,23 @@ func reflectTreeToValue(vt reflect.Type, vv reflect.Value, t *TomlTree, path []s
 	case reflect.Uint32:
 		fallthrough
 	case reflect.Uint64:
-		vv.SetUint(t.GetPath(path).(uint64))
+		sval.SetUint(val.(uint64))
 	case reflect.Float32:
 		fallthrough
 	case reflect.Float64:
-		vv.SetFloat(t.GetPath(path).(float64))
+		sval.SetFloat(val.(float64))
 	case reflect.String:
-		vv.SetString(t.GetPath(path).(string))
+		sval.SetString(val.(string))
 	case reflect.Struct:
-		reflectTreeToStruct(vt, vv, t, path)
-	case reflect.Map:
-		fallthrough
+		reflectTreeToStruct(styp, sval, val.(*TomlTree))
 	case reflect.Slice:
+		switch val.(type) {
+		case []*TomlTree:
+			reflectTreeToStructSlice(styp, sval, val.([]*TomlTree))
+		default:
+			reflectTreeToBasicSlice(styp, sval, val.([]interface{}))
+		}
+	case reflect.Map:
 		fallthrough
 	case reflect.Array:
 		fallthrough

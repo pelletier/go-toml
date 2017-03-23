@@ -7,49 +7,51 @@ import (
 )
 
 type basicMarshalTestStruct struct {
-	String string                    `toml:"string"`
-	Sub    basicMarshalTestSubStruct `toml:"subdoc"`
+	String     string                      `toml:"string"`
+	StringList []string                    `toml:"strlist"`
+	Sub        basicMarshalTestSubStruct   `toml:"subdoc"`
+	SubList    []basicMarshalTestSubStruct `toml:"sublist"`
 }
 
 type basicMarshalTestSubStruct struct {
 	String2 string
 }
 
-func TestBasicMarshal(t *testing.T) {
-	x := basicMarshalTestStruct{
-		String: "Hello",
-		Sub: basicMarshalTestSubStruct{
-			String2: "Howdy",
-		},
-	}
-	expected := []byte(`string = "Hello"
+var basicTestData = basicMarshalTestStruct{
+	String:     "Hello",
+	StringList: []string{"Howdy", "Hey There"},
+	Sub:        basicMarshalTestSubStruct{"One"},
+	SubList:    []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
+}
+
+var basicTestToml = []byte(`string = "Hello"
+strlist = ["Howdy","Hey There"]
 
 [subdoc]
-  string2 = "Howdy"
+  string2 = "One"
+
+[[sublist]]
+  string2 = "Two"
+
+[[sublist]]
+  string2 = "Three"
 `)
-	result, err := Marshal(x)
+
+func TestBasicMarshal(t *testing.T) {
+	result, err := Marshal(basicTestData)
 	if err != nil {
 		t.Fatal(err)
 	}
+	expected := basicTestToml
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
 }
 
 func TestBasicUnmarshal(t *testing.T) {
-	data := []byte(`string = "Hello"
-
-[subdoc]
-string2 = "Howdy"
-`)
-	expected := basicMarshalTestStruct{
-		String: "Hello",
-		Sub: basicMarshalTestSubStruct{
-			String2: "Howdy",
-		},
-	}
 	result := basicMarshalTestStruct{}
-	err := Unmarshal(data, &result)
+	err := Unmarshal(basicTestToml, &result)
+	expected := basicTestData
 	if err != nil {
 		t.Fatal(err)
 	}
