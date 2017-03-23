@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // Marshal ...
@@ -35,10 +36,23 @@ func reflectTreeFromStruct(styp reflect.Type, sval reflect.Value) (*TomlTree, er
 	return t, nil
 }
 
+func reflectTreeFromMap(styp reflect.Type, sval reflect.Value) (*TomlTree, error) {
+	t := newTomlTree()
+	for _, key := range sval.MapKeys() {
+		svalf := sval.MapIndex(key)
+		val, err := reflectTreeFromValue(styp.Elem(), svalf)
+		if err != nil {
+			return nil, err
+		}
+		t.Set(key.String(), val)
+	}
+	return t, nil
+}
+
 func reflectTreeFromBasicSlice(styp reflect.Type, sval reflect.Value) ([]interface{}, error) {
 	t := make([]interface{}, sval.Len(), sval.Len())
 	for i := 0; i < sval.Len(); i++ {
-		t[i] = sval.Index(i).Interface()
+		t[i] = upgradeValue(sval.Index(i).Interface())
 	}
 	return t, nil
 }
@@ -57,51 +71,76 @@ func reflectTreeFromStructSlice(styp reflect.Type, sval reflect.Value) ([]*TomlT
 
 func reflectTreeFromValue(styp reflect.Type, sval reflect.Value) (interface{}, error) {
 	var val interface{}
-	switch styp.Kind() {
+	var typ reflect.Type
+
+	if styp.Kind() == reflect.Interface {
+		typ = sval.Type()
+	} else {
+		typ = styp
+	}
+
+	switch typ.Kind() {
 	case reflect.Bool:
 		val = sval.Bool()
-	case reflect.Int:
-		fallthrough
-	case reflect.Int8:
-		fallthrough
-	case reflect.Int16:
-		fallthrough
-	case reflect.Int32:
-		fallthrough
-	case reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		val = sval.Int()
-	case reflect.Uint:
-		fallthrough
-	case reflect.Uint8:
-		fallthrough
-	case reflect.Uint16:
-		fallthrough
-	case reflect.Uint32:
-		fallthrough
-	case reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		val = sval.Uint()
-	case reflect.Float32:
-		fallthrough
-	case reflect.Float64:
+	case reflect.Float32, reflect.Float64:
 		val = sval.Float()
 	case reflect.String:
 		val = sval.String()
+	case reflect.Interface:
+		val = sval.Interface()
 	case reflect.Struct:
-		return reflectTreeFromStruct(styp, sval)
-	case reflect.Slice:
-		if styp.Elem().Kind() == reflect.Struct {
-			return reflectTreeFromStructSlice(styp, sval)
+		if tmp, ok := sval.Interface().(time.Time); ok {
+			val = tmp
 		} else {
-			return reflectTreeFromBasicSlice(styp, sval)
+			return reflectTreeFromStruct(typ, sval)
+		}
+	case reflect.Slice:
+		switch typ.Elem().Kind() {
+		case reflect.Struct:
+			if styp.Elem().String() == "time.Time" {
+				return reflectTreeFromBasicSlice(typ, sval)
+			}
+			return reflectTreeFromStructSlice(typ, sval)
+		default:
+			return reflectTreeFromBasicSlice(typ, sval)
 		}
 	case reflect.Map:
-		fallthrough
+		return reflectTreeFromMap(typ, sval)
 	case reflect.Array:
 		fallthrough
 	default:
-		return nil, fmt.Errorf("Marshal can't handle %v(%v)", styp, styp.Kind())
+		return nil, fmt.Errorf("Marshal can't handle %v(%v)", typ, typ.Kind())
 	}
 	return val, nil
+}
+
+func upgradeValue(val interface{}) interface{} {
+	switch v := val.(type) {
+	case int:
+		return int64(v)
+	case int8:
+		return int64(v)
+	case int16:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case uint:
+		return uint64(v)
+	case uint8:
+		return uint64(v)
+	case uint16:
+		return uint64(v)
+	case uint32:
+		return uint64(v)
+	case float32:
+		return float64(v)
+	default:
+		return v
+	}
 }
 
 //Unmarshal ...
