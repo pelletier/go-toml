@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -137,5 +138,20 @@ func TestDocMarshal(t *testing.T) {
 	expected, _ := ioutil.ReadFile("marshal_test.toml")
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestDocUnmarshal(t *testing.T) {
+	result := testDoc{}
+	tomlData, _ := ioutil.ReadFile("marshal_test.toml")
+	err := Unmarshal(tomlData, &result)
+	expected := docData
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		resStr, _ := json.MarshalIndent(result, "", "  ")
+		expStr, _ := json.MarshalIndent(expected, "", "  ")
+		t.Errorf("Bad unmarshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
 	}
 }
