@@ -88,7 +88,12 @@ func isTree(mtype reflect.Type) bool {
 	}
 }
 
-// Marshal ...
+/*
+Marshal returns the TOML encoding of v.  Behavior is similar to the Go json
+encoder, except that there is no concept of a Marshaler interface or MarshalTOML
+function for sub-structs, and currently only definite types can be marshaled
+(i.e. no `interface{}`).
+*/
 func Marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
 	if mtype.Kind() != reflect.Struct {
@@ -198,7 +203,13 @@ func valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
 	}
 }
 
-//Unmarshal ...
+/*
+Unmarshal parses the TOML-encoded data and stores the result in the value
+pointed to by v. Behavior is similar to the Go json encoder, except that there
+is no concept of an Unmarshaler interface or UnmarshalTOML function for
+sub-structs, and currently only definite types can be unmarshaled to (i.e. no
+`interface{}`).
+*/
 func Unmarshal(data []byte, v interface{}) error {
 	mtype := reflect.TypeOf(v)
 	if mtype.Kind() != reflect.Ptr || mtype.Elem().Kind() != reflect.Struct {
