@@ -31,3 +31,6 @@ title = "TOML Marshal Testing"
 
 [[subdoclist]]
   name = "List.Second"
+
+[[subdocptrs]]
+  name = "Second"

@@ -70,6 +70,7 @@ type testDoc struct {
 	BasicMap   map[string]string `toml:"basic_map"`
 	Subdocs    testDocSubs       `toml:"subdoc"`
 	SubDocList []testSubDoc      `toml:"subdoclist"`
+	SubDocPtrs []*testSubDoc     `toml:"subdocptrs"`
 }
 
 type testDocBasics struct {
@@ -77,25 +78,31 @@ type testDocBasics struct {
 	Date   time.Time `toml:"date"`
 	Float  float32   `toml:"float"`
 	Int    int       `toml:"int"`
-	String string    `toml:"string"`
+	String *string   `toml:"string"`
 }
 
 type testDocBasicLists struct {
 	Bools   []bool      `toml:"bools"`
 	Dates   []time.Time `toml:"dates"`
-	Floats  []float32   `toml:"floats"`
+	Floats  []*float32  `toml:"floats"`
 	Ints    []int       `toml:"ints"`
 	Strings []string    `toml:"strings"`
 }
 
 type testDocSubs struct {
-	First  testSubDoc `toml:"first"`
-	Second testSubDoc `toml:"second"`
+	First  testSubDoc  `toml:"first"`
+	Second *testSubDoc `toml:"second"`
 }
 
 type testSubDoc struct {
 	Name string `toml:"name"`
 }
+
+var biteMe = "Bite me"
+var float1 float32 = 12.3
+var float2 float32 = 45.6
+var float3 float32 = 78.9
+var subdoc = testSubDoc{"Second"}
 
 var docData = testDoc{
 	Title: "TOML Marshal Testing",
@@ -104,7 +111,7 @@ var docData = testDoc{
 		Date:   time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
 		Float:  123.4,
 		Int:    5000,
-		String: "Bite me",
+		String: &biteMe,
 	},
 	BasicLists: testDocBasicLists{
 		Bools: []bool{true, false, true},
@@ -112,7 +119,7 @@ var docData = testDoc{
 			time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
 			time.Date(1980, 5, 27, 7, 32, 0, 0, time.UTC),
 		},
-		Floats:  []float32{12.3, 45.6, 78.9},
+		Floats:  []*float32{&float1, &float2, &float3},
 		Ints:    []int{8001, 8001, 8002},
 		Strings: []string{"One", "Two", "Three"},
 	},
@@ -122,12 +129,13 @@ var docData = testDoc{
 	},
 	Subdocs: testDocSubs{
 		First:  testSubDoc{"First"},
-		Second: testSubDoc{"Second"},
+		Second: &subdoc,
 	},
 	SubDocList: []testSubDoc{
 		testSubDoc{"List.First"},
 		testSubDoc{"List.Second"},
 	},
+	SubDocPtrs: []*testSubDoc{&subdoc},
 }
 
 func TestDocMarshal(t *testing.T) {
@@ -154,4 +162,36 @@ func TestDocUnmarshal(t *testing.T) {
 		expStr, _ := json.MarshalIndent(expected, "", "  ")
 		t.Errorf("Bad unmarshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
 	}
+}
+
+type tomlTypeCheckTest struct {
+	name string
+	item interface{}
+	typ  int //0=primitive, 1=otherslice, 2=treeslice, 3=tree
+}
+
+func TestTypeChecks(t *testing.T) {
+	tests := []tomlTypeCheckTest{
+		{"integer", 2, 0},
+		{"time", time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC), 0},
+		{"stringlist", []string{"hello", "hi"}, 1},
+		{"timelist", []time.Time{time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)}, 1},
+		{"objectlist", []tomlTypeCheckTest{}, 2},
+		{"object", tomlTypeCheckTest{}, 3},
+	}
+
+	for _, test := range tests {
+		expected := []bool{false, false, false, false}
+		expected[test.typ] = true
+		result := []bool{
+			isPrimitive(reflect.TypeOf(test.item)),
+			isOtherSlice(reflect.TypeOf(test.item)),
+			isTreeSlice(reflect.TypeOf(test.item)),
+			isTree(reflect.TypeOf(test.item)),
+		}
+		if !reflect.DeepEqual(expected, result) {
+			t.Errorf("Bad type check on %q: expected %v, got %v", test.name, expected, result)
+		}
+	}
+
 }
