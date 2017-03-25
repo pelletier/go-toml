@@ -251,7 +251,10 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 			val := tval.Get(key)
 			mvalf, err := valueFromToml(mtype.Elem(), val)
 			if err != nil {
-				return mval, err
+				if err.Error()[0] == '(' {
+					return mval, err
+				}
+				return mval, fmt.Errorf("%s: %s", tval.GetPosition(key), err)
 			}
 			mval.SetMapIndex(reflect.ValueOf(key), mvalf)
 		}

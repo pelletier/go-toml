@@ -266,13 +266,21 @@ var errTomls = []string{
 	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = 5000\nstring = 1",
 }
 
+type mapErr struct {
+	Vals map[string]float64
+}
+
 func TestErrUnmarshal(t *testing.T) {
 	for ind, toml := range errTomls {
 		result := errStruct{}
 		err := Unmarshal([]byte(toml), &result)
-		//fmt.Println(err)
 		if err == nil {
 			t.Errorf("Expected err from case %d\n", ind)
 		}
+	}
+	result2 := mapErr{}
+	err := Unmarshal([]byte("[vals]\nfred=\"1.2\""), &result2)
+	if err == nil {
+		t.Errorf("Expected err from map")
 	}
 }
