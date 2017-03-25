@@ -65,6 +65,9 @@ func sliceToTree(object interface{}) (interface{}, error) {
 	value := reflect.ValueOf(object)
 	insideType := value.Type().Elem()
 	length := value.Len()
+	if length > 0 {
+		insideType = reflect.ValueOf(value.Index(0).Interface()).Type()
+	}
 	if insideType.Kind() == reflect.Map {
 		// this is considered as an array of tables
 		tablesArray := make([]*TomlTree, 0, length)
