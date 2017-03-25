@@ -113,11 +113,13 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*TomlTree, error) {
 	case reflect.Struct:
 		for i := 0; i < mtype.NumField(); i++ {
 			mtypef, mvalf := mtype.Field(i), mval.Field(i)
-			val, err := valueToToml(mtypef.Type, mvalf)
-			if err != nil {
-				return nil, err
+			if mtypef.PkgPath == "" {
+				val, err := valueToToml(mtypef.Type, mvalf)
+				if err != nil {
+					return nil, err
+				}
+				tval.Set(tomlName(mtypef), val)
 			}
-			tval.Set(tomlName(mtypef), val)
 		}
 	case reflect.Map:
 		for _, key := range mval.MapKeys() {
@@ -226,15 +228,17 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 		mval = reflect.New(mtype).Elem()
 		for i := 0; i < mtype.NumField(); i++ {
 			mtypef := mtype.Field(i)
-			key := tomlName(mtypef)
-			exists := tval.Has(key)
-			if exists {
-				val := tval.Get(key)
-				mvalf, err := valueFromToml(mtypef.Type, val)
-				if err != nil {
-					return mval, err
+			if mtypef.PkgPath == "" {
+				key := tomlName(mtypef)
+				exists := tval.Has(key)
+				if exists {
+					val := tval.Get(key)
+					mvalf, err := valueFromToml(mtypef.Type, val)
+					if err != nil {
+						return mval, err
+					}
+					mval.Field(i).Set(mvalf)
 				}
-				mval.Field(i).Set(mvalf)
 			}
 		}
 	case reflect.Map:
