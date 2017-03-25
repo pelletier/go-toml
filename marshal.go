@@ -218,6 +218,7 @@ func Unmarshal(data []byte, v interface{}) error {
 	return nil
 }
 
+// Convert toml tree to marshal struct or map, using marshal type
 func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 	if mtype.Kind() == reflect.Ptr {
 		return unwrapPointer(mtype, tval)
@@ -235,7 +236,10 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 					val := tval.Get(key)
 					mvalf, err := valueFromToml(mtypef.Type, val)
 					if err != nil {
-						return mval, err
+						if err.Error()[0] == '(' {
+							return mval, err
+						}
+						return mval, fmt.Errorf("%s: %s", tval.GetPosition(key), err)
 					}
 					mval.Field(i).Set(mvalf)
 				}
@@ -255,6 +259,7 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 	return mval, nil
 }
 
+// Convert toml value to marshal struct/map slice, using marshal type
 func valueFromTreeSlice(mtype reflect.Type, tval []*TomlTree) (reflect.Value, error) {
 	if mtype.Kind() == reflect.Ptr {
 		return unwrapPointer(mtype, tval)
@@ -270,6 +275,7 @@ func valueFromTreeSlice(mtype reflect.Type, tval []*TomlTree) (reflect.Value, er
 	return mval, nil
 }
 
+// Convert toml value to marshal primitive slice, using marshal type
 func valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (reflect.Value, error) {
 	if mtype.Kind() == reflect.Ptr {
 		return unwrapPointer(mtype, tval)
@@ -300,35 +306,95 @@ func valueFromToml(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 	default:
 		switch mtype.Kind() {
 		case reflect.Bool:
-			return reflect.ValueOf(tval.(bool)), nil
+			val, ok := tval.(bool)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to bool", tval, tval)
+			}
+			return reflect.ValueOf(val), nil
 		case reflect.Int:
-			return reflect.ValueOf(int(tval.(int64))), nil
+			val, ok := tval.(int64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+			}
+			return reflect.ValueOf(int(val)), nil
 		case reflect.Int8:
-			return reflect.ValueOf(int8(tval.(int64))), nil
+			val, ok := tval.(int64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+			}
+			return reflect.ValueOf(int8(val)), nil
 		case reflect.Int16:
-			return reflect.ValueOf(int16(tval.(int64))), nil
+			val, ok := tval.(int64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+			}
+			return reflect.ValueOf(int16(val)), nil
 		case reflect.Int32:
-			return reflect.ValueOf(int32(tval.(int64))), nil
+			val, ok := tval.(int64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+			}
+			return reflect.ValueOf(int32(val)), nil
 		case reflect.Int64:
-			return reflect.ValueOf(tval.(int64)), nil
+			val, ok := tval.(int64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+			}
+			return reflect.ValueOf(val), nil
 		case reflect.Uint:
-			return reflect.ValueOf(uint(tval.(uint64))), nil
+			val, ok := tval.(uint64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
+			}
+			return reflect.ValueOf(uint(val)), nil
 		case reflect.Uint8:
-			return reflect.ValueOf(uint8(tval.(uint64))), nil
+			val, ok := tval.(uint64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
+			}
+			return reflect.ValueOf(uint8(val)), nil
 		case reflect.Uint16:
-			return reflect.ValueOf(uint16(tval.(uint64))), nil
+			val, ok := tval.(uint64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
+			}
+			return reflect.ValueOf(uint16(val)), nil
 		case reflect.Uint32:
-			return reflect.ValueOf(uint32(tval.(uint64))), nil
+			val, ok := tval.(uint64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
+			}
+			return reflect.ValueOf(uint32(val)), nil
 		case reflect.Uint64:
-			return reflect.ValueOf(tval.(uint64)), nil
+			val, ok := tval.(uint64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
+			}
+			return reflect.ValueOf(val), nil
 		case reflect.Float32:
-			return reflect.ValueOf(float32(tval.(float64))), nil
+			val, ok := tval.(float64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to float", tval, tval)
+			}
+			return reflect.ValueOf(float32(val)), nil
 		case reflect.Float64:
-			return reflect.ValueOf(tval.(float64)), nil
+			val, ok := tval.(float64)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to float", tval, tval)
+			}
+			return reflect.ValueOf(val), nil
 		case reflect.String:
-			return reflect.ValueOf(tval.(string)), nil
+			val, ok := tval.(string)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to string", tval, tval)
+			}
+			return reflect.ValueOf(val), nil
 		case reflect.Struct:
-			return reflect.ValueOf(tval.(time.Time)), nil
+			val, ok := tval.(time.Time)
+			if !ok {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to time", tval, tval)
+			}
+			return reflect.ValueOf(val), nil
 		default:
 			return reflect.ValueOf(nil), fmt.Errorf("Unmarshal can't handle %v(%v)", mtype, mtype.Kind())
 		}

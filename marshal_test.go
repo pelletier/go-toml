@@ -71,6 +71,7 @@ type testDoc struct {
 	Subdocs    testDocSubs       `toml:"subdoc"`
 	SubDocList []testSubDoc      `toml:"subdoclist"`
 	SubDocPtrs []*testSubDoc     `toml:"subdocptrs"`
+	err        int               `toml:"shouldntBeHere"`
 	unexported int               `toml:"shouldntBeHere"`
 }
 
@@ -240,5 +241,38 @@ func TestUnexportedUnmarshal(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Bad unexported unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+type errStruct struct {
+	Bool   bool      `toml:"bool"`
+	Date   time.Time `toml:"date"`
+	Float  float64   `toml:"float"`
+	Int    int16     `toml:"int"`
+	String *string   `toml:"string"`
+}
+
+var errTomls = []string{
+	"bool = truly\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = 5000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:3200Z\nfloat = 123.4\nint = 5000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123a4\nint = 5000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = j000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = 5000\nstring = Bite me",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = 5000\nstring = Bite me",
+	"bool = 1\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = 5000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1\nfloat = 123.4\nint = 5000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\n\"sorry\"\nint = 5000\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = \"sorry\"\nstring = \"Bite me\"",
+	"bool = true\ndate = 1979-05-27T07:32:00Z\nfloat = 123.4\nint = 5000\nstring = 1",
+}
+
+func TestErrUnmarshal(t *testing.T) {
+	for ind, toml := range errTomls {
+		result := errStruct{}
+		err := Unmarshal([]byte(toml), &result)
+		//fmt.Println(err)
+		if err == nil {
+			t.Errorf("Expected err from case %d\n", ind)
+		}
 	}
 }
