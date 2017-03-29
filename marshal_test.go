@@ -31,13 +31,13 @@ var basicTestToml = []byte(`string = "Hello"
 strlist = ["Howdy","Hey There"]
 
 [subdoc]
-  string2 = "One"
+  String2 = "One"
 
 [[sublist]]
-  string2 = "Two"
+  String2 = "Two"
 
 [[sublist]]
-  string2 = "Three"
+  String2 = "Three"
 `)
 
 func TestBasicMarshal(t *testing.T) {
@@ -202,19 +202,21 @@ func TestTypeChecks(t *testing.T) {
 }
 
 type unexportedMarshalTestStruct struct {
-	String     string                      `toml:"string"`
-	StringList []string                    `toml:"strlist"`
-	Sub        basicMarshalTestSubStruct   `toml:"subdoc"`
-	SubList    []basicMarshalTestSubStruct `toml:"sublist"`
-	unexported int                         `toml:"shouldntBeHere"`
+	String      string                      `toml:"string"`
+	StringList  []string                    `toml:"strlist"`
+	Sub         basicMarshalTestSubStruct   `toml:"subdoc"`
+	SubList     []basicMarshalTestSubStruct `toml:"sublist"`
+	unexported  int                         `toml:"shouldntBeHere"`
+	Unexported2 int                         `toml:"-"`
 }
 
 var unexportedTestData = unexportedMarshalTestStruct{
-	String:     "Hello",
-	StringList: []string{"Howdy", "Hey There"},
-	Sub:        basicMarshalTestSubStruct{"One"},
-	SubList:    []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
-	unexported: 0,
+	String:      "Hello",
+	StringList:  []string{"Howdy", "Hey There"},
+	Sub:         basicMarshalTestSubStruct{"One"},
+	SubList:     []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
+	unexported:  0,
+	Unexported2: 0,
 }
 
 var unexportedTestToml = []byte(`string = "Hello"
@@ -223,13 +225,13 @@ unexported = 1
 shouldntBeHere = 2
 
 [subdoc]
-  string2 = "One"
+  String2 = "One"
 
 [[sublist]]
-  string2 = "Two"
+  String2 = "Two"
 
 [[sublist]]
-  string2 = "Three"
+  String2 = "Three"
 `)
 
 func TestUnexportedUnmarshal(t *testing.T) {
@@ -279,7 +281,7 @@ func TestErrUnmarshal(t *testing.T) {
 		}
 	}
 	result2 := mapErr{}
-	err := Unmarshal([]byte("[vals]\nfred=\"1.2\""), &result2)
+	err := Unmarshal([]byte("[Vals]\nfred=\"1.2\""), &result2)
 	if err == nil {
 		t.Errorf("Expected err from map")
 	}

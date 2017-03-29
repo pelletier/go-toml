@@ -26,6 +26,12 @@ bool       bool, pointers to same
 time.Time  time.Time{}, pointers to same
 */
 
+type tomlOpts struct {
+	name      string
+	include   bool
+	omitempty bool
+}
+
 var timeType = reflect.TypeOf(time.Time{})
 
 // Check if the given marshall type maps to a TomlTree primitive
@@ -118,12 +124,13 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*TomlTree, error) {
 	case reflect.Struct:
 		for i := 0; i < mtype.NumField(); i++ {
 			mtypef, mvalf := mtype.Field(i), mval.Field(i)
-			if mtypef.PkgPath == "" {
+			opts := tomlOptions(mtypef)
+			if opts.include {
 				val, err := valueToToml(mtypef.Type, mvalf)
 				if err != nil {
 					return nil, err
 				}
-				tval.Set(tomlName(mtypef), val)
+				tval.Set(opts.name, val)
 			}
 		}
 	case reflect.Map:
@@ -240,8 +247,9 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 		mval = reflect.New(mtype).Elem()
 		for i := 0; i < mtype.NumField(); i++ {
 			mtypef := mtype.Field(i)
-			if mtypef.PkgPath == "" {
-				key := tomlName(mtypef)
+			opts := tomlOptions(mtypef)
+			if opts.include {
+				key := opts.name
 				exists := tval.Has(key)
 				if exists {
 					val := tval.Get(key)
@@ -425,10 +433,22 @@ func unwrapPointer(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 	return mval, nil
 }
 
-func tomlName(vf reflect.StructField) string {
-	name := vf.Tag.Get("toml")
-	if name == "" {
-		name = strings.ToLower(vf.Name)
+func tomlOptions(vf reflect.StructField) tomlOpts {
+	tag := vf.Tag.Get("toml")
+	parse := strings.Split(tag, ",")
+	result := tomlOpts{vf.Name, false, false}
+	if parse[0] != "" {
+		if parse[0] == "-" && len(parse) == 1 {
+			result.include = true
+		} else {
+			result.name = strings.Trim(parse[0], " ")
+		}
 	}
-	return name
+	if vf.PkgPath == "" {
+		result.include = true
+	}
+	if len(parse) > 1 && strings.Trim(parse[1], " ") == "omitempty" {
+		result.omitempty = true
+	}
+	return result
 }
