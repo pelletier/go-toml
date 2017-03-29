@@ -81,6 +81,7 @@ type testDocBasics struct {
 	Date       time.Time `toml:"date"`
 	Float      float32   `toml:"float"`
 	Int        int       `toml:"int"`
+	Uint       uint      `toml:"uint"`
 	String     *string   `toml:"string"`
 	unexported int       `toml:"shouldntBeHere"`
 }
@@ -91,6 +92,7 @@ type testDocBasicLists struct {
 	Floats  []*float32  `toml:"floats"`
 	Ints    []int       `toml:"ints"`
 	Strings []string    `toml:"strings"`
+	UInts   []uint      `toml:"uints"`
 }
 
 type testDocSubs struct {
@@ -118,6 +120,7 @@ var docData = testDoc{
 		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
 		Float:      123.4,
 		Int:        5000,
+		Uint:       5001,
 		String:     &biteMe,
 		unexported: 0,
 	},
@@ -130,6 +133,7 @@ var docData = testDoc{
 		Floats:  []*float32{&float1, &float2, &float3},
 		Ints:    []int{8001, 8001, 8002},
 		Strings: []string{"One", "Two", "Three"},
+		UInts:   []uint{5002, 5003},
 	},
 	BasicMap: map[string]string{
 		"one": "one",
@@ -274,6 +278,36 @@ type mapErr struct {
 	Vals map[string]float64
 }
 
+type intErr struct {
+	Int1  int
+	Int2  int8
+	Int3  int16
+	Int4  int32
+	Int5  int64
+	UInt1 uint
+	UInt2 uint8
+	UInt3 uint16
+	UInt4 uint32
+	UInt5 uint64
+	Flt1  float32
+	Flt2  float64
+}
+
+var intErrTomls = []string{
+	"Int1 = []\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = []\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = []\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = []\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = []\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = []\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = []\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = []\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = []\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = []\nFlt1 = 1.0\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = []\nFlt2 = 2.0",
+	"Int1 = 1\nInt2 = 2\nInt3 = 3\nInt4 = 4\nInt5 = 5\nUInt1 = 1\nUInt2 = 2\nUInt3 = 3\nUInt4 = 4\nUInt5 = 5\nFlt1 = 1.0\nFlt2 = []",
+}
+
 func TestErrUnmarshal(t *testing.T) {
 	for ind, toml := range errTomls {
 		result := errStruct{}
@@ -286,6 +320,13 @@ func TestErrUnmarshal(t *testing.T) {
 	err := Unmarshal([]byte("[Vals]\nfred=\"1.2\""), &result2)
 	if err == nil {
 		t.Errorf("Expected err from map")
+	}
+	for ind, toml := range intErrTomls {
+		result3 := intErr{}
+		err := Unmarshal([]byte(toml), &result3)
+		if err == nil {
+			t.Errorf("Expected int err from case %d\n", ind)
+		}
 	}
 }
 
@@ -384,5 +425,111 @@ func TestEmptyUnmarshalOmit(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Bad empty omit unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+type pointerMarshalTestStruct struct {
+	Str       *string
+	List      *[]string
+	ListPtr   *[]*string
+	Map       *map[string]string
+	MapPtr    *map[string]*string
+	EmptyStr  *string
+	EmptyList *[]string
+	EmptyMap  *map[string]string
+	DblPtr    *[]*[]*string
+}
+
+var pointerStr = "Hello"
+var pointerList = []string{"Hello back"}
+var pointerListPtr = []*string{&pointerStr}
+var pointerMap = map[string]string{"response": "Goodbye"}
+var pointerMapPtr = map[string]*string{"alternate": &pointerStr}
+var pointerTestData = pointerMarshalTestStruct{
+	Str:       &pointerStr,
+	List:      &pointerList,
+	ListPtr:   &pointerListPtr,
+	Map:       &pointerMap,
+	MapPtr:    &pointerMapPtr,
+	EmptyStr:  nil,
+	EmptyList: nil,
+	EmptyMap:  nil,
+}
+
+var pointerTestToml = []byte(`List = ["Hello back"]
+ListPtr = ["Hello"]
+Str = "Hello"
+
+[Map]
+  response = "Goodbye"
+
+[MapPtr]
+  alternate = "Hello"
+`)
+
+func TestPointerMarshal(t *testing.T) {
+	result, err := Marshal(pointerTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := pointerTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad pointer marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestPointerUnmarshal(t *testing.T) {
+	result := pointerMarshalTestStruct{}
+	err := Unmarshal(pointerTestToml, &result)
+	expected := pointerTestData
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad pointer unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+type nestedMarshalTestStruct struct {
+	String [][]string
+	//Struct [][]basicMarshalTestSubStruct
+	StringPtr *[]*[]*string
+	// StructPtr *[]*[]*basicMarshalTestSubStruct
+}
+
+var str1 = "Three"
+var str2 = "Four"
+var strPtr = []*string{&str1, &str2}
+var strPtr2 = []*[]*string{&strPtr}
+
+var nestedTestData = nestedMarshalTestStruct{
+	String:    [][]string{[]string{"Five", "Six"}, []string{"One", "Two"}},
+	StringPtr: &strPtr2,
+}
+
+var nestedTestToml = []byte(`String = [["Five","Six"],["One","Two"]]
+StringPtr = [["Three","Four"]]
+`)
+
+func TestNestedMarshal(t *testing.T) {
+	result, err := Marshal(nestedTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := nestedTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad nested marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestNestedUnmarshal(t *testing.T) {
+	result := nestedMarshalTestStruct{}
+	err := Unmarshal(nestedTestToml, &result)
+	expected := nestedTestData
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad nested unmarshal: expected %v, got %v", expected, result)
 	}
 }

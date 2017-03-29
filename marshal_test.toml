@@ -6,6 +6,7 @@ title = "TOML Marshal Testing"
   float = 123.4
   int = 5000
   string = "Bite me"
+  uint = 5001
 
 [basic_lists]
   bools = [true,false,true]
@@ -13,6 +14,7 @@ title = "TOML Marshal Testing"
   floats = [12.3,45.6,78.9]
   ints = [8001,8001,8002]
   strings = ["One","Two","Three"]
+  uints = [5002,5003]
 
 [basic_map]
   one = "one"

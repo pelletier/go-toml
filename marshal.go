@@ -59,8 +59,6 @@ func isPrimitive(mtype reflect.Type) bool {
 // Check if the given marshall type maps to a TomlTree slice
 func isTreeSlice(mtype reflect.Type) bool {
 	switch mtype.Kind() {
-	case reflect.Ptr:
-		return isTreeSlice(mtype.Elem())
 	case reflect.Slice:
 		return !isOtherSlice(mtype)
 	default:
@@ -74,7 +72,7 @@ func isOtherSlice(mtype reflect.Type) bool {
 	case reflect.Ptr:
 		return isOtherSlice(mtype.Elem())
 	case reflect.Slice:
-		return isPrimitive(mtype.Elem()) || mtype.Elem().Kind() == reflect.Slice
+		return isPrimitive(mtype.Elem()) || isOtherSlice(mtype.Elem())
 	default:
 		return false
 	}
@@ -83,8 +81,6 @@ func isOtherSlice(mtype reflect.Type) bool {
 // Check if the given marshall type maps to a TomlTree
 func isTree(mtype reflect.Type) bool {
 	switch mtype.Kind() {
-	case reflect.Ptr:
-		return isTree(mtype.Elem())
 	case reflect.Map:
 		return true
 	case reflect.Struct:
@@ -107,7 +103,7 @@ dropped).
 func Marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
 	if mtype.Kind() != reflect.Struct {
-		return []byte{}, errors.New("Only a Struct can be marshaled to TOML")
+		return []byte{}, errors.New("Only a struct can be marshaled to TOML")
 	}
 	sval := reflect.ValueOf(v)
 	t, err := valueToTree(mtype, sval)
@@ -152,9 +148,6 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*TomlTree, error) {
 
 // Convert given marshal slice to slice of Toml trees
 func valueToTreeSlice(mtype reflect.Type, mval reflect.Value) ([]*TomlTree, error) {
-	if mtype.Kind() == reflect.Ptr {
-		return valueToTreeSlice(mtype.Elem(), mval.Elem())
-	}
 	tval := make([]*TomlTree, mval.Len(), mval.Len())
 	for i := 0; i < mval.Len(); i++ {
 		val, err := valueToTree(mtype.Elem(), mval.Index(i))
@@ -168,9 +161,6 @@ func valueToTreeSlice(mtype reflect.Type, mval reflect.Value) ([]*TomlTree, erro
 
 // Convert given marshal slice to slice of toml values
 func valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
-	if mtype.Kind() == reflect.Ptr {
-		return valueToOtherSlice(mtype.Elem(), mval.Elem())
-	}
 	tval := make([]interface{}, mval.Len(), mval.Len())
 	for i := 0; i < mval.Len(); i++ {
 		val, err := valueToToml(mtype.Elem(), mval.Index(i))
@@ -185,9 +175,6 @@ func valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (interface{}, err
 // Convert given marshal value to toml value
 func valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
 	if mtype.Kind() == reflect.Ptr {
-		if mval.IsNil() {
-			return nil, nil
-		}
 		return valueToToml(mtype.Elem(), mval.Elem())
 	}
 	switch {
@@ -227,7 +214,7 @@ sub-structs, and currently only definite types can be unmarshaled to (i.e. no
 func Unmarshal(data []byte, v interface{}) error {
 	mtype := reflect.TypeOf(v)
 	if mtype.Kind() != reflect.Ptr || mtype.Elem().Kind() != reflect.Struct {
-		return errors.New("Only a pointer to Struct can be unmarshaled from TOML")
+		return errors.New("Only a pointer to struct can be unmarshaled from TOML")
 	}
 
 	t, err := Load(string(data))
@@ -262,10 +249,7 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 					val := tval.Get(key)
 					mvalf, err := valueFromToml(mtypef.Type, val)
 					if err != nil {
-						if err.Error()[0] == '(' {
-							return mval, err
-						}
-						return mval, fmt.Errorf("%s: %s", tval.GetPosition(key), err)
+						return mval, formatError(err, tval.GetPosition(key))
 					}
 					mval.Field(i).Set(mvalf)
 				}
@@ -277,10 +261,7 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 			val := tval.Get(key)
 			mvalf, err := valueFromToml(mtype.Elem(), val)
 			if err != nil {
-				if err.Error()[0] == '(' {
-					return mval, err
-				}
-				return mval, fmt.Errorf("%s: %s", tval.GetPosition(key), err)
+				return mval, formatError(err, tval.GetPosition(key))
 			}
 			mval.SetMapIndex(reflect.ValueOf(key), mvalf)
 		}
@@ -290,9 +271,6 @@ func valueFromTree(mtype reflect.Type, tval *TomlTree) (reflect.Value, error) {
 
 // Convert toml value to marshal struct/map slice, using marshal type
 func valueFromTreeSlice(mtype reflect.Type, tval []*TomlTree) (reflect.Value, error) {
-	if mtype.Kind() == reflect.Ptr {
-		return unwrapPointer(mtype, tval)
-	}
 	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
 	for i := 0; i < len(tval); i++ {
 		val, err := valueFromTree(mtype.Elem(), tval[i])
@@ -306,9 +284,6 @@ func valueFromTreeSlice(mtype reflect.Type, tval []*TomlTree) (reflect.Value, er
 
 // Convert toml value to marshal primitive slice, using marshal type
 func valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (reflect.Value, error) {
-	if mtype.Kind() == reflect.Ptr {
-		return unwrapPointer(mtype, tval)
-	}
 	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
 	for i := 0; i < len(tval); i++ {
 		val, err := valueFromToml(mtype.Elem(), tval[i])
@@ -371,35 +346,35 @@ func valueFromToml(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 			}
 			return reflect.ValueOf(val), nil
 		case reflect.Uint:
-			val, ok := tval.(uint64)
+			val, ok := tval.(int64)
 			if !ok {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
 			}
 			return reflect.ValueOf(uint(val)), nil
 		case reflect.Uint8:
-			val, ok := tval.(uint64)
+			val, ok := tval.(int64)
 			if !ok {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
 			}
 			return reflect.ValueOf(uint8(val)), nil
 		case reflect.Uint16:
-			val, ok := tval.(uint64)
+			val, ok := tval.(int64)
 			if !ok {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
 			}
 			return reflect.ValueOf(uint16(val)), nil
 		case reflect.Uint32:
-			val, ok := tval.(uint64)
+			val, ok := tval.(int64)
 			if !ok {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
 			}
 			return reflect.ValueOf(uint32(val)), nil
 		case reflect.Uint64:
-			val, ok := tval.(uint64)
+			val, ok := tval.(int64)
 			if !ok {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to uint", tval, tval)
 			}
-			return reflect.ValueOf(val), nil
+			return reflect.ValueOf(uint64(val)), nil
 		case reflect.Float32:
 			val, ok := tval.(float64)
 			if !ok {
@@ -474,4 +449,11 @@ func isZero(val reflect.Value) bool {
 	default:
 		return reflect.DeepEqual(val.Interface(), reflect.Zero(val.Type()).Interface())
 	}
+}
+
+func formatError(err error, pos Position) error {
+	if err.Error()[0] == '(' { // Error already contains position information
+		return err
+	}
+	return fmt.Errorf("%s: %s", pos, err)
 }
