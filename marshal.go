@@ -99,6 +99,10 @@ Marshal returns the TOML encoding of v.  Behavior is similar to the Go json
 encoder, except that there is no concept of a Marshaler interface or MarshalTOML
 function for sub-structs, and currently only definite types can be marshaled
 (i.e. no `interface{}`).
+
+Note that pointers are automatically assigned the "omitempty" option, as TOML
+explicity does not handle null values (saying instead the label should be
+dropped).
 */
 func Marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
@@ -125,7 +129,7 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*TomlTree, error) {
 		for i := 0; i < mtype.NumField(); i++ {
 			mtypef, mvalf := mtype.Field(i), mval.Field(i)
 			opts := tomlOptions(mtypef)
-			if opts.include {
+			if opts.include && (!opts.omitempty || !isZero(mvalf)) {
 				val, err := valueToToml(mtypef.Type, mvalf)
 				if err != nil {
 					return nil, err
@@ -181,6 +185,9 @@ func valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (interface{}, err
 // Convert given marshal value to toml value
 func valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
 	if mtype.Kind() == reflect.Ptr {
+		if mval.IsNil() {
+			return nil, nil
+		}
 		return valueToToml(mtype.Elem(), mval.Elem())
 	}
 	switch {
@@ -436,19 +443,35 @@ func unwrapPointer(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 func tomlOptions(vf reflect.StructField) tomlOpts {
 	tag := vf.Tag.Get("toml")
 	parse := strings.Split(tag, ",")
-	result := tomlOpts{vf.Name, false, false}
+	result := tomlOpts{vf.Name, true, false}
 	if parse[0] != "" {
 		if parse[0] == "-" && len(parse) == 1 {
-			result.include = true
+			result.include = false
 		} else {
 			result.name = strings.Trim(parse[0], " ")
 		}
 	}
-	if vf.PkgPath == "" {
-		result.include = true
+	if vf.PkgPath != "" {
+		result.include = false
 	}
 	if len(parse) > 1 && strings.Trim(parse[1], " ") == "omitempty" {
 		result.omitempty = true
 	}
+	if vf.Type.Kind() == reflect.Ptr {
+		result.omitempty = true
+	}
 	return result
+}
+
+func isZero(val reflect.Value) bool {
+	switch val.Type().Kind() {
+	case reflect.Map:
+		fallthrough
+	case reflect.Array:
+		fallthrough
+	case reflect.Slice:
+		return val.Len() == 0
+	default:
+		return reflect.DeepEqual(val.Interface(), reflect.Zero(val.Type()).Interface())
+	}
 }

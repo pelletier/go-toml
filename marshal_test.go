@@ -64,15 +64,16 @@ func TestBasicUnmarshal(t *testing.T) {
 }
 
 type testDoc struct {
-	Title      string            `toml:"title"`
-	Basics     testDocBasics     `toml:"basic"`
-	BasicLists testDocBasicLists `toml:"basic_lists"`
-	BasicMap   map[string]string `toml:"basic_map"`
-	Subdocs    testDocSubs       `toml:"subdoc"`
-	SubDocList []testSubDoc      `toml:"subdoclist"`
-	SubDocPtrs []*testSubDoc     `toml:"subdocptrs"`
-	err        int               `toml:"shouldntBeHere"`
-	unexported int               `toml:"shouldntBeHere"`
+	Title       string            `toml:"title"`
+	Basics      testDocBasics     `toml:"basic"`
+	BasicLists  testDocBasicLists `toml:"basic_lists"`
+	BasicMap    map[string]string `toml:"basic_map"`
+	Subdocs     testDocSubs       `toml:"subdoc"`
+	SubDocList  []testSubDoc      `toml:"subdoclist"`
+	SubDocPtrs  []*testSubDoc     `toml:"subdocptrs"`
+	err         int               `toml:"shouldntBeHere"`
+	unexported  int               `toml:"shouldntBeHere"`
+	Unexported2 int               `toml:"-"`
 }
 
 type testDocBasics struct {
@@ -109,8 +110,9 @@ var float3 float32 = 78.9
 var subdoc = testSubDoc{"Second", 0}
 
 var docData = testDoc{
-	Title:      "TOML Marshal Testing",
-	unexported: 0,
+	Title:       "TOML Marshal Testing",
+	unexported:  0,
+	Unexported2: 0,
 	Basics: testDocBasics{
 		Bool:       true,
 		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
@@ -284,5 +286,103 @@ func TestErrUnmarshal(t *testing.T) {
 	err := Unmarshal([]byte("[Vals]\nfred=\"1.2\""), &result2)
 	if err == nil {
 		t.Errorf("Expected err from map")
+	}
+}
+
+type emptyMarshalTestStruct struct {
+	Title      string                  `toml:"title"`
+	Bool       bool                    `toml:"bool"`
+	Int        int                     `toml:"int"`
+	String     string                  `toml:"string"`
+	StringList []string                `toml:"stringlist"`
+	Ptr        *basicMarshalTestStruct `toml:"ptr"`
+	Map        map[string]string       `toml:"map"`
+}
+
+var emptyTestData = emptyMarshalTestStruct{
+	Title:      "Placeholder",
+	Bool:       false,
+	Int:        0,
+	String:     "",
+	StringList: []string{},
+	Ptr:        nil,
+	Map:        map[string]string{},
+}
+
+var emptyTestToml = []byte(`bool = false
+int = 0
+string = ""
+stringlist = []
+title = "Placeholder"
+
+[map]
+`)
+
+type emptyMarshalTestStruct2 struct {
+	Title      string                  `toml:"title"`
+	Bool       bool                    `toml:"bool,omitempty"`
+	Int        int                     `toml:"int, omitempty"`
+	String     string                  `toml:"string,omitempty "`
+	StringList []string                `toml:"stringlist,omitempty"`
+	Ptr        *basicMarshalTestStruct `toml:"ptr,omitempty"`
+	Map        map[string]string       `toml:"map,omitempty"`
+}
+
+var emptyTestData2 = emptyMarshalTestStruct2{
+	Title:      "Placeholder",
+	Bool:       false,
+	Int:        0,
+	String:     "",
+	StringList: []string{},
+	Ptr:        nil,
+	Map:        map[string]string{},
+}
+
+var emptyTestToml2 = []byte(`title = "Placeholder"
+`)
+
+func TestEmptyMarshal(t *testing.T) {
+	result, err := Marshal(emptyTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := emptyTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad empty marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestEmptyMarshalOmit(t *testing.T) {
+	result, err := Marshal(emptyTestData2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := emptyTestToml2
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad empty omit marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestEmptyUnmarshal(t *testing.T) {
+	result := emptyMarshalTestStruct{}
+	err := Unmarshal(emptyTestToml, &result)
+	expected := emptyTestData
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad empty unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+func TestEmptyUnmarshalOmit(t *testing.T) {
+	result := emptyMarshalTestStruct2{}
+	err := Unmarshal(emptyTestToml, &result)
+	expected := emptyTestData2
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad empty omit unmarshal: expected %v, got %v", expected, result)
 	}
 }
