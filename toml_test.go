@@ -121,8 +121,11 @@ func TestTomlQuery(t *testing.T) {
 
 func TestTomlFromMap(t *testing.T) {
 	simpleMap := map[string]interface{}{"hello": 42}
-	tree := TreeFromMap(simpleMap)
-	if tree.Get("hello") != 42 {
+	tree, err := TreeFromMap(simpleMap)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if tree.Get("hello") != int64(42) {
 		t.Fatal("hello should be 42, not", tree.Get("hello"))
 	}
 }

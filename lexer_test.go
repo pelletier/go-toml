@@ -531,6 +531,30 @@ func TestKeyEqualStringUnicodeEscape(t *testing.T) {
 		{Position{1, 8}, tokenString, "hello δ"},
 		{Position{1, 25}, tokenEOF, ""},
 	})
+	testFlow(t, `foo = "\uabcd"`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 8}, tokenString, "\uabcd"},
+		{Position{1, 15}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = "\uABCD"`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 8}, tokenString, "\uABCD"},
+		{Position{1, 15}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = "\U000bcdef"`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 8}, tokenString, "\U000bcdef"},
+		{Position{1, 19}, tokenEOF, ""},
+	})
+	testFlow(t, `foo = "\U000BCDEF"`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 8}, tokenString, "\U000BCDEF"},
+		{Position{1, 19}, tokenEOF, ""},
+	})
 	testFlow(t, `foo = "\u2"`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
 		{Position{1, 5}, tokenEqual, "="},

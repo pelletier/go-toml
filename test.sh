@@ -19,6 +19,9 @@ function git_clone() {
   popd
 }
 
+# Run go vet
+go vet ./...
+
 go get github.com/pelletier/go-buffruneio
 go get github.com/davecgh/go-spew/spew
 
@@ -38,8 +41,8 @@ cp -R cmd/* src/github.com/pelletier/go-toml/cmd
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
 # Run basic unit tests
-go test github.com/pelletier/go-toml \
-        github.com/pelletier/go-toml/cmd/tomljson
+go test github.com/pelletier/go-toml -v -covermode=count -coverprofile=coverage.out
+go test github.com/pelletier/go-toml/cmd/tomljson
 
 # run the entire BurntSushi test suite
 if [[ $# -eq 0 ]] ; then

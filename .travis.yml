@@ -18,4 +18,4 @@ before_install:
 branches:
   only: [master]
 after_success:
-  - $HOME/gopath/bin/goveralls -service=travis-ci
+  - $HOME/gopath/bin/goveralls -service=travis-ci -coverprofile=coverage.out -repotoken $COVERALLS_TOKEN

@@ -500,7 +500,8 @@ func TestFloatsWithoutLeadingZeros(t *testing.T) {
 
 func TestMissingFile(t *testing.T) {
 	_, err := LoadFile("foo.toml")
-	if err.Error() != "open foo.toml: no such file or directory" {
+	if err.Error() != "open foo.toml: no such file or directory" &&
+		err.Error() != "open foo.toml: The system cannot find the file specified." {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -633,22 +634,13 @@ func TestParseKeyGroupArraySpec(t *testing.T) {
 	})
 }
 
-func TestToTomlValue(t *testing.T) {
+func TestTomlValueStringRepresentation(t *testing.T) {
 	for idx, item := range []struct {
 		Value  interface{}
 		Expect string
 	}{
-		{int(1), "1"},
-		{int8(2), "2"},
-		{int16(3), "3"},
-		{int32(4), "4"},
 		{int64(12345), "12345"},
-		{uint(10), "10"},
-		{uint8(20), "20"},
-		{uint16(30), "30"},
-		{uint32(40), "40"},
 		{uint64(50), "50"},
-		{float32(12.456), "12.456"},
 		{float64(123.45), "123.45"},
 		{bool(true), "true"},
 		{"hello world", "\"hello world\""},
@@ -660,44 +652,22 @@ func TestToTomlValue(t *testing.T) {
 			"[\"gamma\",\"delta\"]"},
 		{nil, ""},
 	} {
-		result := toTomlValue(item.Value, 0)
+		result, err := tomlValueStringRepresentation(item.Value)
+		if err != nil {
+			t.Errorf("Test %d - unexpected error: %s", idx, err)
+		}
 		if result != item.Expect {
 			t.Errorf("Test %d - got '%s', expected '%s'", idx, result, item.Expect)
 		}
 	}
 }
 
-func TestToString(t *testing.T) {
-	tree, err := Load("[foo]\n\n[[foo.bar]]\na = 42\n\n[[foo.bar]]\na = 69\n")
-	if err != nil {
-		t.Errorf("Test failed to parse: %v", err)
-		return
-	}
-	result, err := tree.ToString()
-	if err != nil {
-		t.Errorf("Unexpected error: %s", err)
-	}
-	expected := "\n[foo]\n\n  [[foo.bar]]\n    a = 42\n\n  [[foo.bar]]\n    a = 69\n"
-	if result != expected {
-		t.Errorf("Expected got '%s', expected '%s'", result, expected)
-	}
-}
-
 func TestToStringMapStringString(t *testing.T) {
-	in := map[string]interface{}{"m": map[string]string{"v": "abc"}}
-	want := "\n[m]\n  v = \"abc\"\n"
-	tree := TreeFromMap(in)
-	got := tree.String()
-
-	if got != want {
-		t.Errorf("want:\n%q\ngot:\n%q", want, got)
+	tree, err := TreeFromMap(map[string]interface{}{"m": map[string]interface{}{"v": "abc"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
 	}
-}
-
-func TestToStringMapInterfaceInterface(t *testing.T) {
-	in := map[string]interface{}{"m": map[interface{}]interface{}{"v": "abc"}}
 	want := "\n[m]\n  v = \"abc\"\n"
-	tree := TreeFromMap(in)
 	got := tree.String()
 
 	if got != want {
