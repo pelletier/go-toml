@@ -3,6 +3,7 @@ package toml
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -531,5 +532,47 @@ func TestNestedUnmarshal(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Bad nested unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+type customMarshalerParent struct {
+	Person customMarshaler `toml:"name"`
+}
+
+type customMarshaler struct {
+	FirsName string
+	LastName string
+}
+
+func (c customMarshaler) MarshalTOML() ([]byte, error) {
+	fullName := fmt.Sprintf("%s %s", c.FirsName, c.LastName)
+	return []byte(fullName), nil
+}
+
+var customMarshalerData = customMarshaler{FirsName: "Sally", LastName: "Fields"}
+var customMarshalerToml = []byte(`Sally Fields`)
+var nestedCustomMarshalerData = customMarshalerParent{Person: customMarshalerData}
+var nestedCustomMarshalerToml = []byte(`name = "Sally Fields"
+`)
+
+func TestCustomMarshaler(t *testing.T) {
+	result, err := Marshal(customMarshalerData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := customMarshalerToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad custom marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestNestedCustomMarshaler(t *testing.T) {
+	result, err := Marshal(nestedCustomMarshalerData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := nestedCustomMarshalerToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad nested custom marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
 }
