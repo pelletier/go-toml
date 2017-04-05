@@ -51,7 +51,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	case reflect.String:
 		return true
 	case reflect.Struct:
-		return mtype == timeType
+		return mtype == timeType || isCustomMarshaler(mtype)
 	default:
 		return false
 	}
