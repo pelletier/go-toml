@@ -1,7 +1,8 @@
-package toml
+package query
 
 import (
 	"time"
+	"github.com/pelletier/go-toml"
 )
 
 // NodeFilterFn represents a user-defined filter function, for use with
@@ -18,11 +19,11 @@ type NodeFilterFn func(node interface{}) bool
 // QueryResult is the result of Executing a Query.
 type QueryResult struct {
 	items     []interface{}
-	positions []Position
+	positions []toml.Position
 }
 
 // appends a value/position pair to the result set.
-func (r *QueryResult) appendResult(node interface{}, pos Position) {
+func (r *QueryResult) appendResult(node interface{}, pos toml.Position) {
 	r.items = append(r.items, node)
 	r.positions = append(r.positions, pos)
 }
@@ -31,21 +32,12 @@ func (r *QueryResult) appendResult(node interface{}, pos Position) {
 // guaranteed to be in document order, and may be different each time a query is
 // executed.
 func (r QueryResult) Values() []interface{} {
-	values := make([]interface{}, len(r.items))
-	for i, v := range r.items {
-		o, ok := v.(*tomlValue)
-		if ok {
-			values[i] = o.value
-		} else {
-			values[i] = v
-		}
-	}
-	return values
+	return r.items
 }
 
 // Positions is a set of positions for values within a QueryResult.  Each index
 // in Positions() corresponds to the entry in Value() of the same index.
-func (r QueryResult) Positions() []Position {
+func (r QueryResult) Positions() []toml.Position {
 	return r.positions
 }
 
@@ -53,12 +45,14 @@ func (r QueryResult) Positions() []Position {
 type queryContext struct {
 	result       *QueryResult
 	filters      *map[string]NodeFilterFn
-	lastPosition Position
+	lastPosition toml.Position
 }
 
 // generic path functor interface
 type pathFn interface {
 	setNext(next pathFn)
+	// it is the caller's responsibility to set the ctx.lastPosition before invoking call()
+	// node can be one of: *toml.TomlTree, []*toml.TomlTree, or a scalar
 	call(node interface{}, ctx *queryContext)
 }
 
@@ -88,17 +82,17 @@ func (q *Query) appendPath(next pathFn) {
 	next.setNext(newTerminatingFn()) // init the next functor
 }
 
-// CompileQuery compiles a TOML path expression.  The returned Query can be used
-// to match elements within a TomlTree and its descendants.
-func CompileQuery(path string) (*Query, error) {
+// Compile compiles a TOML path expression. The returned Query can be used
+// to match elements within a TomlTree and its descendants. See Execute.
+func Compile(path string) (*Query, error) {
 	return parseQuery(lexQuery(path))
 }
 
 // Execute executes a query against a TomlTree, and returns the result of the query.
-func (q *Query) Execute(tree *TomlTree) *QueryResult {
+func (q *Query) Execute(tree *toml.TomlTree) *QueryResult {
 	result := &QueryResult{
 		items:     []interface{}{},
-		positions: []Position{},
+		positions: []toml.Position{},
 	}
 	if q.root == nil {
 		result.appendResult(tree, tree.GetPosition(""))
@@ -127,7 +121,7 @@ func (q *Query) SetFilter(name string, fn NodeFilterFn) {
 
 var defaultFilterFunctions = map[string]NodeFilterFn{
 	"tree": func(node interface{}) bool {
-		_, ok := node.(*TomlTree)
+		_, ok := node.(*toml.TomlTree)
 		return ok
 	},
 	"int": func(node interface{}) bool {
