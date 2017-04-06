@@ -101,6 +101,7 @@ func (q *Query) Execute(tree *toml.TomlTree) *QueryResult {
 			result:  result,
 			filters: q.filters,
 		}
+		ctx.lastPosition = tree.Position()
 		q.root.call(tree, ctx)
 	}
 	return result
