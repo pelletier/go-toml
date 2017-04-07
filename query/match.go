@@ -5,7 +5,6 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-
 // base match
 type matchBase struct {
 	next pathFn

@@ -17,25 +17,14 @@ const (
 const (
 	tokenError tokenType = iota
 	tokenEOF
-	tokenComment
 	tokenKey
 	tokenString
 	tokenInteger
-	tokenTrue
-	tokenFalse
 	tokenFloat
-	tokenEqual
 	tokenLeftBracket
 	tokenRightBracket
-	tokenLeftCurlyBrace
-	tokenRightCurlyBrace
 	tokenLeftParen
 	tokenRightParen
-	tokenDoubleLeftBracket
-	tokenDoubleRightBracket
-	tokenDate
-	tokenKeyGroup
-	tokenKeyGroupArray
 	tokenComma
 	tokenColon
 	tokenDollar
@@ -43,31 +32,19 @@ const (
 	tokenQuestion
 	tokenDot
 	tokenDotDot
-	tokenEOL
 )
 
 var tokenTypeNames = []string{
 	"Error",
 	"EOF",
-	"Comment",
 	"Key",
 	"String",
 	"Integer",
-	"True",
-	"False",
 	"Float",
-	"=",
 	"[",
 	"]",
-	"{",
-	"}",
 	"(",
 	")",
-	"]]",
-	"[[",
-	"Date",
-	"KeyGroup",
-	"KeyGroupArray",
 	",",
 	":",
 	"$",
@@ -75,7 +52,6 @@ var tokenTypeNames = []string{
 	"?",
 	".",
 	"..",
-	"EOL",
 }
 
 type token struct {
@@ -117,17 +93,6 @@ func isSpace(r rune) bool {
 
 func isAlphanumeric(r rune) bool {
 	return unicode.IsLetter(r) || r == '_'
-}
-
-func isKeyChar(r rune) bool {
-	// Keys start with the first character that isn't whitespace or [ and end
-	// with the last non-whitespace character before the equals sign. Keys
-	// cannot contain a # character."
-	return !(r == '\r' || r == '\n' || r == eof || r == '=')
-}
-
-func isKeyStartChar(r rune) bool {
-	return !(isSpace(r) || r == '\r' || r == '\n' || r == eof || r == '[')
 }
 
 func isDigit(r rune) bool {
