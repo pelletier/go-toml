@@ -209,17 +209,23 @@ func (f *matchFilterFn) call(node interface{}, ctx *queryContext) {
 	case *toml.TomlTree:
 		for _, k := range castNode.Keys() {
 			v := castNode.Get(k)
-			ctx.lastPosition = castNode.GetPosition(k)
-			f.next.call(v, ctx)
+			if fn(v) {
+				ctx.lastPosition = castNode.GetPosition(k)
+				f.next.call(v, ctx)
+			}
+		}
+	case []*toml.TomlTree:
+		for _, v := range castNode {
+			if fn(v) {
+				if len(castNode) > 0 {
+					ctx.lastPosition = castNode[0].Position()
+				}
+				f.next.call(v, ctx)
+			}
 		}
 	case []interface{}:
 		for _, v := range castNode {
 			if fn(v) {
-				if treesArray, ok := node.([]*toml.TomlTree); ok {
-					if len(treesArray) > 0 {
-						ctx.lastPosition = treesArray[0].Position()
-					}
-				}
 				f.next.call(v, ctx)
 			}
 		}
