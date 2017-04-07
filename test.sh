@@ -36,8 +36,10 @@ go build -o toml-test github.com/BurntSushi/toml-test
 # vendorize the current lib for testing
 # NOTE: this basically mocks an install without having to go back out to github for code
 mkdir -p src/github.com/pelletier/go-toml/cmd
+mkdir -p src/github.com/pelletier/go-toml/query
 cp *.go *.toml src/github.com/pelletier/go-toml
 cp -R cmd/* src/github.com/pelletier/go-toml/cmd
+cp -R query/* src/github.com/pelletier/go-toml/query
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
 # Run basic unit tests
