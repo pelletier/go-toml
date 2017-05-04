@@ -52,9 +52,11 @@ func (t *TomlTree) HasPath(keys []string) bool {
 // Keys returns the keys of the toplevel tree.
 // Warning: this is a costly operation.
 func (t *TomlTree) Keys() []string {
-	var keys []string
+	keys := make([]string, len(t.values))
+	i := 0
 	for k := range t.values {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 	return keys
 }
