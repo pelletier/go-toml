@@ -247,7 +247,7 @@ func unmarshal(data []byte, t *TomlTree, v interface{}) error {
 }
 
 // Unmarshal attempts to unmarshal the TomlTree into a Go struct pointed by v.
-// Unmarshaler interfaces nor UnmarshalTOML functions are not supported for
+// Neither Unmarshaler interfaces nor UnmarshalTOML functions are supported for
 // sub-structs, and only definite types can be unmarshaled.
 func (t *TomlTree) Unmarshal(v interface{}) error {
 	return unmarshal(nil, t, v)
