@@ -16,34 +16,34 @@ import (
 // to use from multiple goroutines.
 type NodeFilterFn func(node interface{}) bool
 
-// QueryResult is the result of Executing a Query.
-type QueryResult struct {
+// Result is the result of Executing a Query.
+type Result struct {
 	items     []interface{}
 	positions []toml.Position
 }
 
 // appends a value/position pair to the result set.
-func (r *QueryResult) appendResult(node interface{}, pos toml.Position) {
+func (r *Result) appendResult(node interface{}, pos toml.Position) {
 	r.items = append(r.items, node)
 	r.positions = append(r.positions, pos)
 }
 
-// Values is a set of values within a QueryResult.  The order of values is not
+// Values is a set of values within a Result.  The order of values is not
 // guaranteed to be in document order, and may be different each time a query is
 // executed.
-func (r QueryResult) Values() []interface{} {
+func (r Result) Values() []interface{} {
 	return r.items
 }
 
-// Positions is a set of positions for values within a QueryResult.  Each index
+// Positions is a set of positions for values within a Result.  Each index
 // in Positions() corresponds to the entry in Value() of the same index.
-func (r QueryResult) Positions() []toml.Position {
+func (r Result) Positions() []toml.Position {
 	return r.positions
 }
 
 // runtime context for executing query paths
 type queryContext struct {
-	result       *QueryResult
+	result       *Result
 	filters      *map[string]NodeFilterFn
 	lastPosition toml.Position
 }
@@ -89,8 +89,8 @@ func Compile(path string) (*Query, error) {
 }
 
 // Execute executes a query against a TomlTree, and returns the result of the query.
-func (q *Query) Execute(tree *toml.TomlTree) *QueryResult {
-	result := &QueryResult{
+func (q *Query) Execute(tree *toml.TomlTree) *Result {
+	result := &Result{
 		items:     []interface{}{},
 		positions: []toml.Position{},
 	}

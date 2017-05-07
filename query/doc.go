@@ -124,7 +124,7 @@
 //
 // Query Results
 //
-// An executed query returns a QueryResult object.  This contains the nodes
+// An executed query returns a Result object.  This contains the nodes
 // in the TOML tree that qualify the query expression.  Position information
 // is also available for each value in the set.
 //

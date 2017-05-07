@@ -18,7 +18,7 @@ type queryTestNode struct {
 func valueString(root interface{}) string {
 	result := "" //fmt.Sprintf("%T:", root)
 	switch node := root.(type) {
-	case *QueryResult:
+	case *Result:
 		items := []string{}
 		for i, v := range node.Values() {
 			items = append(items, fmt.Sprintf("%s:%s",
