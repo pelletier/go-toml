@@ -1,12 +1,12 @@
 // Package query performs JSONPath-like queries on a TOML document.
 //
 // The query path implementation is based loosely on the JSONPath specification:
-// http://goessner.net/articles/JsonPath/
+// http://goessner.net/articles/JsonPath/.
 //
 // The idea behind a query path is to allow quick access to any element, or set
 // of elements within TOML document, with a single expression.
 //
-//   result, err := tree.Query("$.foo.bar.baz")
+//   result, err := query.CompileAndExecute("$.foo.bar.baz", tree)
 //
 // This is roughly equivalent to:
 //
@@ -28,6 +28,8 @@
 // the structure of the TOML file can vary.  Rather than making assumptions about
 // a document's structure, a query allows the programmer to make structured
 // requests into the document, and get zero or more values as a result.
+//
+// Query syntax
 //
 // The syntax of a query begins with a root token, followed by any number
 // sub-expressions:
@@ -68,35 +70,35 @@
 // Negative indexes represent values from the end of the array, counting backwards.
 //
 //   // select the last index of the array named 'foo'
-//   tree.Query("$.foo[-1]")
+//   query.CompileAndExecute("$.foo[-1]", tree)
 //
 // Slice expressions are supported, by using ':' to separate a start/end index pair.
 //
 //   // select up to the first five elements in the array
-//   tree.Query("$.foo[0:5]")
+//   query.CompileAndExecute("$.foo[0:5]", tree)
 //
 // Slice expressions also allow negative indexes for the start and stop
 // arguments.
 //
 //   // select all array elements.
-//   tree.Query("$.foo[0:-1]")
+//   query.CompileAndExecute("$.foo[0:-1]", tree)
 //
 // Slice expressions may have an optional stride/step parameter:
 //
 //   // select every other element
-//   tree.Query("$.foo[0:-1:2]")
+//   query.CompileAndExecute("$.foo[0:-1:2]", tree)
 //
 // Slice start and end parameters are also optional:
 //
 //   // these are all equivalent and select all the values in the array
-//   tree.Query("$.foo[:]")
-//   tree.Query("$.foo[0:]")
-//   tree.Query("$.foo[:-1]")
-//   tree.Query("$.foo[0:-1:]")
-//   tree.Query("$.foo[::1]")
-//   tree.Query("$.foo[0::1]")
-//   tree.Query("$.foo[:-1:1]")
-//   tree.Query("$.foo[0:-1:1]")
+//   query.CompileAndExecute("$.foo[:]", tree)
+//   query.CompileAndExecute("$.foo[0:]", tree)
+//   query.CompileAndExecute("$.foo[:-1]", tree)
+//   query.CompileAndExecute("$.foo[0:-1:]", tree)
+//   query.CompileAndExecute("$.foo[::1]", tree)
+//   query.CompileAndExecute("$.foo[0::1]", tree)
+//   query.CompileAndExecute("$.foo[:-1:1]", tree)
+//   query.CompileAndExecute("$.foo[0:-1:1]", tree)
 //
 // Query Filters
 //
@@ -105,7 +107,7 @@
 // and/or into the result set.
 //
 //   // returns children of foo that are permitted by the 'bar' filter.
-//   tree.Query("$.foo[?(bar)]")
+//   query.CompileAndExecute("$.foo[?(bar)]", tree)
 //
 // There are several filters provided with the library:
 //
@@ -129,7 +131,7 @@
 // is also available for each value in the set.
 //
 //   // display the results of a query
-//   results := tree.Query("$.foo.bar.baz")
+//   results := query.CompileAndExecute("$.foo.bar.baz", tree)
 //   for idx, value := results.Values() {
 //       fmt.Println("%v: %v", results.Positions()[idx], value)
 //   }
@@ -141,10 +143,10 @@
 // penalty of having to recompile the query expression each time.
 //
 //   // basic query
-//   results := tree.Query("$.foo.bar.baz")
+//   results := query.CompileAndExecute("$.foo.bar.baz", tree)
 //
 //   // compiled query
-//   query := toml.CompileQuery("$.foo.bar.baz")
+//   query, err := toml.Compile("$.foo.bar.baz")
 //   results := query.Execute(tree)
 //
 //   // run the compiled query again on a different tree
@@ -157,7 +159,7 @@
 // signifies if the passed node is kept or discarded, respectively.
 //
 //   // create a query that references a user-defined filter
-//   query, _ := CompileQuery("$[?(bazOnly)]")
+//   query, _ := query.Compile("$[?(bazOnly)]")
 //
 //   // define the filter, and assign it to the query
 //   query.SetFilter("bazOnly", func(node interface{}) bool{

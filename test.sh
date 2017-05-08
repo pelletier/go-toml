@@ -19,6 +19,9 @@ function git_clone() {
   popd
 }
 
+# Remove potential previous runs
+rm -rf src test_program_bin toml-test
+
 # Run go vet
 go vet ./...
 

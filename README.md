@@ -18,7 +18,7 @@ Go-toml provides the following features for using data parsed from TOML document
 * Load TOML documents from files and string data
 * Easily navigate TOML structure using TomlTree
 * Line & column position data for all parsed elements
-* Query support similar to JSON-Path
+* [Query support similar to JSON-Path](query/)
 * Syntax errors contain line and column numbers
 
 Go-toml is designed to help cover use-cases not covered by reflection-based TOML parsing:

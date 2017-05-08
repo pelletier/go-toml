@@ -2,6 +2,7 @@ package query
 
 import (
 	"time"
+
 	"github.com/pelletier/go-toml"
 )
 
@@ -105,6 +106,15 @@ func (q *Query) Execute(tree *toml.TomlTree) *Result {
 		q.root.call(tree, ctx)
 	}
 	return result
+}
+
+// CompileAndExecute is a shorthand for Compile(path) followed by Execute(tree).
+func CompileAndExecute(path string, tree *toml.TomlTree) (*Result, error) {
+	query, err := Compile(path)
+	if err != nil {
+		return nil, err
+	}
+	return query.Execute(tree), nil
 }
 
 // SetFilter sets a user-defined filter function.  These may be used inside
