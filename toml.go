@@ -36,6 +36,11 @@ func TreeFromMap(m map[string]interface{}) (*TomlTree, error) {
 	return result.(*TomlTree), nil
 }
 
+// Position returns the position of the tree.
+func (t *TomlTree) Position() Position {
+	return t.position
+}
+
 // Has returns a boolean indicating if the given key exists.
 func (t *TomlTree) Has(key string) bool {
 	if key == "" {
@@ -245,15 +250,6 @@ func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 		}
 	}
 	return nil
-}
-
-// Query compiles and executes a query on a tree and returns the query result.
-func (t *TomlTree) Query(query string) (*QueryResult, error) {
-	q, err := CompileQuery(query)
-	if err != nil {
-		return nil, err
-	}
-	return q.Execute(t), nil
 }
 
 // LoadReader creates a TomlTree from any io.Reader.
