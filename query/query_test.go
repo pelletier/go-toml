@@ -1,9 +1,10 @@
 package query
 
 import (
-	"testing"
-	"github.com/pelletier/go-toml"
 	"fmt"
+	"testing"
+
+	"github.com/pelletier/go-toml"
 )
 
 func assertArrayContainsInAnyOrder(t *testing.T, array []interface{}, objects ...interface{}) {
@@ -37,11 +38,10 @@ func TestQueryExample(t *testing.T) {
       title = "Neuromancer"
       author = "William Gibson"
     `)
-	query, err := Compile("$.book.author")
+	authors, err := CompileAndExecute("$.book.author", config)
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
-	authors := query.Execute(config)
 	names := authors.Values()
 	if len(names) != 3 {
 		t.Fatalf("query should return 3 names but returned %d", len(names))
