@@ -99,13 +99,13 @@ func ExampleNodeFilterFn_filterExample() {
 
 	// define the filter, and assign it to the query
 	query.SetFilter("bazOnly", func(node interface{}) bool {
-		if tree, ok := node.(*toml.TomlTree); ok {
+		if tree, ok := node.(*toml.Tree); ok {
 			return tree.Has("baz")
 		}
 		return false // reject all other node types
 	})
 
-	// results contain only the 'struct_two' TomlTree
+	// results contain only the 'struct_two' Tree
 	query.Execute(tree)
 }
 
@@ -147,8 +147,8 @@ func TestTomlQuery(t *testing.T) {
 		t.Errorf("Expected resultset of 1, got %d instead: %v", len(values), values)
 	}
 
-	if tt, ok := values[0].(*toml.TomlTree); !ok {
-		t.Errorf("Expected type of TomlTree: %T", values[0])
+	if tt, ok := values[0].(*toml.Tree); !ok {
+		t.Errorf("Expected type of Tree: %T", values[0])
 	} else if tt.Get("a") != int64(1) {
 		t.Errorf("Expected 'a' with a value 1: %v", tt.Get("a"))
 	} else if tt.Get("b") != int64(2) {

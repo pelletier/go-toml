@@ -13,14 +13,14 @@
 //   // load TOML data stored in a string
 //   tree, err := toml.Load(stringContainingTomlData)
 //
-// Either way, the result is a TomlTree object that can be used to navigate the
+// Either way, the result is a Tree object that can be used to navigate the
 // structure and data within the original document.
 //
 //
-// Getting data from the TomlTree
+// Getting data from the Tree
 //
 // After parsing TOML data with Load() or LoadFile(), use the Has() and Get()
-// methods on the returned TomlTree, to find your way through the document data.
+// methods on the returned Tree, to find your way through the document data.
 //
 //   if tree.Has("foo") {
 //     fmt.Println("foo is:", tree.Get("foo"))
@@ -50,11 +50,11 @@
 //   tree.GetPath([]string{"foo","bar","baz"})
 //
 // Note that this is distinct from the heavyweight query syntax supported by
-// TomlTree.Query() and the Query() struct (see below).
+// Tree.Query() and the Query() struct (see below).
 //
 // Position Support
 //
-// Each element within the TomlTree is stored with position metadata, which is
+// Each element within the Tree is stored with position metadata, which is
 // invaluable for providing semantic feedback to a user.  This helps in
 // situations where the TOML file parses correctly, but contains data that is
 // not correct for the application.  In such cases, an error message can be

@@ -53,7 +53,7 @@ type queryContext struct {
 type pathFn interface {
 	setNext(next pathFn)
 	// it is the caller's responsibility to set the ctx.lastPosition before invoking call()
-	// node can be one of: *toml.TomlTree, []*toml.TomlTree, or a scalar
+	// node can be one of: *toml.Tree, []*toml.Tree, or a scalar
 	call(node interface{}, ctx *queryContext)
 }
 
@@ -84,13 +84,13 @@ func (q *Query) appendPath(next pathFn) {
 }
 
 // Compile compiles a TOML path expression. The returned Query can be used
-// to match elements within a TomlTree and its descendants. See Execute.
+// to match elements within a Tree and its descendants. See Execute.
 func Compile(path string) (*Query, error) {
 	return parseQuery(lexQuery(path))
 }
 
-// Execute executes a query against a TomlTree, and returns the result of the query.
-func (q *Query) Execute(tree *toml.TomlTree) *Result {
+// Execute executes a query against a Tree, and returns the result of the query.
+func (q *Query) Execute(tree *toml.Tree) *Result {
 	result := &Result{
 		items:     []interface{}{},
 		positions: []toml.Position{},
@@ -109,7 +109,7 @@ func (q *Query) Execute(tree *toml.TomlTree) *Result {
 }
 
 // CompileAndExecute is a shorthand for Compile(path) followed by Execute(tree).
-func CompileAndExecute(path string, tree *toml.TomlTree) (*Result, error) {
+func CompileAndExecute(path string, tree *toml.Tree) (*Result, error) {
 	query, err := Compile(path)
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (q *Query) SetFilter(name string, fn NodeFilterFn) {
 
 var defaultFilterFunctions = map[string]NodeFilterFn{
 	"tree": func(node interface{}) bool {
-		_, ok := node.(*toml.TomlTree)
+		_, ok := node.(*toml.Tree)
 		return ok
 	},
 	"int": func(node interface{}) bool {
