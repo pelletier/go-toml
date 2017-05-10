@@ -36,6 +36,11 @@ func TreeFromMap(m map[string]interface{}) (*TomlTree, error) {
 	return result.(*TomlTree), nil
 }
 
+// Position returns the position of the tree.
+func (t *TomlTree) Position() Position {
+	return t.position
+}
+
 // Has returns a boolean indicating if the given key exists.
 func (t *TomlTree) Has(key string) bool {
 	if key == "" {
@@ -52,9 +57,11 @@ func (t *TomlTree) HasPath(keys []string) bool {
 // Keys returns the keys of the toplevel tree.
 // Warning: this is a costly operation.
 func (t *TomlTree) Keys() []string {
-	var keys []string
+	keys := make([]string, len(t.values))
+	i := 0
 	for k := range t.values {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 	return keys
 }
@@ -178,14 +185,14 @@ func (t *TomlTree) GetDefaultPath(keys []string, def interface{}) interface{} {
 
 // Set an element in the tree.
 // Key is a dot-separated path (e.g. a.b.c).
-// Creates all necessary intermediates trees, if needed.
+// Creates all necessary intermediate trees, if needed.
 func (t *TomlTree) Set(key string, value interface{}) {
 	t.SetPath(strings.Split(key, "."), value)
 }
 
 // SetPath sets an element in the tree.
 // Keys is an array of path elements (e.g. {"a","b","c"}).
-// Creates all necessary intermediates trees, if needed.
+// Creates all necessary intermediate trees, if needed.
 func (t *TomlTree) SetPath(keys []string, value interface{}) {
 	subtree := t
 	for _, intermediateKey := range keys[:len(keys)-1] {
@@ -252,15 +259,6 @@ func (t *TomlTree) createSubTree(keys []string, pos Position) error {
 		}
 	}
 	return nil
-}
-
-// Query compiles and executes a query on a tree and returns the query result.
-func (t *TomlTree) Query(query string) (*QueryResult, error) {
-	q, err := CompileQuery(query)
-	if err != nil {
-		return nil, err
-	}
-	return q.Execute(t), nil
 }
 
 // LoadReader creates a TomlTree from any io.Reader.

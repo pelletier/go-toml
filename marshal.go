@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -224,22 +225,13 @@ func valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
 	}
 }
 
-/*
-Unmarshal parses the TOML-encoded data and stores the result in the value
-pointed to by v. Behavior is similar to the Go json encoder, except that there
-is no concept of an Unmarshaler interface or UnmarshalTOML function for
-sub-structs, and currently only definite types can be unmarshaled to (i.e. no
-`interface{}`).
-*/
-func Unmarshal(data []byte, v interface{}) error {
+// Unmarshal attempts to unmarshal the TomlTree into a Go struct pointed by v.
+// Neither Unmarshaler interfaces nor UnmarshalTOML functions are supported for
+// sub-structs, and only definite types can be unmarshaled.
+func (t *TomlTree) Unmarshal(v interface{}) error {
 	mtype := reflect.TypeOf(v)
 	if mtype.Kind() != reflect.Ptr || mtype.Elem().Kind() != reflect.Struct {
 		return errors.New("Only a pointer to struct can be unmarshaled from TOML")
-	}
-
-	t, err := Load(string(data))
-	if err != nil {
-		return err
 	}
 
 	sval, err := valueFromTree(mtype.Elem(), t)
@@ -248,6 +240,19 @@ func Unmarshal(data []byte, v interface{}) error {
 	}
 	reflect.ValueOf(v).Elem().Set(sval)
 	return nil
+}
+
+// Unmarshal parses the TOML-encoded data and stores the result in the value
+// pointed to by v. Behavior is similar to the Go json encoder, except that there
+// is no concept of an Unmarshaler interface or UnmarshalTOML function for
+// sub-structs, and currently only definite types can be unmarshaled to (i.e. no
+// `interface{}`).
+func Unmarshal(data []byte, v interface{}) error {
+	t, err := LoadReader(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	return t.Unmarshal(v)
 }
 
 // Convert toml tree to marshal struct or map, using marshal type
