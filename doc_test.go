@@ -17,7 +17,7 @@ func Example_comprehensiveExample() {
 		password := config.Get("postgres.password").(string)
 
 		// or using an intermediate object
-		configTree := config.Get("postgres").(*TomlTree)
+		configTree := config.Get("postgres").(*Tree)
 		user = configTree.Get("user").(string)
 		password = configTree.Get("password").(string)
 		fmt.Println("User is ", user, ". Password is ", password)

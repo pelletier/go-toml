@@ -70,12 +70,12 @@ func TestTomlHasPath(t *testing.T) {
 }
 
 func TestTomlGetPath(t *testing.T) {
-	node := newTomlTree()
+	node := newTree()
 	//TODO: set other node data
 
 	for idx, item := range []struct {
 		Path     []string
-		Expected *TomlTree
+		Expected *Tree
 	}{
 		{ // empty path test
 			[]string{},

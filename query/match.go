@@ -42,7 +42,7 @@ func newMatchKeyFn(name string) *matchKeyFn {
 }
 
 func (f *matchKeyFn) call(node interface{}, ctx *queryContext) {
-	if array, ok := node.([]*toml.TomlTree); ok {
+	if array, ok := node.([]*toml.Tree); ok {
 		for _, tree := range array {
 			item := tree.Get(f.Name)
 			if item != nil {
@@ -50,7 +50,7 @@ func (f *matchKeyFn) call(node interface{}, ctx *queryContext) {
 				f.next.call(item, ctx)
 			}
 		}
-	} else if tree, ok := node.(*toml.TomlTree); ok {
+	} else if tree, ok := node.(*toml.Tree); ok {
 		item := tree.Get(f.Name)
 		if item != nil {
 			ctx.lastPosition = tree.GetPosition(f.Name)
@@ -72,7 +72,7 @@ func newMatchIndexFn(idx int) *matchIndexFn {
 func (f *matchIndexFn) call(node interface{}, ctx *queryContext) {
 	if arr, ok := node.([]interface{}); ok {
 		if f.Idx < len(arr) && f.Idx >= 0 {
-			if treesArray, ok := node.([]*toml.TomlTree); ok {
+			if treesArray, ok := node.([]*toml.Tree); ok {
 				if len(treesArray) > 0 {
 					ctx.lastPosition = treesArray[0].Position()
 				}
@@ -107,7 +107,7 @@ func (f *matchSliceFn) call(node interface{}, ctx *queryContext) {
 		}
 		// loop and gather
 		for idx := realStart; idx < realEnd; idx += f.Step {
-			if treesArray, ok := node.([]*toml.TomlTree); ok {
+			if treesArray, ok := node.([]*toml.Tree); ok {
 				if len(treesArray) > 0 {
 					ctx.lastPosition = treesArray[0].Position()
 				}
@@ -127,7 +127,7 @@ func newMatchAnyFn() *matchAnyFn {
 }
 
 func (f *matchAnyFn) call(node interface{}, ctx *queryContext) {
-	if tree, ok := node.(*toml.TomlTree); ok {
+	if tree, ok := node.(*toml.Tree); ok {
 		for _, k := range tree.Keys() {
 			v := tree.Get(k)
 			ctx.lastPosition = tree.GetPosition(k)
@@ -164,17 +164,17 @@ func newMatchRecursiveFn() *matchRecursiveFn {
 
 func (f *matchRecursiveFn) call(node interface{}, ctx *queryContext) {
 	originalPosition := ctx.lastPosition
-	if tree, ok := node.(*toml.TomlTree); ok {
-		var visit func(tree *toml.TomlTree)
-		visit = func(tree *toml.TomlTree) {
+	if tree, ok := node.(*toml.Tree); ok {
+		var visit func(tree *toml.Tree)
+		visit = func(tree *toml.Tree) {
 			for _, k := range tree.Keys() {
 				v := tree.Get(k)
 				ctx.lastPosition = tree.GetPosition(k)
 				f.next.call(v, ctx)
 				switch node := v.(type) {
-				case *toml.TomlTree:
+				case *toml.Tree:
 					visit(node)
-				case []*toml.TomlTree:
+				case []*toml.Tree:
 					for _, subtree := range node {
 						visit(subtree)
 					}
@@ -205,7 +205,7 @@ func (f *matchFilterFn) call(node interface{}, ctx *queryContext) {
 			f.Pos.String(), f.Name))
 	}
 	switch castNode := node.(type) {
-	case *toml.TomlTree:
+	case *toml.Tree:
 		for _, k := range castNode.Keys() {
 			v := castNode.Get(k)
 			if fn(v) {
@@ -213,7 +213,7 @@ func (f *matchFilterFn) call(node interface{}, ctx *queryContext) {
 				f.next.call(v, ctx)
 			}
 		}
-	case []*toml.TomlTree:
+	case []*toml.Tree:
 		for _, v := range castNode {
 			if fn(v) {
 				if len(castNode) > 0 {

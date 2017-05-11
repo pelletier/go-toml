@@ -112,7 +112,7 @@
 // There are several filters provided with the library:
 //
 //   tree
-//          Allows nodes of type TomlTree.
+//          Allows nodes of type Tree.
 //   int
 //          Allows nodes of type int64.
 //   float
@@ -138,7 +138,7 @@
 //
 // Compiled Queries
 //
-// Queries may be executed directly on a TomlTree object, or compiled ahead
+// Queries may be executed directly on a Tree object, or compiled ahead
 // of time and executed discretely.  The former is more convienent, but has the
 // penalty of having to recompile the query expression each time.
 //
@@ -163,7 +163,7 @@
 //
 //   // define the filter, and assign it to the query
 //   query.SetFilter("bazOnly", func(node interface{}) bool{
-//       if tree, ok := node.(*TomlTree); ok {
+//       if tree, ok := node.(*Tree); ok {
 //           return tree.Has("baz")
 //       }
 //       return false  // reject all other node types

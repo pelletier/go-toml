@@ -181,7 +181,7 @@ func TestDocPartialUnmarshal(t *testing.T) {
 	result := testDocSubs{}
 
 	tree, _ := LoadFile("marshal_test.toml")
-	subTree := tree.Get("subdoc").(*TomlTree)
+	subTree := tree.Get("subdoc").(*Tree)
 	err := subTree.Unmarshal(&result)
 	expected := docData.Subdocs
 	if err != nil {
