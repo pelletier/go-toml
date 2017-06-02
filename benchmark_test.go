@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	burntsushi "github.com/BurntSushi/toml"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -95,7 +96,7 @@ type benchmarkDoc struct {
 		Key1 []int64
 		Key2 []string
 		Key3 [][]int64
-		// TODO: Key4
+		// TODO: Key4 not supported by go-toml's Unmarshal
 		Key5 []int64
 		Key6 []int64
 	}
@@ -139,6 +140,21 @@ func BenchmarkUnmarshalToml(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		target := benchmarkDoc{}
 		err := Unmarshal(bytes, &target)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkUnmarshalBurntSushiToml(b *testing.B) {
+	bytes, err := ioutil.ReadFile("benchmark.toml")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		target := benchmarkDoc{}
+		err := burntsushi.Unmarshal(bytes, &target)
 		if err != nil {
 			b.Fatal(err)
 		}
