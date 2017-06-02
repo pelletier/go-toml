@@ -294,6 +294,21 @@ func TestTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
 	testMaps(t, treeMap, expected)
 }
 
+func TestTreeWriteToFloat(t *testing.T) {
+	tree, err := Load(`a = 3.0`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	str, err := tree.ToTomlString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `a = 3.0`
+	if strings.TrimSpace(str) != strings.TrimSpace(expected) {
+		t.Fatalf("Expected:\n%s\nGot:\n%s", expected, str)
+	}
+}
+
 func BenchmarkTreeToTomlString(b *testing.B) {
 	toml, err := Load(sampleHard)
 	if err != nil {
