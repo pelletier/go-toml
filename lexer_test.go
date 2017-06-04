@@ -1,14 +1,12 @@
 package toml
 
 import (
-	"os"
 	"reflect"
-	"strings"
 	"testing"
 )
 
 func testFlow(t *testing.T, input string, expectedFlow []token) {
-	tokens := lexToml(strings.NewReader(input))
+	tokens := lexToml([]byte(input))
 	if !reflect.DeepEqual(tokens, expectedFlow) {
 		t.Fatal("Different flows. Expected\n", expectedFlow, "\nGot:\n", tokens)
 	}
@@ -745,13 +743,8 @@ pluralizeListTitles = false
 	url = "https://github.com/spf13/hugo/releases"
 	weight = -200
 `
-	rd := strings.NewReader(sample)
-
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rd.Seek(0, os.SEEK_SET)
-		ch := lexToml(rd)
-		for _ = range ch {
-		}
+		lexToml([]byte(sample))
 	}
 }
