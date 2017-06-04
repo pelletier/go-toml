@@ -2,37 +2,15 @@ package toml
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
 
 func testFlow(t *testing.T, input string, expectedFlow []token) {
-	ch := lexToml(strings.NewReader(input))
-	for _, expected := range expectedFlow {
-		token := <-ch
-		if token != expected {
-			t.Log("While testing: ", input)
-			t.Log("compared (got)", token, "to (expected)", expected)
-			t.Log("\tvalue:", token.val, "<->", expected.val)
-			t.Log("\tvalue as bytes:", []byte(token.val), "<->", []byte(expected.val))
-			t.Log("\ttype:", token.typ.String(), "<->", expected.typ.String())
-			t.Log("\tline:", token.Line, "<->", expected.Line)
-			t.Log("\tcolumn:", token.Col, "<->", expected.Col)
-			t.Log("compared", token, "to", expected)
-			t.FailNow()
-		}
-	}
-
-	tok, ok := <-ch
-	if ok {
-		t.Log("channel is not closed!")
-		t.Log(len(ch)+1, "tokens remaining:")
-
-		t.Log("token ->", tok)
-		for token := range ch {
-			t.Log("token ->", token)
-		}
-		t.FailNow()
+	tokens := lexToml(strings.NewReader(input))
+	if !reflect.DeepEqual(tokens, expectedFlow) {
+		t.Fatal("Different flows. Expected\n", expectedFlow, "\nGot:\n", tokens)
 	}
 }
 
