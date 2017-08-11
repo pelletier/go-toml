@@ -4,6 +4,7 @@ package toml_test
 
 import (
 	"fmt"
+	"log"
 
 	toml "github.com/pelletier/go-toml"
 )
@@ -54,6 +55,27 @@ func Example_unmarshal() {
 	fmt.Println(person.Name, "is", person.Age, "and works at", person.Employer.Name)
 	// Output:
 	// John is 30 and works at Company Inc.
+}
+
+func ExampleMarshal() {
+	type Postgres struct {
+		User     string `toml:"user"`
+		Password string `toml:"password"`
+	}
+	type Config struct {
+		Postgres Postgres `toml:"postgres"`
+	}
+
+	config := Config{Postgres{User: "pelletier", Password: "mypassword"}}
+	b, err := toml.Marshal(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(b))
+	// Output:
+	// [postgres]
+	//   password = "mypassword"
+	//   user = "pelletier"
 }
 
 func ExampleUnmarshal() {
