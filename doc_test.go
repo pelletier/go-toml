@@ -1,13 +1,15 @@
 // code examples for godoc
 
-package toml
+package toml_test
 
 import (
 	"fmt"
+
+	toml "github.com/pelletier/go-toml"
 )
 
 func Example_tree() {
-	config, err := LoadFile("config.toml")
+	config, err := toml.LoadFile("config.toml")
 
 	if err != nil {
 		fmt.Println("Error ", err.Error())
@@ -17,7 +19,7 @@ func Example_tree() {
 		password := config.Get("postgres.password").(string)
 
 		// or using an intermediate object
-		configTree := config.Get("postgres").(*Tree)
+		configTree := config.Get("postgres").(*toml.Tree)
 		user = configTree.Get("user").(string)
 		password = configTree.Get("password").(string)
 		fmt.Println("User is", user, " and password is", password)
@@ -48,6 +50,29 @@ func Example_unmarshal() {
 	`)
 
 	person := Person{}
-	Unmarshal(document, &person)
+	toml.Unmarshal(document, &person)
 	fmt.Println(person.Name, "is", person.Age, "and works at", person.Employer.Name)
+	// Output:
+	// John is 30 and works at Company Inc.
+}
+
+func ExampleUnmarshal() {
+	type Postgres struct {
+		User     string
+		Password string
+	}
+	type Config struct {
+		Postgres Postgres
+	}
+
+	doc := []byte(`
+	[postgres]
+	user = "pelletier"
+	password = "mypassword"`)
+
+	config := Config{}
+	toml.Unmarshal(doc, &config)
+	fmt.Println("user=", config.Postgres.User)
+	// Output:
+	// user= pelletier
 }
