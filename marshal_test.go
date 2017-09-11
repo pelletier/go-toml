@@ -598,3 +598,47 @@ func TestNestedCustomMarshaler(t *testing.T) {
 		t.Errorf("Bad nested custom marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
 }
+
+var commentTestToml = []byte(`
+# postgres it's a comment on type
+[postgres]
+  noComment = "cvalue"
+
+  # A comment on AttrB
+  password = "bvalue"
+
+  # A comment on AttrA
+  user = "avalue"
+
+  # a comment on My
+  [[postgres.My]]
+
+  # a comment on My
+  [[postgres.My]]
+`)
+
+func TestMarshalComment(t *testing.T) {
+	type TypeC struct {
+		my string
+	}
+	type TypeB struct {
+		AttrA string  `toml:"user" comment:"A comment on AttrA"`
+		AttrB string  `toml:"password" comment:"A comment on AttrB"`
+		AttrC string  `toml:"noComment"`
+		My    []TypeC `comment:"a comment on My"`
+	}
+	type TypeA struct {
+		TypeB TypeB `toml:"postgres" comment:"it's a comment on type"`
+	}
+
+	ta := []TypeC{{my: "Foo"}, {my: "Baar"}}
+	config := TypeA{TypeB{AttrA: "avalue", AttrB: "bvalue", AttrC: "cvalue", My: ta}}
+	result, err := Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := commentTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
