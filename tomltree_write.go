@@ -119,7 +119,7 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64) (
 		}
 
 		if v.comment != nil {
-			comment := strings.Replace(*v.comment, "\n", "\n"+indent, -1)
+			comment := strings.Replace(*v.comment, "\n", "\n"+indent+"#", -1)
 			writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", comment, "\n")
 			bytesCount += int64(writtenBytesCountComment)
 			if errc != nil {
@@ -151,7 +151,7 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64) (
 		}
 
 		if t.comment != nil {
-			comment := strings.Replace(*t.comment, "\n", "\n"+indent, -1)
+			comment := strings.Replace(*t.comment, "\n", "\n"+indent+"#", -1)
 			writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", comment)
 			bytesCount += int64(writtenBytesCountComment)
 			if errc != nil {

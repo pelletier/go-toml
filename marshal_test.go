@@ -605,7 +605,8 @@ var commentTestToml = []byte(`
   # isCommented = "dvalue"
   noComment = "cvalue"
 
-  # A comment on AttrB
+  # A comment on AttrB with a
+  # break line
   password = "bvalue"
 
   # A comment on AttrA
@@ -614,16 +615,22 @@ var commentTestToml = []byte(`
   # a comment on My
   [[postgres.My]]
 
+    # a comment on my on typeC
+    My = "Foo"
+
   [[postgres.My]]
+
+    # a comment on my on typeC
+    My = "Baar"
 `)
 
 func TestMarshalComment(t *testing.T) {
 	type TypeC struct {
-		my string
+		My string `comment:"a comment on my on typeC"`
 	}
 	type TypeB struct {
 		AttrA string  `toml:"user" comment:"A comment on AttrA"`
-		AttrB string  `toml:"password" comment:"A comment on AttrB"`
+		AttrB string  `toml:"password" comment:"A comment on AttrB with a\n break line"`
 		AttrC string  `toml:"noComment"`
 		AttrD string  `toml:"isCommented" commented:"true"`
 		My    []TypeC `comment:"a comment on My"`
@@ -632,7 +639,7 @@ func TestMarshalComment(t *testing.T) {
 		TypeB TypeB `toml:"postgres" comment:"it's a comment on type"`
 	}
 
-	ta := []TypeC{{my: "Foo"}, {my: "Baar"}}
+	ta := []TypeC{{My: "Foo"}, {My: "Baar"}}
 	config := TypeA{TypeB{AttrA: "avalue", AttrB: "bvalue", AttrC: "cvalue", AttrD: "dvalue", My: ta}}
 	result, err := Marshal(config)
 	if err != nil {
