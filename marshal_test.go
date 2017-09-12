@@ -600,8 +600,9 @@ func TestNestedCustomMarshaler(t *testing.T) {
 }
 
 var commentTestToml = []byte(`
-# postgres it's a comment on type
+# it's a comment on type
 [postgres]
+  # isCommented = "dvalue"
   noComment = "cvalue"
 
   # A comment on AttrB
@@ -613,7 +614,6 @@ var commentTestToml = []byte(`
   # a comment on My
   [[postgres.My]]
 
-  # a comment on My
   [[postgres.My]]
 `)
 
@@ -625,6 +625,7 @@ func TestMarshalComment(t *testing.T) {
 		AttrA string  `toml:"user" comment:"A comment on AttrA"`
 		AttrB string  `toml:"password" comment:"A comment on AttrB"`
 		AttrC string  `toml:"noComment"`
+		AttrD string  `toml:"isCommented" commented:"true"`
 		My    []TypeC `comment:"a comment on My"`
 	}
 	type TypeA struct {
@@ -632,7 +633,7 @@ func TestMarshalComment(t *testing.T) {
 	}
 
 	ta := []TypeC{{my: "Foo"}, {my: "Baar"}}
-	config := TypeA{TypeB{AttrA: "avalue", AttrB: "bvalue", AttrC: "cvalue", My: ta}}
+	config := TypeA{TypeB{AttrA: "avalue", AttrB: "bvalue", AttrC: "cvalue", AttrD: "dvalue", My: ta}}
 	result, err := Marshal(config)
 	if err != nil {
 		t.Fatal(err)

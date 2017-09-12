@@ -119,14 +119,19 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64) (
 		}
 
 		if v.comment != nil {
-			writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", *v.comment, "\n")
+			comment := strings.Replace(*v.comment, "\n", "\n"+indent, -1)
+			writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", comment, "\n")
 			bytesCount += int64(writtenBytesCountComment)
 			if errc != nil {
 				return bytesCount, errc
 			}
 		}
 
-		writtenBytesCount, err := writeStrings(w, indent, k, " = ", repr, "\n")
+		var commented string
+		if v.commented {
+			commented = "# "
+		}
+		writtenBytesCount, err := writeStrings(w, indent, commented, k, " = ", repr, "\n")
 		bytesCount += int64(writtenBytesCount)
 		if err != nil {
 			return bytesCount, err
@@ -140,17 +145,24 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64) (
 		if keyspace != "" {
 			combinedKey = keyspace + "." + combinedKey
 		}
+		var commented string
+		if t.commented {
+			commented = "# "
+		}
+
+		if t.comment != nil {
+			comment := strings.Replace(*t.comment, "\n", "\n"+indent, -1)
+			writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", comment)
+			bytesCount += int64(writtenBytesCountComment)
+			if errc != nil {
+				return bytesCount, errc
+			}
+		}
+
 		switch node := v.(type) {
 		// node has to be of those two types given how keys are sorted above
 		case *Tree:
-			if t.comment != nil {
-				writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", combinedKey, " ", *t.comment)
-				bytesCount += int64(writtenBytesCountComment)
-				if errc != nil {
-					return bytesCount, errc
-				}
-			}
-			writtenBytesCount, err := writeStrings(w, "\n", indent, "[", combinedKey, "]\n")
+			writtenBytesCount, err := writeStrings(w, "\n", indent, commented, "[", combinedKey, "]\n")
 			bytesCount += int64(writtenBytesCount)
 			if err != nil {
 				return bytesCount, err
@@ -161,14 +173,7 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64) (
 			}
 		case []*Tree:
 			for _, subTree := range node {
-				if t.comment != nil {
-					writtenBytesCountComment, errc := writeStrings(w, "\n", indent, "# ", *t.comment)
-					bytesCount += int64(writtenBytesCountComment)
-					if errc != nil {
-						return bytesCount, errc
-					}
-				}
-				writtenBytesCount, err := writeStrings(w, "\n", indent, "[[", combinedKey, "]]\n")
+				writtenBytesCount, err := writeStrings(w, "\n", indent, commented, "[[", combinedKey, "]]\n")
 				bytesCount += int64(writtenBytesCount)
 				if err != nil {
 					return bytesCount, err
