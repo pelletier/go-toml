@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type tomlOpts struct {
 	name      string
+	comment   string
+	commented bool
 	include   bool
 	omitempty bool
 }
@@ -147,7 +150,7 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, error) {
 				if err != nil {
 					return nil, err
 				}
-				tval.Set(opts.name, val)
+				tval.Set(opts.name, opts.comment, opts.commented, val)
 			}
 		}
 	case reflect.Map:
@@ -157,7 +160,7 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, error) {
 			if err != nil {
 				return nil, err
 			}
-			tval.Set(key.String(), val)
+			tval.Set(key.String(), "", false, val)
 		}
 	}
 	return tval, nil
@@ -448,7 +451,12 @@ func unwrapPointer(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 func tomlOptions(vf reflect.StructField) tomlOpts {
 	tag := vf.Tag.Get("toml")
 	parse := strings.Split(tag, ",")
-	result := tomlOpts{vf.Name, true, false}
+	var comment string
+	if c := vf.Tag.Get("comment"); c != "" {
+		comment = c
+	}
+	commented, _ := strconv.ParseBool(vf.Tag.Get("commented"))
+	result := tomlOpts{name: vf.Name, comment: comment, commented: commented, include: true, omitempty: false}
 	if parse[0] != "" {
 		if parse[0] == "-" && len(parse) == 1 {
 			result.include = false
