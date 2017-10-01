@@ -97,6 +97,13 @@ encoder, except that there is no concept of a Marshaler interface or MarshalTOML
 function for sub-structs, and currently only definite types can be marshaled
 (i.e. no `interface{}`).
 
+The following struct annotations are supported:
+
+  toml:"Field"      Overrides the field's name to output.
+  omitempty         When set, empty values and groups are not emitted.
+  comment:"comment" Emits a # comment on the same line. This supports new lines.
+  commented:"true"  Emits the value as commented.
+
 Note that pointers are automatically assigned the "omitempty" option, as TOML
 explicity does not handle null values (saying instead the label should be
 dropped).
@@ -248,6 +255,10 @@ func (t *Tree) Unmarshal(v interface{}) error {
 // is no concept of an Unmarshaler interface or UnmarshalTOML function for
 // sub-structs, and currently only definite types can be unmarshaled to (i.e. no
 // `interface{}`).
+//
+// The following struct annotations are supported:
+//
+//   toml:"Field" Overrides the field's name to map to.
 //
 // See Marshal() documentation for types mapping table.
 func Unmarshal(data []byte, v interface{}) error {
