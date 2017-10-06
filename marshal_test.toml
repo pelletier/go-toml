@@ -17,8 +17,8 @@ title = "TOML Marshal Testing"
   uints = [5002,5003]
 
 [basic_map]
-  one = "one"
-  two = "two"
+  "one" = "one"
+  "two" = "two"
 
 [subdoc]
 

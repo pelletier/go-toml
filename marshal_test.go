@@ -479,10 +479,10 @@ ListPtr = ["Hello"]
 Str = "Hello"
 
 [Map]
-  response = "Goodbye"
+  "response" = "Goodbye"
 
 [MapPtr]
-  alternate = "Hello"
+  "alternate" = "Hello"
 `)
 
 func TestPointerMarshal(t *testing.T) {
@@ -549,6 +549,60 @@ func TestNestedUnmarshal(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Bad nested unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+type mapsTestStruct struct {
+	Simple map[string]string
+	Paths  map[string]string
+	Other  map[string]float64
+}
+
+var mapsTestData = mapsTestStruct{
+	Simple: map[string]string{
+		"one plus one": "two",
+		"next":         "three",
+	},
+	Paths: map[string]string{
+		"/this/is/a/path": "/this/is/also/a/path",
+		"/heloo.txt":      "/tmp/lololo.txt",
+	},
+	Other: map[string]float64{
+		"testing": 3.9999,
+	},
+}
+var mapsTestToml = []byte(`
+[Other]
+  "testing" = 3.9999
+
+[Paths]
+  "/heloo.txt" = "/tmp/lololo.txt"
+  "/this/is/a/path" = "/this/is/also/a/path"
+
+[Simple]
+  "next" = "three"
+  "one plus one" = "two"
+`)
+
+func TestMapsMarshal(t *testing.T) {
+	result, err := Marshal(mapsTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := mapsTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad maps marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+func TestMapsUnmarshal(t *testing.T) {
+	result := mapsTestStruct{}
+	err := Unmarshal(mapsTestToml, &result)
+	expected := mapsTestData
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad maps unmarshal: expected %v, got %v", expected, result)
 	}
 }
 
