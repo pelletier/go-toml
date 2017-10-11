@@ -167,7 +167,11 @@ func valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, error) {
 			if err != nil {
 				return nil, err
 			}
-			tval.Set(key.String(), "", false, val)
+			keyStr, err := tomlValueStringRepresentation(key.String())
+			if err != nil {
+				return nil, err
+			}
+			tval.SetPath([]string{keyStr}, "", false, val)
 		}
 	}
 	return tval, nil
@@ -302,7 +306,7 @@ func valueFromTree(mtype reflect.Type, tval *Tree) (reflect.Value, error) {
 	case reflect.Map:
 		mval = reflect.MakeMap(mtype)
 		for _, key := range tval.Keys() {
-			val := tval.Get(key)
+			val := tval.GetPath([]string{key})
 			mvalf, err := valueFromToml(mtype.Elem(), val)
 			if err != nil {
 				return mval, formatError(err, tval.GetPosition(key))
