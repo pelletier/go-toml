@@ -47,6 +47,12 @@ func TestBaseKeyPound(t *testing.T) {
 func TestQuotedKeys(t *testing.T) {
 	testResult(t, `hello."foo".bar`, []string{"hello", "foo", "bar"})
 	testResult(t, `"hello!"`, []string{"hello!"})
+	testResult(t, `"hello\tworld"`, []string{"hello\tworld"})
+	testResult(t, `"\U0001F914"`, []string{"\U0001F914"})
+
+	testResult(t, `hello.'foo'.bar`, []string{"hello", "foo", "bar"})
+	testResult(t, `'hello!'`, []string{"hello!"})
+	testResult(t, `'hello\tworld'`, []string{`hello\tworld`})
 }
 
 func TestEmptyKey(t *testing.T) {
