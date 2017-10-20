@@ -105,7 +105,7 @@ The following struct annotations are supported:
   commented:"true"  Emits the value as commented.
 
 Note that pointers are automatically assigned the "omitempty" option, as TOML
-explicity does not handle null values (saying instead the label should be
+explicitly does not handle null values (saying instead the label should be
 dropped).
 
 Tree structural types and corresponding marshal types:
