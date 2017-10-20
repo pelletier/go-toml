@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -505,6 +506,14 @@ func TestPointerUnmarshal(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Bad pointer unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+func TestUnmarshalTypeMismatch(t *testing.T) {
+	result := pointerMarshalTestStruct{}
+	err := Unmarshal([]byte("List = 123"), &result)
+	if !strings.HasPrefix(err.Error(), "(1, 1): Can't convert 123(int64) to []string(slice)") {
+		t.Errorf("Type mismatch must be reported: got %v", err.Error())
 	}
 }
 
