@@ -344,13 +344,26 @@ func valueFromToml(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 	if mtype.Kind() == reflect.Ptr {
 		return unwrapPointer(mtype, tval)
 	}
-	switch {
-	case isTree(mtype):
-		return valueFromTree(mtype, tval.(*Tree))
-	case isTreeSlice(mtype):
-		return valueFromTreeSlice(mtype, tval.([]*Tree))
-	case isOtherSlice(mtype):
-		return valueFromOtherSlice(mtype, tval.([]interface{}))
+
+	switch tval.(type) {
+	case *Tree:
+		if isTree(mtype) {
+			return valueFromTree(mtype, tval.(*Tree))
+		} else {
+			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a tree", tval, tval)
+		}
+	case []*Tree:
+		if isTreeSlice(mtype) {
+			return valueFromTreeSlice(mtype, tval.([]*Tree))
+		} else {
+			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to trees", tval, tval)
+		}
+	case []interface{}:
+		if isOtherSlice(mtype) {
+			return valueFromOtherSlice(mtype, tval.([]interface{}))
+		} else {
+			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
+		}
 	default:
 		switch mtype.Kind() {
 		case reflect.Bool:
@@ -444,7 +457,7 @@ func valueFromToml(mtype reflect.Type, tval interface{}) (reflect.Value, error) 
 			}
 			return reflect.ValueOf(val), nil
 		default:
-			return reflect.ValueOf(nil), fmt.Errorf("Unmarshal can't handle %v(%v)", mtype, mtype.Kind())
+			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v(%v)", tval, tval, mtype, mtype.Kind())
 		}
 	}
 }
