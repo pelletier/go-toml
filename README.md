@@ -57,9 +57,9 @@ type Config struct {
 }
 
 doc := []byte(`
-[postgres]
-user = "pelletier"
-password = "mypassword"`)
+[Postgres]
+User = "pelletier"
+Password = "mypassword"`)
 
 config := Config{}
 toml.Unmarshal(doc, &config)
