@@ -114,6 +114,11 @@ You have to make sure two kind of tests run:
 
 You can run both of them using `./test.sh`.
 
+### Fuzzing
+
+The script `./fuzz.sh` is available to
+run [go-fuzz](https://github.com/dvyukov/go-fuzz) on go-toml.
+
 ## Versioning
 
 Go-toml follows [Semantic Versioning](http://semver.org/). The supported version

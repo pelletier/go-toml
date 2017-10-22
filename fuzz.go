@@ -19,7 +19,7 @@ func Fuzz(data []byte) int {
 		panic(err)
 	}
 
-	tree, err = LoadString(str)
+	tree, err = Load(str)
 	if err != nil {
 		if tree != nil {
 			panic("tree must be nil if there is an error")
