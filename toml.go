@@ -71,18 +71,14 @@ func (t *Tree) Keys() []string {
 }
 
 // Get the value at key in the Tree.
-// Key is a dot-separated path (e.g. a.b.c).
+// Key is a dot-separated path (e.g. a.b.c) without single/double quoted strings
 // Returns nil if the path does not exist in the tree.
 // If keys is of length zero, the current tree is returned.
 func (t *Tree) Get(key string) interface{} {
 	if key == "" {
 		return t
 	}
-	comps, err := parseKey(key)
-	if err != nil {
-		return nil
-	}
-	return t.GetPath(comps)
+	return t.GetPath(strings.Split(key, "."))
 }
 
 // GetPath returns the element in the tree indicated by 'keys'.
