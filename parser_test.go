@@ -155,6 +155,36 @@ func TestSpaceKey(t *testing.T) {
 	})
 }
 
+func TestDoubleQuotedKey(t *testing.T) {
+	tree, err := Load(`
+	"key"        = "a"
+	"\t"         = "b"
+	"\U0001F914" = "c"
+	"\u2764"     = "d"
+	`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"key":        "a",
+		"\t":         "b",
+		"\U0001F914": "c",
+		"\u2764":     "d",
+	})
+}
+
+func TestSingleQuotedKey(t *testing.T) {
+	tree, err := Load(`
+	'key'        = "a"
+	'\t'         = "b"
+	'\U0001F914' = "c"
+	'\u2764'     = "d"
+	`)
+	assertTree(t, tree, err, map[string]interface{}{
+		`key`:        "a",
+		`\t`:         "b",
+		`\U0001F914`: "c",
+		`\u2764`:     "d",
+	})
+}
+
 func TestStringEscapables(t *testing.T) {
 	tree, err := Load("a = \"a \\n b\"")
 	assertTree(t, tree, err, map[string]interface{}{
