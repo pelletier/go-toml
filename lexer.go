@@ -277,6 +277,8 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 	return l.lexRvalue
 }
 
+// Parse the key and emits its value without escape sequences.
+// bare keys, basic string keys and literal string keys are supported.
 func (l *tomlLexer) lexKey() tomlLexStateFn {
 	growingString := ""
 
@@ -287,7 +289,16 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 			if err != nil {
 				return l.errorf(err.Error())
 			}
-			growingString += `"` + str + `"`
+			growingString += str
+			l.next()
+			continue
+		} else if r == '\'' {
+			l.next()
+			str, err := l.lexLiteralStringAsString(`'`, false)
+			if err != nil {
+				return l.errorf(err.Error())
+			}
+			growingString += str
 			l.next()
 			continue
 		} else if r == '\n' {
@@ -527,6 +538,7 @@ func (l *tomlLexer) lexTableKey() tomlLexStateFn {
 	return l.lexInsideTableKey
 }
 
+// Parse the key till "]]", but only bare keys are supported
 func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 	for r := l.peek(); r != eof; r = l.peek() {
 		switch r {
@@ -550,6 +562,7 @@ func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 	return l.errorf("unclosed table array key")
 }
 
+// Parse the key till "]" but only bare keys are supported
 func (l *tomlLexer) lexInsideTableKey() tomlLexStateFn {
 	for r := l.peek(); r != eof; r = l.peek() {
 		switch r {

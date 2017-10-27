@@ -185,10 +185,7 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	}
 
 	// assign value to the found table
-	keyVals, err := parseKey(key.val)
-	if err != nil {
-		p.raiseError(key, "%s", err)
-	}
+	keyVals := []string{key.val}
 	if len(keyVals) != 1 {
 		p.raiseError(key, "Invalid key")
 	}
