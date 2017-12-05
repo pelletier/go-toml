@@ -652,7 +652,7 @@ func TestTomlValueStringRepresentation(t *testing.T) {
 			"[\"gamma\",\"delta\"]"},
 		{nil, ""},
 	} {
-		result, err := tomlValueStringRepresentation(item.Value)
+		result, err := tomlValueStringRepresentation(item.Value, "", false)
 		if err != nil {
 			t.Errorf("Test %d - unexpected error: %s", idx, err)
 		}
