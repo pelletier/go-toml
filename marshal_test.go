@@ -721,6 +721,7 @@ func TestEncodeQuotedMapKeys(t *testing.T) {
 		t.Errorf("Bad maps marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
 }
+
 func TestDecodeQuotedMapKeys(t *testing.T) {
 	result := mapsTestStruct{}
 	err := NewDecoder(bytes.NewBuffer(mapsTestToml)).Decode(&result)
@@ -730,5 +731,76 @@ func TestDecodeQuotedMapKeys(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Bad maps unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
+type structArrayNoTag struct {
+	A struct {
+		B []int64
+		C []int64
+	}
+}
+
+func TestMarshalArray(t *testing.T) {
+	expected := []byte(`
+[A]
+  B = [1,2,3]
+  C = [1]
+`)
+
+	m := structArrayNoTag{
+		A: struct {
+			B []int64
+			C []int64
+		}{
+			B: []int64{1, 2, 3},
+			C: []int64{1},
+		},
+	}
+
+	b, err := Marshal(m)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(b, expected) {
+		t.Errorf("Bad arrays marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, b)
+	}
+}
+
+func TestMarshalArrayOnePerLine(t *testing.T) {
+	expected := []byte(`
+[A]
+  B = [
+    1,
+    2,
+    3
+  ]
+  C = [1]
+`)
+
+	m := structArrayNoTag{
+		A: struct {
+			B []int64
+			C []int64
+		}{
+			B: []int64{1, 2, 3},
+			C: []int64{1},
+		},
+	}
+
+	var buf bytes.Buffer
+	encoder := NewEncoder(&buf).ArraysWithOneElementPerLine(true)
+	err := encoder.Encode(m)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b := buf.Bytes()
+
+	if !bytes.Equal(b, expected) {
+		t.Errorf("Bad arrays marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, b)
 	}
 }

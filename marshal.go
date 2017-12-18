@@ -20,7 +20,8 @@ type tomlOpts struct {
 }
 
 type encOpts struct {
-	quoteMapKeys bool
+	quoteMapKeys            bool
+	arraysOneElementPerLine bool
 }
 
 var encOptsDefaults = encOpts{
@@ -174,6 +175,25 @@ func (e *Encoder) QuoteMapKeys(v bool) *Encoder {
 	return e
 }
 
+// ArraysWithOneElementPerLine sets up the encoder to encode arrays
+// with more than one element on multiple lines instead of one.
+//
+// For example:
+//
+//   A = [1,2,3]
+//
+// Becomes
+//
+//   A = [
+//     1,
+//     2,
+//     3
+//   ]
+func (e *Encoder) ArraysWithOneElementPerLine(v bool) *Encoder {
+	e.arraysOneElementPerLine = v
+	return e
+}
+
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
 	if mtype.Kind() != reflect.Struct {
@@ -187,8 +207,11 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
 	}
-	s, err := t.ToTomlString()
-	return []byte(s), err
+
+	var buf bytes.Buffer
+	_, err = t.writeTo(&buf, "", "", 0, e.arraysOneElementPerLine)
+
+	return buf.Bytes(), err
 }
 
 // Convert given marshal struct or map value to toml tree
@@ -218,7 +241,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				return nil, err
 			}
 			if e.quoteMapKeys {
-				keyStr, err := tomlValueStringRepresentation(key.String())
+				keyStr, err := tomlValueStringRepresentation(key.String(), "", e.arraysOneElementPerLine)
 				if err != nil {
 					return nil, err
 				}
