@@ -23,7 +23,7 @@ var escapeSequenceMap = map[rune]rune{
 type parseKeyState int
 
 const (
-	bare     parseKeyState = iota
+	bare parseKeyState = iota
 	basic
 	literal
 	esc
