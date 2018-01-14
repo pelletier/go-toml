@@ -515,18 +515,16 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.V
 			}
 
 			return val.Convert(mtype), nil
-		case reflect.Float32:
-			val, ok := tval.(float64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to float", tval, tval)
+		case reflect.Float32, reflect.Float64:
+			val := reflect.ValueOf(tval)
+			if !val.Type().ConvertibleTo(mtype) {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
-			return reflect.ValueOf(float32(val)), nil
-		case reflect.Float64:
-			val, ok := tval.(float64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to float", tval, tval)
+			if reflect.Indirect(reflect.New(mtype)).OverflowFloat(val.Float()) {
+				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) would overflow %v", tval, tval, mtype.String())
 			}
-			return reflect.ValueOf(val), nil
+
+			return val.Convert(mtype), nil
 		case reflect.String:
 			val, ok := tval.(string)
 			if !ok {
