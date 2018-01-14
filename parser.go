@@ -350,7 +350,7 @@ Loop:
 			}
 			p.getToken()
 		default:
-			p.raiseError(follow, "unexpected token type in inline table: %s", follow.typ.String())
+			p.raiseError(follow, "unexpected token type in inline table: %s", follow.String())
 		}
 		previous = follow
 	}
