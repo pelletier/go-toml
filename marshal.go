@@ -492,36 +492,16 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.V
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to bool", tval, tval)
 			}
 			return reflect.ValueOf(val), nil
-		case reflect.Int:
-			val, ok := tval.(int64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			val := reflect.ValueOf(tval)
+			if !val.Type().ConvertibleTo(mtype) {
+				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
-			return reflect.ValueOf(int(val)), nil
-		case reflect.Int8:
-			val, ok := tval.(int64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
+			if reflect.Indirect(reflect.New(mtype)).OverflowInt(val.Int()) {
+				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) would overflow %v", tval, tval, mtype.String())
 			}
-			return reflect.ValueOf(int8(val)), nil
-		case reflect.Int16:
-			val, ok := tval.(int64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
-			}
-			return reflect.ValueOf(int16(val)), nil
-		case reflect.Int32:
-			val, ok := tval.(int64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
-			}
-			return reflect.ValueOf(int32(val)), nil
-		case reflect.Int64:
-			val, ok := tval.(int64)
-			if !ok {
-				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to int", tval, tval)
-			}
-			return reflect.ValueOf(val), nil
+
+			return val.Convert(mtype), nil
 		case reflect.Uint:
 			val, ok := tval.(int64)
 			if !ok {
