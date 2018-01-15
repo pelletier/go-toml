@@ -2,6 +2,7 @@ package toml
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -79,6 +80,25 @@ func TestSimpleNumbers(t *testing.T) {
 		"b": int64(-21),
 		"c": float64(4.2),
 		"d": float64(-2.1),
+	})
+}
+
+func TestSpecialFloats(t *testing.T) {
+	tree, err := Load(`
+normalinf = inf
+plusinf = +inf
+minusinf = -inf
+normalnan = nan
+plusnan = +nan
+minusnan = -nan
+`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"normalinf": math.Inf(1),
+		"plusinf":   math.Inf(1),
+		"minusinf":  math.Inf(-1),
+		"normalnan": math.NaN(),
+		"plusnan":   math.NaN(),
+		"minusnan":  math.NaN(),
 	})
 }
 
