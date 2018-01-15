@@ -5,6 +5,7 @@ package toml
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -246,6 +247,13 @@ func (p *tomlParser) parseRvalue() interface{} {
 		return true
 	case tokenFalse:
 		return false
+	case tokenInf:
+		if tok.val[0] == '-' {
+			return math.Inf(-1)
+		}
+		return math.Inf(1)
+	case tokenNan:
+		return math.NaN()
 	case tokenInteger:
 		cleanedVal := cleanupNumberToken(tok.val)
 		var err error

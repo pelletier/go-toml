@@ -204,6 +204,14 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexFalse
 		}
 
+		if l.follow("inf") {
+			return l.lexInf
+		}
+
+		if l.follow("nan") {
+			return l.lexNan
+		}
+
 		if isSpace(next) {
 			l.skip()
 			continue
@@ -262,6 +270,18 @@ func (l *tomlLexer) lexTrue() tomlLexStateFn {
 func (l *tomlLexer) lexFalse() tomlLexStateFn {
 	l.fastForward(5)
 	l.emit(tokenFalse)
+	return l.lexRvalue
+}
+
+func (l *tomlLexer) lexInf() tomlLexStateFn {
+	l.fastForward(3)
+	l.emit(tokenInf)
+	return l.lexRvalue
+}
+
+func (l *tomlLexer) lexNan() tomlLexStateFn {
+	l.fastForward(3)
+	l.emit(tokenNan)
 	return l.lexRvalue
 }
 
@@ -638,7 +658,14 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 
 	if r == '+' || r == '-' {
 		l.next()
+		if l.follow("inf") {
+			return l.lexInf
+		}
+		if l.follow("nan") {
+			return l.lexNan
+		}
 	}
+
 	pointSeen := false
 	expSeen := false
 	digitSeen := false
