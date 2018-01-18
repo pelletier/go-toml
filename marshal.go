@@ -230,7 +230,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				if err != nil {
 					return nil, err
 				}
-				tval.Set(opts.name, opts.comment, opts.commented, val)
+				tval.SetWithComment(opts.name, opts.comment, opts.commented, val)
 			}
 		}
 	case reflect.Map:
@@ -245,9 +245,9 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				if err != nil {
 					return nil, err
 				}
-				tval.SetPath([]string{keyStr}, "", false, val)
+				tval.SetPath([]string{keyStr}, val)
 			} else {
-				tval.Set(key.String(), "", false, val)
+				tval.Set(key.String(), val)
 			}
 		}
 	}
