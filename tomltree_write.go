@@ -12,6 +12,40 @@ import (
 	"time"
 )
 
+// alankm NOTE: this function is a clone of the existing encodeTomlString function, except that whitespace characters are preserved. Quotation marks and backslashes are also not escaped.
+// encodes a string to a TOML-compliant multi-line string value
+func encodeMultilineTomlString(value string) string {
+	var b bytes.Buffer
+
+	for _, rr := range value {
+		// alankm NOTE: should \b and \f also be changed for multi-line strings?
+		switch rr {
+		case '\b':
+			b.WriteString(`\b`)
+		case '\t':
+			b.WriteString("\t")
+		case '\n':
+			b.WriteString("\n")
+		case '\f':
+			b.WriteString(`\f`)
+		case '\r':
+			b.WriteString("\r")
+		case '"':
+			b.WriteString(`"`)
+		case '\\':
+			b.WriteString(`\`)
+		default:
+			intRr := uint16(rr)
+			if intRr < 0x001F {
+				b.WriteString(fmt.Sprintf("\\u%0.4X", intRr))
+			} else {
+				b.WriteRune(rr)
+			}
+		}
+	}
+	return b.String()
+}
+
 // encodes a string to a TOML-compliant string value
 func encodeTomlString(value string) string {
 	var b bytes.Buffer
@@ -45,6 +79,15 @@ func encodeTomlString(value string) string {
 }
 
 func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElementPerLine bool) (string, error) {
+
+	// alankm NOTE: this interface check is added to dereference the change made in the writeTo function. That change was made to allow this function to see formatting options.
+	tv, ok := v.(*tomlValue)
+	if ok {
+		v = tv.value
+	} else {
+		tv = &tomlValue{}
+	}
+
 	switch value := v.(type) {
 	case uint64:
 		return strconv.FormatUint(value, 10), nil
@@ -58,6 +101,10 @@ func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElemen
 		}
 		return strings.ToLower(strconv.FormatFloat(value, 'f', -1, 32)), nil
 	case string:
+		// alankm NOTE: this conditional code added to produce multiline strings if the multiline option was set
+		if tv.multiline {
+			return "\"\"\"\n" + encodeMultilineTomlString(value) + "\"\"\"", nil
+		}
 		return "\"" + encodeTomlString(value) + "\"", nil
 	case []byte:
 		b, _ := v.([]byte)
@@ -130,7 +177,7 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64, a
 			return bytesCount, fmt.Errorf("invalid value type at %s: %T", k, t.values[k])
 		}
 
-		repr, err := tomlValueStringRepresentation(v.value, indent, arraysOneElementPerLine)
+		repr, err := tomlValueStringRepresentation(v, indent, arraysOneElementPerLine) // alankm NOTE: changed the first argument from 'v.value' to 'v' so that the formatting function would have access to the formatting options
 		if err != nil {
 			return bytesCount, err
 		}
