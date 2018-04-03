@@ -11,10 +11,13 @@ import (
 	"time"
 )
 
+const tagKeyMultiline = "multiline" // alankm NOTE: key string for the new multiline struct tag
+
 type tomlOpts struct {
 	name      string
 	comment   string
 	commented bool
+	multiline bool // alankm NOTE: a new field option for multi-line strings
 	include   bool
 	omitempty bool
 }
@@ -230,7 +233,13 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				if err != nil {
 					return nil, err
 				}
-				tval.SetWithComment(opts.name, opts.comment, opts.commented, val)
+
+				// alankm NOTE: replaces SetWithComment with the more general SetWithOptions in order to enable multiline
+				tval.SetWithOptions(opts.name, SetOptions{
+					Comment:   opts.comment,
+					Commented: opts.commented,
+					Multiline: opts.multiline,
+				}, val)
 			}
 		}
 	case reflect.Map:
@@ -559,7 +568,8 @@ func tomlOptions(vf reflect.StructField) tomlOpts {
 		comment = c
 	}
 	commented, _ := strconv.ParseBool(vf.Tag.Get("commented"))
-	result := tomlOpts{name: vf.Name, comment: comment, commented: commented, include: true, omitempty: false}
+	multiline, _ := strconv.ParseBool(vf.Tag.Get(tagKeyMultiline)) // alankm NOTE: extract new multiline setting from struct tags
+	result := tomlOpts{name: vf.Name, comment: comment, commented: commented, multiline: multiline, include: true, omitempty: false}
 	if parse[0] != "" {
 		if parse[0] == "-" && len(parse) == 1 {
 			result.include = false
