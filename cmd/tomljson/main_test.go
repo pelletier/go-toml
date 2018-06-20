@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"runtime"
 )
 
 func expectBufferEquality(t *testing.T, name string, buffer *bytes.Buffer, expected string) {
@@ -76,7 +77,14 @@ func TestProcessMainReadFromFile(t *testing.T) {
 }
 
 func TestProcessMainReadFromMissingFile(t *testing.T) {
-	expectedError := `open /this/file/does/not/exist: no such file or directory
+	var expectedError string
+	if runtime.GOOS == "windows" {
+		expectedError = `open /this/file/does/not/exist: The system cannot find the path specified.
 `
+	} else {
+		expectedError = `open /this/file/does/not/exist: no such file or directory
+`
+	}
+
 	expectProcessMainResults(t, ``, []string{"/this/file/does/not/exist"}, -1, ``, expectedError)
 }
