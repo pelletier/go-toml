@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"runtime"
 )
 
 func expectBufferEquality(t *testing.T, name string, buffer *bytes.Buffer, expected string) {
