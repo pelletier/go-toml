@@ -29,9 +29,8 @@ go get gopkg.in/yaml.v2
 go get github.com/BurntSushi/toml
 
 # get code for BurntSushi TOML validation
-# pinning all to 'HEAD' for version 0.3.x work (TODO: pin to commit hash when tests stabilize)
-git_clone github.com/BurntSushi/toml master HEAD
-git_clone github.com/BurntSushi/toml-test master HEAD #was: 0.2.0 HEAD
+git_clone github.com/BurntSushi/toml master a368813
+git_clone github.com/BurntSushi/toml-test master 39e37e6
 
 # build the BurntSushi test application
 go build -o toml-test github.com/BurntSushi/toml-test
