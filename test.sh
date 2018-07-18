@@ -23,7 +23,6 @@ function git_clone() {
 # Remove potential previous runs
 rm -rf src test_program_bin toml-test
 
-go get github.com/pelletier/go-buffruneio
 go get github.com/davecgh/go-spew/spew
 go get gopkg.in/yaml.v2
 go get github.com/BurntSushi/toml
