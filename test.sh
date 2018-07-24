@@ -44,7 +44,7 @@ cp -R query/* src/github.com/pelletier/go-toml/query
 go build -o test_program_bin src/github.com/pelletier/go-toml/cmd/test_program.go
 
 # Run basic unit tests
-go test github.com/pelletier/go-toml -covermode=count -coverprofile=coverage.out
+go test github.com/pelletier/go-toml -race -coverprofile=coverage.txt -covermode=atomic
 go test github.com/pelletier/go-toml/cmd/tomljson
 go test github.com/pelletier/go-toml/query
 
