@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var dateRegexp *regexp.Regexp
@@ -574,7 +575,7 @@ func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 			l.emit(tokenDoubleRightBracket)
 			return l.lexVoid
 		case '[':
-			return l.errorf("table array key cannot contain ']'")
+			return l.errorf("table array key cannot contain '['")
 		default:
 			l.next()
 		}
@@ -594,7 +595,7 @@ func (l *tomlLexer) lexInsideTableKey() tomlLexStateFn {
 			l.emit(tokenRightBracket)
 			return l.lexVoid
 		case '[':
-			return l.errorf("table key cannot contain ']'")
+			return l.errorf("table key cannot contain '['")
 		default:
 			l.next()
 		}
@@ -704,6 +705,8 @@ func (l *tomlLexer) lexNumber() tomlLexStateFn {
 			digitSeen = true
 			l.next()
 		} else if next == '_' {
+			l.next()
+		} else if next == 'm' || next == 's' || next == 'h' || next == 'n' || next == 'µ' {
 			l.next()
 		} else {
 			break

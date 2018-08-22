@@ -283,7 +283,7 @@ func (p *tomlParser) parseRvalue() interface{} {
 			if err != nil {
 				p.raiseError(tok, "%s", err)
 			}
-			val, err = strconv.ParseInt(cleanedVal, 10, 64)
+			val, err = parseIntDecimal(cleanedVal)
 		}
 		if err != nil {
 			p.raiseError(tok, "%s", err)
@@ -427,4 +427,23 @@ func parseToml(flow []token) *Tree {
 func init() {
 	numberUnderscoreInvalidRegexp = regexp.MustCompile(`([^\d]_|_[^\d])|_$|^_`)
 	hexNumberUnderscoreInvalidRegexp = regexp.MustCompile(`(^0x_)|([^\da-f]_|_[^\da-f])|_$|^_`)
+}
+
+func isTimeDuration(val string) bool {
+	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	if strings.Contains(val, "ns") || strings.Contains(val, "us") || strings.Contains(val, "µs") ||
+		strings.Contains(val, "ms") || strings.Contains(val, "s") || strings.Contains(val, "m") ||
+		strings.Contains(val, "h") {
+		return true
+	}
+
+	return false
+}
+
+func parseIntDecimal(val string) (int64, error) {
+	if isTimeDuration(val) {
+		duration, err := time.ParseDuration(val)
+		return int64(duration), err
+	}
+	return strconv.ParseInt(val, 10, 64)
 }
