@@ -574,7 +574,7 @@ func (l *tomlLexer) lexInsideTableArrayKey() tomlLexStateFn {
 			l.emit(tokenDoubleRightBracket)
 			return l.lexVoid
 		case '[':
-			return l.errorf("table array key cannot contain '['")
+			return l.errorf("table array key cannot contain ']'")
 		default:
 			l.next()
 		}
@@ -594,7 +594,7 @@ func (l *tomlLexer) lexInsideTableKey() tomlLexStateFn {
 			l.emit(tokenRightBracket)
 			return l.lexVoid
 		case '[':
-			return l.errorf("table key cannot contain '['")
+			return l.errorf("table key cannot contain ']'")
 		default:
 			l.next()
 		}
