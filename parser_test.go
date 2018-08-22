@@ -897,3 +897,13 @@ func TestInvalidFloatParsing(t *testing.T) {
 		t.Error("Bad error message:", err.Error())
 	}
 }
+
+func TestTimeDurationParsing(t *testing.T) {
+	tree, err := Load(`a = 5m3s`)
+	assertTree(t, tree, err, map[string]interface{}{"a": int64(5*time.Minute + 3*time.Second)})
+
+	_, err = Load(`a = 5m_3s`)
+	if err.Error() != "(1, 5): invalid use of _ in number" {
+		t.Error("Bad error message:", err.Error())
+	}
+}

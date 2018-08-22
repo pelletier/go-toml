@@ -726,6 +726,22 @@ func TestLexUnknownRvalue(t *testing.T) {
 	})
 }
 
+func TestTimeDuration(t *testing.T) {
+	testFlow(t, "Expiration = 2m5s", []token{
+		{Position{1, 1}, tokenKey, "Expiration"},
+		{Position{1, 12}, tokenEqual, "="},
+		{Position{1, 14}, tokenInteger, "2m5s"},
+		{Position{1, 18}, tokenEOF, ""},
+	})
+
+	testFlow(t, "Expiration = 3h5ms", []token{
+		{Position{1, 1}, tokenKey, "Expiration"},
+		{Position{1, 12}, tokenEqual, "="},
+		{Position{1, 14}, tokenInteger, "3h5ms"},
+		{Position{1, 19}, tokenEOF, ""},
+	})
+}
+
 func BenchmarkLexer(b *testing.B) {
 	sample := `title = "Hugo: A Fast and Flexible Website Generator"
 baseurl = "http://gohugo.io/"
