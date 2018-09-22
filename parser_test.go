@@ -897,3 +897,14 @@ func TestInvalidFloatParsing(t *testing.T) {
 		t.Error("Bad error message:", err.Error())
 	}
 }
+
+func TestMapKeyIsNum(t *testing.T) {
+	_, err := Load("table={2018=1,2019=2}")
+	if err != nil {
+		t.Error("should be passed")
+	}
+	_, err = Load(`table={"2018"=1,"2019"=2}`)
+	if err != nil {
+		t.Error("should be passed")
+	}
+}

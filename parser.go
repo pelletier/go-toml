@@ -338,7 +338,7 @@ Loop:
 		case tokenRightCurlyBrace:
 			p.getToken()
 			break Loop
-		case tokenKey:
+		case tokenKey, tokenInteger, tokenString:
 			if !tokenIsComma(previous) && previous != nil {
 				p.raiseError(follow, "comma expected between fields in inline table")
 			}
