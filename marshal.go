@@ -530,20 +530,20 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.V
 		return d.unwrapPointer(mtype, tval)
 	}
 
-	switch tval.(type) {
+	switch t := tval.(type) {
 	case *Tree:
 		if isTree(mtype) {
-			return d.valueFromTree(mtype, tval.(*Tree))
+			return d.valueFromTree(mtype, t)
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a tree", tval, tval)
 	case []*Tree:
 		if isTreeSlice(mtype) {
-			return d.valueFromTreeSlice(mtype, tval.([]*Tree))
+			return d.valueFromTreeSlice(mtype, t)
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to trees", tval, tval)
 	case []interface{}:
 		if isOtherSlice(mtype) {
-			return d.valueFromOtherSlice(mtype, tval.([]interface{}))
+			return d.valueFromOtherSlice(mtype, t)
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
 	default:
