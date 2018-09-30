@@ -9,7 +9,7 @@ clone_folder: c:\gopath\src\github.com\pelletier\go-toml
 environment:
   GOPATH: c:\gopath
   DEPTESTBYPASS501: 1
-  GOVERSION: 1.9
+  GOVERSION: 1.11
 
 init:
   - git config --global core.autocrlf input
@@ -28,6 +28,9 @@ install:
 
 build: false
 deploy: false
+branches:
+  only:
+  - master
 
 test_script:
   - go get github.com/davecgh/go-spew/spew
