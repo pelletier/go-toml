@@ -244,9 +244,17 @@ func (e *Encoder) SetTagMultiline(v string) *Encoder {
 
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
-	if mtype.Kind() != reflect.Struct {
-		return []byte{}, errors.New("Only a struct can be marshaled to TOML")
+
+	switch mtype.Kind() {
+	case reflect.Struct, reflect.Map:
+	case reflect.Ptr:
+		if mtype.Elem().Kind() != reflect.Struct {
+			return []byte{}, errors.New("Only pointer to struct can be marshaled to TOML")
+		}
+	default:
+		return []byte{}, errors.New("Only a struct or map can be marshaled to TOML")
 	}
+
 	sval := reflect.ValueOf(v)
 	if isCustomMarshaler(mtype) {
 		return callCustomMarshaler(sval)
