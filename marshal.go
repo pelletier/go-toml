@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -352,6 +353,9 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 		case reflect.Bool:
 			return mval.Bool(), nil
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if mtype.Kind() == reflect.Int64 && mtype == reflect.TypeOf(time.Duration(1)) {
+				return fmt.Sprint(mval), nil
+			}
 			return mval.Int(), nil
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			return mval.Uint(), nil
@@ -566,6 +570,15 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.V
 			return val.Convert(mtype), nil
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			val := reflect.ValueOf(tval)
+			if mtype.Kind() == reflect.Int64 && mtype == reflect.TypeOf(time.Duration(1)) && val.Kind() == reflect.String {
+				log.Printf("will convert %s(%s) to %s", val, val.Kind(), mtype)
+				d, err := time.ParseDuration(val.String())
+				if err != nil {
+					log.Println(err)
+					return reflect.ValueOf(nil), err
+				}
+				return reflect.ValueOf(d), nil
+			}
 			if !val.Type().ConvertibleTo(mtype) {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
