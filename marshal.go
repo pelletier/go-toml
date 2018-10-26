@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -571,11 +570,9 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.V
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			val := reflect.ValueOf(tval)
 			if mtype.Kind() == reflect.Int64 && mtype == reflect.TypeOf(time.Duration(1)) && val.Kind() == reflect.String {
-				log.Printf("will convert %s(%s) to %s", val, val.Kind(), mtype)
 				d, err := time.ParseDuration(val.String())
 				if err != nil {
-					log.Println(err)
-					return reflect.ValueOf(nil), err
+					return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v. %s", tval, tval, mtype.String(), err)
 				}
 				return reflect.ValueOf(d), nil
 			}

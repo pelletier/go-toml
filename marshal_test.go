@@ -1012,6 +1012,7 @@ type testDuration struct {
 	Min       time.Duration  `toml:"min"`
 	Hour      time.Duration  `toml:"hour"`
 	Mixed     time.Duration  `toml:"mixed"`
+	AString   string         `toml:"a_string"`
 }
 
 var testDurationToml = []byte(`
@@ -1023,6 +1024,7 @@ sec = "1s"
 min = "1m"
 hour = "1h"
 mixed = "1h1m1s1ms1µs1ns"
+a_string = "15s"
 `)
 
 func TestUnmarshalDuration(t *testing.T) {
@@ -1048,6 +1050,7 @@ func TestUnmarshalDuration(t *testing.T) {
 			time.Millisecond +
 			time.Microsecond +
 			time.Nanosecond,
+		AString: "15s",
 	}
 	if !reflect.DeepEqual(result, expected) {
 		resStr, _ := json.MarshalIndent(result, "", "  ")
@@ -1057,7 +1060,8 @@ func TestUnmarshalDuration(t *testing.T) {
 	}
 }
 
-var testDurationToml2 = []byte(`hour = "1h0m0s"
+var testDurationToml2 = []byte(`a_string = "15s"
+hour = "1h0m0s"
 microsec1 = "1µs"
 microsec2 = "1µs"
 millisec = "1ms"
@@ -1083,6 +1087,7 @@ func TestMarshalDuration(t *testing.T) {
 			time.Millisecond +
 			time.Microsecond +
 			time.Nanosecond,
+		AString: "15s",
 	}
 
 	var buf bytes.Buffer
@@ -1094,5 +1099,24 @@ func TestMarshalDuration(t *testing.T) {
 	result := buf.Bytes()
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+type testBadDuration struct {
+	Val time.Duration `toml:"val"`
+}
+
+var testBadDurationToml = []byte(`val = "1z"`)
+
+func TestUnmarshalBadDuration(t *testing.T) {
+	buf := bytes.NewBuffer(testBadDurationToml)
+
+	result := testBadDuration{}
+	err := NewDecoder(buf).Decode(&result)
+	if err == nil {
+		t.Fatal()
+	}
+	if err.Error() != "(1, 1): Can't convert 1z(string) to time.Duration. time: unknown unit z in duration 1z" {
+		t.Fatalf("unexpected error: %s", err)
 	}
 }
