@@ -470,7 +470,12 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree) (reflect.Value, 
 			opts := tomlOptions(mtypef, an)
 			if opts.include {
 				baseKey := opts.name
-				keysToTry := []string{baseKey, strings.ToLower(baseKey), strings.ToTitle(baseKey)}
+				keysToTry := []string{
+					baseKey,
+					strings.ToLower(baseKey),
+					strings.ToTitle(baseKey),
+					strings.ToLower(string(baseKey[0])) + baseKey[1:],
+				}
 				for _, key := range keysToTry {
 					exists := tval.Has(key)
 					if !exists {
