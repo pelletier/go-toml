@@ -53,6 +53,17 @@ func TestBasicMarshal(t *testing.T) {
 	}
 }
 
+func TestBasicMarshalWithPointer(t *testing.T) {
+	result, err := Marshal(&basicTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := basicTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
 func TestBasicUnmarshal(t *testing.T) {
 	result := basicMarshalTestStruct{}
 	err := Unmarshal(basicTestToml, &result)
@@ -154,6 +165,17 @@ var docData = testDoc{
 
 func TestDocMarshal(t *testing.T) {
 	result, err := Marshal(docData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, _ := ioutil.ReadFile("marshal_test.toml")
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestDocMarshalPointer(t *testing.T) {
+	result, err := Marshal(&docData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -992,13 +1014,32 @@ func TestUnmarshalMap(t *testing.T) {
 	}
 }
 
-func TestMarshalMap(t *testing.T) {
-	m := make(map[string]int)
-	m["a"] = 1
+func TestMarshalSlice(t *testing.T) {
+	m := make([]int, 1)
+	m[0] = 1
+
+	var buf bytes.Buffer
+	err := NewEncoder(&buf).Encode(&m)
+	if err == nil {
+		t.Error("expected error, got nil")
+		return
+	}
+	if err.Error() != "Only pointer to struct can be marshaled to TOML" {
+		t.Fail()
+	}
+}
+
+func TestMarshalSlicePointer(t *testing.T) {
+	m := make([]int, 1)
+	m[0] = 1
 
 	var buf bytes.Buffer
 	err := NewEncoder(&buf).Encode(m)
-	if err.Error() != "Only a struct can be marshaled to TOML" {
+	if err == nil {
+		t.Error("expected error, got nil")
+		return
+	}
+	if err.Error() != "Only a struct or map can be marshaled to TOML" {
 		t.Fail()
 	}
 }
