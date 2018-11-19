@@ -1,21 +1,18 @@
 version: "{build}"
 
 # Source Config
-
 clone_folder: c:\gopath\src\github.com\pelletier\go-toml
 
 # Build host
-
 environment:
   GOPATH: c:\gopath
   DEPTESTBYPASS501: 1
-  GOVERSION: 1.9
+  GOVERSION: 1.11
 
 init:
   - git config --global core.autocrlf input
 
 # Build
-
 install:
   # Install the specific Go version.
   - rmdir c:\go /s /q
