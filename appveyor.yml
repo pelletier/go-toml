@@ -25,9 +25,6 @@ install:
 
 build: false
 deploy: false
-branches:
-  only:
-  - master
 
 test_script:
   - go get github.com/davecgh/go-spew/spew
