@@ -1120,3 +1120,20 @@ func TestUnmarshalBadDuration(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 }
+
+var testCamelCaseKeyToml = []byte(`fooBar = 10`)
+
+func TestUnmarshalCamelCaseKey(t *testing.T) {
+	var x struct {
+		FooBar int
+		B      int
+	}
+
+	if err := Unmarshal(testCamelCaseKeyToml, &x); err != nil {
+		t.Fatal(err)
+	}
+
+	if x.FooBar != 10 {
+		t.Fatal("Did not set camelCase'd key")
+	}
+}
