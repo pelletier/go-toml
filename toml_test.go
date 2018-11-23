@@ -104,3 +104,23 @@ func TestTomlFromMap(t *testing.T) {
 		t.Fatal("hello should be 42, not", tree.Get("hello"))
 	}
 }
+
+func TestLoadBytesBOM(t *testing.T) {
+	payloads := [][]byte{
+		[]byte("\xFE\xFFhello=1"),
+		[]byte("\xFF\xFEhello=1"),
+		[]byte("\xEF\xBB\xBFhello=1"),
+		[]byte("\x00\x00\xFE\xFFhello=1"),
+		[]byte("\xFF\xFE\x00\x00hello=1"),
+	}
+	for _, data := range payloads {
+		tree, err := LoadBytes(data)
+		if err != nil {
+			t.Fatal("unexpected error:", err, "for:", data)
+		}
+		v := tree.Get("hello")
+		if v != int64(1) {
+			t.Fatal("hello should be 1, not", v)
+		}
+	}
+}
