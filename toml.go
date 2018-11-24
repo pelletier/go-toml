@@ -333,8 +333,37 @@ func LoadBytes(b []byte) (tree *Tree, err error) {
 			err = errors.New(r.(string))
 		}
 	}()
+
+	if len(b) >= 4 && (hasUTF32BigEndianBOM4(b) || hasUTF32LittleEndianBOM4(b)) {
+		b = b[4:]
+	} else if len(b) >= 3 && hasUTF8BOM3(b) {
+		b = b[3:]
+	} else if len(b) >= 2 && (hasUTF16BigEndianBOM2(b) || hasUTF16LittleEndianBOM2(b)) {
+		b = b[2:]
+	}
+
 	tree = parseToml(lexToml(b))
 	return
+}
+
+func hasUTF16BigEndianBOM2(b []byte) bool {
+	return b[0] == 0xFE && b[1] == 0xFF
+}
+
+func hasUTF16LittleEndianBOM2(b []byte) bool {
+	return b[0] == 0xFF && b[1] == 0xFE
+}
+
+func hasUTF8BOM3(b []byte) bool {
+	return b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF
+}
+
+func hasUTF32BigEndianBOM4(b []byte) bool {
+	return b[0] == 0x00 && b[1] == 0x00 && b[2] == 0xFE && b[3] == 0xFF
+}
+
+func hasUTF32LittleEndianBOM4(b []byte) bool {
+	return b[0] == 0xFF && b[1] == 0xFE && b[2] == 0x00 && b[3] == 0x00
 }
 
 // LoadReader creates a Tree from any io.Reader.
