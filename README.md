@@ -11,6 +11,7 @@ This library supports TOML version
 [![Windows Build status](https://ci.appveyor.com/api/projects/status/4aepwwjori266hkt/branch/master?svg=true)](https://ci.appveyor.com/project/pelletier/go-toml/branch/master)
 [![codecov](https://codecov.io/gh/pelletier/go-toml/branch/master/graph/badge.svg)](https://codecov.io/gh/pelletier/go-toml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pelletier/go-toml)](https://goreportcard.com/report/github.com/pelletier/go-toml)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpelletier%2Fgo-toml.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fpelletier%2Fgo-toml?ref=badge_shield)
 
 ## Features
 
