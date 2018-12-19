@@ -101,6 +101,18 @@ func TestTomlDeleteNestedKey(t *testing.T) {
 
 }
 
+func TestTomlDeleteNonexistentNestedKey(t *testing.T) {
+	tree, _ := Load(`
+		[foo]
+        [foo.bar]
+        key = "value"
+    `)
+	err := tree.Delete("foo.not.there.key")
+	if err == nil {
+		t.Errorf("Delete should have thrown an error trying to delete key in nonexistent tree")
+	}
+}
+
 func TestTomlGetPath(t *testing.T) {
 	node := newTree()
 	//TODO: set other node data
