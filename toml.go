@@ -307,8 +307,8 @@ func (t *Tree) Delete(key string) error {
 		delete(t.values, key)
 		return nil
 	}
-	tree := t.GetPath(keys[:keyLen - 1])
-	item := keys[keyLen - 1]
+	tree := t.GetPath(keys[:keyLen-1])
+	item := keys[keyLen-1]
 	switch node := tree.(type) {
 	case *Tree:
 		delete(node.values, item)
