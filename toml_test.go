@@ -69,6 +69,38 @@ func TestTomlHasPath(t *testing.T) {
 	}
 }
 
+func TestTomlDelete(t *testing.T) {
+	tree, _ := Load(`
+        key = "value"
+    `)
+	err := tree.Delete("key")
+	if err != nil {
+		t.Errorf("Delete - unexpected error while deleting key: %s", err.Error())
+	}
+
+	if tree.Get("key") != nil {
+		t.Errorf("Delete should have removed key but did not.")
+	}
+
+}
+
+func TestTomlDeleteNestedKey(t *testing.T) {
+	tree, _ := Load(`
+		[foo]
+        [foo.bar]
+        key = "value"
+    `)
+	err := tree.Delete("foo.bar.key")
+	if err != nil {
+		t.Errorf("Error while deleting nested key: %s", err.Error())
+	}
+
+	if tree.Get("key") != nil {
+		t.Errorf("Delete should have removed nested key but did not.")
+	}
+
+}
+
 func TestTomlGetPath(t *testing.T) {
 	node := newTree()
 	//TODO: set other node data
