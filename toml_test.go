@@ -84,6 +84,16 @@ func TestTomlDelete(t *testing.T) {
 
 }
 
+func TestTomlDeleteUnparsableKey(t *testing.T) {
+	tree, _ := Load(`
+        key = "value"
+    `)
+	err := tree.Delete(".")
+	if err == nil {
+		t.Errorf("Delete should error")
+	}
+}
+
 func TestTomlDeleteNestedKey(t *testing.T) {
 	tree, _ := Load(`
 		[foo]
