@@ -292,6 +292,34 @@ func (t *Tree) SetPathWithComment(keys []string, comment string, commented bool,
 	subtree.values[keys[len(keys)-1]] = toInsert
 }
 
+// Delete removes a key from the tree.
+// Key is a dot-separated path (e.g. a.b.c).
+func (t *Tree) Delete(key string) error {
+	keys, err := parseKey(key)
+	if err != nil {
+		return err
+	}
+	return t.DeletePath(keys)
+}
+
+// Delete removes a key from the tree.
+// Keys is an array of path elements (e.g. {"a","b","c"}).
+func (t *Tree) DeletePath(keys []string) error {
+	keyLen := len(keys)
+	if keyLen == 1 {
+		delete(t.values, keys[0])
+		return nil
+	}
+	tree := t.GetPath(keys[:keyLen-1])
+	item := keys[keyLen-1]
+	switch node := tree.(type) {
+	case *Tree:
+		delete(node.values, item)
+		return nil
+	}
+	return errors.New("no such key to delete")
+}
+
 // createSubTree takes a tree and a key and create the necessary intermediate
 // subtrees to create a subtree at that point. In-place.
 //
