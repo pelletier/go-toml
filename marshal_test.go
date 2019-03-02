@@ -1178,3 +1178,88 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 		t.Fatal("Did not set camelCase'd key")
 	}
 }
+
+func TestUnmarshalDefault(t *testing.T) {
+	var doc struct {
+		StringField  string  `default:"a"`
+		BoolField    bool    `default:"true"`
+		IntField     int     `default:"1"`
+		Int64Field   int64   `default:"2"`
+		Float64Field float64 `default:"3.1"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.BoolField != true {
+		t.Errorf("BoolField should be true, not %t", doc.BoolField)
+	}
+	if doc.StringField != "a" {
+		t.Errorf("StringField should be \"a\", not %s", doc.StringField)
+	}
+	if doc.IntField != 1 {
+		t.Errorf("IntField should be 1, not %d", doc.IntField)
+	}
+	if doc.Int64Field != 2 {
+		t.Errorf("Int64Field should be 2, not %d", doc.Int64Field)
+	}
+	if doc.Float64Field != 3.1 {
+		t.Errorf("Float64Field should be 3.1, not %f", doc.Float64Field)
+	}
+}
+
+func TestUnmarshalDefaultFailureBool(t *testing.T) {
+	var doc struct {
+		Field bool `default:"blah"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
+
+func TestUnmarshalDefaultFailureInt(t *testing.T) {
+	var doc struct {
+		Field int `default:"blah"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
+
+func TestUnmarshalDefaultFailureInt64(t *testing.T) {
+	var doc struct {
+		Field int64 `default:"blah"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
+
+func TestUnmarshalDefaultFailureFloat64(t *testing.T) {
+	var doc struct {
+		Field float64 `default:"blah"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
+
+func TestUnmarshalDefaultFailureUnsupported(t *testing.T) {
+	var doc struct {
+		Field struct{} `default:"blah"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
