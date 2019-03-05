@@ -28,6 +28,8 @@ func parseKey(key string) ([]string, error) {
 			ignoreSpace = false
 		}
 		switch char {
+		case '\'':
+			fallthrough
 		case '"':
 			if inQuotes {
 				groups = append(groups, buffer.String())

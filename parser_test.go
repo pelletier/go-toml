@@ -79,7 +79,7 @@ zyx = 42`)
 	if err == nil {
 		t.Error("Error should have been returned.")
 	}
-	if err.Error() != "(1, 4): unexpected token" {
+	if err.Error() != "(1, 4): parsing error: keys cannot contain ] character" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -906,5 +906,34 @@ func TestMapKeyIsNum(t *testing.T) {
 	_, err = Load(`table={"2018"=1,"2019"=2}`)
 	if err != nil {
 		t.Error("should be passed")
+	}
+}
+
+func TestDottedKeys(t *testing.T) {
+	tree, err := Load(`
+name = "Orange"
+physical.color = "orange"
+physical.shape = "round"
+site."google.com" = true`)
+
+	assertTree(t, tree, err, map[string]interface{}{
+		"name": "Orange",
+		"physical": map[string]interface{}{
+			"color": "orange",
+			"shape": "round",
+		},
+		"site": map[string]interface{}{
+			"google.com": true,
+		},
+	})
+}
+
+func TestInvalidDottedKeyEmptyGroup(t *testing.T) {
+	_, err := Load(`a..b = true`)
+	if err == nil {
+		t.Fatal("should return an error")
+	}
+	if err.Error() != "(1, 1): invalid key: empty table key" {
+		t.Fatalf("invalid error message: %s", err)
 	}
 }
