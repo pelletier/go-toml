@@ -581,7 +581,7 @@ func TestDuplicateKeys(t *testing.T) {
 
 func TestEmptyIntermediateTable(t *testing.T) {
 	_, err := Load("[foo..bar]")
-	if err.Error() != "(1, 2): invalid table array key: empty table key" {
+	if err.Error() != "(1, 2): invalid table array key: expecting key part after dot" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -933,7 +933,7 @@ func TestInvalidDottedKeyEmptyGroup(t *testing.T) {
 	if err == nil {
 		t.Fatal("should return an error")
 	}
-	if err.Error() != "(1, 1): invalid key: empty table key" {
+	if err.Error() != "(1, 1): invalid key: expecting key part after dot" {
 		t.Fatalf("invalid error message: %s", err)
 	}
 }

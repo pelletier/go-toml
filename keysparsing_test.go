@@ -44,7 +44,23 @@ func TestDottedKeyBasic(t *testing.T) {
 }
 
 func TestBaseKeyPound(t *testing.T) {
-	testError(t, "hello#world", "invalid bare character: #")
+	testError(t, "hello#world", "invalid bare key character: #")
+}
+
+func TestUnclosedSingleQuotedKey(t *testing.T) {
+	testError(t, "'", "unclosed single-quoted key")
+}
+
+func TestUnclosedDoubleQuotedKey(t *testing.T) {
+	testError(t, "\"", "unclosed double-quoted key")
+}
+
+func TestInvalidStartKeyCharacter(t *testing.T) {
+	testError(t, "/", "invalid key character: /")
+}
+
+func TestInvalidSpaceInKey(t *testing.T) {
+	testError(t, "invalid key", "invalid key character after whitespace: k")
 }
 
 func TestQuotedKeys(t *testing.T) {
@@ -57,7 +73,7 @@ func TestQuotedKeys(t *testing.T) {
 }
 
 func TestEmptyKey(t *testing.T) {
-	testError(t, "", "empty key")
-	testError(t, " ", "empty key")
+	testError(t, ``, "empty key")
+	testError(t, ` `, "empty key")
 	testResult(t, `""`, []string{""})
 }
