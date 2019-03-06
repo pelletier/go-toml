@@ -38,6 +38,10 @@ job-template: &job-template
                 go test github.com/pelletier/go-toml/query -race -v | tee ${TEST_RESULTS}/go-test.out
         - store_test_results:
             path: /tmp/test-results
+        - persist_to_workspace:
+            root: /tmp/workspace
+            paths:
+                - coverage.txt
 
 jobs:
     go1_11:
@@ -48,11 +52,6 @@ jobs:
         <<: *job-template
         docker:
             - image: "circleci/golang:1.12"
-        steps:
-            - persist_to_workspace:
-                root: /tmp/workspace
-                paths:
-                    - coverage.txt
     codecov:
         docker:
             - image: "circleci/golang:1.12"
