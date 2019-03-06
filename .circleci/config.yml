@@ -28,11 +28,13 @@ commands:
                 default: false
                 type: boolean
         steps:
-            - run: |
-                TEST_DIR="/tmp/test-results/<<parameters.test_name>>"
-                mkdir -p ${TEST_DIR}
-                trap "go-junit-report </tmp/test-results/go-test.out > ${TEST_DIR}/go-test-report.xml" EXIT
-                go test <<parameters.module>> -race -v <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> | tee /tmp/test-results/go-test.out
+            - run:
+                name: "Run tests for <<parameters.test_name>>"
+                command: |
+                    TEST_DIR="/tmp/test-results/<<parameters.test_name>>"
+                    mkdir -p ${TEST_DIR}
+                    trap "go-junit-report </tmp/test-results/go-test.out > ${TEST_DIR}/go-test-report.xml" EXIT
+                    go test <<parameters.module>> -race -v <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> | tee /tmp/test-results/go-test.out
 
 jobs:
     go1_11:
