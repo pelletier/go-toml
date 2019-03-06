@@ -69,7 +69,7 @@ workflows:
         jobs:
             - go1_11
             - go1_12
-            - coverage:
+            - codecov:
                 requires:
                     - go1_11
                     - go1_12
