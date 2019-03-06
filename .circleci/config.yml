@@ -1,10 +1,13 @@
-version: 2
+version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.4
 job-template: &job-template
     working_directory: /go/src/github.com/pelletier/go-toml
     environment:
         TEST_RESULTS: /tmp/test-results
     steps:
         - checkout
+        - run: mkdir -p /workspace
         - run: go fmt ./...
         - run: go get github.com/jstemmer/go-junit-report
         - run: go get github.com/davecgh/go-spew/spew
@@ -15,8 +18,25 @@ job-template: &job-template
             name: Run unit tests
             command: |
                 trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-toml/go-test-report.xml" EXIT
-                go test -v | tee ${TEST_RESULTS}/go-test.out
-        - run: ./test.sh
+                go test -race -v -coverprofile=/workspace/coverage.txt -covermode=atomic | tee ${TEST_RESULTS}/go-test.out
+        - run: mkdir -p $TEST_RESULTS/tomljson
+        - run:
+            name: Run tomljson unit tests
+            command: |
+                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/tomljson/go-test-report.xml" EXIT
+                go test github.com/pelletier/go-toml/cmd/tomljson -race -v | tee ${TEST_RESULTS}/go-test.out
+        - run: mkdir -p $TEST_RESULTS/tomll
+        - run:
+            name: Run tomll unit tests
+            command: |
+                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/tomll/go-test-report.xml" EXIT
+                go test github.com/pelletier/go-toml/cmd/tomll -race -v | tee ${TEST_RESULTS}/go-test.out
+        - run: mkdir -p $TEST_RESULTS/query
+        - run:
+            name: Run query unit tests
+            command: |
+                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/query/go-test-report.xml" EXIT
+                go test github.com/pelletier/go-toml/query -race -v | tee ${TEST_RESULTS}/go-test.out
         - store_test_results:
             path: /tmp/test-results
 jobs:
@@ -28,9 +48,24 @@ jobs:
         <<: *job-template
         docker:
             - image: "circleci/golang:1.12"
+        steps:
+            - persist_to_workspace:
+                root: /workspace
+                paths:
+                    - coverage.txt
+    codecov:
+        steps:
+            - attach_workspace:
+                at: /workspace
+            - codecov/upload:
+                file: /workspace/coverage.txt
 workflows:
     version: 2
     test_all:
         jobs:
             - "go1.11"
             - "go1.12"
+            - codecov:
+                requires:
+                    - "go1.11"
+                    - "go1.12"
