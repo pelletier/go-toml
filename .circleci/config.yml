@@ -20,7 +20,7 @@ commands:
     run_test:
         description: "Run unit tests for a go module"
         parameters:
-            name:
+            test_name:
                 type: string
             module:
                 type: string
@@ -28,11 +28,11 @@ commands:
                 default: false
                 type: boolean
         steps:
-            -run:
-                command: |
-                    mkdir -p /tmp/test-results/<<name>>
-                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/<<name>>/go-test-report.xml" EXIT
-                    go test <<module>> -race -v <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> | tee /tmp/test-results/go-test.out
+            - run: |
+                TEST_DIR="/tmp/test-results/<<parameters.test_name>>"
+                mkdir -p ${TEST_DIR}
+                trap "go-junit-report </tmp/test-results/go-test.out > ${TEST_DIR}/go-test-report.xml" EXIT
+                go test <<parameters.module>> -race -v <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> | tee /tmp/test-results/go-test.out
 
 jobs:
     go1_11:
@@ -46,17 +46,17 @@ jobs:
             - run: go fmt ./...
             - get_deps
             - run_test:
-                name: "go-toml"
+                test_name: "go-toml"
                 module: "github.com/pelletier/go-toml"
                 coverage: true
             - run_test:
-                name: "tomljson"
+                test_name: "tomljson"
                 module: "github.com/pelletier/go-toml/cmd/tomljson"
             - run_test:
-                name: "tomll"
+                test_name: "tomll"
                 module: "github.com/pelletier/go-toml/cmd/tomll"
             - run_test:
-                name: "query"
+                test_name: "query"
                 module: "github.com/pelletier/go-toml/query"
             - store_test_results:
                 path: /tmp/test-results
