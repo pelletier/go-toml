@@ -1,9 +1,18 @@
 version: 2.1
 
+executors:
+    golang:
+        parameters:
+            version:
+                type: string
+        docker:
+            - image: circleci/golang:<< parameters.version >>
+
 jobs:
     go1_11:
-        docker:
-            - image: "circleci/golang:1.11"
+        executor:
+            name: golang
+            version: "1.11"
         working_directory: /go/src/github.com/pelletier/go-toml
         steps:
             - checkout
