@@ -23,19 +23,19 @@ jobs:
             - run:
                 name: Run tomljson unit tests
                 command: |
-                    trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/tomljson/go-test-report.xml" EXIT
+                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/tomljson/go-test-report.xml" EXIT
                     go test github.com/pelletier/go-toml/cmd/tomljson -race -v | tee /tmp/test-results/go-test.out
             - run: mkdir -p /tmp/test-results/tomll
             - run:
                 name: Run tomll unit tests
                 command: |
-                    trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/tomll/go-test-report.xml" EXIT
+                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/tomll/go-test-report.xml" EXIT
                     go test github.com/pelletier/go-toml/cmd/tomll -race -v | tee /tmp/test-results/go-test.out
             - run: mkdir -p /tmp/test-results/query
             - run:
                 name: Run query unit tests
                 command: |
-                    trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/query/go-test-report.xml" EXIT
+                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/query/go-test-report.xml" EXIT
                     go test github.com/pelletier/go-toml/query -race -v | tee /tmp/test-results/go-test.out
             - store_test_results:
                 path: /tmp/test-results
@@ -55,6 +55,6 @@ workflows:
     test_all:
         jobs:
             - go1_11
-            - codecov:
-                requires:
-                    - go1_11
+#           - codecov:
+#               requires:
+#                   - go1_11
