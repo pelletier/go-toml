@@ -76,7 +76,9 @@ jobs:
             - run:
                 name: "upload to codecov"
                 working_directory: /tmp/workspace
-                command: bash <(curl -s https://codecov.io/bash)
+                command: |
+                    curl https://codecov.io/bash > codecov.sh
+                    bash codecov.sh -v
 
 workflows:
     version: 2.1
