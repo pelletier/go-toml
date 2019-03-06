@@ -3,7 +3,7 @@ jobs:
     "go1.11":
         docker:
             - image: "circleci/golang:1.12"
-        working_directory: /go/src/github.com/pelletier/go-toml
+        working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
         environment:
             TEST_RESULTS: /tmp/test-results
         steps:
