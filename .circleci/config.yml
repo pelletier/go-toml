@@ -6,7 +6,7 @@ executors:
             version:
                 type: string
         docker:
-            - image: golang:<< parameters.version >>-alpine
+            - image: circleci/golang:<< parameters.version >>
 
 commands:
     get_deps:
@@ -69,7 +69,7 @@ jobs:
                 path: /tmp/test-results
     codecov:
         docker:
-            - image: "golang:1.12-alpine"
+            - image: "circleci/golang:1.12"
         steps:
             - attach_workspace:
                 at: /tmp/workspace
@@ -100,6 +100,30 @@ workflows:
                         root: /tmp/workspace
                         paths:
                             - coverage.txt
+            - go:
+                name: "gotip"
+                version: "1.12" # use as base
+                pre-steps:
+                    - restore_cache:
+                        keys:
+                            - go-tip-source
+                    - run:
+                        name: "Compile go tip"
+                        command: |
+                            if [ ! -d "/tmp/go" ]; then
+                                git clone https://go.googlesource.com/go /tmp/go
+                            fi
+                            cd /tmp/go
+                            git checkout master
+                            git pull
+                            cd src
+                            ./make.bash
+                            export PATH="/tmp/go/bin:${PATH}"
+                    - run: go version
+                    - save_cache:
+                        key: go-tip-source
+                        paths:
+                            - "/tmp/go"
             - codecov:
                 requires:
                     - go1_11
