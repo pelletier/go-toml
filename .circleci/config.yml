@@ -55,7 +55,7 @@ jobs:
                 root: /workspace
                 paths:
                     - coverage.txt
-    "codecov":
+    "coverage":
         steps:
             - attach_workspace:
                 at: /workspace
@@ -68,7 +68,7 @@ workflows:
         jobs:
             - "go1_11"
             - "go1_12"
-            - "codecov":
+            - "coverage":
                 requires:
                     - "go1_11"
                     - "go1_12"
