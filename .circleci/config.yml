@@ -1,5 +1,5 @@
 version: 2
-job-template:
+job-template: &job-template
     working_directory: /go/src/github.com/pelletier/go-toml
     environment:
         TEST_RESULTS: /tmp/test-results
