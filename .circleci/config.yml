@@ -1,8 +1,10 @@
 version: 2.1
 
-commands:
-    test_all:
-        description: "Run all go-toml tests"
+jobs:
+    go1_11:
+        docker:
+            - image: "circleci/golang:1.11"
+        working_directory: /go/src/github.com/pelletier/go-toml
         steps:
             - checkout
             - run: mkdir -p /tmp/workspace
@@ -35,26 +37,8 @@ commands:
                 command: |
                     trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/query/go-test-report.xml" EXIT
                     go test github.com/pelletier/go-toml/query -race -v | tee /tmp/test-results/go-test.out
-            - store_/tmp/test-results:
+            - store_test_results:
                 path: /tmp/test-results
-
-jobs:
-    go1_11:
-        docker:
-            - image: "circleci/golang:1.11"
-        working_directory: /go/src/github.com/pelletier/go-toml
-        steps:
-            - test_all
-    go1_12:
-        docker:
-            - image: "circleci/golang:1.12"
-        working_directory: /go/src/github.com/pelletier/go-toml
-        steps:
-            - test_all
-            - persist_to_workspace:
-                root: /tmp/workspace
-                paths:
-                    - coverage.txt
     codecov:
         docker:
             - image: "circleci/golang:1.12"
@@ -71,8 +55,6 @@ workflows:
     test_all:
         jobs:
             - go1_11
-            - go1_12
             - codecov:
                 requires:
                     - go1_11
-                    - go1_12
