@@ -91,6 +91,8 @@ workflows:
                 name: "go1_12"
                 version: "1.12"
                 post-steps:
+                    - store_artifacts:
+                        path: /tmp/workspace/coverage.txt
                     - persist_to_workspace:
                         root: /tmp/workspace
                         paths:
