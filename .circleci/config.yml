@@ -6,7 +6,7 @@ job-template: &job-template
         TEST_RESULTS: /tmp/test-results
     steps:
         - checkout
-        - run: mkdir -p /workspace
+        - run: mkdir -p /tmp/workspace
         - run: go fmt ./...
         - run: go get github.com/jstemmer/go-junit-report
         - run: go get github.com/davecgh/go-spew/spew
@@ -17,7 +17,7 @@ job-template: &job-template
             name: Run unit tests
             command: |
                 trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-toml/go-test-report.xml" EXIT
-                go test -race -v -coverprofile=/workspace/coverage.txt -covermode=atomic | tee ${TEST_RESULTS}/go-test.out
+                go test -race -v -coverprofile=/tmp/workspace/coverage.txt -covermode=atomic | tee ${TEST_RESULTS}/go-test.out
         - run: mkdir -p $TEST_RESULTS/tomljson
         - run:
             name: Run tomljson unit tests
@@ -50,7 +50,7 @@ jobs:
             - image: "circleci/golang:1.12"
         steps:
             - persist_to_workspace:
-                root: /workspace
+                root: /tmp/workspace
                 paths:
                     - coverage.txt
     codecov:
@@ -58,8 +58,11 @@ jobs:
             - image: "circleci/golang:1.12"
         steps:
             - attach_workspace:
-                at: /workspace
-            - run: bash <(curl -s https://codecov.io/bash)
+                at: /tmp/workspace
+            - run:
+                name: "upload to codecov"
+                working_directory: /tmp/workspace
+                command: bash <(curl -s https://codecov.io/bash)
 
 workflows:
     version: 2
