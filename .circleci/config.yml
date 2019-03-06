@@ -1,30 +1,36 @@
 version: 2
+job-template:
+    working_directory: /go/src/github.com/pelletier/go-toml
+    environment:
+        TEST_RESULTS: /tmp/test-results
+    steps:
+        - checkout
+        - run: go fmt ./...
+        - run: go get github.com/jstemmer/go-junit-report
+        - run: go get github.com/davecgh/go-spew/spew
+        - run: go get gopkg.in/yaml.v2
+        - run: go get github.com/BurntSushi/toml
+        - run: mkdir -p $TEST_RESULTS/go-toml
+        - run:
+            name: Run unit tests
+            command: |
+                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-toml/go-test-report.xml" EXIT
+                go test -v | tee ${TEST_RESULTS}/go-test.out
+        - run: ./test.sh
+        - store_test_results:
+            path: /tmp/test-results
 jobs:
     "go1.11":
+        <<: *job-template
+        docker:
+            - image: "circleci/golang:1.11"
+    "go1.12":
+        <<: *job-template
         docker:
             - image: "circleci/golang:1.12"
-        working_directory: /go/src/github.com/pelletier/go-toml
-        environment:
-            TEST_RESULTS: /tmp/test-results
-        steps:
-            - checkout
-            - run: go fmt ./...
-            - run: go get github.com/jstemmer/go-junit-report
-            - run: go get github.com/davecgh/go-spew/spew
-            - run: go get gopkg.in/yaml.v2
-            - run: go get github.com/BurntSushi/toml
-            - run: mkdir -p $TEST_RESULTS/go-toml
-            - run:
-                name: Run unit tests
-                command: |
-                    trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-toml/go-test-report.xml" EXIT
-                    go test -v | tee ${TEST_RESULTS}/go-test.out
-            - run: ./test.sh
-            - store_test_results:
-                path: /tmp/test-results
-
 workflows:
     version: 2
     test_all:
         jobs:
             - "go1.11"
+            - "go1.12"
