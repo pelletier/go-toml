@@ -8,10 +8,17 @@ jobs:
             TEST_RESULTS: /tmp/test-results
         steps:
             - checkout
-            - run: mkdir -p $TEST_RESULTS
             - run: go fmt ./...
-            - run: go get -u github.com/jstemmer/go-junit-report
-            - run: go test -v 2>&1 | go-junit-report > ${TEST_RESULTS}/report.xml
+            - run: go get github.com/jstemmer/go-junit-report
+            - run: go get github.com/davecgh/go-spew/spew
+            - run: go get gopkg.in/yaml.v2
+            - run: go get github.com/BurntSushi/toml
+            - run: mkdir -p $TEST_RESULTS/go-toml
+            - run:
+                name: Run unit tests
+                command: |
+                    trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-test-report.xml" EXIT
+                    go test -v | tee ${TEST_RESULTS}/go-toml/go-test.out
             - run: ./test.sh
 workflows:
     version: 2
