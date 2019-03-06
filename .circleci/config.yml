@@ -35,7 +35,7 @@ commands:
                     mkdir -p ${TEST_DIR}
                     trap "go-junit-report </tmp/test-results/go-test.out > ${TEST_DIR}/go-test-report.xml" EXIT
                     go test <<parameters.module>> -race -v \
-                        <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> \
+                        <<# parameters.coverage >>-html=coverage.html -coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> \
                         | tee /tmp/test-results/go-test.out
 
 jobs:
@@ -93,6 +93,8 @@ workflows:
                 post-steps:
                     - store_artifacts:
                         path: /tmp/workspace/coverage.txt
+                    - store_artifacts:
+                        path: coverage.html
                     - persist_to_workspace:
                         root: /tmp/workspace
                         paths:
