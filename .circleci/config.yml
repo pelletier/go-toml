@@ -17,6 +17,23 @@ commands:
             - run: go get gopkg.in/yaml.v2
             - run: go get github.com/BurntSushi/toml
 
+    run_test:
+        description: "Run unit tests for a go module"
+        parameters:
+            name:
+                type: string
+            module:
+                type: string
+            coverage:
+                default: false
+                type: boolean
+        steps:
+            -run:
+                command: |
+                    mkdir -p /tmp/test-results/<<name>>
+                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/<<name>>/go-test-report.xml" EXIT
+                    go test <<module>> -race -v <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> | tee /tmp/test-results/go-test.out
+
 jobs:
     go1_11:
         executor:
@@ -28,30 +45,19 @@ jobs:
             - run: mkdir -p /tmp/workspace
             - run: go fmt ./...
             - get_deps
-            - run: mkdir -p /tmp/test-results/go-toml
-            - run:
-                name: Run unit tests
-                command: |
-                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/go-toml/go-test-report.xml" EXIT
-                    go test -race -v -coverprofile=/tmp/workspace/coverage.txt -covermode=atomic | tee /tmp/test-results/go-test.out
-            - run: mkdir -p /tmp/test-results/tomljson
-            - run:
-                name: Run tomljson unit tests
-                command: |
-                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/tomljson/go-test-report.xml" EXIT
-                    go test github.com/pelletier/go-toml/cmd/tomljson -race -v | tee /tmp/test-results/go-test.out
-            - run: mkdir -p /tmp/test-results/tomll
-            - run:
-                name: Run tomll unit tests
-                command: |
-                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/tomll/go-test-report.xml" EXIT
-                    go test github.com/pelletier/go-toml/cmd/tomll -race -v | tee /tmp/test-results/go-test.out
-            - run: mkdir -p /tmp/test-results/query
-            - run:
-                name: Run query unit tests
-                command: |
-                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/query/go-test-report.xml" EXIT
-                    go test github.com/pelletier/go-toml/query -race -v | tee /tmp/test-results/go-test.out
+            - run_test:
+                name: "go-toml"
+                module: "github.com/pelletier/go-toml"
+                coverage: true
+            - run_test:
+                name: "tomljson"
+                module: "github.com/pelletier/go-toml/cmd/tomljson"
+            - run_test:
+                name: "tomll"
+                module: "github.com/pelletier/go-toml/cmd/tomll"
+            - run_test:
+                name: "query"
+                module: "github.com/pelletier/go-toml/query"
             - store_test_results:
                 path: /tmp/test-results
     codecov:
