@@ -1,0 +1,20 @@
+version: 2
+jobs:
+    "go1.11":
+        docker:
+            - image: "circleci/golang:1.12"
+        working_directory: /go/src/github.com/pelletier/go-toml
+        environment:
+            TEST_RESULTS: /tmp/test-results
+        steps:
+            - checkout
+            - run: mkdir -p $TEST_RESULTS
+            - run: go fmt ./...
+            - run: go get -u github.com/jstemmer/go-junit-report
+            - run: go test -v 2>&1 | go-junit-report > ${TEST_RESULTS}/report.xml
+            - run: ./test.sh
+workflows:
+    version: 2
+    test_all:
+        jobs:
+            - "go1.11"
