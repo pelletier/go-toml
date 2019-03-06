@@ -88,6 +88,12 @@ workflows:
             - go:
                 name: "go1_12"
                 version: "1.12"
-#           - codecov:
-#               requires:
-#                   - go1_11
+                post-steps:
+                    - persist_to_workspace:
+                        root: /tmp/workspace
+                        paths:
+                            - coverage.txt
+            - codecov:
+                requires:
+                    - go1_11
+                    - go1_12
