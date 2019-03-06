@@ -8,6 +8,15 @@ executors:
         docker:
             - image: circleci/golang:<< parameters.version >>
 
+commands:
+    get_deps:
+        description: "Get go dependencies"
+        steps:
+            - run: go get github.com/jstemmer/go-junit-report
+            - run: go get github.com/davecgh/go-spew/spew
+            - run: go get gopkg.in/yaml.v2
+            - run: go get github.com/BurntSushi/toml
+
 jobs:
     go1_11:
         executor:
@@ -18,10 +27,7 @@ jobs:
             - checkout
             - run: mkdir -p /tmp/workspace
             - run: go fmt ./...
-            - run: go get github.com/jstemmer/go-junit-report
-            - run: go get github.com/davecgh/go-spew/spew
-            - run: go get gopkg.in/yaml.v2
-            - run: go get github.com/BurntSushi/toml
+            - get_deps
             - run: mkdir -p /tmp/test-results/go-toml
             - run:
                 name: Run unit tests
