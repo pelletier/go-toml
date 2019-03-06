@@ -51,7 +51,7 @@ jobs:
                 command: bash <(curl -s https://codecov.io/bash)
 
 workflows:
-    version: 2
+    version: 2.1
     test_all:
         jobs:
             - go1_11
