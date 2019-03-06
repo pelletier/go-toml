@@ -1,6 +1,4 @@
-version: 2.1
-orbs:
-  codecov: codecov/codecov@1.0.4
+version: 2
 
 job-template: &job-template
     working_directory: /go/src/github.com/pelletier/go-toml
@@ -42,11 +40,11 @@ job-template: &job-template
             path: /tmp/test-results
 
 jobs:
-    "go1_11":
+    go1_11:
         <<: *job-template
         docker:
             - image: "circleci/golang:1.11"
-    "go1_12":
+    go1_12:
         <<: *job-template
         docker:
             - image: "circleci/golang:1.12"
@@ -55,20 +53,21 @@ jobs:
                 root: /workspace
                 paths:
                     - coverage.txt
-    "coverage":
+    codecov:
+        docker:
+            - image: "circleci/golang:1.12"
         steps:
             - attach_workspace:
                 at: /workspace
-            - codecov/upload:
-                file: /workspace/coverage.txt
+            - run: bash <(curl -s https://codecov.io/bash)
 
 workflows:
-    version: 2.1
+    version: 2
     test_all:
         jobs:
-            - "go1_11"
-            - "go1_12"
-            - "coverage":
+            - go1_11
+            - go1_12
+            - coverage:
                 requires:
-                    - "go1_11"
-                    - "go1_12"
+                    - go1_11
+                    - go1_12
