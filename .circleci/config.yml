@@ -6,7 +6,7 @@ executors:
             version:
                 type: string
         docker:
-            - image: circleci/golang:<< parameters.version >>
+            - image: golang:<< parameters.version >>-alpine
 
 commands:
     get_deps:
@@ -69,7 +69,7 @@ jobs:
                 path: /tmp/test-results
     codecov:
         docker:
-            - image: "circleci/golang:1.12"
+            - image: "golang:1.12-alpine"
         steps:
             - attach_workspace:
                 at: /tmp/workspace
