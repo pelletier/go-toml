@@ -118,7 +118,7 @@ workflows:
                             git pull
                             cd src
                             ./make.bash
-                            export PATH="/tmp/go/bin:${PATH}"
+                            echo 'export PATH="/tmp/go/bin:$PATH"' >> $BASH_ENV
                     - run: go version
                     - save_cache:
                         key: go-tip-source
