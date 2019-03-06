@@ -39,6 +39,7 @@ job-template: &job-template
                 go test github.com/pelletier/go-toml/query -race -v | tee ${TEST_RESULTS}/go-test.out
         - store_test_results:
             path: /tmp/test-results
+
 jobs:
     "go1.11":
         <<: *job-template
@@ -59,6 +60,7 @@ jobs:
                 at: /workspace
             - codecov/upload:
                 file: /workspace/coverage.txt
+
 workflows:
     version: 2
     test_all:
