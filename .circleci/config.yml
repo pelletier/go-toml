@@ -42,11 +42,11 @@ job-template: &job-template
             path: /tmp/test-results
 
 jobs:
-    "go1.11":
+    "go1_11":
         <<: *job-template
         docker:
             - image: "circleci/golang:1.11"
-    "go1.12":
+    "go1_12":
         <<: *job-template
         docker:
             - image: "circleci/golang:1.12"
@@ -66,9 +66,9 @@ workflows:
     version: 2
     test_all:
         jobs:
-            - "go1.11"
-            - "go1.12"
+            - "go1_11"
+            - "go1_12"
             - codecov:
                 requires:
-                    - "go1.11"
-                    - "go1.12"
+                    - "go1_11"
+                    - "go1_12"
