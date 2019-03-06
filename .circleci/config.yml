@@ -1,57 +1,60 @@
-version: 2
+version: 2.1
 
-job-template: &job-template
-    working_directory: /go/src/github.com/pelletier/go-toml
-    environment:
-        TEST_RESULTS: /tmp/test-results
-    steps:
-        - checkout
-        - run: mkdir -p /tmp/workspace
-        - run: go fmt ./...
-        - run: go get github.com/jstemmer/go-junit-report
-        - run: go get github.com/davecgh/go-spew/spew
-        - run: go get gopkg.in/yaml.v2
-        - run: go get github.com/BurntSushi/toml
-        - run: mkdir -p $TEST_RESULTS/go-toml
-        - run:
-            name: Run unit tests
-            command: |
-                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-toml/go-test-report.xml" EXIT
-                go test -race -v -coverprofile=/tmp/workspace/coverage.txt -covermode=atomic | tee ${TEST_RESULTS}/go-test.out
-        - run: mkdir -p $TEST_RESULTS/tomljson
-        - run:
-            name: Run tomljson unit tests
-            command: |
-                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/tomljson/go-test-report.xml" EXIT
-                go test github.com/pelletier/go-toml/cmd/tomljson -race -v | tee ${TEST_RESULTS}/go-test.out
-        - run: mkdir -p $TEST_RESULTS/tomll
-        - run:
-            name: Run tomll unit tests
-            command: |
-                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/tomll/go-test-report.xml" EXIT
-                go test github.com/pelletier/go-toml/cmd/tomll -race -v | tee ${TEST_RESULTS}/go-test.out
-        - run: mkdir -p $TEST_RESULTS/query
-        - run:
-            name: Run query unit tests
-            command: |
-                trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/query/go-test-report.xml" EXIT
-                go test github.com/pelletier/go-toml/query -race -v | tee ${TEST_RESULTS}/go-test.out
-        - store_test_results:
-            path: /tmp/test-results
-        - persist_to_workspace:
-            root: /tmp/workspace
-            paths:
-                - coverage.txt
+commands:
+    test_all:
+        description: "Run all go-toml tests"
+        steps:
+            - checkout
+            - run: mkdir -p /tmp/workspace
+            - run: go fmt ./...
+            - run: go get github.com/jstemmer/go-junit-report
+            - run: go get github.com/davecgh/go-spew/spew
+            - run: go get gopkg.in/yaml.v2
+            - run: go get github.com/BurntSushi/toml
+            - run: mkdir -p /tmp/test-results/go-toml
+            - run:
+                name: Run unit tests
+                command: |
+                    trap "go-junit-report </tmp/test-results/go-test.out > /tmp/test-results/go-toml/go-test-report.xml" EXIT
+                    go test -race -v -coverprofile=/tmp/workspace/coverage.txt -covermode=atomic | tee /tmp/test-results/go-test.out
+            - run: mkdir -p /tmp/test-results/tomljson
+            - run:
+                name: Run tomljson unit tests
+                command: |
+                    trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/tomljson/go-test-report.xml" EXIT
+                    go test github.com/pelletier/go-toml/cmd/tomljson -race -v | tee /tmp/test-results/go-test.out
+            - run: mkdir -p /tmp/test-results/tomll
+            - run:
+                name: Run tomll unit tests
+                command: |
+                    trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/tomll/go-test-report.xml" EXIT
+                    go test github.com/pelletier/go-toml/cmd/tomll -race -v | tee /tmp/test-results/go-test.out
+            - run: mkdir -p /tmp/test-results/query
+            - run:
+                name: Run query unit tests
+                command: |
+                    trap "go-junit-report <${/tmp/test-results}/go-test.out > /tmp/test-results/query/go-test-report.xml" EXIT
+                    go test github.com/pelletier/go-toml/query -race -v | tee /tmp/test-results/go-test.out
+            - store_/tmp/test-results:
+                path: /tmp/test-results
 
 jobs:
     go1_11:
-        <<: *job-template
         docker:
             - image: "circleci/golang:1.11"
+        working_directory: /go/src/github.com/pelletier/go-toml
+        steps:
+            - test_all
     go1_12:
-        <<: *job-template
         docker:
             - image: "circleci/golang:1.12"
+        working_directory: /go/src/github.com/pelletier/go-toml
+        steps:
+            - test_all
+            - persist_to_workspace:
+                root: /tmp/workspace
+                paths:
+                    - coverage.txt
     codecov:
         docker:
             - image: "circleci/golang:1.12"
