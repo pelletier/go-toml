@@ -1,6 +1,7 @@
 version: 2.1
 orbs:
   codecov: codecov/codecov@1.0.4
+
 job-template: &job-template
     working_directory: /go/src/github.com/pelletier/go-toml
     environment:
