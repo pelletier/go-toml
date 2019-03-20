@@ -27,6 +27,9 @@ commands:
             coverage:
                 default: false
                 type: boolean
+            allow_fail:
+                type: boolean
+                default: false
         steps:
             - run:
                 name: "Run tests for <<parameters.test_name>>"
@@ -36,13 +39,16 @@ commands:
                     trap "go-junit-report </tmp/test-results/go-test.out > ${TEST_DIR}/go-test-report.xml" EXIT
                     go test <<parameters.module>> -race -v \
                         <<# parameters.coverage >>-coverprofile=/tmp/workspace/coverage.txt -covermode=atomic<</ parameters.coverage >> \
-                        | tee /tmp/test-results/go-test.out
+                        | tee /tmp/test-results/go-test.out <<# parameters.allow_fail >>|| true<</ parameters.allow_fail >>
 
 jobs:
     go:
         parameters:
             version:
                 type: string
+            allow_fail:
+                type: boolean
+                default: false
         executor:
             name: golang
             version: "<<parameters.version>>"
@@ -50,21 +56,25 @@ jobs:
         steps:
             - checkout
             - run: mkdir -p /tmp/workspace
-            - run: go fmt ./...
+            - run: go fmt ./... <<# parameters.allow_fail >>|| true<</ parameters.allow_fail >>
             - get_deps
             - run_test:
                 test_name: "go-toml"
                 module: "github.com/pelletier/go-toml"
                 coverage: true
+                allow_fail: <<parameters.allow_fail>>
             - run_test:
                 test_name: "tomljson"
                 module: "github.com/pelletier/go-toml/cmd/tomljson"
+                allow_fail: <<parameters.allow_fail>>
             - run_test:
                 test_name: "tomll"
                 module: "github.com/pelletier/go-toml/cmd/tomll"
+                allow_fail: <<parameters.allow_fail>>
             - run_test:
                 test_name: "query"
                 module: "github.com/pelletier/go-toml/query"
+                allow_fail: <<parameters.allow_fail>>
             - store_test_results:
                 path: /tmp/test-results
     codecov:
@@ -103,6 +113,7 @@ workflows:
             - go:
                 name: "gotip"
                 version: "1.12" # use as base
+                allow_fail: true
                 pre-steps:
                     - restore_cache:
                         keys:
