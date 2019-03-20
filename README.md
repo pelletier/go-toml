@@ -109,12 +109,7 @@ much appreciated!
 
 ### Run tests
 
-You have to make sure two kind of tests run:
-
-1. The Go unit tests
-2. The TOML examples base
-
-You can run both of them using `./test.sh`.
+`go test ./...`
 
 ### Fuzzing
 

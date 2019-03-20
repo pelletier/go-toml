@@ -30,7 +30,7 @@ test_script:
   - go get github.com/davecgh/go-spew/spew
   - go get gopkg.in/yaml.v2
   - go get github.com/BurntSushi/toml
-  - go build github.com/pelletier/go-toml
   - go test github.com/pelletier/go-toml
   - go test github.com/pelletier/go-toml/cmd/tomljson
+  - go test github.com/pelletier/go-toml/cmd/tomll
   - go test github.com/pelletier/go-toml/query
