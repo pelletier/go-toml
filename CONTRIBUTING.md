@@ -83,9 +83,7 @@ some early feedback!
 
 #### Run the tests
 
-go-toml uses two kind of tests: unit tests and TOML example tests.
-You can run both of them using ./test.sh.
-
+You can run tests for go-toml using Go's test tool: `go test ./...`.
 When creating a pull requests, all tests will be ran on Linux on a few Go
 versions (Travis CI), and on Windows using the latest Go version
 (AppVeyor).
