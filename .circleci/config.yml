@@ -13,9 +13,6 @@ commands:
         description: "Get go dependencies"
         steps:
             - run: go get github.com/jstemmer/go-junit-report
-            - run: go get github.com/davecgh/go-spew/spew
-            - run: go get gopkg.in/yaml.v2
-            - run: go get github.com/BurntSushi/toml
 
     run_test:
         description: "Run unit tests for a go module"
@@ -53,6 +50,8 @@ jobs:
             name: golang
             version: "<<parameters.version>>"
         working_directory: /go/src/github.com/pelletier/go-toml
+        environment:
+          GO111MODULE: "on"
         steps:
             - checkout
             - run: mkdir -p /tmp/workspace
