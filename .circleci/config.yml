@@ -51,7 +51,7 @@ jobs:
             version: "<<parameters.version>>"
         working_directory: /go/src/github.com/pelletier/go-toml
         environment:
-          GO111MODULE: on
+          GO111MODULE: "on"
         steps:
             - checkout
             - run: mkdir -p /tmp/workspace
