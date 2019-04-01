@@ -296,7 +296,6 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 
 // Create next tree with a position based on Encoder.line
 func (e *Encoder) nextTree() *Tree {
-	e.line++
 	return newTreeWithPosition(Position{Line: e.line, Col: 1})
 }
 
@@ -373,6 +372,7 @@ func (e *Encoder) valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (int
 
 // Convert given marshal value to toml value
 func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
+	e.line++
 	if mtype.Kind() == reflect.Ptr {
 		return e.valueToToml(mtype.Elem(), mval.Elem())
 	}

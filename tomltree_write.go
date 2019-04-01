@@ -12,6 +12,19 @@ import (
 	"time"
 )
 
+type valueComplexity int
+
+const (
+	valueSimple valueComplexity = iota + 1
+	valueComplex
+)
+
+type sortNode struct {
+	key        string
+	complexity valueComplexity
+	sortOrder  int
+}
+
 // Encodes a string to a TOML-compliant multi-line string value
 // This function is a clone of the existing encodeTomlString function, except that whitespace characters
 // are preserved. Quotation marks and backslashes are also not escaped.
@@ -153,22 +166,6 @@ func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElemen
 	return "", fmt.Errorf("unsupported value type %T: %v", v, v)
 }
 
-func sortSimpleByLine(vals []string, t *Tree) {
-	m := make(map[int]string)
-	var lines []int
-
-	for _, val := range vals {
-		tv := t.values[val].(*tomlValue)
-		lines = append(lines, tv.position.Line)
-		m[tv.position.Line] = val
-	}
-	sort.Ints(lines)
-
-	for i, line := range lines {
-		vals[i] = m[line]
-	}
-}
-
 func getTreeArrayLine(trees []*Tree) (line int) {
 	// get lowest line number that is not 0
 	for _, tv := range trees {
@@ -179,30 +176,83 @@ func getTreeArrayLine(trees []*Tree) (line int) {
 	return
 }
 
-func sortComplexByLine(vals []string, t *Tree) {
-	m := make(map[int]string)
-	var lines []int
-	var tv *Tree
+func sortByLines(t *Tree) (vals []sortNode) {
+	var (
+		line  int
+		lines []int
+		tv    *Tree
+		tom   *tomlValue
+		node  sortNode
+	)
+	vals = make([]sortNode, 0)
+	m := make(map[int]sortNode)
 
-	for _, val := range vals {
-		var line int
-		v := t.values[val]
+	for k := range t.values {
+		v := t.values[k]
 		switch v.(type) {
 		case *Tree:
 			tv = v.(*Tree)
 			line = tv.position.Line
+			node = sortNode{key: k, sortOrder: line, complexity: valueComplex}
 		case []*Tree:
 			line = getTreeArrayLine(v.([]*Tree))
+			node = sortNode{key: k, sortOrder: line, complexity: valueComplex}
+		default:
+			tom = v.(*tomlValue)
+			line = tom.position.Line
+			node = sortNode{key: k, sortOrder: line, complexity: valueSimple}
 		}
-
 		lines = append(lines, line)
-		m[line] = val
+		vals = append(vals, node)
+		m[line] = node
 	}
 	sort.Ints(lines)
 
 	for i, line := range lines {
 		vals[i] = m[line]
 	}
+
+	return vals
+}
+
+func sortAlphabetical(t *Tree) (vals []sortNode) {
+	var (
+		node     sortNode
+		simpVals []string
+		compVals []string
+	)
+	vals = make([]sortNode, 0)
+	m := make(map[string]sortNode)
+
+	for k := range t.values {
+		v := t.values[k]
+		switch v.(type) {
+		case *Tree, []*Tree:
+			node = sortNode{key: k, complexity: valueComplex}
+			compVals = append(compVals, node.key)
+		default:
+			node = sortNode{key: k, complexity: valueSimple}
+			simpVals = append(simpVals, node.key)
+		}
+		vals = append(vals, node)
+		m[node.key] = node
+	}
+
+	// Simples first to match previous implementation
+	sort.Strings(simpVals)
+	i := 0
+	for _, key := range simpVals {
+		vals[i] = m[key]
+		i++
+	}
+
+	sort.Strings(compVals)
+	for _, key := range compVals {
+		vals[i] = m[key]
+		i++
+	}
+
+	return vals
 }
 
 func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64, arraysOneElementPerLine bool) (int64, error) {
@@ -210,115 +260,105 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64, a
 }
 
 func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount int64, arraysOneElementPerLine bool, ord marshalOrder) (int64, error) {
-	simpleValuesKeys := make([]string, 0)
-	complexValuesKeys := make([]string, 0)
-
-	for k := range t.values {
-		v := t.values[k]
-		switch v.(type) {
-		case *Tree, []*Tree:
-			complexValuesKeys = append(complexValuesKeys, k)
-		default:
-			simpleValuesKeys = append(simpleValuesKeys, k)
-		}
-	}
+	orderedVals := make([]sortNode, 0)
 
 	switch ord {
 	case OrderPreserve:
-		sortSimpleByLine(simpleValuesKeys, t)
-		sortComplexByLine(complexValuesKeys, t)
+		orderedVals = sortByLines(t)
 	default:
-		sort.Strings(simpleValuesKeys)
-		sort.Strings(complexValuesKeys)
+		orderedVals = sortAlphabetical(t)
 	}
 
-	for _, k := range simpleValuesKeys {
-		v, ok := t.values[k].(*tomlValue)
-		if !ok {
-			return bytesCount, fmt.Errorf("invalid value type at %s: %T", k, t.values[k])
-		}
+	for _, node := range orderedVals {
+		switch node.complexity {
+		case valueComplex:
+			k := node.key
+			v := t.values[k]
 
-		repr, err := tomlValueStringRepresentation(v, indent, arraysOneElementPerLine)
-		if err != nil {
-			return bytesCount, err
-		}
-
-		if v.comment != "" {
-			comment := strings.Replace(v.comment, "\n", "\n"+indent+"#", -1)
-			start := "# "
-			if strings.HasPrefix(comment, "#") {
-				start = ""
+			combinedKey := k
+			if keyspace != "" {
+				combinedKey = keyspace + "." + combinedKey
 			}
-			writtenBytesCountComment, errc := writeStrings(w, "\n", indent, start, comment, "\n")
-			bytesCount += int64(writtenBytesCountComment)
-			if errc != nil {
-				return bytesCount, errc
+			var commented string
+			if t.commented {
+				commented = "# "
 			}
-		}
 
-		var commented string
-		if v.commented {
-			commented = "# "
-		}
-		writtenBytesCount, err := writeStrings(w, indent, commented, k, " = ", repr, "\n")
-		bytesCount += int64(writtenBytesCount)
-		if err != nil {
-			return bytesCount, err
-		}
-	}
+			switch node := v.(type) {
+			// node has to be of those two types given how keys are sorted above
+			case *Tree:
+				tv, ok := t.values[k].(*Tree)
+				if !ok {
+					return bytesCount, fmt.Errorf("invalid value type at %s: %T", k, t.values[k])
+				}
+				if tv.comment != "" {
+					comment := strings.Replace(tv.comment, "\n", "\n"+indent+"#", -1)
+					start := "# "
+					if strings.HasPrefix(comment, "#") {
+						start = ""
+					}
+					writtenBytesCountComment, errc := writeStrings(w, "\n", indent, start, comment)
+					bytesCount += int64(writtenBytesCountComment)
+					if errc != nil {
+						return bytesCount, errc
+					}
+				}
+				writtenBytesCount, err := writeStrings(w, "\n", indent, commented, "[", combinedKey, "]\n")
+				bytesCount += int64(writtenBytesCount)
+				if err != nil {
+					return bytesCount, err
+				}
+				bytesCount, err = node.writeToOrdered(w, indent+"  ", combinedKey, bytesCount, arraysOneElementPerLine, ord)
+				if err != nil {
+					return bytesCount, err
+				}
+			case []*Tree:
+				for _, subTree := range node {
+					writtenBytesCount, err := writeStrings(w, "\n", indent, commented, "[[", combinedKey, "]]\n")
+					bytesCount += int64(writtenBytesCount)
+					if err != nil {
+						return bytesCount, err
+					}
 
-	for _, k := range complexValuesKeys {
-		v := t.values[k]
-
-		combinedKey := k
-		if keyspace != "" {
-			combinedKey = keyspace + "." + combinedKey
-		}
-		var commented string
-		if t.commented {
-			commented = "# "
-		}
-
-		switch node := v.(type) {
-		// node has to be of those two types given how keys are sorted above
-		case *Tree:
-			tv, ok := t.values[k].(*Tree)
+					bytesCount, err = subTree.writeToOrdered(w, indent+"  ", combinedKey, bytesCount, arraysOneElementPerLine, ord)
+					if err != nil {
+						return bytesCount, err
+					}
+				}
+			}
+		default: // Simple
+			k := node.key
+			v, ok := t.values[k].(*tomlValue)
 			if !ok {
 				return bytesCount, fmt.Errorf("invalid value type at %s: %T", k, t.values[k])
 			}
-			if tv.comment != "" {
-				comment := strings.Replace(tv.comment, "\n", "\n"+indent+"#", -1)
+
+			repr, err := tomlValueStringRepresentation(v, indent, arraysOneElementPerLine)
+			if err != nil {
+				return bytesCount, err
+			}
+
+			if v.comment != "" {
+				comment := strings.Replace(v.comment, "\n", "\n"+indent+"#", -1)
 				start := "# "
 				if strings.HasPrefix(comment, "#") {
 					start = ""
 				}
-				writtenBytesCountComment, errc := writeStrings(w, "\n", indent, start, comment)
+				writtenBytesCountComment, errc := writeStrings(w, "\n", indent, start, comment, "\n")
 				bytesCount += int64(writtenBytesCountComment)
 				if errc != nil {
 					return bytesCount, errc
 				}
 			}
-			writtenBytesCount, err := writeStrings(w, "\n", indent, commented, "[", combinedKey, "]\n")
+
+			var commented string
+			if v.commented {
+				commented = "# "
+			}
+			writtenBytesCount, err := writeStrings(w, indent, commented, k, " = ", repr, "\n")
 			bytesCount += int64(writtenBytesCount)
 			if err != nil {
 				return bytesCount, err
-			}
-			bytesCount, err = node.writeTo(w, indent+"  ", combinedKey, bytesCount, arraysOneElementPerLine)
-			if err != nil {
-				return bytesCount, err
-			}
-		case []*Tree:
-			for _, subTree := range node {
-				writtenBytesCount, err := writeStrings(w, "\n", indent, commented, "[[", combinedKey, "]]\n")
-				bytesCount += int64(writtenBytesCount)
-				if err != nil {
-					return bytesCount, err
-				}
-
-				bytesCount, err = subTree.writeTo(w, indent+"  ", combinedKey, bytesCount, arraysOneElementPerLine)
-				if err != nil {
-					return bytesCount, err
-				}
 			}
 		}
 	}

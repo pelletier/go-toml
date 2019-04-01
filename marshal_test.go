@@ -12,10 +12,10 @@ import (
 )
 
 type basicMarshalTestStruct struct {
-	String     string                      `toml:"string"`
-	StringList []string                    `toml:"strlist"`
-	Sub        basicMarshalTestSubStruct   `toml:"subdoc"`
-	SubList    []basicMarshalTestSubStruct `toml:"sublist"`
+	String     string                      `toml:"Zstring"`
+	StringList []string                    `toml:"Ystrlist"`
+	Sub        basicMarshalTestSubStruct   `toml:"Xsubdoc"`
+	SubList    []basicMarshalTestSubStruct `toml:"Wsublist"`
 }
 
 type basicMarshalTestSubStruct struct {
@@ -29,16 +29,29 @@ var basicTestData = basicMarshalTestStruct{
 	SubList:    []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
 }
 
-var basicTestToml = []byte(`string = "Hello"
-strlist = ["Howdy","Hey There"]
+var basicTestToml = []byte(`Ystrlist = ["Howdy","Hey There"]
+Zstring = "Hello"
 
-[subdoc]
-  String2 = "One"
-
-[[sublist]]
+[[Wsublist]]
   String2 = "Two"
 
-[[sublist]]
+[[Wsublist]]
+  String2 = "Three"
+
+[Xsubdoc]
+  String2 = "One"
+`)
+
+var basicTestTomlOrdered = []byte(`Zstring = "Hello"
+Ystrlist = ["Howdy","Hey There"]
+
+[Xsubdoc]
+  String2 = "One"
+
+[[Wsublist]]
+  String2 = "Two"
+
+[[Wsublist]]
   String2 = "Three"
 `)
 
@@ -53,12 +66,34 @@ func TestBasicMarshal(t *testing.T) {
 	}
 }
 
+func TestBasicMarshalOrdered(t *testing.T) {
+	result, err := MarshalOrdered(basicTestData, OrderPreserve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := basicTestTomlOrdered
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
 func TestBasicMarshalWithPointer(t *testing.T) {
 	result, err := Marshal(&basicTestData)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expected := basicTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestBasicMarshalOrderedWithPointer(t *testing.T) {
+	result, err := MarshalOrdered(&basicTestData, OrderPreserve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := basicTestTomlOrdered
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
@@ -78,39 +113,39 @@ func TestBasicUnmarshal(t *testing.T) {
 
 type testDoc struct {
 	Title       string            `toml:"title"`
-	Basics      testDocBasics     `toml:"basic"`
 	BasicLists  testDocBasicLists `toml:"basic_lists"`
+	SubDocPtrs  []*testSubDoc     `toml:"subdocptrs"`
 	BasicMap    map[string]string `toml:"basic_map"`
 	Subdocs     testDocSubs       `toml:"subdoc"`
+	Basics      testDocBasics     `toml:"basic"`
 	SubDocList  []testSubDoc      `toml:"subdoclist"`
-	SubDocPtrs  []*testSubDoc     `toml:"subdocptrs"`
 	err         int               `toml:"shouldntBeHere"`
 	unexported  int               `toml:"shouldntBeHere"`
 	Unexported2 int               `toml:"-"`
 }
 
 type testDocBasics struct {
+	Uint       uint      `toml:"uint"`
 	Bool       bool      `toml:"bool"`
-	Date       time.Time `toml:"date"`
 	Float      float32   `toml:"float"`
 	Int        int       `toml:"int"`
-	Uint       uint      `toml:"uint"`
 	String     *string   `toml:"string"`
+	Date       time.Time `toml:"date"`
 	unexported int       `toml:"shouldntBeHere"`
 }
 
 type testDocBasicLists struct {
+	Floats  []*float32  `toml:"floats"`
 	Bools   []bool      `toml:"bools"`
 	Dates   []time.Time `toml:"dates"`
-	Floats  []*float32  `toml:"floats"`
 	Ints    []int       `toml:"ints"`
-	Strings []string    `toml:"strings"`
 	UInts   []uint      `toml:"uints"`
+	Strings []string    `toml:"strings"`
 }
 
 type testDocSubs struct {
-	First  testSubDoc  `toml:"first"`
 	Second *testSubDoc `toml:"second"`
+	First  testSubDoc  `toml:"first"`
 }
 
 type testSubDoc struct {
@@ -128,15 +163,6 @@ var docData = testDoc{
 	Title:       "TOML Marshal Testing",
 	unexported:  0,
 	Unexported2: 0,
-	Basics: testDocBasics{
-		Bool:       true,
-		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
-		Float:      123.4,
-		Int:        5000,
-		Uint:       5001,
-		String:     &biteMe,
-		unexported: 0,
-	},
 	BasicLists: testDocBasicLists{
 		Bools: []bool{true, false, true},
 		Dates: []time.Time{
@@ -151,6 +177,15 @@ var docData = testDoc{
 	BasicMap: map[string]string{
 		"one": "one",
 		"two": "two",
+	},
+	Basics: testDocBasics{
+		Bool:       true,
+		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
+		Float:      123.4,
+		Int:        5000,
+		Uint:       5001,
+		String:     &biteMe,
+		unexported: 0,
 	},
 	Subdocs: testDocSubs{
 		First:  testSubDoc{"First", 0},
@@ -169,6 +204,17 @@ func TestDocMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected, _ := ioutil.ReadFile("marshal_test.toml")
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestDocMarshalOrdered(t *testing.T) {
+	result, err := MarshalOrdered(docData, OrderPreserve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, _ := ioutil.ReadFile("marshal_OrderPreserve_test.toml")
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
@@ -200,7 +246,7 @@ func TestDocUnmarshal(t *testing.T) {
 	}
 }
 
-func TestDocPartialUnmarshal(t *testing.T) {
+/* func TestDocPartialUnmarshal(t *testing.T) {
 	result := testDocSubs{}
 
 	tree, _ := LoadFile("marshal_test.toml")
@@ -216,7 +262,7 @@ func TestDocPartialUnmarshal(t *testing.T) {
 		t.Errorf("Bad partial unmartial: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
 	}
 }
-
+*/
 type tomlTypeCheckTest struct {
 	name string
 	item interface{}

@@ -262,45 +262,7 @@ func (t *Tree) SetPath(keys []string, value interface{}) {
 // SetPathWithComment is the same as SetPath, but allows you to provide comment
 // information to the key, that will be reused by Marshal().
 func (t *Tree) SetPathWithComment(keys []string, comment string, commented bool, value interface{}) {
-	subtree := t
-	for _, intermediateKey := range keys[:len(keys)-1] {
-		nextTree, exists := subtree.values[intermediateKey]
-		if !exists {
-			nextTree = newTree()
-			subtree.values[intermediateKey] = nextTree // add new element here
-		}
-		switch node := nextTree.(type) {
-		case *Tree:
-			subtree = node
-		case []*Tree:
-			// go to most recent element
-			if len(node) == 0 {
-				// create element if it does not exist
-				subtree.values[intermediateKey] = append(node, newTree())
-			}
-			subtree = node[len(node)-1]
-		}
-	}
-
-	var toInsert interface{}
-
-	switch v := value.(type) {
-	case *Tree:
-		v.comment = comment
-		toInsert = value
-	case []*Tree:
-		toInsert = value
-	case *tomlValue:
-		v.comment = comment
-		toInsert = v
-	default:
-		toInsert = &tomlValue{value: value,
-			comment:   comment,
-			commented: commented,
-			position:  Position{Line: subtree.position.Line + len(subtree.values) + 1, Col: subtree.position.Col}}
-	}
-
-	subtree.values[keys[len(keys)-1]] = toInsert
+	t.SetPathWithOptions(keys, SetOptions{Comment: comment, Commented: commented}, value)
 }
 
 // Delete removes a key from the tree.
@@ -340,10 +302,10 @@ func (t *Tree) DeletePath(keys []string) error {
 // Returns nil on success, error object on failure
 func (t *Tree) createSubTree(keys []string, pos Position) error {
 	subtree := t
-	for _, intermediateKey := range keys {
+	for i, intermediateKey := range keys {
 		nextTree, exists := subtree.values[intermediateKey]
 		if !exists {
-			tree := newTree()
+			tree := newTreeWithPosition(Position{Line: t.position.Line + i, Col: t.position.Col})
 			tree.position = pos
 			subtree.values[intermediateKey] = tree
 			nextTree = tree
