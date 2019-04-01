@@ -22,7 +22,6 @@ const (
 type sortNode struct {
 	key        string
 	complexity valueComplexity
-	sortOrder  int
 }
 
 // Encodes a string to a TOML-compliant multi-line string value
@@ -193,14 +192,14 @@ func sortByLines(t *Tree) (vals []sortNode) {
 		case *Tree:
 			tv = v.(*Tree)
 			line = tv.position.Line
-			node = sortNode{key: k, sortOrder: line, complexity: valueComplex}
+			node = sortNode{key: k, complexity: valueComplex}
 		case []*Tree:
 			line = getTreeArrayLine(v.([]*Tree))
-			node = sortNode{key: k, sortOrder: line, complexity: valueComplex}
+			node = sortNode{key: k, complexity: valueComplex}
 		default:
 			tom = v.(*tomlValue)
 			line = tom.position.Line
-			node = sortNode{key: k, sortOrder: line, complexity: valueSimple}
+			node = sortNode{key: k, complexity: valueSimple}
 		}
 		lines = append(lines, line)
 		vals = append(vals, node)
