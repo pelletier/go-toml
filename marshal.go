@@ -54,6 +54,13 @@ var annotationDefault = annotation{
 	defaultValue: tagDefault,
 }
 
+type marshalOrder int
+
+const (
+	OrderAlphabetical marshalOrder = iota + 1
+	OrderPreserve
+)
+
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
 
@@ -161,7 +168,14 @@ Tree primitive types and corresponding marshal types:
   time.Time  time.Time{}, pointers to same
 */
 func Marshal(v interface{}) ([]byte, error) {
-	return NewEncoder(nil).marshal(v)
+	return MarshalOrdered(v, OrderAlphabetical)
+}
+
+// MarshalOrdered is same as Marshal with enforced order.
+func MarshalOrdered(v interface{}, ord marshalOrder) ([]byte, error) {
+	ne := NewEncoder(nil)
+	ne.order = ord
+	return ne.marshal(v)
 }
 
 // Encoder writes TOML values to an output stream.
@@ -169,6 +183,9 @@ type Encoder struct {
 	w io.Writer
 	encOpts
 	annotation
+	line  int
+	col   int
+	order marshalOrder
 }
 
 // NewEncoder returns a new encoder that writes to w.
@@ -177,6 +194,9 @@ func NewEncoder(w io.Writer) *Encoder {
 		w:          w,
 		encOpts:    encOptsDefaults,
 		annotation: annotationDefault,
+		line:       0,
+		col:        1,
+		order:      OrderAlphabetical,
 	}
 }
 
@@ -269,9 +289,15 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	_, err = t.writeTo(&buf, "", "", 0, e.arraysOneElementPerLine)
+	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order)
 
 	return buf.Bytes(), err
+}
+
+// Create next tree with a position based on Encoder.line
+func (e *Encoder) nextTree() *Tree {
+	e.line++
+	return newTreeWithPosition(Position{Line: e.line, Col: 1})
 }
 
 // Convert given marshal struct or map value to toml tree
@@ -279,7 +305,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 	if mtype.Kind() == reflect.Ptr {
 		return e.valueToTree(mtype.Elem(), mval.Elem())
 	}
-	tval := newTree()
+	tval := e.nextTree()
 	switch mtype.Kind() {
 	case reflect.Struct:
 		for i := 0; i < mtype.NumField(); i++ {

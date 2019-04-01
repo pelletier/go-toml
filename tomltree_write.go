@@ -153,7 +153,63 @@ func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElemen
 	return "", fmt.Errorf("unsupported value type %T: %v", v, v)
 }
 
+func sortSimpleByLine(vals []string, t *Tree) {
+	m := make(map[int]string)
+	var lines []int
+
+	for _, val := range vals {
+		tv := t.values[val].(*tomlValue)
+		lines = append(lines, tv.position.Line)
+		m[tv.position.Line] = val
+	}
+	sort.Ints(lines)
+
+	for i, line := range lines {
+		vals[i] = m[line]
+	}
+}
+
+func getTreeArrayLine(trees []*Tree) (line int) {
+	// get lowest line number that is not 0
+	for _, tv := range trees {
+		if tv.position.Line < line || line == 0 {
+			line = tv.position.Line
+		}
+	}
+	return
+}
+
+func sortComplexByLine(vals []string, t *Tree) {
+	m := make(map[int]string)
+	var lines []int
+	var tv *Tree
+
+	for _, val := range vals {
+		var line int
+		v := t.values[val]
+		switch v.(type) {
+		case *Tree:
+			tv = v.(*Tree)
+			line = tv.position.Line
+		case []*Tree:
+			line = getTreeArrayLine(v.([]*Tree))
+		}
+
+		lines = append(lines, line)
+		m[line] = val
+	}
+	sort.Ints(lines)
+
+	for i, line := range lines {
+		vals[i] = m[line]
+	}
+}
+
 func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64, arraysOneElementPerLine bool) (int64, error) {
+	return t.writeToOrdered(w, indent, keyspace, bytesCount, arraysOneElementPerLine, OrderAlphabetical)
+}
+
+func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount int64, arraysOneElementPerLine bool, ord marshalOrder) (int64, error) {
 	simpleValuesKeys := make([]string, 0)
 	complexValuesKeys := make([]string, 0)
 
@@ -167,8 +223,14 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64, a
 		}
 	}
 
-	sort.Strings(simpleValuesKeys)
-	sort.Strings(complexValuesKeys)
+	switch ord {
+	case OrderPreserve:
+		sortSimpleByLine(simpleValuesKeys, t)
+		sortComplexByLine(complexValuesKeys, t)
+	default:
+		sort.Strings(simpleValuesKeys)
+		sort.Strings(complexValuesKeys)
+	}
 
 	for _, k := range simpleValuesKeys {
 		v, ok := t.values[k].(*tomlValue)
