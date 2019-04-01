@@ -163,6 +163,15 @@ var docData = testDoc{
 	Title:       "TOML Marshal Testing",
 	unexported:  0,
 	Unexported2: 0,
+	Basics: testDocBasics{
+		Bool:       true,
+		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
+		Float:      123.4,
+		Int:        5000,
+		Uint:       5001,
+		String:     &biteMe,
+		unexported: 0,
+	},
 	BasicLists: testDocBasicLists{
 		Bools: []bool{true, false, true},
 		Dates: []time.Time{
@@ -177,15 +186,6 @@ var docData = testDoc{
 	BasicMap: map[string]string{
 		"one": "one",
 		"two": "two",
-	},
-	Basics: testDocBasics{
-		Bool:       true,
-		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
-		Float:      123.4,
-		Int:        5000,
-		Uint:       5001,
-		String:     &biteMe,
-		unexported: 0,
 	},
 	Subdocs: testDocSubs{
 		First:  testSubDoc{"First", 0},
@@ -246,7 +246,7 @@ func TestDocUnmarshal(t *testing.T) {
 	}
 }
 
-/* func TestDocPartialUnmarshal(t *testing.T) {
+func TestDocPartialUnmarshal(t *testing.T) {
 	result := testDocSubs{}
 
 	tree, _ := LoadFile("marshal_test.toml")
@@ -262,7 +262,7 @@ func TestDocUnmarshal(t *testing.T) {
 		t.Errorf("Bad partial unmartial: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
 	}
 }
-*/
+
 type tomlTypeCheckTest struct {
 	name string
 	item interface{}
