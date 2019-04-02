@@ -64,7 +64,7 @@ const (
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
 
-// Check if the given marshall type maps to a Tree primitive
+// Check if the given marshal type maps to a Tree primitive
 func isPrimitive(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Ptr:
@@ -86,7 +86,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshall type maps to a Tree slice
+// Check if the given marshal type maps to a Tree slice
 func isTreeSlice(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Slice:
@@ -96,7 +96,7 @@ func isTreeSlice(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshall type maps to a non-Tree slice
+// Check if the given marshal type maps to a non-Tree slice
 func isOtherSlice(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Ptr:
@@ -108,7 +108,7 @@ func isOtherSlice(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshall type maps to a Tree
+// Check if the given marshal type maps to a Tree
 func isTree(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Map:
@@ -168,14 +168,7 @@ Tree primitive types and corresponding marshal types:
   time.Time  time.Time{}, pointers to same
 */
 func Marshal(v interface{}) ([]byte, error) {
-	return MarshalOrdered(v, OrderAlphabetical)
-}
-
-// MarshalOrdered is same as Marshal with enforced order.
-func MarshalOrdered(v interface{}, ord marshalOrder) ([]byte, error) {
-	ne := NewEncoder(nil)
-	ne.order = ord
-	return ne.marshal(v)
+	return NewEncoder(nil).marshal(v)
 }
 
 // Encoder writes TOML values to an output stream.
@@ -239,6 +232,12 @@ func (e *Encoder) QuoteMapKeys(v bool) *Encoder {
 //   ]
 func (e *Encoder) ArraysWithOneElementPerLine(v bool) *Encoder {
 	e.arraysOneElementPerLine = v
+	return e
+}
+
+// SetOrder allows changing default tag "toml"
+func (e *Encoder) SetOrder(ord marshalOrder) *Encoder {
+	e.order = ord
 	return e
 }
 
