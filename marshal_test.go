@@ -68,7 +68,7 @@ func TestBasicMarshal(t *testing.T) {
 
 func TestBasicMarshalOrdered(t *testing.T) {
 	var result bytes.Buffer
-	err := NewEncoder(&result).SetOrder(OrderPreserve).Encode(basicTestData)
+	err := NewEncoder(&result).Order(OrderPreserve).Encode(basicTestData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestBasicMarshalWithPointer(t *testing.T) {
 
 func TestBasicMarshalOrderedWithPointer(t *testing.T) {
 	var result bytes.Buffer
-	err := NewEncoder(&result).SetOrder(OrderPreserve).Encode(&basicTestData)
+	err := NewEncoder(&result).Order(OrderPreserve).Encode(&basicTestData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestDocMarshal(t *testing.T) {
 
 func TestDocMarshalOrdered(t *testing.T) {
 	var result bytes.Buffer
-	err := NewEncoder(&result).SetOrder(OrderPreserve).Encode(docData)
+	err := NewEncoder(&result).Order(OrderPreserve).Encode(docData)
 	if err != nil {
 		t.Fatal(err)
 	}
