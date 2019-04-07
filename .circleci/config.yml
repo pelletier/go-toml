@@ -88,6 +88,10 @@ jobs:
                 command: |
                     curl https://codecov.io/bash > codecov.sh
                     bash codecov.sh -v
+    docker:
+        machine: true
+        steps:
+            - run: docker build -t go-toml:$CIRCLE_BRANCH .
 
 workflows:
     version: 2.1
@@ -138,7 +142,4 @@ workflows:
                 requires:
                     - go1_11
                     - go1_12
-            - docker:
-                steps:
-                    - setup_remote_docker
-                    - run: docker build -t go-toml:$CIRCLE_BRANCH .
+            - docker
