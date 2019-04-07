@@ -92,7 +92,9 @@ jobs:
         machine: true
         steps:
             - checkout
-            - run: docker build -t go-toml:$CIRCLE_BRANCH .
+            - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+            - run: docker build -t pelletier/go-toml:$CIRCLE_BRANCH .
+            - run: docker push pelletier/go-toml:$CIRCLE_BRANCH
 
 workflows:
     version: 2.1
