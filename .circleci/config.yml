@@ -89,14 +89,20 @@ jobs:
                     curl https://codecov.io/bash > codecov.sh
                     bash codecov.sh -v
     docker:
-        machine: true
+        docker:
+            - image: "circleci/golang:1.12"
         steps:
             - checkout
+            - setup_remote_docker:
+                  docker_layer_caching: true
             - run: docker build -t pelletier/go-toml:$CIRCLE_SHA1 .
 
     docker-push:
-        machine: true
+        docker:
+            - image: "circleci/golang:1.12"
         steps:
+            - setup_remote_docker:
+                docker_layer_caching: true
             - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
             - run: docker push pelletier/go-toml:$CIRCLE_SHA1
 
