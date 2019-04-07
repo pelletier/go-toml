@@ -96,13 +96,6 @@ jobs:
             - setup_remote_docker:
                   docker_layer_caching: true
             - run: docker build -t pelletier/go-toml:$CIRCLE_SHA1 .
-
-    docker-push:
-        docker:
-            - image: "circleci/golang:1.12"
-        steps:
-            - setup_remote_docker:
-                docker_layer_caching: true
             - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
             - run: docker push pelletier/go-toml:$CIRCLE_SHA1
 
@@ -155,8 +148,6 @@ workflows:
                 requires:
                     - go1_11
                     - go1_12
-            - docker
-            - docker-push:
+            - docker:
                 requires:
                     - codecov
-                    - docker
