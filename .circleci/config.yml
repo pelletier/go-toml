@@ -92,9 +92,13 @@ jobs:
         machine: true
         steps:
             - checkout
+            - run: docker build -t pelletier/go-toml:$CIRCLE_SHA1 .
+
+    docker-push:
+        machine: true
+        steps:
             - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
-            - run: docker build -t pelletier/go-toml:$CIRCLE_BRANCH .
-            - run: docker push pelletier/go-toml:$CIRCLE_BRANCH
+            - run: docker push pelletier/go-toml:$CIRCLE_SHA1
 
 workflows:
     version: 2.1
@@ -146,3 +150,7 @@ workflows:
                     - go1_11
                     - go1_12
             - docker
+            - docker-push:
+                requires:
+                    - codecov
+                    - docker
