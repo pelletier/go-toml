@@ -138,3 +138,7 @@ workflows:
                 requires:
                     - go1_11
                     - go1_12
+            - docker:
+                steps:
+                    - setup_remote_docker
+                    - run: docker build -t go-toml:$CIRCLE_BRANCH .
