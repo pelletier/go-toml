@@ -56,15 +56,19 @@ var annotationDefault = annotation{
 
 type marshalOrder int
 
+// Orders the Encoder can write the fields to the output stream.
 const (
+	// Sort fields alphabetically.
 	OrderAlphabetical marshalOrder = iota + 1
+	// Preserve the order the fields are encountered. For example, the order of fields in
+	// a struct.
 	OrderPreserve
 )
 
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
 
-// Check if the given marshall type maps to a Tree primitive
+// Check if the given marshal type maps to a Tree primitive
 func isPrimitive(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Ptr:
@@ -86,7 +90,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshall type maps to a Tree slice
+// Check if the given marshal type maps to a Tree slice
 func isTreeSlice(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Slice:
@@ -96,7 +100,7 @@ func isTreeSlice(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshall type maps to a non-Tree slice
+// Check if the given marshal type maps to a non-Tree slice
 func isOtherSlice(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Ptr:
@@ -108,7 +112,7 @@ func isOtherSlice(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshall type maps to a Tree
+// Check if the given marshal type maps to a Tree
 func isTree(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Map:
@@ -166,6 +170,8 @@ Tree primitive types and corresponding marshal types:
   string     string, pointers to same
   bool       bool, pointers to same
   time.Time  time.Time{}, pointers to same
+
+For additional flexibility, use the Encoder API.
 */
 func Marshal(v interface{}) ([]byte, error) {
 	return MarshalOrdered(v, OrderAlphabetical)
@@ -239,6 +245,12 @@ func (e *Encoder) QuoteMapKeys(v bool) *Encoder {
 //   ]
 func (e *Encoder) ArraysWithOneElementPerLine(v bool) *Encoder {
 	e.arraysOneElementPerLine = v
+	return e
+}
+
+// Order allows to change in which order fields will be written to the output stream.
+func (e *Encoder) Order(ord marshalOrder) *Encoder {
+	e.order = ord
 	return e
 }
 

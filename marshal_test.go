@@ -67,13 +67,14 @@ func TestBasicMarshal(t *testing.T) {
 }
 
 func TestBasicMarshalOrdered(t *testing.T) {
-	result, err := MarshalOrdered(basicTestData, OrderPreserve)
+	var result bytes.Buffer
+	err := NewEncoder(&result).Order(OrderPreserve).Encode(basicTestData)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expected := basicTestTomlOrdered
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	if !bytes.Equal(result.Bytes(), expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
 	}
 }
 
@@ -89,13 +90,14 @@ func TestBasicMarshalWithPointer(t *testing.T) {
 }
 
 func TestBasicMarshalOrderedWithPointer(t *testing.T) {
-	result, err := MarshalOrdered(&basicTestData, OrderPreserve)
+	var result bytes.Buffer
+	err := NewEncoder(&result).Order(OrderPreserve).Encode(&basicTestData)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expected := basicTestTomlOrdered
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	if !bytes.Equal(result.Bytes(), expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
 	}
 }
 
@@ -210,13 +212,14 @@ func TestDocMarshal(t *testing.T) {
 }
 
 func TestDocMarshalOrdered(t *testing.T) {
-	result, err := MarshalOrdered(docData, OrderPreserve)
+	var result bytes.Buffer
+	err := NewEncoder(&result).Order(OrderPreserve).Encode(docData)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expected, _ := ioutil.ReadFile("marshal_OrderPreserve_test.toml")
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	if !bytes.Equal(result.Bytes(), expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
 	}
 }
 
