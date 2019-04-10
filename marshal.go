@@ -175,14 +175,7 @@ Tree primitive types and corresponding marshal types:
 For additional flexibility, use the Encoder API.
 */
 func Marshal(v interface{}) ([]byte, error) {
-	return MarshalOrdered(v, OrderAlphabetical)
-}
-
-// MarshalOrdered is same as Marshal with enforced order.
-func MarshalOrdered(v interface{}, ord marshalOrder) ([]byte, error) {
-	ne := NewEncoder(nil)
-	ne.order = ord
-	return ne.marshal(v)
+	return NewEncoder(nil).marshal(v)
 }
 
 // Encoder writes TOML values to an output stream.
