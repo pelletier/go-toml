@@ -88,6 +88,28 @@ jobs:
                 command: |
                     curl https://codecov.io/bash > codecov.sh
                     bash codecov.sh -v
+    docker:
+        docker:
+            - image: "circleci/golang:1.12"
+        steps:
+            - checkout
+            - setup_remote_docker:
+                  docker_layer_caching: true
+            - run: docker build -t pelletier/go-toml:$CIRCLE_SHA1 .
+            - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
+            - run:
+                name: "Publish docker image"
+                command: |
+                    IMAGE_NAME="pelletier/go-toml"
+                    IMAGE_SHA_TAG="${IMAGE_NAME}:$CIRCLE_SHA1"
+                    if [ "${CIRCLE_BRANCH}" = "master" ]; then
+                        docker tag ${IMAGE_SHA_TAG} ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:latest
+                    fi
+                    if [ "${CIRCLE_TAG}" != "" ]; then
+                        docker tag ${IMAGE_SHA_TAG} ${IMAGE_NAME}:${CIRCLE_TAG}
+                        docker push ${IMAGE_NAME}:${CIRCLE_TAG}
+                    fi
 
 workflows:
     version: 2.1
@@ -138,3 +160,6 @@ workflows:
                 requires:
                     - go1_11
                     - go1_12
+            - docker:
+                requires:
+                    - codecov
