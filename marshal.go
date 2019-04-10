@@ -341,48 +341,18 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 		if e.order == OrderPreserve && len(keys) > 0 {
 			// Sorting []reflect.Value is not straight forward.
 			//
-			// OrderPreserve with support deterministic results when these types are used
+			// OrderPreserve will support deterministic results when string is used
 			// as the key to maps.
-			// int, int8, int16, int32, int64,
-			// uint, uint8, uint16, uint32, uint64,
-			// float32, float64,
-			// string
-			switch reflect.TypeOf(keys[0]).Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				ikeys := make([]int64, len(keys))
-				for i := range keys {
-					ikeys[i] = keys[i].Int()
-				}
-				sort.Slice(ikeys, func(i, j int) bool { return ikeys[i] < ikeys[j] })
-				for i := range ikeys {
-					keys[i] = reflect.ValueOf(ikeys[i])
-				}
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				ikeys := make([]uint64, len(keys))
-				for i := range keys {
-					ikeys[i] = keys[i].Uint()
-				}
-				sort.Slice(ikeys, func(i, j int) bool { return ikeys[i] < ikeys[j] })
-				for i := range ikeys {
-					keys[i] = reflect.ValueOf(ikeys[i])
-				}
-			case reflect.Float32, reflect.Float64:
-				ikeys := make([]float64, len(keys))
-				for i := range keys {
-					ikeys[i] = keys[i].Float()
-				}
-				sort.Slice(ikeys, func(i, j int) bool { return ikeys[i] < ikeys[j] })
-				for i := range ikeys {
-					keys[i] = reflect.ValueOf(ikeys[i])
-				}
-			case reflect.String:
+			typ := keys[0].Type()
+			kind := keys[0].Kind()
+			if kind == reflect.String {
 				ikeys := make([]string, len(keys))
 				for i := range keys {
 					ikeys[i] = keys[i].Interface().(string)
 				}
 				sort.Strings(ikeys)
 				for i := range ikeys {
-					keys[i] = reflect.ValueOf(ikeys[i])
+					keys[i] = reflect.ValueOf(ikeys[i]).Convert(typ)
 				}
 			}
 		}
