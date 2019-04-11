@@ -24,7 +24,7 @@ func testResult(t *testing.T, key string, expected []string) {
 func testError(t *testing.T, key string, expectedError string) {
 	res, err := parseKey(key)
 	if err == nil {
-		t.Fatalf("Expected error, but succesfully parsed key %s", res)
+		t.Fatalf("Expected error, but successfully parsed key %s", res)
 	}
 	if fmt.Sprintf("%s", err) != expectedError {
 		t.Fatalf("Expected error \"%s\", but got \"%s\".", expectedError, err)

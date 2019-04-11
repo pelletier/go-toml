@@ -546,8 +546,8 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree) (reflect.Value, 
 
 				if !found && opts.defaultValue != "" {
 					mvalf := mval.Field(i)
-					var val interface{} = nil
-					var err error = nil
+					var val interface{}
+					var err error
 					switch mvalf.Kind() {
 					case reflect.Bool:
 						val, err = strconv.ParseBool(opts.defaultValue)
