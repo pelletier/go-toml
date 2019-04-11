@@ -96,19 +96,24 @@ jobs:
             - setup_remote_docker:
                   docker_layer_caching: true
             - run: docker build -t pelletier/go-toml:$CIRCLE_SHA1 .
-            - run: docker login -u $DOCKER_USER -p $DOCKER_PASS
             - run:
                 name: "Publish docker image"
                 command: |
-                    IMAGE_NAME="pelletier/go-toml"
-                    IMAGE_SHA_TAG="${IMAGE_NAME}:$CIRCLE_SHA1"
-                    if [ "${CIRCLE_BRANCH}" = "master" ]; then
-                        docker tag ${IMAGE_SHA_TAG} ${IMAGE_NAME}:latest
-                        docker push ${IMAGE_NAME}:latest
-                    fi
-                    if [ "${CIRCLE_TAG}" != "" ]; then
-                        docker tag ${IMAGE_SHA_TAG} ${IMAGE_NAME}:${CIRCLE_TAG}
-                        docker push ${IMAGE_NAME}:${CIRCLE_TAG}
+                    if [ "${CIRCLE_PR_REPONAME}" == "" ]; then
+                      IMAGE_NAME="pelletier/go-toml"
+                      IMAGE_SHA_TAG="${IMAGE_NAME}:$CIRCLE_SHA1"
+                      if [ "${CIRCLE_BRANCH}" = "master" ]; then
+                          docker login -u $DOCKER_USER -p $DOCKER_PASS
+                          docker tag ${IMAGE_SHA_TAG} ${IMAGE_NAME}:latest
+                          docker push ${IMAGE_NAME}:latest
+                      fi
+                      if [ "${CIRCLE_TAG}" != "" ]; then
+                          docker login -u $DOCKER_USER -p $DOCKER_PASS
+                          docker tag ${IMAGE_SHA_TAG} ${IMAGE_NAME}:${CIRCLE_TAG}
+                          docker push ${IMAGE_NAME}:${CIRCLE_TAG}
+                      fi
+                    else
+                      echo "not pushing docker image for forked repo"
                     fi
 
 workflows:
