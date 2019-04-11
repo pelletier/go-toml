@@ -546,7 +546,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree) (reflect.Value, 
 
 				if !found && opts.defaultValue != "" {
 					mvalf := mval.Field(i)
-					var val interface{} = nil
+					var val interface{}
 					var err error
 					switch mvalf.Kind() {
 					case reflect.Bool:
