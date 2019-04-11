@@ -16,8 +16,9 @@ func Example_tree() {
 		fmt.Println("Error ", err.Error())
 	} else {
 		// retrieve data directly
-		user := config.Get("postgres.user").(string)
-		password := config.Get("postgres.password").(string)
+		directUser := config.Get("postgres.user").(string)
+		directPassword := config.Get("postgres.password").(string)
+		fmt.Println("User is", directUser, " and password is", directPassword)
 
 		// or using an intermediate object
 		configTree := config.Get("postgres").(*toml.Tree)
