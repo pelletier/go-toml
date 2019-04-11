@@ -22,8 +22,8 @@ func Example_tree() {
 
 		// or using an intermediate object
 		configTree := config.Get("postgres").(*toml.Tree)
-		user = configTree.Get("user").(string)
-		password = configTree.Get("password").(string)
+		user := configTree.Get("user").(string)
+		password := configTree.Get("password").(string)
 		fmt.Println("User is", user, " and password is", password)
 
 		// show where elements are in the file
