@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -329,7 +330,26 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 			}
 		}
 	case reflect.Map:
-		for _, key := range mval.MapKeys() {
+		keys := mval.MapKeys()
+		if e.order == OrderPreserve && len(keys) > 0 {
+			// Sorting []reflect.Value is not straight forward.
+			//
+			// OrderPreserve will support deterministic results when string is used
+			// as the key to maps.
+			typ := keys[0].Type()
+			kind := keys[0].Kind()
+			if kind == reflect.String {
+				ikeys := make([]string, len(keys))
+				for i := range keys {
+					ikeys[i] = keys[i].Interface().(string)
+				}
+				sort.Strings(ikeys)
+				for i := range ikeys {
+					keys[i] = reflect.ValueOf(ikeys[i]).Convert(typ)
+				}
+			}
+		}
+		for _, key := range keys {
 			mvalf := mval.MapIndex(key)
 			val, err := e.valueToToml(mtype.Elem(), mvalf)
 			if err != nil {
