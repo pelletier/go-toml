@@ -1103,12 +1103,26 @@ func TestUnmarshalCustomTag(t *testing.T) {
 }
 
 func TestUnmarshalMap(t *testing.T) {
-	m := make(map[string]int)
-	m["a"] = 1
+	testToml := []byte(`
+		a = 1
+		b = 2
+		c = 3
+		`)
+	var result map[string]int
+	err := Unmarshal(testToml, &result)
+	if err != nil {
+		t.Errorf("Received unexpected error: %s", err)
+		return
+	}
 
-	err := Unmarshal(basicTestToml, m)
-	if err.Error() != "Only a pointer to struct can be unmarshaled from TOML" {
-		t.Fail()
+	expected := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, result)
 	}
 }
 
