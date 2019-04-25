@@ -1134,7 +1134,6 @@ func TestUnmarshalNonPointer(t *testing.T) {
 	}
 }
 
-
 func TestUnmarshalInvalidPointerKind(t *testing.T) {
 	a := 1
 	err := Unmarshal([]byte{}, &a)
