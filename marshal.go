@@ -514,11 +514,19 @@ func (d *Decoder) SetTagName(v string) *Decoder {
 
 func (d *Decoder) unmarshal(v interface{}) error {
 	mtype := reflect.TypeOf(v)
-	if mtype.Kind() != reflect.Ptr || mtype.Elem().Kind() != reflect.Struct {
-		return errors.New("Only a pointer to struct can be unmarshaled from TOML")
+	if mtype.Kind() != reflect.Ptr {
+		return errors.New("only a pointer to struct or map can be unmarshaled from TOML")
 	}
 
-	sval, err := d.valueFromTree(mtype.Elem(), d.tval)
+	elem := mtype.Elem()
+
+	switch elem.Kind() {
+	case reflect.Struct, reflect.Map:
+	default:
+		return errors.New("only a pointer to struct or map can be unmarshaled from TOML")
+	}
+
+	sval, err := d.valueFromTree(elem, d.tval)
 	if err != nil {
 		return err
 	}
