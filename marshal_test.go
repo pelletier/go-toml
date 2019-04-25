@@ -1126,6 +1126,23 @@ func TestUnmarshalMap(t *testing.T) {
 	}
 }
 
+func TestUnmarshalNonPointer(t *testing.T) {
+	a := 1
+	err := Unmarshal([]byte{}, a)
+	if err == nil {
+		t.Fatal("unmarshal should err when given a non pointer")
+	}
+}
+
+
+func TestUnmarshalInvalidPointerKind(t *testing.T) {
+	a := 1
+	err := Unmarshal([]byte{}, &a)
+	if err == nil {
+		t.Fatal("unmarshal should err when given an invalid pointer type")
+	}
+}
+
 func TestMarshalSlice(t *testing.T) {
 	m := make([]int, 1)
 	m[0] = 1
