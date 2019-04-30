@@ -1126,6 +1126,32 @@ func TestUnmarshalMap(t *testing.T) {
 	}
 }
 
+func TestUnmarshalMapWithTypedKey(t *testing.T) {
+	testToml := []byte(`
+		a = 1
+		b = 2
+		c = 3
+		`)
+
+	type letter string
+	var result map[letter]int
+	err := Unmarshal(testToml, &result)
+	if err != nil {
+		t.Errorf("Received unexpected error: %s", err)
+		return
+	}
+
+	expected := map[letter]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
 func TestUnmarshalNonPointer(t *testing.T) {
 	a := 1
 	err := Unmarshal([]byte{}, a)

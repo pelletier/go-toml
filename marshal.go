@@ -615,7 +615,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree) (reflect.Value, 
 			if err != nil {
 				return mval, formatError(err, tval.GetPosition(key))
 			}
-			mval.SetMapIndex(reflect.ValueOf(key), mvalf)
+			mval.SetMapIndex(reflect.ValueOf(key).Convert(mtype.Key()), mvalf)
 		}
 	}
 	return mval, nil
