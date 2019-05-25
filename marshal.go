@@ -604,6 +604,15 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree) (reflect.Value, 
 					}
 					mval.Field(i).Set(reflect.ValueOf(val))
 				}
+
+				// save the old behavior above and try to check anonymous structs
+				if !found && opts.defaultValue == "" && mtypef.Anonymous && mtypef.Type.Kind() == reflect.Struct {
+					v, err := d.valueFromTree(mtypef.Type, tval)
+					if err != nil {
+						return v, err
+					}
+					mval.Field(i).Set(v)
+				}
 			}
 		}
 	case reflect.Map:

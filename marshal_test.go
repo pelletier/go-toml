@@ -1417,3 +1417,46 @@ func TestUnmarshalDefaultFailureUnsupported(t *testing.T) {
 		t.Fatal("should error")
 	}
 }
+
+func TestUnmarshalNestedAnonymousStructs(t *testing.T) {
+	type Nested struct {
+		Value string `toml:"nested_field"`
+	}
+	type Deep struct {
+		Nested
+	}
+	type Document struct {
+		Deep
+		Value string `toml:"own_field"`
+	}
+
+	var doc Document
+
+	err := Unmarshal([]byte(`nested_field = "nested value"`+"\n"+`own_field = "own value"`), &doc)
+	if err != nil {
+		t.Fatal("should not error")
+	}
+	if doc.Value != "own value" || doc.Nested.Value != "nested value" {
+		t.Fatal("unexpected values")
+	}
+}
+
+func TestUnmarshalNestedAnonymousStructs_Controversial(t *testing.T) {
+	type Nested struct {
+		Value string `toml:"nested"`
+	}
+	type Deep struct {
+		Nested
+	}
+	type Document struct {
+		Deep
+		Value string `toml:"own"`
+	}
+
+	var doc Document
+
+	err := Unmarshal([]byte(`nested = "nested value"`+"\n"+`own = "own value"`), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
