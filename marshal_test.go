@@ -1466,6 +1466,7 @@ type unexportedFieldPreservationTest struct {
 	unexported string
 	Nested1    unexportedFieldPreservationTestNested    `toml:"nested1"`
 	Nested2    *unexportedFieldPreservationTestNested   `toml:"nested2"`
+	Nested3    *unexportedFieldPreservationTestNested   `toml:"nested3"`
 	Slice1     []unexportedFieldPreservationTestNested  `toml:"slice1"`
 	Slice2     []*unexportedFieldPreservationTestNested `toml:"slice2"`
 }
@@ -1487,6 +1488,10 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 	[nested2]
 	exported1 = "visible2"
 	unexported1 = "ignored2"
+
+	[nested3]
+	exported1 = "visible3"
+	unexported1 = "ignored3"
 
 	[[slice1]]
 	exported1 = "visible3"
@@ -1511,6 +1516,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 			unexported: "",
 			Nested1:    unexportedFieldPreservationTestNested{"visible1", ""},
 			Nested2:    &unexportedFieldPreservationTestNested{"visible2", ""},
+			Nested3:    &unexportedFieldPreservationTestNested{"visible3", ""},
 			Slice1: []unexportedFieldPreservationTestNested{
 				{Exported1: "visible3"},
 				{Exported1: "visible4"},
@@ -1530,6 +1536,8 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 			Exported:   "foo",
 			unexported: "bar",
 			Nested1:    unexportedFieldPreservationTestNested{"baz", "bax"},
+			Nested2:    nil,
+			Nested3:    &unexportedFieldPreservationTestNested{"baz", "bax"},
 		}
 		err := Unmarshal([]byte(toml), &actual)
 
@@ -1542,6 +1550,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 			unexported: "bar",
 			Nested1:    unexportedFieldPreservationTestNested{"visible1", "bax"},
 			Nested2:    &unexportedFieldPreservationTestNested{"visible2", ""},
+			Nested3:    &unexportedFieldPreservationTestNested{"visible3", "bax"},
 			Slice1: []unexportedFieldPreservationTestNested{
 				{Exported1: "visible3"},
 				{Exported1: "visible4"},

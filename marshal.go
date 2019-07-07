@@ -540,7 +540,7 @@ func (d *Decoder) unmarshal(v interface{}) error {
 // is non-nil, merge fields into the given value instead of allocating a new one.
 func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.Value) (reflect.Value, error) {
 	if mtype.Kind() == reflect.Ptr {
-		return d.unwrapPointer(mtype, tval)
+		return d.unwrapPointer(mtype, tval, mval1)
 	}
 	var mval reflect.Value
 	switch mtype.Kind() {
@@ -669,7 +669,7 @@ func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (r
 // and the given type is a struct value, merge fields into it.
 func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *reflect.Value) (reflect.Value, error) {
 	if mtype.Kind() == reflect.Ptr {
-		return d.unwrapPointer(mtype, tval)
+		return d.unwrapPointer(mtype, tval, mval1)
 	}
 
 	switch t := tval.(type) {
@@ -758,8 +758,15 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 	}
 }
 
-func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
-	val, err := d.valueFromToml(mtype.Elem(), tval, nil)
+func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}, mval1 *reflect.Value) (reflect.Value, error) {
+	var melem *reflect.Value
+
+	if mval1 != nil && !mval1.IsNil() && mtype.Elem().Kind() == reflect.Struct {
+		elem := mval1.Elem()
+		melem = &elem
+	}
+
+	val, err := d.valueFromToml(mtype.Elem(), tval, melem)
 	if err != nil {
 		return reflect.ValueOf(nil), err
 	}
