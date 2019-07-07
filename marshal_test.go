@@ -1460,3 +1460,45 @@ func TestUnmarshalNestedAnonymousStructs_Controversial(t *testing.T) {
 		t.Fatal("should error")
 	}
 }
+
+type unexportedFieldPreservationTest struct {
+	Exported   string `toml:"exported"`
+	unexported string
+}
+
+func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
+	toml := `
+	exported = "visible"
+	unexported = "ignored"
+	`
+
+	t.Run("unexported field should not be set from toml", func(t *testing.T) {
+		var actual unexportedFieldPreservationTest
+		err := Unmarshal([]byte(toml), &actual)
+
+		if err != nil {
+			t.Fatal("did not expect an error")
+		}
+
+		expect := unexportedFieldPreservationTest{"visible", ""}
+
+		if !reflect.DeepEqual(actual, expect) {
+			t.Fatalf("%+v did not equal %+v", actual, expect)
+		}
+	})
+
+	t.Run("unexported field should be preserved", func(t *testing.T) {
+		actual := unexportedFieldPreservationTest{"foo", "bar"}
+		err := Unmarshal([]byte(toml), &actual)
+
+		if err != nil {
+			t.Fatal("did not expect an error")
+		}
+
+		expect := unexportedFieldPreservationTest{"visible", "bar"}
+
+		if !reflect.DeepEqual(actual, expect) {
+			t.Fatalf("%+v did not equal %+v", actual, expect)
+		}
+	})
+}
