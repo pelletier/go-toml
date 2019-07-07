@@ -571,7 +571,8 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 						continue
 					}
 					val := tval.Get(key)
-					mvalf, err := d.valueFromToml(mtypef.Type, val)
+					fval := mval.Field(i)
+					mvalf, err := d.valueFromToml(mtypef.Type, val, &fval)
 					if err != nil {
 						return mval, formatError(err, tval.GetPosition(key))
 					}
@@ -628,7 +629,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 		for _, key := range tval.Keys() {
 			// TODO: path splits key
 			val := tval.GetPath([]string{key})
-			mvalf, err := d.valueFromToml(mtype.Elem(), val)
+			mvalf, err := d.valueFromToml(mtype.Elem(), val, nil)
 			if err != nil {
 				return mval, formatError(err, tval.GetPosition(key))
 			}
@@ -655,7 +656,7 @@ func (d *Decoder) valueFromTreeSlice(mtype reflect.Type, tval []*Tree) (reflect.
 func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (reflect.Value, error) {
 	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
 	for i := 0; i < len(tval); i++ {
-		val, err := d.valueFromToml(mtype.Elem(), tval[i])
+		val, err := d.valueFromToml(mtype.Elem(), tval[i], nil)
 		if err != nil {
 			return mval, err
 		}
@@ -664,16 +665,22 @@ func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (r
 	return mval, nil
 }
 
-// Convert toml value to marshal value, using marshal type
-func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
+// Convert toml value to marshal value, using marshal type. When mval1 is non-nil
+// and the given type is a struct value, merge fields into it.
+func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *reflect.Value) (reflect.Value, error) {
 	if mtype.Kind() == reflect.Ptr {
 		return d.unwrapPointer(mtype, tval)
 	}
 
 	switch t := tval.(type) {
 	case *Tree:
+		var mval11 *reflect.Value
+		if mtype.Kind() == reflect.Struct {
+			mval11 = mval1
+		}
+
 		if isTree(mtype) {
-			return d.valueFromTree(mtype, t, nil)
+			return d.valueFromTree(mtype, t, mval11)
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a tree", tval, tval)
 	case []*Tree:
@@ -752,7 +759,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}) (reflect.V
 }
 
 func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
-	val, err := d.valueFromToml(mtype.Elem(), tval)
+	val, err := d.valueFromToml(mtype.Elem(), tval, nil)
 	if err != nil {
 		return reflect.ValueOf(nil), err
 	}
