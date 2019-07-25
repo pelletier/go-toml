@@ -1460,3 +1460,108 @@ func TestUnmarshalNestedAnonymousStructs_Controversial(t *testing.T) {
 		t.Fatal("should error")
 	}
 }
+
+type unexportedFieldPreservationTest struct {
+	Exported   string `toml:"exported"`
+	unexported string
+	Nested1    unexportedFieldPreservationTestNested    `toml:"nested1"`
+	Nested2    *unexportedFieldPreservationTestNested   `toml:"nested2"`
+	Nested3    *unexportedFieldPreservationTestNested   `toml:"nested3"`
+	Slice1     []unexportedFieldPreservationTestNested  `toml:"slice1"`
+	Slice2     []*unexportedFieldPreservationTestNested `toml:"slice2"`
+}
+
+type unexportedFieldPreservationTestNested struct {
+	Exported1   string `toml:"exported1"`
+	unexported1 string
+}
+
+func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
+	toml := `
+	exported = "visible"
+	unexported = "ignored"
+
+	[nested1]
+	exported1 = "visible1"
+	unexported1 = "ignored1"
+
+	[nested2]
+	exported1 = "visible2"
+	unexported1 = "ignored2"
+
+	[nested3]
+	exported1 = "visible3"
+	unexported1 = "ignored3"
+
+	[[slice1]]
+	exported1 = "visible3"
+	
+	[[slice1]]
+	exported1 = "visible4"
+
+	[[slice2]]
+	exported1 = "visible5"
+	`
+
+	t.Run("unexported field should not be set from toml", func(t *testing.T) {
+		var actual unexportedFieldPreservationTest
+		err := Unmarshal([]byte(toml), &actual)
+
+		if err != nil {
+			t.Fatal("did not expect an error")
+		}
+
+		expect := unexportedFieldPreservationTest{
+			Exported:   "visible",
+			unexported: "",
+			Nested1:    unexportedFieldPreservationTestNested{"visible1", ""},
+			Nested2:    &unexportedFieldPreservationTestNested{"visible2", ""},
+			Nested3:    &unexportedFieldPreservationTestNested{"visible3", ""},
+			Slice1: []unexportedFieldPreservationTestNested{
+				{Exported1: "visible3"},
+				{Exported1: "visible4"},
+			},
+			Slice2: []*unexportedFieldPreservationTestNested{
+				{Exported1: "visible5"},
+			},
+		}
+
+		if !reflect.DeepEqual(actual, expect) {
+			t.Fatalf("%+v did not equal %+v", actual, expect)
+		}
+	})
+
+	t.Run("unexported field should be preserved", func(t *testing.T) {
+		actual := unexportedFieldPreservationTest{
+			Exported:   "foo",
+			unexported: "bar",
+			Nested1:    unexportedFieldPreservationTestNested{"baz", "bax"},
+			Nested2:    nil,
+			Nested3:    &unexportedFieldPreservationTestNested{"baz", "bax"},
+		}
+		err := Unmarshal([]byte(toml), &actual)
+
+		if err != nil {
+			t.Fatal("did not expect an error")
+		}
+
+		expect := unexportedFieldPreservationTest{
+			Exported:   "visible",
+			unexported: "bar",
+			Nested1:    unexportedFieldPreservationTestNested{"visible1", "bax"},
+			Nested2:    &unexportedFieldPreservationTestNested{"visible2", ""},
+			Nested3:    &unexportedFieldPreservationTestNested{"visible3", "bax"},
+			Slice1: []unexportedFieldPreservationTestNested{
+				{Exported1: "visible3"},
+				{Exported1: "visible4"},
+			},
+			Slice2: []*unexportedFieldPreservationTestNested{
+				{Exported1: "visible5"},
+			},
+		}
+
+		if !reflect.DeepEqual(actual, expect) {
+			t.Fatalf("%+v did not equal %+v", actual, expect)
+		}
+	})
+}
