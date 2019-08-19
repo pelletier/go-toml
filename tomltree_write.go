@@ -354,7 +354,8 @@ func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount i
 			if v.commented {
 				commented = "# "
 			}
-			writtenBytesCount, err := writeStrings(w, indent, commented, k, " = ", repr, "\n")
+			quotedKey := quoteKeyIfNeeded(k)
+			writtenBytesCount, err := writeStrings(w, indent, commented, quotedKey, " = ", repr, "\n")
 			bytesCount += int64(writtenBytesCount)
 			if err != nil {
 				return bytesCount, err
@@ -363,6 +364,32 @@ func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount i
 	}
 
 	return bytesCount, nil
+}
+
+// quote a key if it does not fit the bare key format (A-Za-z0-9_-)
+// quoted keys use the same rules as strings
+func quoteKeyIfNeeded(k string) string {
+	// when encoding a map with the 'quoteMapKeys' option enabled, the tree will contain
+	// keys that have already been quoted.
+	// not an ideal situation, but good enough of a stop gap.
+	if len(k) >= 2 && k[0] == '"' && k[len(k)-1] == '"' {
+		return k
+	}
+	isBare := true
+	for _, r := range k {
+		if !isValidBareChar(r) {
+			isBare = false
+			break
+		}
+	}
+	if isBare {
+		return k
+	}
+	return quoteKey(k)
+}
+
+func quoteKey(k string) string {
+	return "\"" + encodeTomlString(k) + "\""
 }
 
 func writeStrings(w io.Writer, s ...string) (int, error) {
