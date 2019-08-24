@@ -422,7 +422,7 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			return mval.Uint(), nil
 		case reflect.Float32, reflect.Float64:
-			return mval.Float(), nil
+			return strconv.ParseFloat(fmt.Sprintf("%v", mval.Interface()), 64)
 		case reflect.String:
 			return mval.String(), nil
 		case reflect.Struct:
