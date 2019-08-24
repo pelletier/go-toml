@@ -55,6 +55,9 @@ Ystrlist = ["Howdy","Hey There"]
   String2 = "Three"
 `)
 
+var testMarshalFloat64 = []byte(`Value = 1.24675324675
+`)
+
 func TestBasicMarshal(t *testing.T) {
 	result, err := Marshal(basicTestData)
 	if err != nil {
@@ -98,6 +101,22 @@ func TestBasicMarshalOrderedWithPointer(t *testing.T) {
 	expected := basicTestTomlOrdered
 	if !bytes.Equal(result.Bytes(), expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
+	}
+}
+
+func TestMarshalFloat64(t *testing.T) {
+	foo := struct {
+		Value float64
+	}{
+		Value: 1.24675324675,
+	}
+	b, err := Marshal(&foo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := testMarshalFloat64
+	if !bytes.Equal(b, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, b)
 	}
 }
 
@@ -1495,7 +1514,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
