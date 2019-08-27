@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"reflect"
 	"sort"
 	"strconv"
@@ -106,12 +107,20 @@ func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElemen
 	case int64:
 		return strconv.FormatInt(value, 10), nil
 	case float64:
-		// Ensure a round float does contain a decimal point. Otherwise feeding
-		// the output back to the parser would convert to an integer.
-		if math.Trunc(value) == value {
-			return strings.ToLower(strconv.FormatFloat(value, 'f', 1, 32)), nil
+		// Default bit length is full 64
+		bits := 64
+		// Float panics if nan is used
+		if !math.IsNaN(value) {
+			// if 32 bit accuracy is enough to exactly show, use 32
+			_, acc := big.NewFloat(value).Float32()
+			if acc == big.Exact {
+				bits = 32
+			}
 		}
-		return strings.ToLower(strconv.FormatFloat(value, 'f', -1, 32)), nil
+		if math.Trunc(value) == value {
+			return strings.ToLower(strconv.FormatFloat(value, 'f', 1, bits)), nil
+		}
+		return strings.ToLower(strconv.FormatFloat(value, 'f', -1, bits)), nil
 	case string:
 		if tv.multiline {
 			return "\"\"\"\n" + encodeMultilineTomlString(value) + "\"\"\"", nil
