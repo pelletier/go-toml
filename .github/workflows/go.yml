@@ -42,3 +42,14 @@ jobs:
           go-version: '1.12'
       - uses: actions/checkout@v1
       - run: ./benchmark.sh $GITHUB_REF https://github.com/$GITHUB_REPOSITORY.git
+  fuzzing:
+    name: Run fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.12'
+      - uses: actions/checkout@v1
+      - run: ./fuzzit.sh
+        env:
+          TYPE: local-regression
