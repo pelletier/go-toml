@@ -23,4 +23,5 @@ jobs:
       - uses: actions/checkout@v1
       - run: go test github.com/pelletier/go-toml -race -coverprofile=coverage.txt -covermode=atomic
       - run: bash <(curl -s https://codecov.io/bash)
-        secrets: ["CODECOV_TOKEN"]
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
