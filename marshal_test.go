@@ -135,7 +135,8 @@ type testMapDoc struct {
 type testDocBasics struct {
 	Uint       uint      `toml:"uint"`
 	Bool       bool      `toml:"bool"`
-	Float      float32   `toml:"float"`
+	Float32    float32   `toml:"float"`
+	Float64    float64   `toml:"float64"`
 	Int        int       `toml:"int"`
 	String     *string   `toml:"string"`
 	Date       time.Time `toml:"date"`
@@ -174,7 +175,8 @@ var docData = testDoc{
 	Basics: testDocBasics{
 		Bool:       true,
 		Date:       time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
-		Float:      123.4,
+		Float32:    123.4,
+		Float64:    123.456782132399,
 		Int:        5000,
 		Uint:       5001,
 		String:     &biteMe,
