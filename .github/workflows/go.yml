@@ -15,13 +15,19 @@ jobs:
       - uses: actions/checkout@v1
       - run: go test ./...
   coverage:
+    name: Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v1
-        with:
-          go-version: '1.12'
       - uses: actions/checkout@v1
       - run: go test github.com/pelletier/go-toml -race -coverprofile=coverage.txt -covermode=atomic
       - run: bash <(curl -s https://codecov.io/bash)
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  fmt:
+    name: Go fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v1
+      - uses: actions/checkout@v1
+      - run: go fmt ./...
