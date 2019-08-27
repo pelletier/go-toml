@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 type basicMarshalTestStruct struct {
@@ -260,8 +258,7 @@ func TestDocMarshalMaps(t *testing.T) {
 	}
 	expected, _ := ioutil.ReadFile("marshal_OrderPreserve_Map_test.toml")
 	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n\n%s", expected, result, cmp.Diff(expected,
-			result))
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
 }
 
