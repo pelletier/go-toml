@@ -66,6 +66,10 @@ jobs:
                 test_name: "tomljson"
                 module: "github.com/pelletier/go-toml/cmd/tomljson"
                 allow_fail: <<parameters.allow_fail>>
+	    - run_test:
+	        test_name: "jsontoml"
+		module: "github.com/pelletier/go-toml/cmd/jsontoml"
+		allow_fail: <<parameters.allow_fail>>
             - run_test:
                 test_name: "tomll"
                 module: "github.com/pelletier/go-toml/cmd/tomll"
