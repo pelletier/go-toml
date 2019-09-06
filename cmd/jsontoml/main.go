@@ -37,6 +37,7 @@ func processMain(files []string, defaultInput io.Reader, output io.Writer, error
 		file, err := os.Open(files[0])
 		if err != nil {
 			printError(err, errorOutput)
+			return -1
 		}
 		inputReader = file
 		defer file.Close()
@@ -60,9 +61,9 @@ func reader(r io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	error := json.Unmarshal(jsonBytes, &jsonMap)
-	if error != nil {
-		return "", error
+	err = json.Unmarshal(jsonBytes, &jsonMap)
+	if err != nil {
+		return "", err
 	}
 
 	tree, err := toml.TreeFromMap(jsonMap)
