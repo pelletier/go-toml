@@ -1,0 +1,20 @@
+name: Docker
+on:
+  push:
+    branches:
+      - master
+jobs:
+  docker:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.13'
+      - uses: actions/checkout@v1
+      - run: docker build -t pelletier/go-toml:$GITHUB_SHA -t pelletier/go-toml:latest
+      - uses: actions/docker/login@master
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      - run: docker pushpelletier/go-toml:$GITHUB_SHA

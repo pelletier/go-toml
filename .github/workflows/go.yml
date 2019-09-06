@@ -5,7 +5,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        go: ['1.11', '1.12']
+        go: ['1.12', '1.13']
     runs-on: ${{ matrix.os }}
     name: Test Go ${{ matrix.go }} on ${{ matrix.os }}
     steps:
@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: pelletier/setup-go@v1.0.2-patch
         with:
-          go-version: '1.12'
+          go-version: '1.13'
       - uses: actions/checkout@v1
       - run: ./benchmark.sh master https://github.com/$GITHUB_REPOSITORY.git
 
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: pelletier/setup-go@v1.0.2-patch
         with:
-          go-version: '1.12'
+          go-version: '1.13'
       - uses: actions/checkout@v1
       - run: mkdir -p /home/runner/go/src/github.com/pelletier/go-toml
           | cp -R . /home/runner/go/src/github.com/pelletier/go-toml
