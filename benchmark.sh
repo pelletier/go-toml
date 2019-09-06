@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 reference_ref=${1:-master}
 reference_git=${2:-.}
