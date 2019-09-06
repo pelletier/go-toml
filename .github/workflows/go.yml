@@ -51,6 +51,8 @@ jobs:
         with:
           go-version: '1.12'
       - uses: actions/checkout@v1
+      - run: mkdir -p /home/runner/go/src/github.com/pelletier/go-toml
+          | cp -R . /home/runner/go/src/github.com/pelletier/go-toml
       - run: ./fuzzit.sh
         env:
           TYPE: local-regression
