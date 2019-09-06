@@ -85,7 +85,6 @@ func TestProcessMainReadFromMissingFile(t *testing.T) {
 `
 	} else {
 		expectedError = `open /this/file/does/not/exist: no such file or directory
-invalid argument
 `
 	}
 
