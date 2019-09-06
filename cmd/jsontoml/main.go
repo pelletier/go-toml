@@ -34,11 +34,12 @@ func processMain(files []string, defaultInput io.Reader, output io.Writer, error
 	inputReader := defaultInput
 
 	if len(files) > 0 {
-		var err error
-		inputReader, err = os.Open(files[0])
+		file, err := os.Open(files[0])
 		if err != nil {
 			printError(err, errorOutput)
 		}
+		inputReader = file
+		defer file.Close()
 	}
 	s, err := reader(inputReader)
 	if err != nil {
@@ -55,7 +56,7 @@ func printError(err error, output io.Writer) {
 
 func reader(r io.Reader) (string, error) {
 	jsonMap := make(map[string]interface{})
-	jsonBytes, err :=  ioutil.ReadAll(r)
+	jsonBytes, err := ioutil.ReadAll(r)
 	if err != nil {
 		return "", err
 	}

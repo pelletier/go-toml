@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
-	"os"
-	"io/ioutil"
-	"runtime"
 )
 
 func expectBufferEquality(t *testing.T, name string, buffer *bytes.Buffer, expected string) {
