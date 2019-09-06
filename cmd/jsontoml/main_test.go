@@ -20,6 +20,7 @@ func expectBufferEquality(t *testing.T, name string, buffer *bytes.Buffer, expec
 
 func expectProcessMainResults(t *testing.T, input string, args []string, exitCode int, expectedOutput string, expectedError string) {
 	inputReader := strings.NewReader(input)
+
 	outputBuffer := new(bytes.Buffer)
 	errorBuffer := new(bytes.Buffer)
 

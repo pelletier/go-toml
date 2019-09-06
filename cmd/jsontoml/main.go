@@ -1,3 +1,8 @@
+// Jsontoml reads JSON and converts to TOML.
+//
+// Usage:
+//   cat file.toml | jsontoml > file.json
+//   jsontoml file1.toml > file.json
 package main
 
 import (
@@ -50,10 +55,14 @@ func printError(err error, output io.Writer) {
 
 func reader(r io.Reader) (string, error) {
 	jsonMap := make(map[string]interface{})
-	jsonBytes, err :=  ioutil.ReadAll(r); if err != nil {
+	jsonBytes, err :=  ioutil.ReadAll(r)
+	if err != nil {
 		return "", err
 	}
-	json.Unmarshal(jsonBytes, &jsonMap)
+	error := json.Unmarshal(jsonBytes, &jsonMap)
+	if error != nil {
+		return "", error
+	}
 
 	tree, err := toml.TreeFromMap(jsonMap)
 	if err != nil {
