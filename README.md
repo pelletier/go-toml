@@ -100,6 +100,13 @@ Go-toml provides two handy command line tools:
     go install github.com/pelletier/go-toml/cmd/tomljson
     tomljson --help
     ```
+  
+ * `jsontoml`: Reads a JSON file and outputs a TOML representation.
+ 
+    ```
+    go install github.com/pelletier/go-toml/cmd/jsontoml
+    jsontoml --help
+    ```
 
 ### Docker image
 
