@@ -6,7 +6,7 @@ set -xe
 export GO111MODULE="off"
 
 # install go-fuzz
-go get -u github.com/dvyukov/go-fuzz/go-fuzz github.com/dvyukov/go-fuzz/go-fuzz-build
+go get -v -u github.com/dvyukov/go-fuzz/go-fuzz github.com/dvyukov/go-fuzz/go-fuzz-build
 
 # target name can only contain lower-case letters (a-z), digits (0-9) and a dash (-)
 # to add another target, make sure to create it with `fuzzit create target`
