@@ -9,9 +9,14 @@ jobs:
         with:
           go-version: '1.13'
       - uses: actions/checkout@v1
-      - run: docker build -t pelletier/go-toml:$GITHUB_SHA
+      - run: docker build -t toml .
+      - uses: actions/docker/tag@master
+        with:
+          args: toml pelletier/go-toml
+      - run: docker tag pelletier/go-toml pelletier/go-toml:latest
+        if: github.ref == 'heads/refs/master'
       - uses: actions/docker/login@master
         with:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      - run: docker pushpelletier/go-toml:$GITHUB_SHA
+      - run: docker push pelletier/go-toml
