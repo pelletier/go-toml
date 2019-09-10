@@ -1,8 +1,5 @@
 name: Fuzzit
-on:
-  push:
-    branches:
-      - master
+on: [push]
 jobs:
   fuzzing:
     name: Run fuzzing
