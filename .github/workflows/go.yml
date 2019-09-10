@@ -72,7 +72,7 @@ jobs:
       - run: docker build -t toml .
       - uses: actions/docker/tag@master
         with:
-          args: toml pelletier/go-toml
+          args: toml pelletier/go-toml --no-latest
       - run: docker tag pelletier/go-toml pelletier/go-toml:latest
         if: github.ref == 'heads/refs/master'
       - name: Docker login
