@@ -18,3 +18,4 @@ jobs:
       - run: ./fuzzit.sh
         env:
           TYPE: fuzzing
+          FUZZIT_API_KEY: ${{ secrets.FUZZIT_API_KEY }}
