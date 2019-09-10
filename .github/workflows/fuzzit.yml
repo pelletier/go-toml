@@ -1,0 +1,17 @@
+name: Fuzzit
+on:
+  push:
+    branches:
+      - master
+jobs:
+  fuzzing:
+    name: Run fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.13'
+      - uses: actions/checkout@v1
+      - run: ./fuzzit.sh
+        env:
+          TYPE: fuzzing

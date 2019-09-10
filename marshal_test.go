@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -53,6 +54,107 @@ Ystrlist = ["Howdy","Hey There"]
 
 [[Wsublist]]
   String2 = "Three"
+`)
+
+var marshalTestToml = []byte(`title = "TOML Marshal Testing"
+
+[basic]
+  bool = true
+  date = 1979-05-27T07:32:00Z
+  float = 123.4
+  float64 = 123.456782132399
+  int = 5000
+  string = "Bite me"
+  uint = 5001
+
+[basic_lists]
+  bools = [true,false,true]
+  dates = [1979-05-27T07:32:00Z,1980-05-27T07:32:00Z]
+  floats = [12.3,45.6,78.9]
+  ints = [8001,8001,8002]
+  strings = ["One","Two","Three"]
+  uints = [5002,5003]
+
+[basic_map]
+  one = "one"
+  two = "two"
+
+[subdoc]
+
+  [subdoc.first]
+    name = "First"
+
+  [subdoc.second]
+    name = "Second"
+
+[[subdoclist]]
+  name = "List.First"
+
+[[subdoclist]]
+  name = "List.Second"
+
+[[subdocptrs]]
+  name = "Second"
+`)
+
+var marshalOrderPreserveToml = []byte(`title = "TOML Marshal Testing"
+
+[basic_lists]
+  floats = [12.3,45.6,78.9]
+  bools = [true,false,true]
+  dates = [1979-05-27T07:32:00Z,1980-05-27T07:32:00Z]
+  ints = [8001,8001,8002]
+  uints = [5002,5003]
+  strings = ["One","Two","Three"]
+
+[[subdocptrs]]
+  name = "Second"
+
+[basic_map]
+  one = "one"
+  two = "two"
+
+[subdoc]
+
+  [subdoc.second]
+    name = "Second"
+
+  [subdoc.first]
+    name = "First"
+
+[basic]
+  uint = 5001
+  bool = true
+  float = 123.4
+  float64 = 123.456782132399
+  int = 5000
+  string = "Bite me"
+  date = 1979-05-27T07:32:00Z
+
+[[subdoclist]]
+  name = "List.First"
+
+[[subdoclist]]
+  name = "List.Second"
+`)
+
+var mashalOrderPreserveMapToml = []byte(`title = "TOML Marshal Testing"
+
+[basic_map]
+  one = "one"
+  two = "two"
+
+[long_map]
+  a7 = "1"
+  b3 = "2"
+  c8 = "3"
+  d4 = "4"
+  e6 = "5"
+  f5 = "6"
+  g10 = "7"
+  h1 = "8"
+  i2 = "9"
+  j9 = "10"
 `)
 
 func TestBasicMarshal(t *testing.T) {
@@ -233,9 +335,8 @@ func TestDocMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, _ := ioutil.ReadFile("marshal_test.toml")
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	if !bytes.Equal(result, marshalTestToml) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", marshalTestToml, result)
 	}
 }
 
@@ -245,9 +346,8 @@ func TestDocMarshalOrdered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, _ := ioutil.ReadFile("marshal_OrderPreserve_test.toml")
-	if !bytes.Equal(result.Bytes(), expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
+	if !bytes.Equal(result.Bytes(), marshalOrderPreserveToml) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", marshalOrderPreserveToml, result.Bytes())
 	}
 }
 
@@ -256,9 +356,8 @@ func TestDocMarshalMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, _ := ioutil.ReadFile("marshal_OrderPreserve_Map_test.toml")
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	if !bytes.Equal(result, mashalOrderPreserveMapToml) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", mashalOrderPreserveMapToml, result)
 	}
 }
 
@@ -268,9 +367,8 @@ func TestDocMarshalOrderedMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, _ := ioutil.ReadFile("marshal_OrderPreserve_Map_test.toml")
-	if !bytes.Equal(result.Bytes(), expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
+	if !bytes.Equal(result.Bytes(), mashalOrderPreserveMapToml) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", mashalOrderPreserveMapToml, result.Bytes())
 	}
 }
 
@@ -279,16 +377,15 @@ func TestDocMarshalPointer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected, _ := ioutil.ReadFile("marshal_test.toml")
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+
+	if !bytes.Equal(result, marshalTestToml) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", marshalTestToml, result)
 	}
 }
 
 func TestDocUnmarshal(t *testing.T) {
 	result := testDoc{}
-	tomlData, _ := ioutil.ReadFile("marshal_test.toml")
-	err := Unmarshal(tomlData, &result)
+	err := Unmarshal(marshalTestToml, &result)
 	expected := docData
 	if err != nil {
 		t.Fatal(err)
@@ -301,11 +398,22 @@ func TestDocUnmarshal(t *testing.T) {
 }
 
 func TestDocPartialUnmarshal(t *testing.T) {
-	result := testDocSubs{}
+	file, err := ioutil.TempFile("", "test-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(file.Name())
 
-	tree, _ := LoadFile("marshal_test.toml")
+	err = ioutil.WriteFile(file.Name(), marshalTestToml, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tree, _ := LoadFile(file.Name())
 	subTree := tree.Get("subdoc").(*Tree)
-	err := subTree.Unmarshal(&result)
+
+	result := testDocSubs{}
+	err = subTree.Unmarshal(&result)
 	expected := docData.Subdocs
 	if err != nil {
 		t.Fatal(err)
