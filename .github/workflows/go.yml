@@ -14,6 +14,7 @@ jobs:
           go-version: ${{ matrix.go }}
       - uses: actions/checkout@v1
       - run: go test ./...
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
@@ -26,6 +27,7 @@ jobs:
       - run: bash <(curl -s https://codecov.io/bash)
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
   fmt:
     name: Go fmt
     runs-on: ubuntu-latest
@@ -33,6 +35,7 @@ jobs:
       - uses: pelletier/setup-go@v1.0.2-patch
       - uses: actions/checkout@v1
       - run: go fmt ./...
+
   benchmark:
     name: Run benchmark
     runs-on: ubuntu-latest
@@ -56,3 +59,24 @@ jobs:
       - run: ./fuzzit.sh
         env:
           TYPE: local-regression
+
+  docker:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: [test, fuzzing, fmt]
+    steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.13'
+      - uses: actions/checkout@v1
+      - run: docker build -t toml .
+      - uses: actions/docker/tag@master
+        with:
+          args: toml pelletier/go-toml
+      - run: docker tag pelletier/go-toml pelletier/go-toml:latest
+        if: github.ref == 'heads/refs/master'
+      - uses: actions/docker/login@master
+        with:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      - run: docker push pelletier/go-toml
