@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/civil"
 )
 
 type tomlParser struct {
@@ -318,6 +320,36 @@ func (p *tomlParser) parseRvalue() interface{} {
 			layout = strings.Replace(layout, "T", " ", 1)
 		}
 		val, err := time.ParseInLocation(layout, tok.val, time.UTC)
+		if err != nil {
+			p.raiseError(tok, "%s", err)
+		}
+		return val
+	case tokenLocalDate:
+		v := strings.Replace(tok.val, " ", "T", -1)
+		isDateTime := false
+		isTime := false
+		for _, c := range v {
+			if c == 'T' || c == 't' {
+				isDateTime = true
+				break
+			}
+			if c == ':' {
+				isTime = true
+				break
+			}
+		}
+
+		var val interface{}
+		var err error
+
+		if isDateTime {
+			val, err = civil.ParseDateTime(v)
+		} else if isTime {
+			val, err = civil.ParseTime(v)
+		} else {
+			val, err = civil.ParseDate(v)
+		}
+
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}

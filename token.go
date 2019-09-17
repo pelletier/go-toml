@@ -34,6 +34,7 @@ const (
 	tokenDoubleLeftBracket
 	tokenDoubleRightBracket
 	tokenDate
+	tokenLocalDate
 	tokenKeyGroup
 	tokenKeyGroupArray
 	tokenComma
@@ -68,6 +69,7 @@ var tokenTypeNames = []string{
 	"]]",
 	"[[",
 	"Date",
+	"LocalDate",
 	"KeyGroup",
 	"KeyGroupArray",
 	",",

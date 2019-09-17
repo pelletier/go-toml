@@ -26,6 +26,7 @@ func TestTokenStringer(t *testing.T) {
 		{tokenDoubleLeftBracket, "]]"},
 		{tokenDoubleRightBracket, "[["},
 		{tokenDate, "Date"},
+		{tokenLocalDate, "LocalDate"},
 		{tokenKeyGroup, "KeyGroup"},
 		{tokenKeyGroupArray, "KeyGroupArray"},
 		{tokenComma, ","},

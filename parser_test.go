@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"github.com/davecgh/go-spew/spew"
 )
 
@@ -197,7 +198,7 @@ func TestFloatsWithExponents(t *testing.T) {
 	tree, err := Load("a = 5e+22\nb = 5E+22\nc = -5e+22\nd = -5e-22\ne = 6.626e-34")
 	assertTree(t, tree, err, map[string]interface{}{
 		"a": float64(5e+22),
-		"b": float64(5E+22),
+		"b": float64(5e+22),
 		"c": float64(-5e+22),
 		"d": float64(-5e-22),
 		"e": float64(6.626e-34),
@@ -225,10 +226,74 @@ func TestDateNano(t *testing.T) {
 	})
 }
 
-func TestDateSpaceDelimiter(t *testing.T) {
-	tree, err := Load("odt4 = 1979-05-27 07:32:00Z")
+func TestLocalDateTime(t *testing.T) {
+	tree, err := Load("a = 1979-05-27T07:32:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"odt4": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+		"a": civil.DateTime{
+			Date: civil.Date{
+				Year:  1979,
+				Month: 5,
+				Day:   27,
+			},
+			Time: civil.Time{
+				Hour:       7,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 0,
+			}},
+	})
+}
+
+func TestLocalDateTimeNano(t *testing.T) {
+	tree, err := Load("a = 1979-05-27T07:32:00.999999")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": civil.DateTime{
+			Date: civil.Date{
+				Year:  1979,
+				Month: 5,
+				Day:   27,
+			},
+			Time: civil.Time{
+				Hour:       7,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 999999000,
+			}},
+	})
+}
+
+func TestLocalDate(t *testing.T) {
+	tree, err := Load("a = 1979-05-27")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": civil.Date{
+			Year:  1979,
+			Month: 5,
+			Day:   27,
+		},
+	})
+}
+
+func TestLocalTime(t *testing.T) {
+	tree, err := Load("a = 07:32:00")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": civil.Time{
+			Hour:       7,
+			Minute:     32,
+			Second:     0,
+			Nanosecond: 0,
+		},
+	})
+}
+
+func TestLocalTimeNano(t *testing.T) {
+	tree, err := Load("a = 00:32:00.999999")
+	assertTree(t, tree, err, map[string]interface{}{
+		"a": civil.Time{
+			Hour:       0,
+			Minute:     32,
+			Second:     0,
+			Nanosecond: 999999000,
+		},
 	})
 }
 
