@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"cloud.google.com/go/civil"
 )
 
 type tomlParser struct {
@@ -343,11 +341,11 @@ func (p *tomlParser) parseRvalue() interface{} {
 		var err error
 
 		if isDateTime {
-			val, err = civil.ParseDateTime(v)
+			val, err = ParseDateTime(v)
 		} else if isTime {
-			val, err = civil.ParseTime(v)
+			val, err = ParseTime(v)
 		} else {
-			val, err = civil.ParseDate(v)
+			val, err = ParseDate(v)
 		}
 
 		if err != nil {
