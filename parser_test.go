@@ -228,13 +228,13 @@ func TestDateNano(t *testing.T) {
 func TestLocalDateTime(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T07:32:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": DateTime{
-			Date: Date{
+		"a": LocalDateTime{
+			Date: LocalDate{
 				Year:  1979,
 				Month: 5,
 				Day:   27,
 			},
-			Time: Time{
+			Time: LocalTime{
 				Hour:       7,
 				Minute:     32,
 				Second:     0,
@@ -246,13 +246,13 @@ func TestLocalDateTime(t *testing.T) {
 func TestLocalDateTimeNano(t *testing.T) {
 	tree, err := Load("a = 1979-05-27T07:32:00.999999")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": DateTime{
-			Date: Date{
+		"a": LocalDateTime{
+			Date: LocalDate{
 				Year:  1979,
 				Month: 5,
 				Day:   27,
 			},
-			Time: Time{
+			Time: LocalTime{
 				Hour:       7,
 				Minute:     32,
 				Second:     0,
@@ -264,7 +264,7 @@ func TestLocalDateTimeNano(t *testing.T) {
 func TestLocalDate(t *testing.T) {
 	tree, err := Load("a = 1979-05-27")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": Date{
+		"a": LocalDate{
 			Year:  1979,
 			Month: 5,
 			Day:   27,
@@ -275,7 +275,7 @@ func TestLocalDate(t *testing.T) {
 func TestLocalTime(t *testing.T) {
 	tree, err := Load("a = 07:32:00")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": Time{
+		"a": LocalTime{
 			Hour:       7,
 			Minute:     32,
 			Second:     0,
@@ -287,7 +287,7 @@ func TestLocalTime(t *testing.T) {
 func TestLocalTimeNano(t *testing.T) {
 	tree, err := Load("a = 00:32:00.999999")
 	assertTree(t, tree, err, map[string]interface{}{
-		"a": Time{
+		"a": LocalTime{
 			Hour:       0,
 			Minute:     32,
 			Second:     0,

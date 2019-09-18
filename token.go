@@ -68,7 +68,7 @@ var tokenTypeNames = []string{
 	")",
 	"]]",
 	"[[",
-	"Date",
+	"LocalDate",
 	"LocalDate",
 	"KeyGroup",
 	"KeyGroupArray",

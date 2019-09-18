@@ -174,7 +174,7 @@ Tree primitive types and corresponding marshal types:
   float64    float32, float64, pointers to same
   string     string, pointers to same
   bool       bool, pointers to same
-  time.Time  time.Time{}, pointers to same
+  time.LocalTime  time.LocalTime{}, pointers to same
 
 For additional flexibility, use the Encoder API.
 */
@@ -704,7 +704,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		switch mtype.Kind() {
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
-			// if this passes for when mtype is reflect.Struct, tval is a time.Time
+			// if this passes for when mtype is reflect.Struct, tval is a time.LocalTime
 			if !val.Type().ConvertibleTo(mtype) {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}

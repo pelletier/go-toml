@@ -341,11 +341,11 @@ func (p *tomlParser) parseRvalue() interface{} {
 		var err error
 
 		if isDateTime {
-			val, err = ParseDateTime(v)
+			val, err = ParseLocalDateTime(v)
 		} else if isTime {
-			val, err = ParseTime(v)
+			val, err = ParseLocalTime(v)
 		} else {
-			val, err = ParseDate(v)
+			val, err = ParseLocalDate(v)
 		}
 
 		if err != nil {
