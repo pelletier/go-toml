@@ -19,7 +19,7 @@ clang -fsanitize=fuzzer ${TARGET}.a -o ${TARGET}
 # install fuzzit for talking to fuzzit.dev service
 # or latest version:
 # https://github.com/fuzzitdev/fuzzit/releases/latest/download/fuzzit_Linux_x86_64
-wget -q -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.23/fuzzit_Linux_x86_64
+wget -q -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.52/fuzzit_Linux_x86_64
 chmod a+x fuzzit
 
 # TODO: change kkowalczyk to go-toml and create toml-fuzzer target there
