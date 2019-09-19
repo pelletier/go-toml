@@ -225,6 +225,13 @@ func TestDateNano(t *testing.T) {
 	})
 }
 
+func TestDateSpaceDelimiter(t *testing.T) {
+	tree, err := Load("odt4 = 1979-05-27 07:32:00Z")
+	assertTree(t, tree, err, map[string]interface{}{
+		"odt4": time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
+	})
+}
+
 func TestSimpleString(t *testing.T) {
 	tree, err := Load("a = \"hello world\"")
 	assertTree(t, tree, err, map[string]interface{}{
