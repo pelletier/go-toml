@@ -5,6 +5,7 @@ stages:
 - stage: fuzzit
   displayName: "Run Fuzzit"
   dependsOn: []
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
   jobs:
   - job: submit
     displayName: "Submit"
