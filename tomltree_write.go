@@ -423,12 +423,11 @@ func (t *Tree) WriteTo(w io.Writer) (int64, error) {
 // Output spans multiple lines, and is suitable for ingest by a TOML parser.
 // If the conversion cannot be performed, ToString returns a non-nil error.
 func (t *Tree) ToTomlString() (string, error) {
-	var buf bytes.Buffer
-	_, err := t.WriteTo(&buf)
+	b, err := t.Marshal()
 	if err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	return string(b), nil
 }
 
 // String generates a human-readable representation of the current tree.

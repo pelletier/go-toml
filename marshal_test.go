@@ -1675,3 +1675,27 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 		}
 	})
 }
+
+func TestTreeMarshal(t *testing.T) {
+	cases := [][]byte{
+		basicTestToml,
+		marshalTestToml,
+		emptyTestToml,
+		pointerTestToml,
+	}
+	for _, expected := range cases {
+		t.Run("", func(t *testing.T) {
+			tree, err := LoadBytes(expected)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := tree.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(result, expected) {
+				t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+			}
+		})
+	}
+}

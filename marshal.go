@@ -445,8 +445,11 @@ func (t *Tree) Unmarshal(v interface{}) error {
 // See Marshal() documentation for types mapping table.
 func (t *Tree) Marshal() ([]byte, error) {
 	var buf bytes.Buffer
-	err := NewEncoder(&buf).Encode(t)
-	return buf.Bytes(), err
+	_, err := t.WriteTo(&buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // Unmarshal parses the TOML-encoded data and stores the result in the value
