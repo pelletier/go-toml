@@ -433,12 +433,36 @@ type tomlTypeCheckTest struct {
 
 func TestTypeChecks(t *testing.T) {
 	tests := []tomlTypeCheckTest{
-		{"integer", 2, 0},
+		{"bool", true, 0},
+		{"bool", false, 0},
+		{"int", int(2), 0},
+		{"int8", int8(2), 0},
+		{"int16", int16(2), 0},
+		{"int32", int32(2), 0},
+		{"int64", int64(2), 0},
+		{"uint", uint(2), 0},
+		{"uint8", uint8(2), 0},
+		{"uint16", uint16(2), 0},
+		{"uint32", uint32(2), 0},
+		{"uint64", uint64(2), 0},
+		{"float32", float32(3.14), 0},
+		{"float64", float64(3.14), 0},
+		{"string", "lorem ipsum", 0},
 		{"time", time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC), 0},
 		{"stringlist", []string{"hello", "hi"}, 1},
+		{"stringlistptr", &[]string{"hello", "hi"}, 1},
+		{"stringarray", [2]string{"hello", "hi"}, 1},
+		{"stringarrayptr", &[2]string{"hello", "hi"}, 1},
 		{"timelist", []time.Time{time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)}, 1},
+		{"timelistptr", &[]time.Time{time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)}, 1},
+		{"timearray", [1]time.Time{time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)}, 1},
+		{"timearrayptr", &[1]time.Time{time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)}, 1},
 		{"objectlist", []tomlTypeCheckTest{}, 2},
+		{"objectlistptr", &[]tomlTypeCheckTest{}, 2},
+		{"objectarray", [2]tomlTypeCheckTest{{}, {}}, 2},
+		{"objectlistptr", &[2]tomlTypeCheckTest{{}, {}}, 2},
 		{"object", tomlTypeCheckTest{}, 3},
+		{"objectptr", &tomlTypeCheckTest{}, 3},
 	}
 
 	for _, test := range tests {
@@ -446,8 +470,8 @@ func TestTypeChecks(t *testing.T) {
 		expected[test.typ] = true
 		result := []bool{
 			isPrimitive(reflect.TypeOf(test.item)),
-			isOtherSlice(reflect.TypeOf(test.item)),
-			isTreeSlice(reflect.TypeOf(test.item)),
+			isOtherSequence(reflect.TypeOf(test.item)),
+			isTreeSequence(reflect.TypeOf(test.item)),
 			isTree(reflect.TypeOf(test.item)),
 		}
 		if !reflect.DeepEqual(expected, result) {
@@ -1695,6 +1719,61 @@ func TestTreeMarshal(t *testing.T) {
 			}
 			if !bytes.Equal(result, expected) {
 				t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+			}
+		})
+	}
+}
+
+func TestMarshalArrays(t *testing.T) {
+	cases := []struct {
+		Data     interface{}
+		Expected string
+	}{
+		{
+			Data: struct {
+				XY [2]int
+			}{
+				XY: [2]int{1, 2},
+			},
+			Expected: `XY = [1,2]
+`,
+		},
+		{
+			Data: struct {
+				XY [1][2]int
+			}{
+				XY: [1][2]int{{1, 2}},
+			},
+			Expected: `XY = [[1,2]]
+`,
+		},
+		{
+			Data: struct {
+				XY [1][]int
+			}{
+				XY: [1][]int{{1, 2}},
+			},
+			Expected: `XY = [[1,2]]
+`,
+		},
+		{
+			Data: struct {
+				XY [][2]int
+			}{
+				XY: [][2]int{{1, 2}},
+			},
+			Expected: `XY = [[1,2]]
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run("", func(t *testing.T) {
+			result, err := Marshal(tc.Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(result, []byte(tc.Expected)) {
+				t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", []byte(tc.Expected), result)
 			}
 		})
 	}
