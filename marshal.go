@@ -91,23 +91,25 @@ func isPrimitive(mtype reflect.Type) bool {
 	}
 }
 
-// Check if the given marshal type maps to a Tree slice
-func isTreeSlice(mtype reflect.Type) bool {
+// Check if the given marshal type maps to a Tree slice or array
+func isTreeSequence(mtype reflect.Type) bool {
 	switch mtype.Kind() {
-	case reflect.Slice:
-		return !isOtherSlice(mtype)
+	case reflect.Ptr:
+		return isTreeSequence(mtype.Elem())
+	case reflect.Slice, reflect.Array:
+		return isTree(mtype.Elem())
 	default:
 		return false
 	}
 }
 
-// Check if the given marshal type maps to a non-Tree slice
-func isOtherSlice(mtype reflect.Type) bool {
+// Check if the given marshal type maps to a non-Tree slice or array
+func isOtherSequence(mtype reflect.Type) bool {
 	switch mtype.Kind() {
 	case reflect.Ptr:
-		return isOtherSlice(mtype.Elem())
-	case reflect.Slice:
-		return isPrimitive(mtype.Elem()) || isOtherSlice(mtype.Elem())
+		return isOtherSequence(mtype.Elem())
+	case reflect.Slice, reflect.Array:
+		return !isTreeSequence(mtype)
 	default:
 		return false
 	}
@@ -116,6 +118,8 @@ func isOtherSlice(mtype reflect.Type) bool {
 // Check if the given marshal type maps to a Tree
 func isTree(mtype reflect.Type) bool {
 	switch mtype.Kind() {
+	case reflect.Ptr:
+		return isTree(mtype.Elem())
 	case reflect.Map:
 		return true
 	case reflect.Struct:
@@ -406,9 +410,9 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 		return callCustomMarshaler(mval)
 	case isTree(mtype):
 		return e.valueToTree(mtype, mval)
-	case isTreeSlice(mtype):
+	case isTreeSequence(mtype):
 		return e.valueToTreeSlice(mtype, mval)
-	case isOtherSlice(mtype):
+	case isOtherSequence(mtype):
 		return e.valueToOtherSlice(mtype, mval)
 	default:
 		switch mtype.Kind() {
@@ -687,12 +691,12 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a tree", tval, tval)
 	case []*Tree:
-		if isTreeSlice(mtype) {
+		if isTreeSequence(mtype) {
 			return d.valueFromTreeSlice(mtype, t)
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to trees", tval, tval)
 	case []interface{}:
-		if isOtherSlice(mtype) {
+		if isOtherSequence(mtype) {
 			return d.valueFromOtherSlice(mtype, t)
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
