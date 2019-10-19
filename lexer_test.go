@@ -735,6 +735,58 @@ func TestLexUnknownRvalue(t *testing.T) {
 	})
 }
 
+func TestLexInlineTableBareKey(t *testing.T) {
+	testFlow(t, `foo = { bar = "baz" }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "bar"},
+		{Position{1, 13}, tokenEqual, "="},
+		{Position{1, 16}, tokenString, "baz"},
+		{Position{1, 21}, tokenRightCurlyBrace, "}"},
+		{Position{1, 22}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableBareKeyDash(t *testing.T) {
+	testFlow(t, `foo = { -bar = "baz" }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "-bar"},
+		{Position{1, 14}, tokenEqual, "="},
+		{Position{1, 17}, tokenString, "baz"},
+		{Position{1, 22}, tokenRightCurlyBrace, "}"},
+		{Position{1, 23}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableBareKeyUnderscore(t *testing.T) {
+	testFlow(t, `foo = { _bar = "baz" }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "_bar"},
+		{Position{1, 14}, tokenEqual, "="},
+		{Position{1, 17}, tokenString, "baz"},
+		{Position{1, 22}, tokenRightCurlyBrace, "}"},
+		{Position{1, 23}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableQuotedKey(t *testing.T) {
+	testFlow(t, `foo = { "bar" = "baz" }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "\"bar\""},
+		{Position{1, 15}, tokenEqual, "="},
+		{Position{1, 18}, tokenString, "baz"},
+		{Position{1, 23}, tokenRightCurlyBrace, "}"},
+		{Position{1, 24}, tokenEOF, ""},
+	})
+}
+
 func BenchmarkLexer(b *testing.B) {
 	sample := `title = "Hugo: A Fast and Flexible Website Generator"
 baseurl = "http://gohugo.io/"
