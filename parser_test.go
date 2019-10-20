@@ -943,6 +943,13 @@ func TestMapKeyIsNum(t *testing.T) {
 	}
 }
 
+func TestInvalidKeyInlineTable(t *testing.T) {
+	_, err := Load("table={invalid..key = 1}")
+	if err.Error() != "(1, 8): invalid key: expecting key part after dot" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestDottedKeys(t *testing.T) {
 	tree, err := Load(`
 name = "Orange"
