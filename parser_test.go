@@ -532,6 +532,33 @@ point = { x = 1, y = 2 }`)
 	})
 }
 
+func TestInlineGroupBareKeysUnderscore(t *testing.T) {
+	tree, err := Load(`foo = { _bar = "buz" }`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"foo": map[string]interface{}{
+			"_bar": "buz",
+		},
+	})
+}
+
+func TestInlineGroupBareKeysDash(t *testing.T) {
+	tree, err := Load(`foo = { -bar = "buz" }`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"foo": map[string]interface{}{
+			"-bar": "buz",
+		},
+	})
+}
+
+func TestInlineGroupKeyQuoted(t *testing.T) {
+	tree, err := Load(`foo = { "bar" = "buz" }`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"foo": map[string]interface{}{
+			"bar": "buz",
+		},
+	})
+}
+
 func TestExampleInlineGroupInArray(t *testing.T) {
 	tree, err := Load(`points = [{ x = 1, y = 2 }]`)
 	assertTree(t, tree, err, map[string]interface{}{
@@ -560,7 +587,7 @@ func TestInlineTableCommaExpected(t *testing.T) {
 
 func TestInlineTableCommaStart(t *testing.T) {
 	_, err := Load("foo = {, hello = 53}")
-	if err.Error() != "(1, 8): inline table cannot start with a comma" {
+	if err.Error() != "(1, 8): unexpected token type in inline table: keys cannot contain , character" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -913,6 +940,13 @@ func TestMapKeyIsNum(t *testing.T) {
 	_, err = Load(`table={"2018"=1,"2019"=2}`)
 	if err != nil {
 		t.Error("should be passed")
+	}
+}
+
+func TestInvalidKeyInlineTable(t *testing.T) {
+	_, err := Load("table={invalid..key = 1}")
+	if err.Error() != "(1, 8): invalid key: expecting key part after dot" {
+		t.Error("Bad error message:", err.Error())
 	}
 }
 

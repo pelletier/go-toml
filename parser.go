@@ -360,12 +360,15 @@ Loop:
 			}
 			key := p.getToken()
 			p.assume(tokenEqual)
-			value := p.parseRvalue()
-			tree.Set(key.val, value)
-		case tokenComma:
-			if previous == nil {
-				p.raiseError(follow, "inline table cannot start with a comma")
+
+			parsedKey, err := parseKey(key.val)
+			if err != nil {
+				p.raiseError(key, "invalid key: %s", err)
 			}
+
+			value := p.parseRvalue()
+			tree.SetPath(parsedKey, value)
+		case tokenComma:
 			if tokenIsComma(previous) {
 				p.raiseError(follow, "need field between two commas in inline table")
 			}

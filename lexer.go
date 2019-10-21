@@ -247,13 +247,13 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 func (l *tomlLexer) lexLeftCurlyBrace() tomlLexStateFn {
 	l.next()
 	l.emit(tokenLeftCurlyBrace)
-	return l.lexRvalue
+	return l.lexVoid
 }
 
 func (l *tomlLexer) lexRightCurlyBrace() tomlLexStateFn {
 	l.next()
 	l.emit(tokenRightCurlyBrace)
-	return l.lexRvalue
+	return l.lexVoid
 }
 
 func (l *tomlLexer) lexDate() tomlLexStateFn {
