@@ -2,7 +2,6 @@ package toml
 
 import (
 	"fmt"
-	"strconv"
 	"unicode"
 )
 
@@ -93,14 +92,6 @@ func (tt tokenType) String() string {
 		return tokenTypeNames[idx]
 	}
 	return "Unknown"
-}
-
-func (t token) Int() int {
-	if result, err := strconv.Atoi(t.val); err != nil {
-		panic(err)
-	} else {
-		return result
-	}
 }
 
 func (t token) String() string {
