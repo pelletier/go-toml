@@ -1159,6 +1159,21 @@ func TestMarshalCustomCommented(t *testing.T) {
 	}
 }
 
+func TestMarshalDirectMultilineString(t *testing.T) {
+	tree := newTree()
+	tree.SetWithOptions("mykey", SetOptions{
+		Multiline: true,
+	}, "my\x11multiline\nstring\ba\tb\fc\rd\"e\\!")
+	result, err := tree.Marshal()
+	if err != nil {
+		t.Fatal("marshal should not error:", err)
+	}
+	expected := []byte("mykey = \"\"\"\nmy\\u0011multiline\nstring\\ba\tb\\fc\rd\"e\\!\"\"\"\n")
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
 var customMultilineTagTestToml = []byte(`int_slice = [
   1,
   2,
