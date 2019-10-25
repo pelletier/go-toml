@@ -69,6 +69,7 @@ const (
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
 var localDateType = reflect.TypeOf(LocalDate{})
+var localDateTimeType = reflect.TypeOf(LocalDateTime{})
 
 // Check if the given marshal type maps to a Tree primitive
 func isPrimitive(mtype reflect.Type) bool {
@@ -86,7 +87,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	case reflect.String:
 		return true
 	case reflect.Struct:
-		return mtype == timeType || mtype == localDateType || isCustomMarshaler(mtype)
+		return mtype == timeType || mtype == localDateType || mtype == localDateTimeType || isCustomMarshaler(mtype)
 	default:
 		return false
 	}
@@ -706,11 +707,26 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
 
-			if val.Type() == localDateType {
+			switch val.Type() {
+			case localDateType:
 				localDate := val.Interface().(LocalDate)
 				switch mtype {
 				case timeType:
 					return reflect.ValueOf(time.Date(localDate.Year, localDate.Month, localDate.Day, 0, 0, 0, 0, time.Local)), nil
+				}
+			case localDateTimeType:
+				localDateTime := val.Interface().(LocalDateTime)
+				switch mtype {
+				case timeType:
+					return reflect.ValueOf(time.Date(
+						localDateTime.Date.Year,
+						localDateTime.Date.Month,
+						localDateTime.Date.Day,
+						localDateTime.Time.Hour,
+						localDateTime.Time.Minute,
+						localDateTime.Time.Second,
+						localDateTime.Time.Nanosecond,
+						time.Local)), nil
 				}
 			}
 
