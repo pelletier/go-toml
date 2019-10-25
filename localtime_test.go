@@ -174,6 +174,7 @@ func TestDateBefore(t *testing.T) {
 		{LocalDate{2016, 12, 31}, LocalDate{2017, 1, 1}, true},
 		{LocalDate{2016, 1, 1}, LocalDate{2016, 1, 1}, false},
 		{LocalDate{2016, 12, 30}, LocalDate{2016, 12, 31}, true},
+		{LocalDate{2016, 1, 30}, LocalDate{2016, 12, 31}, true},
 	} {
 		if got := test.d1.Before(test.d2); got != test.want {
 			t.Errorf("%v.Before(%v): got %t, want %t", test.d1, test.d2, got, test.want)
