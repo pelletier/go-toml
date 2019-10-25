@@ -1847,3 +1847,29 @@ func TestUnmarshalLocalDate(t *testing.T) {
 		}
 	})
 }
+
+func TestMarshalLocalDate(t *testing.T) {
+	type dateStruct struct {
+		Date LocalDate
+	}
+
+	obj := dateStruct{Date: LocalDate{
+		Year:  1979,
+		Month: 5,
+		Day:   27,
+	}}
+
+	b, err := Marshal(obj)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := string(b)
+	expected := `Date = 1979-05-27
+`
+
+	if got != expected {
+		t.Errorf("expected '%s', got '%s'", expected, got)
+	}
+}
