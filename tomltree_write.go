@@ -140,6 +140,8 @@ func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElemen
 		return value.String(), nil
 	case LocalDateTime:
 		return value.String(), nil
+	case LocalTime:
+		return value.String(), nil
 	case nil:
 		return "", nil
 	}

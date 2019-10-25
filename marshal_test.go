@@ -1959,16 +1959,16 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 				t.Errorf("expected day %d, got %d", example.out.Date.Day, obj.Date.Day())
 			}
 			if obj.Date.Hour() != example.out.Time.Hour {
-				t.Errorf("expected day %d, got %d", example.out.Time.Hour, obj.Date.Hour())
+				t.Errorf("expected hour %d, got %d", example.out.Time.Hour, obj.Date.Hour())
 			}
 			if obj.Date.Minute() != example.out.Time.Minute {
-				t.Errorf("expected day %d, got %d", example.out.Time.Minute, obj.Date.Minute())
+				t.Errorf("expected minute %d, got %d", example.out.Time.Minute, obj.Date.Minute())
 			}
 			if obj.Date.Second() != example.out.Time.Second {
-				t.Errorf("expected day %d, got %d", example.out.Time.Second, obj.Date.Second())
+				t.Errorf("expected second %d, got %d", example.out.Time.Second, obj.Date.Second())
 			}
 			if obj.Date.Nanosecond() != example.out.Time.Nanosecond {
-				t.Errorf("expected day %d, got %d", example.out.Time.Nanosecond, obj.Date.Nanosecond())
+				t.Errorf("expected nanoseconds %d, got %d", example.out.Time.Nanosecond, obj.Date.Nanosecond())
 			}
 		})
 	}
@@ -2023,6 +2023,108 @@ func TestMarshalLocalDateTime(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_%s", i, example.name), func(t *testing.T) {
 			obj := dateStruct{
 				DateTime: example.in,
+			}
+			b, err := Marshal(obj)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			got := string(b)
+
+			if got != example.out {
+				t.Errorf("expected '%s', got '%s'", example.out, got)
+			}
+		})
+	}
+}
+
+func TestUnmarshalLocalTime(t *testing.T) {
+	examples := []struct {
+		name string
+		in   string
+		out  LocalTime
+	}{
+		{
+			name: "normal",
+			in:   "07:32:00",
+			out: LocalTime{
+				Hour:       7,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 0,
+			},
+		},
+		{
+			name: "with nanoseconds",
+			in:   "00:32:00.999999",
+			out: LocalTime{
+				Hour:       0,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 999999000,
+			},
+		},
+	}
+
+	for i, example := range examples {
+		toml := fmt.Sprintf(`Time = %s`, example.in)
+
+		t.Run(fmt.Sprintf("ToLocalTime_%d_%s", i, example.name), func(t *testing.T) {
+			type dateStruct struct {
+				Time LocalTime
+			}
+
+			var obj dateStruct
+
+			err := Unmarshal([]byte(toml), &obj)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if obj.Time != example.out {
+				t.Errorf("expected '%s', got '%s'", example.out, obj.Time)
+			}
+		})
+	}
+}
+
+func TestMarshalLocalTime(t *testing.T) {
+	type timeStruct struct {
+		Time LocalTime
+	}
+
+	examples := []struct {
+		name string
+		in   LocalTime
+		out  string
+	}{
+		{
+			name: "normal",
+			out:  "Time = 07:32:00\n",
+			in: LocalTime{
+				Hour:       7,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 0,
+			}},
+		{
+			name: "with nanoseconds",
+			out:  "Time = 00:32:00.999999000\n",
+			in: LocalTime{
+				Hour:       0,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 999999000,
+			},
+		},
+	}
+
+	for i, example := range examples {
+		t.Run(fmt.Sprintf("%d_%s", i, example.name), func(t *testing.T) {
+			obj := timeStruct{
+				Time: example.in,
 			}
 			b, err := Marshal(obj)
 
