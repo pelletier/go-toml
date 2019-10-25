@@ -69,6 +69,7 @@ const (
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
 var localDateType = reflect.TypeOf(LocalDate{})
+var localTimeType = reflect.TypeOf(LocalTime{})
 var localDateTimeType = reflect.TypeOf(LocalDateTime{})
 
 // Check if the given marshal type maps to a Tree primitive
@@ -87,7 +88,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	case reflect.String:
 		return true
 	case reflect.Struct:
-		return mtype == timeType || mtype == localDateType || mtype == localDateTimeType || isCustomMarshaler(mtype)
+		return mtype == timeType || mtype == localDateType || mtype == localDateTimeType || mtype == localTimeType || isCustomMarshaler(mtype)
 	default:
 		return false
 	}
