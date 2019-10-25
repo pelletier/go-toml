@@ -12,6 +12,7 @@ func TestTokenStringer(t *testing.T) {
 		{tokenComment, "Comment"},
 		{tokenKey, "Key"},
 		{tokenString, "String"},
+		{tokenStringMultiLine, "StringMultiLine"},
 		{tokenInteger, "Integer"},
 		{tokenTrue, "True"},
 		{tokenFalse, "False"},

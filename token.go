@@ -18,6 +18,7 @@ const (
 	tokenComment
 	tokenKey
 	tokenString
+	tokenStringMultiLine
 	tokenInteger
 	tokenTrue
 	tokenFalse
@@ -52,6 +53,7 @@ var tokenTypeNames = []string{
 	"Comment",
 	"Key",
 	"String",
+	"StringMultiLine",
 	"Integer",
 	"True",
 	"False",

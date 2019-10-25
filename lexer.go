@@ -524,12 +524,14 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 
 	// handle special case for triple-quote
 	terminator := `"`
+	multiLine := false
 	discardLeadingNewLine := false
 	acceptNewLines := false
 	if l.follow(`""`) {
 		l.skip()
 		l.skip()
 		terminator = `"""`
+		multiLine = true
 		discardLeadingNewLine = true
 		acceptNewLines = true
 	}
@@ -540,7 +542,11 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 		return l.errorf(err.Error())
 	}
 
-	l.emitWithValue(tokenString, str)
+	if multiLine {
+		l.emitWithValue(tokenStringMultiLine, str)
+	} else {
+		l.emitWithValue(tokenString, str)
+	}
 	l.fastForward(len(terminator))
 	l.ignore()
 	return l.lexRvalue

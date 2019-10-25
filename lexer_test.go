@@ -624,35 +624,35 @@ func TestMultilineString(t *testing.T) {
 	testFlow(t, `foo = """hello "literal" world"""`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
 		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 10}, tokenString, `hello "literal" world`},
+		{Position{1, 10}, tokenStringMultiLine, `hello "literal" world`},
 		{Position{1, 34}, tokenEOF, ""},
 	})
 
 	testFlow(t, "foo = \"\"\"\r\nhello\\\r\n\"literal\"\\\nworld\"\"\"", []token{
 		{Position{1, 1}, tokenKey, "foo"},
 		{Position{1, 5}, tokenEqual, "="},
-		{Position{2, 1}, tokenString, "hello\"literal\"world"},
+		{Position{2, 1}, tokenStringMultiLine, "hello\"literal\"world"},
 		{Position{4, 9}, tokenEOF, ""},
 	})
 
 	testFlow(t, "foo = \"\"\"\\\n    \\\n    \\\n    hello\\\nmultiline\\\nworld\"\"\"", []token{
 		{Position{1, 1}, tokenKey, "foo"},
 		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 10}, tokenString, "hellomultilineworld"},
+		{Position{1, 10}, tokenStringMultiLine, "hellomultilineworld"},
 		{Position{6, 9}, tokenEOF, ""},
 	})
 
 	testFlow(t, "key2 = \"\"\"\nThe quick brown \\\n\n\n  fox jumps over \\\n    the lazy dog.\"\"\"", []token{
 		{Position{1, 1}, tokenKey, "key2"},
 		{Position{1, 6}, tokenEqual, "="},
-		{Position{2, 1}, tokenString, "The quick brown fox jumps over the lazy dog."},
+		{Position{2, 1}, tokenStringMultiLine, "The quick brown fox jumps over the lazy dog."},
 		{Position{6, 21}, tokenEOF, ""},
 	})
 
 	testFlow(t, "key2 = \"\"\"\\\n       The quick brown \\\n       fox jumps over \\\n       the lazy dog.\\\n       \"\"\"", []token{
 		{Position{1, 1}, tokenKey, "key2"},
 		{Position{1, 6}, tokenEqual, "="},
-		{Position{1, 11}, tokenString, "The quick brown fox jumps over the lazy dog."},
+		{Position{1, 11}, tokenStringMultiLine, "The quick brown fox jumps over the lazy dog."},
 		{Position{5, 11}, tokenEOF, ""},
 	})
 
@@ -666,7 +666,7 @@ func TestMultilineString(t *testing.T) {
 	testFlow(t, "key2 = \"\"\"\nRoses are red\nViolets are blue\"\"\"", []token{
 		{Position{1, 1}, tokenKey, "key2"},
 		{Position{1, 6}, tokenEqual, "="},
-		{Position{2, 1}, tokenString, "Roses are red\nViolets are blue"},
+		{Position{2, 1}, tokenStringMultiLine, "Roses are red\nViolets are blue"},
 		{Position{3, 20}, tokenEOF, ""},
 	})
 }

@@ -172,7 +172,7 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 		p.raiseError(key, "invalid key: %s", err.Error())
 	}
 
-	value := p.parseRvalue()
+	value, opts := p.parseRvalue()
 	var tableKey []string
 	if len(p.currentTable) > 0 {
 		tableKey = p.currentTable
@@ -215,7 +215,13 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	case *Tree, []*Tree:
 		toInsert = value
 	default:
-		toInsert = &tomlValue{value: value, position: key.Position}
+		v := &tomlValue{value: value, position: key.Position}
+		if opts != nil {
+			v.multiline = opts.Multiline
+			v.commented = opts.Commented
+			v.comment = opts.Comment
+		}
+		toInsert = v
 	}
 	targetNode.values[keyVal] = toInsert
 	return p.parseStart
@@ -243,7 +249,7 @@ func cleanupNumberToken(value string) string {
 	return cleanedVal
 }
 
-func (p *tomlParser) parseRvalue() interface{} {
+func (p *tomlParser) parseRvalue() (interface{}, *SetOptions) {
 	tok := p.getToken()
 	if tok == nil || tok.typ == tokenEOF {
 		p.raiseError(tok, "expecting a value")
@@ -251,18 +257,20 @@ func (p *tomlParser) parseRvalue() interface{} {
 
 	switch tok.typ {
 	case tokenString:
-		return tok.val
+		return tok.val, nil
+	case tokenStringMultiLine:
+		return tok.val, &SetOptions{Multiline: true}
 	case tokenTrue:
-		return true
+		return true, nil
 	case tokenFalse:
-		return false
+		return false, nil
 	case tokenInf:
 		if tok.val[0] == '-' {
-			return math.Inf(-1)
+			return math.Inf(-1), nil
 		}
-		return math.Inf(1)
+		return math.Inf(1), nil
 	case tokenNan:
-		return math.NaN()
+		return math.NaN(), nil
 	case tokenInteger:
 		cleanedVal := cleanupNumberToken(tok.val)
 		var err error
@@ -300,7 +308,7 @@ func (p *tomlParser) parseRvalue() interface{} {
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
-		return val
+		return val, nil
 	case tokenFloat:
 		err := numberContainsInvalidUnderscore(tok.val)
 		if err != nil {
@@ -311,7 +319,7 @@ func (p *tomlParser) parseRvalue() interface{} {
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
-		return val
+		return val, nil
 	case tokenDate:
 		layout := time.RFC3339Nano
 		if !strings.Contains(tok.val, "T") {
@@ -321,11 +329,11 @@ func (p *tomlParser) parseRvalue() interface{} {
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
-		return val
+		return val, nil
 	case tokenLeftBracket:
-		return p.parseArray()
+		return p.parseArray(), nil
 	case tokenLeftCurlyBrace:
-		return p.parseInlineTable()
+		return p.parseInlineTable(), nil
 	case tokenEqual:
 		p.raiseError(tok, "cannot have multiple equals for the same key")
 	case tokenError:
@@ -334,7 +342,7 @@ func (p *tomlParser) parseRvalue() interface{} {
 
 	p.raiseError(tok, "never reached")
 
-	return nil
+	return nil, nil
 }
 
 func tokenIsComma(t *token) bool {
@@ -366,8 +374,12 @@ Loop:
 				p.raiseError(key, "invalid key: %s", err)
 			}
 
-			value := p.parseRvalue()
-			tree.SetPath(parsedKey, value)
+			value, opts := p.parseRvalue()
+			if opts != nil {
+				tree.SetPathWithOptions(parsedKey, *opts, value)
+			} else {
+				tree.SetPath(parsedKey, value)
+			}
 		case tokenComma:
 			if tokenIsComma(previous) {
 				p.raiseError(follow, "need field between two commas in inline table")
@@ -396,7 +408,7 @@ func (p *tomlParser) parseArray() interface{} {
 			p.getToken()
 			break
 		}
-		val := p.parseRvalue()
+		val, _ := p.parseRvalue()
 		if arrayType == nil {
 			arrayType = reflect.TypeOf(val)
 		}

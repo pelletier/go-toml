@@ -1793,3 +1793,38 @@ func TestMarshalArrays(t *testing.T) {
 		})
 	}
 }
+
+func TestFoo(t *testing.T) {
+	data := `foo = """
+foo1
+
+foo2
+
+foo3"""
+`
+	tree, err := Load(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree.SetWithOptions("xxx", SetOptions{Multiline: true}, `xxx1
+
+xxx2`)
+	got, err := tree.ToTomlString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `foo = """
+foo1
+
+foo2
+
+foo3"""
+xxx = """
+xxx1
+
+xxx2"""
+`
+	if want != got {
+		t.Errorf("got: %s, want: %s", got, want)
+	}
+}
