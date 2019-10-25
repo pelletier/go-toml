@@ -1042,3 +1042,40 @@ func TestInvalidDottedKeyEmptyGroup(t *testing.T) {
 		t.Fatalf("invalid error message: %s", err)
 	}
 }
+
+func TestAccidentalNewlines(t *testing.T) {
+	expected := "The quick brown fox jumps over the lazy dog."
+	tree, err := Load(`str1 = "The quick brown fox jumps over the lazy dog."
+
+str2 = """
+The quick brown \
+
+
+  fox jumps over \
+    the lazy dog."""
+
+str3 = """\
+       The quick brown \ 
+       fox jumps over \ 
+       the lazy dog.\  
+       """`)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := tree.Get("str1")
+	if got != expected {
+		t.Errorf("expected '%s', got '%s'", expected, got)
+	}
+
+	got = tree.Get("str2")
+	if got != expected {
+		t.Errorf("expected '%s', got '%s'", expected, got)
+	}
+
+	got = tree.Get("str3")
+	if got != expected {
+		t.Errorf("expected '%s', got '%s'", expected, got)
+	}
+}
