@@ -68,6 +68,7 @@ const (
 
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
+var localDateType = reflect.TypeOf(LocalDate{})
 
 // Check if the given marshal type maps to a Tree primitive
 func isPrimitive(mtype reflect.Type) bool {
@@ -85,7 +86,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	case reflect.String:
 		return true
 	case reflect.Struct:
-		return mtype == timeType || isCustomMarshaler(mtype)
+		return mtype == timeType || mtype == localDateType || isCustomMarshaler(mtype)
 	default:
 		return false
 	}
@@ -174,7 +175,7 @@ Tree primitive types and corresponding marshal types:
   float64    float32, float64, pointers to same
   string     string, pointers to same
   bool       bool, pointers to same
-  time.Time  time.Time{}, pointers to same
+  time.LocalTime  time.LocalTime{}, pointers to same
 
 For additional flexibility, use the Encoder API.
 */
@@ -430,7 +431,7 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 		case reflect.String:
 			return mval.String(), nil
 		case reflect.Struct:
-			return mval.Interface().(time.Time), nil
+			return mval.Interface(), nil
 		default:
 			return nil, fmt.Errorf("Marshal can't handle %v(%v)", mtype, mtype.Kind())
 		}
@@ -704,7 +705,16 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		switch mtype.Kind() {
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
-			// if this passes for when mtype is reflect.Struct, tval is a time.Time
+
+			if val.Type() == localDateType {
+				localDate := val.Interface().(LocalDate)
+				switch mtype {
+				case timeType:
+					return reflect.ValueOf(time.Date(localDate.Year, localDate.Month, localDate.Day, 0, 0, 0, 0, time.Local)), nil
+				}
+			}
+
+			// if this passes for when mtype is reflect.Struct, tval is a time.LocalTime
 			if !val.Type().ConvertibleTo(mtype) {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}

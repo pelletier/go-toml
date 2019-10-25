@@ -136,6 +136,8 @@ func tomlValueStringRepresentation(v interface{}, indent string, arraysOneElemen
 		return "false", nil
 	case time.Time:
 		return value.Format(time.RFC3339), nil
+	case LocalDate:
+		return value.String(), nil
 	case nil:
 		return "", nil
 	}

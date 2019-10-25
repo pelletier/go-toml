@@ -1793,3 +1793,83 @@ func TestMarshalArrays(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalLocalDate(t *testing.T) {
+	t.Run("ToLocalDate", func(t *testing.T) {
+		type dateStruct struct {
+			Date LocalDate
+		}
+
+		toml := `date = 1979-05-27`
+
+		var obj dateStruct
+
+		err := Unmarshal([]byte(toml), &obj)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if obj.Date.Year != 1979 {
+			t.Errorf("expected year 1979, got %d", obj.Date.Year)
+		}
+		if obj.Date.Month != 5 {
+			t.Errorf("expected month 5, got %d", obj.Date.Month)
+		}
+		if obj.Date.Day != 27 {
+			t.Errorf("expected day 27, got %d", obj.Date.Day)
+		}
+	})
+
+	t.Run("ToLocalDate", func(t *testing.T) {
+		type dateStruct struct {
+			Date time.Time
+		}
+
+		toml := `date = 1979-05-27`
+
+		var obj dateStruct
+
+		err := Unmarshal([]byte(toml), &obj)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if obj.Date.Year() != 1979 {
+			t.Errorf("expected year 1979, got %d", obj.Date.Year())
+		}
+		if obj.Date.Month() != 5 {
+			t.Errorf("expected month 5, got %d", obj.Date.Month())
+		}
+		if obj.Date.Day() != 27 {
+			t.Errorf("expected day 27, got %d", obj.Date.Day())
+		}
+	})
+}
+
+func TestMarshalLocalDate(t *testing.T) {
+	type dateStruct struct {
+		Date LocalDate
+	}
+
+	obj := dateStruct{Date: LocalDate{
+		Year:  1979,
+		Month: 5,
+		Day:   27,
+	}}
+
+	b, err := Marshal(obj)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := string(b)
+	expected := `Date = 1979-05-27
+`
+
+	if got != expected {
+		t.Errorf("expected '%s', got '%s'", expected, got)
+	}
+}

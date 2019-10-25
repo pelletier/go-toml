@@ -322,6 +322,36 @@ func (p *tomlParser) parseRvalue() interface{} {
 			p.raiseError(tok, "%s", err)
 		}
 		return val
+	case tokenLocalDate:
+		v := strings.Replace(tok.val, " ", "T", -1)
+		isDateTime := false
+		isTime := false
+		for _, c := range v {
+			if c == 'T' || c == 't' {
+				isDateTime = true
+				break
+			}
+			if c == ':' {
+				isTime = true
+				break
+			}
+		}
+
+		var val interface{}
+		var err error
+
+		if isDateTime {
+			val, err = ParseLocalDateTime(v)
+		} else if isTime {
+			val, err = ParseLocalTime(v)
+		} else {
+			val, err = ParseLocalDate(v)
+		}
+
+		if err != nil {
+			p.raiseError(tok, "%s", err)
+		}
+		return val
 	case tokenLeftBracket:
 		return p.parseArray()
 	case tokenLeftCurlyBrace:

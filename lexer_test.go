@@ -290,14 +290,26 @@ func TestKeyEqualArrayBoolsWithComments(t *testing.T) {
 }
 
 func TestDateRegexp(t *testing.T) {
-	if dateRegexp.FindString("1979-05-27T07:32:00Z") == "" {
-		t.Error("basic lexing")
+	cases := map[string]string{
+		"basic":               "1979-05-27T07:32:00Z",
+		"offset":              "1979-05-27T00:32:00-07:00",
+		"nano precision":      "1979-05-27T00:32:00.999999-07:00",
+		"basic-no-T":          "1979-05-27 07:32:00Z",
+		"offset-no-T":         "1979-05-27 00:32:00-07:00",
+		"nano precision-no-T": "1979-05-27 00:32:00.999999-07:00",
+		"no-tz":               "1979-05-27T07:32:00",
+		"no-tz-nano":          "1979-05-27T00:32:00.999999",
+		"no-tz-no-t":          "1979-05-27 07:32:00",
+		"no-tz-no-t-nano":     "1979-05-27 00:32:00.999999",
+		"date-no-tz":          "1979-05-27",
+		"time-no-tz":          "07:32:00",
+		"time-no-tz-nano":     "00:32:00.999999",
 	}
-	if dateRegexp.FindString("1979-05-27T00:32:00-07:00") == "" {
-		t.Error("offset lexing")
-	}
-	if dateRegexp.FindString("1979-05-27T00:32:00.999999-07:00") == "" {
-		t.Error("nano precision lexing")
+
+	for name, value := range cases {
+		if dateRegexp.FindString(value) == "" {
+			t.Error("failed date regexp test", name)
+		}
 	}
 	if dateRegexp.FindString("1979-05-27 07:32:00Z") == "" {
 		t.Error("space delimiter lexing")
