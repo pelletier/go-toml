@@ -704,6 +704,15 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		switch mtype.Kind() {
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
+
+			if val.Type() == reflect.TypeOf(LocalDate{}) {
+				localDate := val.Interface().(LocalDate)
+				switch mtype {
+				case reflect.TypeOf(time.Time{}):
+					return reflect.ValueOf(time.Date(localDate.Year, localDate.Month, localDate.Day, 0, 0, 0, 0, time.Local)), nil
+				}
+			}
+
 			// if this passes for when mtype is reflect.Struct, tval is a time.LocalTime
 			if !val.Type().ConvertibleTo(mtype) {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
