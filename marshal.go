@@ -624,8 +624,8 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 					mval.Field(i).Set(reflect.ValueOf(val))
 				}
 
-				// save the old behavior above and try to check anonymous structs
-				if !found && opts.defaultValue == "" && mtypef.Anonymous && mtypef.Type.Kind() == reflect.Struct {
+				// save the old behavior above and try to check structs
+				if !found && opts.defaultValue == "" && mtypef.Type.Kind() == reflect.Struct {
 					v, err := d.valueFromTree(mtypef.Type, tval, nil)
 					if err != nil {
 						return v, err

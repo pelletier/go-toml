@@ -1483,12 +1483,20 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 }
 
 func TestUnmarshalDefault(t *testing.T) {
+	type EmbeddedStruct struct {
+		StringField string `default:"c"`
+	}
+
 	var doc struct {
 		StringField  string  `default:"a"`
 		BoolField    bool    `default:"true"`
 		IntField     int     `default:"1"`
 		Int64Field   int64   `default:"2"`
 		Float64Field float64 `default:"3.1"`
+		NonEmbeddedStruct  struct {
+			StringField string `default:"b"`
+		}
+		EmbeddedStruct
 	}
 
 	err := Unmarshal([]byte(``), &doc)
@@ -1509,6 +1517,12 @@ func TestUnmarshalDefault(t *testing.T) {
 	}
 	if doc.Float64Field != 3.1 {
 		t.Errorf("Float64Field should be 3.1, not %f", doc.Float64Field)
+	}
+	if doc.NonEmbeddedStruct.StringField != "b" {
+		t.Errorf("StringField should be \"b\", not %s", doc.NonEmbeddedStruct.StringField)
+	}
+	if doc.EmbeddedStruct.StringField != "c" {
+		t.Errorf("StringField should be \"c\", not %s", doc.EmbeddedStruct.StringField)
 	}
 }
 
