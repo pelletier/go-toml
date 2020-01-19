@@ -2154,3 +2154,33 @@ func TestMarshalLocalTime(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalNestedDefaultValue(t *testing.T) {
+	type configTypeInner struct {
+		V2 int `default:"456"`
+	}
+	type configType struct {
+		V1    int `default:"123"`
+		Inner configTypeInner
+	}
+	expected := []byte(`V1 = 123
+
+[Inner]
+  V2 = 456
+`)
+	for _, str := range []string{`[Inner]`, ``} {
+		t.Run("", func(t *testing.T) {
+			var config configType
+			if err := Unmarshal([]byte(str), &config); err != nil {
+				t.Fatal(err)
+			}
+			result, err := Marshal(&config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(result, expected) {
+				t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+			}
+		})
+	}
+}
