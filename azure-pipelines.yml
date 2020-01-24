@@ -105,19 +105,19 @@ stages:
           imageName: 'ubuntu-latest'
         mac 1.13:
           goVersion: '1.13'
-          imageName: 'macos-10.13'
+          imageName: 'macOS-latest'
         windows 1.13:
           goVersion: '1.13'
-          imageName: 'vs2017-win2016'
+          imageName: 'windows-latest'
         linux 1.12:
           goVersion: '1.12'
           imageName: 'ubuntu-latest'
         mac 1.12:
           goVersion: '1.12'
-          imageName: 'macos-10.13'
+          imageName: 'macOS-latest'
         windows 1.12:
           goVersion: '1.12'
-          imageName: 'vs2017-win2016'
+          imageName: 'windows-latest'
     pool:
       vmImage: $(imageName)
     steps:
