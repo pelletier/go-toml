@@ -581,6 +581,39 @@ func TestDoubleInlineGroup(t *testing.T) {
 	})
 }
 
+func TestNestedInlineGroup(t *testing.T) {
+	tree, err := Load("out = {block0 = {x = 99, y = 100}, block1 = {p = \"999\", q = \"1000\"}}")
+	assertTree(t, tree, err, map[string]interface{}{
+		"out": map[string]interface{}{
+			"block0": map[string]interface{}{
+				"x": int64(99),
+				"y": int64(100),
+			},
+			"block1": map[string]interface{}{
+				"p": "999",
+				"q": "1000",
+			},
+		},
+	})
+}
+
+func TestArrayInNestedInlineGroup(t *testing.T) {
+	tree, err := Load(`image = {name = "xxx", palette = {id = 100, colors = ["red", "blue", "green"]}}`)
+	assertTree(t, tree, err, map[string]interface{}{
+		"image": map[string]interface{}{
+			"name": "xxx",
+			"palette": map[string]interface{}{
+				"id": int64(100),
+				"colors": []string{
+					"red",
+					"blue",
+					"green",
+				},
+			},
+		},
+	})
+}
+
 func TestExampleInlineGroup(t *testing.T) {
 	tree, err := Load(`name = { first = "Tom", last = "Preston-Werner" }
 point = { x = 1, y = 2 }`)
