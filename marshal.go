@@ -692,6 +692,16 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		if isTree(mtype) {
 			return d.valueFromTree(mtype, t, mval11)
 		}
+
+		if mtype.Kind() == reflect.Interface &&
+			mval1.Elem().Kind() == reflect.Ptr &&
+			reflect.TypeOf(mval1.Elem()).Kind() == reflect.Struct {
+
+			mval111 := reflect.ValueOf(mval1.Interface()).Elem()
+			mval11 = &mval111
+			return d.valueFromTree(reflect.TypeOf(mval1.Interface()).Elem(), t, mval11)
+		}
+
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a tree", tval, tval)
 	case []*Tree:
 		if isTreeSequence(mtype) {
