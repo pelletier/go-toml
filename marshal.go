@@ -302,7 +302,7 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order)
+	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order, false)
 
 	return buf.Bytes(), err
 }
@@ -363,7 +363,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				return nil, err
 			}
 			if e.quoteMapKeys {
-				keyStr, err := tomlValueStringRepresentation(key.String(), "", e.arraysOneElementPerLine)
+				keyStr, err := tomlValueStringRepresentation(key.String(), "", "", e.arraysOneElementPerLine)
 				if err != nil {
 					return nil, err
 				}
