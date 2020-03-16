@@ -157,6 +157,44 @@ var mashalOrderPreserveMapToml = []byte(`title = "TOML Marshal Testing"
   j9 = "10"
 `)
 
+type Conf struct {
+	Name  string
+	Age   int
+	Inter interface{}
+}
+
+type NestedStruct struct {
+	FirstName string
+	LastName  string
+	Age       int
+}
+
+var doc = []byte(`Name = "rui"
+Age = 18
+
+[Inter]
+  FirstName = "wang"
+  LastName = "jl"
+  Age = 100`)
+
+func TestInterface(t *testing.T) {
+	var config Conf
+	config.Inter = &NestedStruct{}
+	err := Unmarshal(doc, &config)
+	expected := Conf{
+		Name: "rui",
+		Age:  18,
+		Inter: NestedStruct{
+			FirstName: "wang",
+			LastName:  "jl",
+			Age:       100,
+		},
+	}
+	if err != nil || !reflect.DeepEqual(config, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, config)
+	}
+}
+
 func TestBasicMarshal(t *testing.T) {
 	result, err := Marshal(basicTestData)
 	if err != nil {
