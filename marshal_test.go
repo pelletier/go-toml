@@ -951,6 +951,213 @@ func TestMarshalComment(t *testing.T) {
 	}
 }
 
+func TestMarshalMultilineCommented(t *testing.T) {
+	expectedToml := []byte(`# MultilineArray = [
+  # 100,
+  # 200,
+  # 300,
+# ]
+# MultilineNestedArray = [
+  # [
+  # "a",
+  # "b",
+  # "c",
+# ],
+  # [
+  # "d",
+  # "e",
+  # "f",
+# ],
+# ]
+# MultilineString = """
+# I
+# am
+# Allen"""
+NonCommented = "Not commented line"
+`)
+	type StructWithMultiline struct {
+		NonCommented         string
+		MultilineString      string     `commented:"true" multiline:"true"`
+		MultilineArray       []int      `commented:"true"`
+		MultilineNestedArray [][]string `commented:"true"`
+	}
+
+	var buf bytes.Buffer
+	enc := NewEncoder(&buf)
+	if err := enc.ArraysWithOneElementPerLine(true).Encode(StructWithMultiline{
+		NonCommented:    "Not commented line",
+		MultilineString: "I\nam\nAllen",
+		MultilineArray:  []int{100, 200, 300},
+		MultilineNestedArray: [][]string{
+			{"a", "b", "c"},
+			{"d", "e", "f"},
+		},
+	}); err == nil {
+		result := buf.Bytes()
+		if !bytes.Equal(result, expectedToml) {
+			t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expectedToml, result)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}
+
+func TestMarshalNonPrimitiveTypeCommented(t *testing.T) {
+	expectedToml := []byte(`
+# [CommentedMapField]
+
+  # [CommentedMapField.CommentedMapField1]
+    # SingleLineString = "This line should be commented out"
+
+  # [CommentedMapField.CommentedMapField2]
+    # SingleLineString = "This line should be commented out"
+
+# [CommentedStructField]
+
+  # [CommentedStructField.CommentedStructField]
+    # MultilineArray = [
+      # 1,
+      # 2,
+    # ]
+    # MultilineNestedArray = [
+      # [
+      # 10,
+      # 20,
+    # ],
+      # [
+      # 100,
+      # 200,
+    # ],
+    # ]
+    # MultilineString = """
+# This line
+# should be
+# commented out"""
+
+  # [CommentedStructField.NotCommentedStructField]
+    # MultilineArray = [
+      # 1,
+      # 2,
+    # ]
+    # MultilineNestedArray = [
+      # [
+      # 10,
+      # 20,
+    # ],
+      # [
+      # 100,
+      # 200,
+    # ],
+    # ]
+    # MultilineString = """
+# This line
+# should be
+# commented out"""
+
+[NotCommentedStructField]
+
+  # [NotCommentedStructField.CommentedStructField]
+    # MultilineArray = [
+      # 1,
+      # 2,
+    # ]
+    # MultilineNestedArray = [
+      # [
+      # 10,
+      # 20,
+    # ],
+      # [
+      # 100,
+      # 200,
+    # ],
+    # ]
+    # MultilineString = """
+# This line
+# should be
+# commented out"""
+
+  [NotCommentedStructField.NotCommentedStructField]
+    MultilineArray = [
+      3,
+      4,
+    ]
+    MultilineNestedArray = [
+      [
+      30,
+      40,
+    ],
+      [
+      300,
+      400,
+    ],
+    ]
+    MultilineString = """
+This line
+should NOT be
+commented out"""
+`)
+	type InnerStruct struct {
+		MultilineString      string `multiline:"true"`
+		MultilineArray       []int
+		MultilineNestedArray [][]int
+	}
+	type MiddleStruct struct {
+		NotCommentedStructField InnerStruct
+		CommentedStructField    InnerStruct `commented:"true"`
+	}
+	type OuterStruct struct {
+		CommentedStructField    MiddleStruct `commented:"true"`
+		NotCommentedStructField MiddleStruct
+		CommentedMapField       map[string]struct{ SingleLineString string } `commented:"true"`
+	}
+
+	commentedTestStruct := OuterStruct{
+		CommentedStructField: MiddleStruct{
+			NotCommentedStructField: InnerStruct{
+				MultilineString:      "This line\nshould be\ncommented out",
+				MultilineArray:       []int{1, 2},
+				MultilineNestedArray: [][]int{{10, 20}, {100, 200}},
+			},
+			CommentedStructField: InnerStruct{
+				MultilineString:      "This line\nshould be\ncommented out",
+				MultilineArray:       []int{1, 2},
+				MultilineNestedArray: [][]int{{10, 20}, {100, 200}},
+			},
+		},
+		NotCommentedStructField: MiddleStruct{
+			NotCommentedStructField: InnerStruct{
+				MultilineString:      "This line\nshould NOT be\ncommented out",
+				MultilineArray:       []int{3, 4},
+				MultilineNestedArray: [][]int{{30, 40}, {300, 400}},
+			},
+			CommentedStructField: InnerStruct{
+				MultilineString:      "This line\nshould be\ncommented out",
+				MultilineArray:       []int{1, 2},
+				MultilineNestedArray: [][]int{{10, 20}, {100, 200}},
+			},
+		},
+		CommentedMapField: map[string]struct{ SingleLineString string }{
+			"CommentedMapField1": {
+				SingleLineString: "This line should be commented out",
+			},
+			"CommentedMapField2": {
+				SingleLineString: "This line should be commented out",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	enc := NewEncoder(&buf)
+	if err := enc.ArraysWithOneElementPerLine(true).Encode(commentedTestStruct); err == nil {
+		result := buf.Bytes()
+		if !bytes.Equal(result, expectedToml) {
+			t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expectedToml, result)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}
+
 type mapsTestStruct struct {
 	Simple map[string]string
 	Paths  map[string]string
@@ -1526,12 +1733,12 @@ func TestUnmarshalDefault(t *testing.T) {
 	}
 
 	var doc struct {
-		StringField  string  `default:"a"`
-		BoolField    bool    `default:"true"`
-		IntField     int     `default:"1"`
-		Int64Field   int64   `default:"2"`
-		Float64Field float64 `default:"3.1"`
-		NonEmbeddedStruct  struct {
+		StringField       string  `default:"a"`
+		BoolField         bool    `default:"true"`
+		IntField          int     `default:"1"`
+		Int64Field        int64   `default:"2"`
+		Float64Field      float64 `default:"3.1"`
+		NonEmbeddedStruct struct {
 			StringField string `default:"b"`
 		}
 		EmbeddedStruct
