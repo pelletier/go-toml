@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/BurntSushi/toml"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -1488,12 +1489,12 @@ func TestUnmarshalDefault(t *testing.T) {
 	}
 
 	var doc struct {
-		StringField  string  `default:"a"`
-		BoolField    bool    `default:"true"`
-		IntField     int     `default:"1"`
-		Int64Field   int64   `default:"2"`
-		Float64Field float64 `default:"3.1"`
-		NonEmbeddedStruct  struct {
+		StringField       string  `default:"a"`
+		BoolField         bool    `default:"true"`
+		IntField          int     `default:"1"`
+		Int64Field        int64   `default:"2"`
+		Float64Field      float64 `default:"3.1"`
+		NonEmbeddedStruct struct {
 			StringField string `default:"b"`
 		}
 		EmbeddedStruct
@@ -2152,5 +2153,43 @@ func TestMarshalLocalTime(t *testing.T) {
 				t.Errorf("expected '%s', got '%s'", example.out, got)
 			}
 		})
+	}
+}
+
+// test case for issue #339
+func TestUnmarshalSameInnerField(t *testing.T) {
+	type InterStruct2 struct {
+		Test string
+		Name string
+		Age  int
+	}
+	type Inter2 struct {
+		Name         string
+		Age          int
+		InterStruct2 InterStruct2
+	}
+	type Server struct {
+		Name   string `toml:"name"`
+		Inter2 Inter2 `toml:"inter2"`
+	}
+
+	var server Server
+
+	if err := toml.Unmarshal([]byte(`name = "123"
+[inter2]
+name = "inter2"
+age = 222`), &server); err == nil {
+		expected := Server{
+			Name: "123",
+			Inter2: Inter2{
+				Name: "inter2",
+				Age:  222,
+			},
+		}
+		if !reflect.DeepEqual(server, expected) {
+			t.Errorf("Bad unmarshal: expected %v, got %v", expected, server)
+		}
+	} else {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
