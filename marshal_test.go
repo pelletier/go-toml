@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/BurntSushi/toml"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -2175,7 +2174,7 @@ func TestUnmarshalSameInnerField(t *testing.T) {
 
 	var server Server
 
-	if err := toml.Unmarshal([]byte(`name = "123"
+	if err := Unmarshal([]byte(`name = "123"
 [inter2]
 name = "inter2"
 age = 222`), &server); err == nil {
