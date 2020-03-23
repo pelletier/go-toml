@@ -2399,3 +2399,41 @@ func TestMarshalLocalTime(t *testing.T) {
 		})
 	}
 }
+
+// test case for issue #339
+func TestUnmarshalSameInnerField(t *testing.T) {
+	type InterStruct2 struct {
+		Test string
+		Name string
+		Age  int
+	}
+	type Inter2 struct {
+		Name         string
+		Age          int
+		InterStruct2 InterStruct2
+	}
+	type Server struct {
+		Name   string `toml:"name"`
+		Inter2 Inter2 `toml:"inter2"`
+	}
+
+	var server Server
+
+	if err := Unmarshal([]byte(`name = "123"
+[inter2]
+name = "inter2"
+age = 222`), &server); err == nil {
+		expected := Server{
+			Name: "123",
+			Inter2: Inter2{
+				Name: "inter2",
+				Age:  222,
+			},
+		}
+		if !reflect.DeepEqual(server, expected) {
+			t.Errorf("Bad unmarshal: expected %v, got %v", expected, server)
+		}
+	} else {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
