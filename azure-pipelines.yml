@@ -64,7 +64,7 @@ stages:
         targetType: 'inline'
         script: 'bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}'
       env:
-        CODECOV_TOKEN: ${CODECOV_TOKEN}
+        CODECOV_TOKEN: $(CODECOV_TOKEN)
   - job: benchmark
     displayName: "benchmark"
     pool:
