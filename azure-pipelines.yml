@@ -62,7 +62,7 @@ stages:
     - task: Bash@3
       inputs:
         targetType: 'inline'
-        script: 'bash <(curl -s https://codecov.io/bash) -t $(CODECOV_TOKEN)'
+        script: 'bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}'
   - job: benchmark
     displayName: "benchmark"
     pool:
