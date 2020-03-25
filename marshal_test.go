@@ -184,7 +184,7 @@ func TestInterface(t *testing.T) {
 	expected := Conf{
 		Name: "rui",
 		Age:  18,
-		Inter: NestedStruct{
+		Inter: &NestedStruct{
 			FirstName: "wang",
 			LastName:  "jl",
 			Age:       100,
@@ -2435,5 +2435,242 @@ age = 222`), &server); err == nil {
 		}
 	} else {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMarshalInterface(t *testing.T) {
+	type InnerStruct struct {
+		InnerField string
+	}
+
+	type OuterStruct struct {
+		PrimitiveField        interface{}
+		ArrayField            interface{}
+		StructArrayField      interface{}
+		MapField              map[string]interface{}
+		StructField           interface{}
+		PointerField          interface{}
+		NilField              interface{}
+		InterfacePointerField *interface{}
+	}
+
+	type ShouldNotSupportStruct struct {
+		InterfaceArray []interface{}
+	}
+
+	expected := []byte(`ArrayField = [1,2,3]
+InterfacePointerField = "hello world"
+PrimitiveField = "string"
+
+[MapField]
+  key1 = "value1"
+  key2 = false
+
+  [MapField.key3]
+    InnerField = "value3"
+
+[PointerField]
+  InnerField = "yyy"
+
+[[StructArrayField]]
+  InnerField = "s1"
+
+[[StructArrayField]]
+  InnerField = "s2"
+
+[StructField]
+  InnerField = "xxx"
+`)
+
+	var h interface{} = "hello world"
+	if result, err := Marshal(OuterStruct{
+		"string",
+		[]int{1, 2, 3},
+		[]InnerStruct{{"s1"}, {"s2"}},
+		map[string]interface{}{
+			"key1":      "value1",
+			"key2":      false,
+			"key3":      InnerStruct{"value3"},
+			"nil value": nil,
+		},
+		InnerStruct{
+			"xxx",
+		},
+		&InnerStruct{
+			"yyy",
+		},
+		nil,
+		&h,
+	}); err == nil {
+		if !bytes.Equal(result, expected) {
+			t.Errorf("Bad marshal: expected\n----\n%s\n----\ngot\n----\n%s\n----\n", expected, result)
+		}
+	} else {
+		t.Fatal(err)
+	}
+
+	// according to the toml standard, data types of array may not be mixed
+	if _, err := Marshal(ShouldNotSupportStruct{[]interface{}{1, "a", true}}); err == nil {
+		t.Errorf("Should not support []interface{} marshaling")
+	}
+}
+
+func TestUnmarshalToNilInterface(t *testing.T) {
+	toml := []byte(`
+PrimitiveField = "Hello"
+ArrayField = [1,2,3]
+InterfacePointerField = "World"
+
+[StructField]
+Field1 = 123
+Field2 = "Field2"
+
+[MapField]
+MapField1 = [4,5,6]
+MapField2 = {A = "A"}
+MapField3 = false
+
+[[StructArrayField]]
+Name = "Allen"
+Age = 20
+
+[[StructArrayField]]
+Name = "Jack"
+Age = 23
+`)
+
+	type OuterStruct struct {
+		PrimitiveField        interface{}
+		ArrayField            interface{}
+		StructArrayField      interface{}
+		MapField              map[string]interface{}
+		StructField           interface{}
+		NilField              interface{}
+		InterfacePointerField *interface{}
+	}
+
+	var s interface{} = "World"
+	expected := OuterStruct{
+		PrimitiveField: "Hello",
+		ArrayField:     []interface{}{int64(1), int64(2), int64(3)},
+		StructField: map[string]interface{}{
+			"Field1": int64(123),
+			"Field2": "Field2",
+		},
+		MapField: map[string]interface{}{
+			"MapField1": []interface{}{int64(4), int64(5), int64(6)},
+			"MapField2": map[string]interface{}{
+				"A": "A",
+			},
+			"MapField3": false,
+		},
+		NilField:              nil,
+		InterfacePointerField: &s,
+		StructArrayField: []map[string]interface{}{
+			{
+				"Name": "Allen",
+				"Age":  int64(20),
+			},
+			{
+				"Name": "Jack",
+				"Age":  int64(23),
+			},
+		},
+	}
+	actual := OuterStruct{}
+	if err := Unmarshal(toml, &actual); err == nil {
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}
+
+func TestUnmarshalToNonNilInterface(t *testing.T) {
+	toml := []byte(`
+PrimitiveField = "Allen"
+ArrayField = [1,2,3]
+
+[StructField]
+InnerField = "After1"
+
+[PointerField]
+InnerField = "After2"
+
+[InterfacePointerField]
+InnerField = "After"
+
+[MapField]
+MapField1 = [4,5,6]
+MapField2 = {A = "A"}
+MapField3 = false
+
+[[StructArrayField]]
+InnerField = "After3"
+
+[[StructArrayField]]
+InnerField = "After4"
+`)
+	type InnerStruct struct {
+		InnerField interface{}
+	}
+
+	type OuterStruct struct {
+		PrimitiveField        interface{}
+		ArrayField            interface{}
+		StructArrayField      interface{}
+		MapField              map[string]interface{}
+		StructField           interface{}
+		PointerField          interface{}
+		NilField              interface{}
+		InterfacePointerField *interface{}
+	}
+
+	var s interface{} = InnerStruct{"After"}
+	expected := OuterStruct{
+		PrimitiveField: "Allen",
+		ArrayField:     []int{1, 2, 3},
+		StructField:    InnerStruct{InnerField: "After1"},
+		MapField: map[string]interface{}{
+			"MapField1": []interface{}{int64(4), int64(5), int64(6)},
+			"MapField2": map[string]interface{}{
+				"A": "A",
+			},
+			"MapField3": false,
+		},
+		PointerField:          &InnerStruct{InnerField: "After2"},
+		NilField:              nil,
+		InterfacePointerField: &s,
+		StructArrayField: []InnerStruct{
+			{InnerField: "After3"},
+			{InnerField: "After4"},
+		},
+	}
+	actual := OuterStruct{
+		PrimitiveField: "aaa",
+		ArrayField:     []int{100, 200, 300, 400},
+		StructField:    InnerStruct{InnerField: "Before1"},
+		MapField: map[string]interface{}{
+			"MapField1": []int{4, 5, 6},
+			"MapField2": map[string]string{
+				"B": "BBB",
+			},
+			"MapField3": true,
+		},
+		PointerField:          &InnerStruct{InnerField: "Before2"},
+		NilField:              nil,
+		InterfacePointerField: &s,
+		StructArrayField: []InnerStruct{
+			{InnerField: "Before3"},
+			{InnerField: "Before4"},
+		},
+	}
+	if err := Unmarshal(toml, &actual); err == nil {
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
+		}
+	} else {
+		t.Fatal(err)
 	}
 }

@@ -323,7 +323,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 		for i := 0; i < mtype.NumField(); i++ {
 			mtypef, mvalf := mtype.Field(i), mval.Field(i)
 			opts := tomlOptions(mtypef, e.annotation)
-			if opts.include && (!opts.omitempty || !isZero(mvalf)) {
+			if opts.include && ((mtypef.Type.Kind() != reflect.Interface && !opts.omitempty) || !isZero(mvalf)) {
 				val, err := e.valueToToml(mtypef.Type, mvalf)
 				if err != nil {
 					return nil, err
@@ -358,6 +358,9 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 		}
 		for _, key := range keys {
 			mvalf := mval.MapIndex(key)
+			if (mtype.Elem().Kind() == reflect.Ptr || mtype.Elem().Kind() == reflect.Interface) && mvalf.IsNil() {
+				continue
+			}
 			val, err := e.valueToToml(mtype.Elem(), mvalf)
 			if err != nil {
 				return nil, err
@@ -391,6 +394,9 @@ func (e *Encoder) valueToTreeSlice(mtype reflect.Type, mval reflect.Value) ([]*T
 
 // Convert given marshal slice to slice of toml values
 func (e *Encoder) valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
+	if mtype.Elem().Kind() == reflect.Interface {
+		return nil, fmt.Errorf("marshal can't handle []interface{}")
+	}
 	tval := make([]interface{}, mval.Len(), mval.Len())
 	for i := 0; i < mval.Len(); i++ {
 		val, err := e.valueToToml(mtype.Elem(), mval.Index(i))
@@ -407,6 +413,9 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 	e.line++
 	if mtype.Kind() == reflect.Ptr {
 		return e.valueToToml(mtype.Elem(), mval.Elem())
+	}
+	if mtype.Kind() == reflect.Interface {
+		return e.valueToToml(mval.Elem().Type(), mval.Elem())
 	}
 	switch {
 	case isCustomMarshaler(mtype):
@@ -699,13 +708,12 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			return d.valueFromTree(mtype, t, mval11)
 		}
 
-		if mtype.Kind() == reflect.Interface &&
-			mval1.Elem().Kind() == reflect.Ptr &&
-			reflect.TypeOf(mval1.Elem()).Kind() == reflect.Struct {
-
-			mval111 := reflect.ValueOf(mval1.Interface()).Elem()
-			mval11 = &mval111
-			return d.valueFromTree(reflect.TypeOf(mval1.Interface()).Elem(), t, mval11)
+		if mtype.Kind() == reflect.Interface {
+			if mval1 == nil || mval1.IsNil() {
+				return d.valueFromTree(reflect.TypeOf(map[string]interface{}{}), t, nil)
+			} else {
+				return d.valueFromToml(mval1.Elem().Type(), t, nil)
+			}
 		}
 
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a tree", tval, tval)
@@ -713,10 +721,26 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		if isTreeSequence(mtype) {
 			return d.valueFromTreeSlice(mtype, t)
 		}
+		if mtype.Kind() == reflect.Interface {
+			if mval1 == nil || mval1.IsNil() {
+				return d.valueFromTreeSlice(reflect.TypeOf([]map[string]interface{}{}), t)
+			} else {
+				ival := mval1.Elem()
+				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
+			}
+		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to trees", tval, tval)
 	case []interface{}:
 		if isOtherSequence(mtype) {
 			return d.valueFromOtherSlice(mtype, t)
+		}
+		if mtype.Kind() == reflect.Interface {
+			if mval1 == nil || mval1.IsNil() {
+				return d.valueFromOtherSlice(reflect.TypeOf([]interface{}{}), t)
+			} else {
+				ival := mval1.Elem()
+				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
+			}
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
 	default:
@@ -802,6 +826,13 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			}
 
 			return val.Convert(mtype), nil
+		case reflect.Interface:
+			if mval1 == nil || mval1.IsNil() {
+				return reflect.ValueOf(tval), nil
+			} else {
+				ival := mval1.Elem()
+				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
+			}
 		default:
 			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v(%v)", tval, tval, mtype, mtype.Kind())
 		}
@@ -811,7 +842,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}, mval1 *reflect.Value) (reflect.Value, error) {
 	var melem *reflect.Value
 
-	if mval1 != nil && !mval1.IsNil() && mtype.Elem().Kind() == reflect.Struct {
+	if mval1 != nil && !mval1.IsNil() && (mtype.Elem().Kind() == reflect.Struct || mtype.Elem().Kind() == reflect.Interface) {
 		elem := mval1.Elem()
 		melem = &elem
 	}
