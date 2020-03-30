@@ -163,7 +163,15 @@ stages:
       env:
         go.goos: $(GOOS)
         go.goarch: $(GOARCH)
-    - publish: $(System.DefaultWorkingDirectory)/*.tar.xz
+    - task: CopyFiles@2
+      inputs:
+        sourceFolder: '$(Build.SourcesDirectory)'
+        contents: '*.tar.xz'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: binaries
     
 - stage: build_docker_image
   displayName: "Build Docker image"

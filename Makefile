@@ -17,7 +17,6 @@ $(out.tools): $(sources)
 .PHONY:
 dist: $(out.dist)
 
-
 $(out.dist):%_$(go.goos)_$(go.goarch).tar.xz: %
 	if [ "$(go.goos)" = "windows" ]; then \
 		tar -cJf $@ $^.exe; \
