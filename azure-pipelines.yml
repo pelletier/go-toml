@@ -132,7 +132,53 @@ stages:
       inputs:
         command: 'test'
         arguments: './...'
+- stage: build_binaries
+  displayName: "Build binaries"
+  dependsOn: run_checks
+  jobs:
+  - job: go_unit_tests
+    displayName: "unit tests"
+    strategy:
+      matrix:
+        linux 1.14:
+          goVersion: '1.14'
+          imageName: 'ubuntu-latest'
+          GOOS: linux
+          GOARCH: amd64
+        # mac 1.14:
+        #   goVersion: '1.14'
+        #   imageName: 'macOS-latest'
+        # windows 1.14:
+        #   goVersion: '1.14'
+        #   imageName: 'windows-latest'
+        # linux 1.13:
+        #   goVersion: '1.13'
+        #   imageName: 'ubuntu-latest'
+        # mac 1.13:
+        #   goVersion: '1.13'
+        #   imageName: 'macOS-latest'
+        # windows 1.13:
+        #   goVersion: '1.13'
+        #   imageName: 'windows-latest'
+    pool:
+      vmImage: $(imageName)
+    steps:
+    - task: GoTool@0
+      displayName: "Install Go $(goVersion)"
+      inputs:
+        version: $(goVersion)
+    - task: Go@0
+      displayName: "Build binaries"
+      inputs:
+        command: 'custom'
+        customCommand: 'install'
+        arguments: './...'
+      env:
+        CGO_ENABLED: "0"
+        GOOS: $(GOOS)
+        GOARCH: $(GOARCH)
 
+    
 - stage: build_docker_image
   displayName: "Build Docker image"
   dependsOn: run_checks
