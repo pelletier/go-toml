@@ -163,7 +163,7 @@ stages:
       env:
         go.goos: $(GOOS)
         go.goarch: $(GOARCH)
-
+    - publish: $(System.DefaultWorkingDirectory)/*.tar.xz
     
 - stage: build_docker_image
   displayName: "Build Docker image"
