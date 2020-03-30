@@ -188,7 +188,7 @@ stages:
       - task: Bash@3
         inputs:
           targetType: inline
-          script: "sha256sum --binary *.tar.xz > $(Build.ArtifactStagingDirectory)/sha256sums.txt"
+          script: "cd binaries && sha256sum --binary *.tar.xz | tee $(Build.ArtifactStagingDirectory)/sha256sums.txt"
       - task: PublishBuildArtifacts@1
         inputs:
           pathtoPublish: '$(Build.ArtifactStagingDirectory)'
