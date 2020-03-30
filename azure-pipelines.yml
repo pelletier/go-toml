@@ -132,7 +132,47 @@ stages:
       inputs:
         command: 'test'
         arguments: './...'
-
+- stage: build_binaries
+  displayName: "Build binaries"
+  dependsOn: run_checks
+  jobs:
+  - job: build_binary
+    displayName: "Build binary"
+    strategy:
+      matrix:
+        linux_amd64:
+          GOOS: linux
+          GOARCH: amd64
+        darwin_amd64:
+          GOOS: darwin
+          GOARCH: amd64
+        windows_amd64:
+          GOOS: windows
+          GOARCH: amd64
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: GoTool@0
+      displayName: "Install Go"
+      inputs:
+        version: 1.14
+    - task: Bash@3
+      inputs:
+        targetType: inline
+        script: "make dist"
+      env:
+        go.goos: $(GOOS)
+        go.goarch: $(GOARCH)
+    - task: CopyFiles@2
+      inputs:
+        sourceFolder: '$(Build.SourcesDirectory)'
+        contents: '*.tar.xz'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: binaries
+    
 - stage: build_docker_image
   displayName: "Build Docker image"
   dependsOn: run_checks
