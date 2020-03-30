@@ -172,7 +172,28 @@ stages:
       inputs:
         pathtoPublish: '$(Build.ArtifactStagingDirectory)'
         artifactName: binaries
-    
+- stage: build_binaries_manifest
+  displayName: "Build binaries manifest"
+  dependsOn: build_binaries
+  jobs:
+  - job: build_manifest
+    displayName: "Build binaries manifest"
+    steps:
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'binaries'
+          downloadPath: '$(Build.SourcesDirectory)'
+      - task: Bash@3
+        inputs:
+          targetType: inline
+          script: "cd binaries && sha256sum --binary *.tar.xz | tee $(Build.ArtifactStagingDirectory)/sha256sums.txt"
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          artifactName: manifest
+
 - stage: build_docker_image
   displayName: "Build Docker image"
   dependsOn: run_checks
