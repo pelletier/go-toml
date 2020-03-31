@@ -629,6 +629,39 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 						if err != nil {
 							return mval.Field(i), err
 						}
+					// For slice
+					case reflect.Slice:
+						var tt interface{}
+						switch mvalf.Type().Elem().Kind() {
+						case reflect.Bool:
+							tt, err = strconv.ParseBool(opts.defaultValue)
+							if err != nil {
+								return mval.Field(i), err
+							}
+						case reflect.Int:
+							tt, err = strconv.Atoi(opts.defaultValue)
+							if err != nil {
+								return mval.Field(i), err
+							}
+						case reflect.String:
+							tt = opts.defaultValue
+						case reflect.Int64:
+							tt, err = strconv.ParseInt(opts.defaultValue, 10, 64)
+							if err != nil {
+								return mval.Field(i), err
+							}
+						case reflect.Float64:
+							tt, err = strconv.ParseFloat(opts.defaultValue, 64)
+							if err != nil {
+								return mval.Field(i), err
+							}
+						default:
+							return mval.Field(i), fmt.Errorf("unsuported field type for default option")
+						}
+						val := reflect.MakeSlice(mtypef.Type, 1, 1)
+						val.Index(0).Set(reflect.ValueOf(tt))
+						mval.Field(i).Set(val)
+						continue
 					default:
 						return mval.Field(i), fmt.Errorf("unsuported field type for default option")
 					}

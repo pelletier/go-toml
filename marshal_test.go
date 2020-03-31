@@ -177,6 +177,74 @@ Age = 18
   LastName = "jl"
   Age = 100`)
 
+func TestSliceWithDefault(t *testing.T) {
+	type sliceWithDefault struct {
+		Bools  []bool    `toml:"bool" default:"false"`
+		Strs   []string  `toml:"name" default:"test"`
+		Ints   []int     `toml:"int" default:"100"`
+		Int64s []int64   `toml:"int64" default:"10000"`
+		Floats []float64 `toml:"float" default:"100.111"`
+	}
+
+	var test sliceWithDefault
+	err := Unmarshal([]byte(``), &test)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := sliceWithDefault{
+		Bools:  []bool{false},
+		Strs:   []string{"test"},
+		Ints:   []int{100},
+		Int64s: []int64{10000},
+		Floats: []float64{100.111},
+	}
+	if !reflect.DeepEqual(test, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, test)
+	}
+}
+
+func TestSliceWithDefaultError(t *testing.T) {
+	var testBool struct{
+		Bools []bool `default:"error"`
+	}
+	err := Unmarshal([]byte(``), &testBool)
+	if err == nil {
+		t.Fatal("should error")
+	}
+
+	var testInt struct{
+		Ints []int `default:"error"`
+	}
+	err = Unmarshal([]byte(``), &testInt)
+	if err == nil {
+		t.Fatal("should error")
+	}
+
+	var testInt64 struct{
+		Int64s []int64 `default:"error"`
+	}
+	err = Unmarshal([]byte(``), &testInt64)
+	if err == nil {
+		t.Fatal("should error")
+	}
+
+	var testFloat64 struct{
+		Float64s []float64 `default:"error"`
+	}
+	err = Unmarshal([]byte(``), &testFloat64)
+	if err == nil {
+		t.Fatal("should error")
+	}
+
+	var unsupportSliceWithDefault struct{
+		Ints []struct{} `default:"error"`
+	}
+	err = Unmarshal([]byte(``), &unsupportSliceWithDefault)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
+
 func TestInterface(t *testing.T) {
 	var config Conf
 	config.Inter = &NestedStruct{}
