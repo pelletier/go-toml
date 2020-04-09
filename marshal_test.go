@@ -1458,7 +1458,7 @@ OuterField2 = 1024
 	type InnerStruct struct {
 		InnerField1 string
 		InnerField2 int
-		EmbedStruct struct{
+		EmbedStruct struct {
 			EmbedField string
 		}
 	}
@@ -1466,7 +1466,7 @@ OuterField2 = 1024
 	type OuterStruct struct {
 		OuterField1 string
 		OuterField2 int
-		TreeField *Tree
+		TreeField   *Tree
 	}
 
 	tree, err := Load(`
@@ -1487,7 +1487,7 @@ InnerField2 = 2048
 	}
 	actual, _ := Marshal(out)
 
-	if !bytes.Equal(actual, expected){
+	if !bytes.Equal(actual, expected) {
 		t.Errorf("Bad marshal: expected %s, got %s", expected, actual)
 	}
 }
@@ -2739,7 +2739,7 @@ InnerField2 = 2048
 	type InnerStruct struct {
 		InnerField1 string
 		InnerField2 int
-		EmbedStruct struct{
+		EmbedStruct struct {
 			EmbedField string
 		}
 	}
@@ -2747,7 +2747,7 @@ InnerField2 = 2048
 	type OuterStruct struct {
 		OuterField1 string
 		OuterField2 int
-		TreeField *Tree
+		TreeField   *Tree
 	}
 
 	out := OuterStruct{}
@@ -2755,10 +2755,10 @@ InnerField2 = 2048
 	expected := InnerStruct{
 		"In",
 		2048,
-		struct{
+		struct {
 			EmbedField string
 		}{
-			EmbedField:"Embed",
+			EmbedField: "Embed",
 		},
 	}
 	if err := Unmarshal(toml, &out); err != nil {
@@ -2768,7 +2768,25 @@ InnerField2 = 2048
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(actual, expected){
+	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
+	}
+}
+
+func TestMarshalNil(t *testing.T) {
+	if _, err := Marshal(nil); err == nil {
+		t.Errorf("Expected err from nil marshal")
+	}
+	if _, err := Marshal((*struct{})(nil)); err == nil {
+		t.Errorf("Expected err from nil marshal")
+	}
+}
+
+func TestUnmarshalNil(t *testing.T) {
+	if err := Unmarshal([]byte(`whatever = "whatever"`), nil); err == nil {
+		t.Errorf("Expected err from nil marshal")
+	}
+	if err := Unmarshal([]byte(`whatever = "whatever"`), (*struct{})(nil)); err == nil {
+		t.Errorf("Expected err from nil marshal")
 	}
 }

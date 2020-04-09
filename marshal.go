@@ -281,12 +281,18 @@ func (e *Encoder) SetTagMultiline(v string) *Encoder {
 
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
+	if mtype == nil {
+		return []byte{}, errors.New("nil cannot be marshaled to TOML")
+	}
 
 	switch mtype.Kind() {
 	case reflect.Struct, reflect.Map:
 	case reflect.Ptr:
 		if mtype.Elem().Kind() != reflect.Struct {
 			return []byte{}, errors.New("Only pointer to struct can be marshaled to TOML")
+		}
+		if reflect.ValueOf(v).IsNil() {
+			return []byte{}, errors.New("nil pointer cannot be marshaled to TOML")
 		}
 	default:
 		return []byte{}, errors.New("Only a struct or map can be marshaled to TOML")
@@ -538,6 +544,9 @@ func (d *Decoder) SetTagName(v string) *Decoder {
 
 func (d *Decoder) unmarshal(v interface{}) error {
 	mtype := reflect.TypeOf(v)
+	if mtype == nil {
+		return errors.New("nil cannot be unmarshaled from TOML")
+	}
 	if mtype.Kind() != reflect.Ptr {
 		return errors.New("only a pointer to struct or map can be unmarshaled from TOML")
 	}
@@ -548,6 +557,10 @@ func (d *Decoder) unmarshal(v interface{}) error {
 	case reflect.Struct, reflect.Map:
 	default:
 		return errors.New("only a pointer to struct or map can be unmarshaled from TOML")
+	}
+
+	if reflect.ValueOf(v).IsNil() {
+		return errors.New("nil pointer cannot be unmarshaled from TOML")
 	}
 
 	vv := reflect.ValueOf(v).Elem()
