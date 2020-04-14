@@ -654,6 +654,13 @@ func TestMultilineString(t *testing.T) {
 		{Position{6, 9}, tokenEOF, ""},
 	})
 
+	testFlow(t, `foo = """hello	world"""`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 10}, tokenString, "hello\tworld"},
+		{Position{1, 24}, tokenEOF, ""},
+	})
+
 	testFlow(t, "key2 = \"\"\"\nThe quick brown \\\n\n\n  fox jumps over \\\n    the lazy dog.\"\"\"", []token{
 		{Position{1, 1}, tokenKey, "key2"},
 		{Position{1, 6}, tokenEqual, "="},

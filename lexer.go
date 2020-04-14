@@ -313,7 +313,7 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 	for r := l.peek(); isKeyChar(r) || r == '\n' || r == '\r'; r = l.peek() {
 		if r == '"' {
 			l.next()
-			str, err := l.lexStringAsString(`"`, false, true)
+			str, err := l.lexStringAsString(`"`, false, true, false)
 			if err != nil {
 				return l.errorf(err.Error())
 			}
@@ -419,7 +419,7 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 // Lex a string and return the results as a string.
 // Terminator is the substring indicating the end of the token.
 // The resulting string does not include the terminator.
-func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, acceptNewLines bool) (string, error) {
+func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, acceptNewLines bool, acceptTab bool) (string, error) {
 	growingString := ""
 
 	if discardLeadingNewLine {
@@ -512,7 +512,8 @@ func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, 
 		} else {
 			r := l.peek()
 
-			if 0x00 <= r && r <= 0x1F && !(acceptNewLines && (r == '\n' || r == '\r')) {
+			if 0x00 <= r && r <= 0x1F && !(acceptNewLines && (r == '\n' || r == '\r')) &&
+				!(acceptTab && r == '\t') {
 				return "", fmt.Errorf("unescaped control character %U", r)
 			}
 			l.next()
@@ -534,15 +535,17 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 	terminator := `"`
 	discardLeadingNewLine := false
 	acceptNewLines := false
+	acceptTab := false
 	if l.follow(`""`) {
 		l.skip()
 		l.skip()
 		terminator = `"""`
 		discardLeadingNewLine = true
 		acceptNewLines = true
+		acceptTab = true
 	}
 
-	str, err := l.lexStringAsString(terminator, discardLeadingNewLine, acceptNewLines)
+	str, err := l.lexStringAsString(terminator, discardLeadingNewLine, acceptNewLines, acceptTab)
 
 	if err != nil {
 		return l.errorf(err.Error())

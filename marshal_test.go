@@ -1419,6 +1419,29 @@ func TestMarshalDirectMultilineString(t *testing.T) {
 	}
 }
 
+//issue 354
+func TestUnmarshalMultilineStringWithTab(t *testing.T) {
+	input := []byte(`
+Field = """
+hello	world"""
+`)
+
+	type Test struct {
+		Field string
+	}
+
+	expected := Test{"hello\tworld"}
+	result := Test{}
+	err := Unmarshal(input, &result)
+	if err != nil {
+		t.Fatal("unmarshal should not error:", err)
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad unmarshal: expected\n-----\n%+v\n-----\ngot\n-----\n%+v\n-----\n", expected, result)
+	}
+}
+
 var customMultilineTagTestToml = []byte(`int_slice = [
   1,
   2,
@@ -1458,7 +1481,7 @@ OuterField2 = 1024
 	type InnerStruct struct {
 		InnerField1 string
 		InnerField2 int
-		EmbedStruct struct{
+		EmbedStruct struct {
 			EmbedField string
 		}
 	}
@@ -1466,7 +1489,7 @@ OuterField2 = 1024
 	type OuterStruct struct {
 		OuterField1 string
 		OuterField2 int
-		TreeField *Tree
+		TreeField   *Tree
 	}
 
 	tree, err := Load(`
@@ -1487,7 +1510,7 @@ InnerField2 = 2048
 	}
 	actual, _ := Marshal(out)
 
-	if !bytes.Equal(actual, expected){
+	if !bytes.Equal(actual, expected) {
 		t.Errorf("Bad marshal: expected %s, got %s", expected, actual)
 	}
 }
@@ -2739,7 +2762,7 @@ InnerField2 = 2048
 	type InnerStruct struct {
 		InnerField1 string
 		InnerField2 int
-		EmbedStruct struct{
+		EmbedStruct struct {
 			EmbedField string
 		}
 	}
@@ -2747,7 +2770,7 @@ InnerField2 = 2048
 	type OuterStruct struct {
 		OuterField1 string
 		OuterField2 int
-		TreeField *Tree
+		TreeField   *Tree
 	}
 
 	out := OuterStruct{}
@@ -2755,10 +2778,10 @@ InnerField2 = 2048
 	expected := InnerStruct{
 		"In",
 		2048,
-		struct{
+		struct {
 			EmbedField string
 		}{
-			EmbedField:"Embed",
+			EmbedField: "Embed",
 		},
 	}
 	if err := Unmarshal(toml, &out); err != nil {
@@ -2768,7 +2791,7 @@ InnerField2 = 2048
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(actual, expected){
+	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
 	}
 }
