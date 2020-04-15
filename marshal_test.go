@@ -1419,6 +1419,29 @@ func TestMarshalDirectMultilineString(t *testing.T) {
 	}
 }
 
+//issue 354
+func TestUnmarshalMultilineStringWithTab(t *testing.T) {
+	input := []byte(`
+Field = """
+hello	world"""
+`)
+
+	type Test struct {
+		Field string
+	}
+
+	expected := Test{"hello\tworld"}
+	result := Test{}
+	err := Unmarshal(input, &result)
+	if err != nil {
+		t.Fatal("unmarshal should not error:", err)
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad unmarshal: expected\n-----\n%+v\n-----\ngot\n-----\n%+v\n-----\n", expected, result)
+	}
+}
+
 var customMultilineTagTestToml = []byte(`int_slice = [
   1,
   2,
