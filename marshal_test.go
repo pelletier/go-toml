@@ -2867,7 +2867,18 @@ func TestUnmarshalSliceFail(t *testing.T) {
 
 	var actual sliceStruct
 	err := tree.Unmarshal(&actual)
-	if err == nil {
-		t.Error("expect err but got nil")
+	if err.Error() != "(0, 0): Can't convert 1(int64) to string" {
+		t.Error("expect err:(0, 0): Can't convert 1(int64) to string but got ", err)
 	}
+}
+
+func TestUnmarshalSliceFail2(t *testing.T) {
+	tree, _ := Load(`str_slice=[1,2]`)
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(1, 1): Can't convert 1(int64) to string" {
+		t.Error("expect err:(1, 1): Can't convert 1(int64) to string but got ", err)
+	}
+
 }
