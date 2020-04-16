@@ -236,6 +236,7 @@ func TestTreeWriteToMapExampleFile(t *testing.T) {
 				[]interface{}{"gamma", "delta"},
 				[]interface{}{int64(1), int64(2)},
 			},
+			"score": 4e-08,
 		},
 	}
 	testMaps(t, tree.ToMap(), expected)
