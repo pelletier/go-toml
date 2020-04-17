@@ -407,7 +407,10 @@ func TestQueryFilterFn(t *testing.T) {
 
 	assertQueryPositions(t, string(buff),
 		"$..[?(float)]",
-		[]interface{}{ // no float values in document
+		[]interface{}{ 
+			queryTestNode{
+				4e-08, toml.Position{30, 1},
+			},
 		})
 
 	tv, _ := time.Parse(time.RFC3339, "1979-05-27T07:32:00Z")
@@ -460,6 +463,7 @@ func TestQueryFilterFn(t *testing.T) {
 						[]interface{}{"gamma", "delta"},
 						[]interface{}{int64(1), int64(2)},
 					},
+					"score": 4e-08,
 				}, toml.Position{28, 1},
 			},
 		})
