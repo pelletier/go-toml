@@ -783,6 +783,7 @@ func TestParseFile(t *testing.T) {
 				[]string{"gamma", "delta"},
 				[]int64{1, 2},
 			},
+			"score": 4e-08,
 		},
 	})
 }
@@ -819,6 +820,7 @@ func TestParseFileCRLF(t *testing.T) {
 				[]string{"gamma", "delta"},
 				[]int64{1, 2},
 			},
+			"score": 4e-08,
 		},
 	})
 }
