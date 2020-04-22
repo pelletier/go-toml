@@ -1419,26 +1419,54 @@ func TestMarshalDirectMultilineString(t *testing.T) {
 	}
 }
 
-//issue 354
-func TestUnmarshalMultilineStringWithTab(t *testing.T) {
-	input := []byte(`
-Field = """
-hello	world"""
-`)
-
+func TestUnmarshalTabInStringAndQuotedKey(t *testing.T) {
 	type Test struct {
-		Field string
+		Field1 string `toml:"Fie	ld1"`
+		Field2 string
 	}
 
-	expected := Test{"hello\tworld"}
-	result := Test{}
-	err := Unmarshal(input, &result)
-	if err != nil {
-		t.Fatal("unmarshal should not error:", err)
+	type TestCase struct {
+		desc     string
+		input    []byte
+		expected Test
 	}
 
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad unmarshal: expected\n-----\n%+v\n-----\ngot\n-----\n%+v\n-----\n", expected, result)
+	testCases := []TestCase{
+		{
+			desc:  "multiline string with tab",
+			input: []byte("Field2 = \"\"\"\nhello\tworld\"\"\""),
+			expected: Test{
+				Field2: "hello\tworld",
+			},
+		},
+		{
+			desc:  "quoted key with tab",
+			input: []byte("\"Fie\tld1\" = \"key with tab\""),
+			expected: Test{
+				Field1: "key with tab",
+			},
+		},
+		{
+			desc:  "basic string tab",
+			input: []byte("Field2 = \"hello\tworld\""),
+			expected: Test{
+				Field2: "hello\tworld",
+			},
+		},
+	}
+
+	for i := range testCases {
+		result := Test{}
+		err := Unmarshal(testCases[i].input, &result)
+		if err != nil {
+			t.Errorf("%s test error:%v", testCases[i].desc, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(result, testCases[i].expected) {
+			t.Errorf("%s test error: expected\n-----\n%+v\n-----\ngot\n-----\n%+v\n-----\n",
+				testCases[i].desc, testCases[i].expected, result)
+		}
 	}
 }
 
