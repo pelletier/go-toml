@@ -2813,3 +2813,72 @@ func TestUnmarshalNil(t *testing.T) {
 		t.Errorf("Expected err from nil marshal")
 	}
 }
+
+var sliceTomlDemo = []byte(`str_slice = ["Howdy","Hey There"]
+str_slice_ptr= ["Howdy","Hey There"]
+int_slice=[1,2]
+int_slice_ptr=[1,2]
+[[struct_slice]]
+String2="1"
+[[struct_slice]]
+String2="2"
+[[struct_slice_ptr]]
+String2="1"
+[[struct_slice_ptr]]
+String2="2"
+`)
+
+type sliceStruct struct {
+	Slice          []string                     `  toml:"str_slice"  `
+	SlicePtr       *[]string                    `  toml:"str_slice_ptr"  `
+	IntSlice       []int                        `  toml:"int_slice"  `
+	IntSlicePtr    *[]int                       `  toml:"int_slice_ptr"  `
+	StructSlice    []basicMarshalTestSubStruct  `  toml:"struct_slice"  `
+	StructSlicePtr *[]basicMarshalTestSubStruct `  toml:"struct_slice_ptr"  `
+}
+
+func TestUnmarshalSlice(t *testing.T) {
+	tree, _ := LoadBytes(sliceTomlDemo)
+	tree, _ = TreeFromMap(tree.ToMap())
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err != nil {
+		t.Error("shound not err", err)
+	}
+	expected := sliceStruct{
+		Slice:          []string{"Howdy", "Hey There"},
+		SlicePtr:       &[]string{"Howdy", "Hey There"},
+		IntSlice:       []int{1, 2},
+		IntSlicePtr:    &[]int{1, 2},
+		StructSlice:    []basicMarshalTestSubStruct{{"1"}, {"2"}},
+		StructSlicePtr: &[]basicMarshalTestSubStruct{{"1"}, {"2"}},
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
+	}
+
+}
+
+func TestUnmarshalSliceFail(t *testing.T) {
+	tree, _ := TreeFromMap(map[string]interface{}{
+		"str_slice": []int{1, 2},
+	})
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(0, 0): Can't convert 1(int64) to string" {
+		t.Error("expect err:(0, 0): Can't convert 1(int64) to string but got ", err)
+	}
+}
+
+func TestUnmarshalSliceFail2(t *testing.T) {
+	tree, _ := Load(`str_slice=[1,2]`)
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(1, 1): Can't convert 1(int64) to string" {
+		t.Error("expect err:(1, 1): Can't convert 1(int64) to string but got ", err)
+	}
+
+}

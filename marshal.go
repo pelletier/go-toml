@@ -714,6 +714,22 @@ func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (r
 	return mval, nil
 }
 
+// Convert toml value to marshal primitive slice, using marshal type
+func (d *Decoder) valueFromOtherSliceI(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
+	val := reflect.ValueOf(tval)
+
+	lenght := val.Len()
+	mval := reflect.MakeSlice(mtype, lenght, lenght)
+	for i := 0; i < lenght; i++ {
+		val, err := d.valueFromToml(mtype.Elem(), val.Index(i).Interface(), nil)
+		if err != nil {
+			return mval, err
+		}
+		mval.Index(i).Set(val)
+	}
+	return mval, nil
+}
+
 // Convert toml value to marshal value, using marshal type. When mval1 is non-nil
 // and the given type is a struct value, merge fields into it.
 func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *reflect.Value) (reflect.Value, error) {
@@ -857,6 +873,11 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 				ival := mval1.Elem()
 				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
 			}
+		case reflect.Slice:
+			if isOtherSequence(mtype) && isOtherSequence(reflect.TypeOf(t)) {
+				return d.valueFromOtherSliceI(mtype, t)
+			}
+			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v(%v)", tval, tval, mtype, mtype.Kind())
 		default:
 			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v(%v)", tval, tval, mtype, mtype.Kind())
 		}
