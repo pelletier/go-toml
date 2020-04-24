@@ -2016,6 +2016,23 @@ func TestMarshalNestedAnonymousStructs(t *testing.T) {
 
 }
 
+func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	var doc struct {
+		Value int `toml:"value"`
+		Embedded
+	}
+	if rest, err := Marshal(doc); err == nil {
+		t.Fatal("should error", string(rest))
+	}
+}
+
 func TestUnmarshalNestedAnonymousStructs(t *testing.T) {
 	type Nested struct {
 		Value string `toml:"nested_field"`
