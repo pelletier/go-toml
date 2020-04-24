@@ -1974,6 +1974,48 @@ func TestUnmarshalDefaultFailureUnsupported(t *testing.T) {
 	}
 }
 
+func TestMarshalNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	type Named struct {
+		Value string `toml:"value"`
+	}
+
+	var doc struct {
+		Embedded
+		Named     `toml:"named"`
+		Anonymous struct {
+			Value string `toml:"value"`
+		} `toml:"anonymous"`
+	}
+
+	expected := `value = ""
+
+[anonymous]
+  value = ""
+
+[named]
+  value = ""
+
+[top]
+  value = ""
+`
+
+	result, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", string(expected), string(result))
+	}
+
+}
+
 func TestUnmarshalNestedAnonymousStructs(t *testing.T) {
 	type Nested struct {
 		Value string `toml:"nested_field"`
