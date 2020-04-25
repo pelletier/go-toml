@@ -707,6 +707,15 @@ func TestEscapeInString(t *testing.T) {
 	})
 }
 
+func TestTabInString(t *testing.T) {
+	testFlow(t, `foo = "hello	world"`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 8}, tokenString, "hello\tworld"},
+		{Position{1, 20}, tokenEOF, ""},
+	})
+}
+
 func TestKeyGroupArray(t *testing.T) {
 	testFlow(t, "[[foo]]", []token{
 		{Position{1, 1}, tokenDoubleLeftBracket, "[["},
@@ -722,6 +731,15 @@ func TestQuotedKey(t *testing.T) {
 		{Position{1, 7}, tokenEqual, "="},
 		{Position{1, 9}, tokenInteger, "42"},
 		{Position{1, 11}, tokenEOF, ""},
+	})
+}
+
+func TestQuotedKeyTab(t *testing.T) {
+	testFlow(t, "\"num\tber\" = 123", []token{
+		{Position{1, 1}, tokenKey, "\"num\tber\""},
+		{Position{1, 11}, tokenEqual, "="},
+		{Position{1, 13}, tokenInteger, "123"},
+		{Position{1, 16}, tokenEOF, ""},
 	})
 }
 
