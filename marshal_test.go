@@ -1974,6 +1974,99 @@ func TestUnmarshalDefaultFailureUnsupported(t *testing.T) {
 	}
 }
 
+func TestMarshalNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	type Named struct {
+		Value string `toml:"value"`
+	}
+
+	var doc struct {
+		Embedded
+		Named     `toml:"named"`
+		Anonymous struct {
+			Value string `toml:"value"`
+		} `toml:"anonymous"`
+	}
+
+	expected := `value = ""
+
+[anonymous]
+  value = ""
+
+[named]
+  value = ""
+
+[top]
+  value = ""
+`
+
+	result, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
+	}
+}
+
+func TestEncoderPromoteNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+	}
+
+	var doc struct {
+		Embedded
+	}
+
+	expected := `
+[Embedded]
+  value = ""
+`
+	var buf bytes.Buffer
+	if err := NewEncoder(&buf).PromoteAnonymous(true).Encode(doc); err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(buf.Bytes(), []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, buf.String())
+	}
+}
+
+func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	var doc struct {
+		Value string `toml:"value"`
+		Embedded
+	}
+	doc.Embedded.Value = "shadowed"
+	doc.Value = "shadows"
+
+	expected := `value = "shadows"
+
+[top]
+  value = ""
+`
+
+	result, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
+	}
+}
+
 func TestUnmarshalNestedAnonymousStructs(t *testing.T) {
 	type Nested struct {
 		Value string `toml:"nested_field"`

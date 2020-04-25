@@ -5,6 +5,7 @@ package toml_test
 import (
 	"fmt"
 	"log"
+	"os"
 
 	toml "github.com/pelletier/go-toml"
 )
@@ -103,4 +104,67 @@ func ExampleUnmarshal() {
 	fmt.Println("user=", config.Postgres.User)
 	// Output:
 	// user= pelletier
+}
+
+func ExampleEncoder_anonymous() {
+	type Credentials struct {
+		User     string `toml:"user"`
+		Password string `toml:"password"`
+	}
+
+	type Protocol struct {
+		Name string `toml:"name"`
+	}
+
+	type Config struct {
+		Version int `toml:"version"`
+		Credentials
+		Protocol `toml:"Protocol"`
+	}
+	config := Config{
+		Version: 2,
+		Credentials: Credentials{
+			User:     "pelletier",
+			Password: "mypassword",
+		},
+		Protocol: Protocol{
+			Name: "tcp",
+		},
+	}
+	fmt.Println("Default:")
+	fmt.Println("---------------")
+
+	def := toml.NewEncoder(os.Stdout)
+	if err := def.Encode(config); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("---------------")
+	fmt.Println("With promotion:")
+	fmt.Println("---------------")
+
+	prom := toml.NewEncoder(os.Stdout).PromoteAnonymous(true)
+	if err := prom.Encode(config); err != nil {
+		log.Fatal(err)
+	}
+	// Output:
+	// Default:
+	// ---------------
+	// password = "mypassword"
+	// user = "pelletier"
+	// version = 2
+	//
+	// [Protocol]
+	//   name = "tcp"
+	// ---------------
+	// With promotion:
+	// ---------------
+	// version = 2
+	//
+	// [Credentials]
+	//   password = "mypassword"
+	//   user = "pelletier"
+	//
+	// [Protocol]
+	//   name = "tcp"
 }
