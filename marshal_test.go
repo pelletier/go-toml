@@ -1467,6 +1467,55 @@ func TestMarshalCustomMultiline(t *testing.T) {
 	}
 }
 
+func TestMultilineWithAdjacentQuotationMarks(t *testing.T) {
+	type testStruct struct {
+		Str string `multiline:"true"`
+	}
+	type testCase struct {
+		expected []byte
+		data     testStruct
+	}
+
+	testCases := []testCase{
+		{
+			expected: []byte(`Str = """
+hello\""""
+`),
+			data: testStruct{
+				Str: "hello\"",
+			},
+		},
+		{
+			expected: []byte(`Str = """
+""\"""\"""\""""
+`),
+			data: testStruct{
+				Str: "\"\"\"\"\"\"\"\"\"",
+			},
+		},
+	}
+	for i := range testCases {
+		result, err := Marshal(testCases[i].data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !bytes.Equal(result, testCases[i].expected) {
+			t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n",
+				testCases[i].expected, result)
+		} else {
+			var data testStruct
+			if err = Unmarshal(result, &data); err != nil {
+				t.Fatal(err)
+			}
+			if data.Str != testCases[i].data.Str {
+				t.Errorf("Round trip test fail: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n",
+					testCases[i].data.Str, data.Str)
+			}
+		}
+	}
+}
+
 func TestMarshalEmbedTree(t *testing.T) {
 	expected := []byte(`OuterField1 = "Out"
 OuterField2 = 1024
