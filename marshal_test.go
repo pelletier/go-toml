@@ -3052,3 +3052,63 @@ func TestUnmarshalSliceFail2(t *testing.T) {
 	}
 
 }
+
+func TestDecoderStrict(t *testing.T) {
+	input := `
+[decoded]
+  key = ""
+
+[undecoded]
+  key = ""
+
+  [undecoded.inner]
+	key = ""
+
+  [[undecoded.array]]
+	key = ""
+
+  [[undecoded.array]]
+	key = ""
+
+`
+	var doc struct {
+		Decoded struct {
+			Key string
+		}
+	}
+
+	expected := `undecoded keys: ["undecoded.array.0.key" "undecoded.array.1.key" "undecoded.inner.key" "undecoded.key"]`
+
+	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
+	if err == nil {
+		t.Error("expected error, got none")
+	} else if err.Error() != expected {
+		t.Errorf("expect err: %s, got: %s", expected, err.Error())
+	}
+
+	if err := NewDecoder(bytes.NewReader([]byte(input))).Decode(&doc); err != nil {
+		t.Errorf("unexpected err: %s", err)
+	}
+
+	var m map[string]interface{}
+	if err := NewDecoder(bytes.NewReader([]byte(input))).Decode(&m); err != nil {
+		t.Errorf("unexpected err: %s", err)
+	}
+}
+
+func TestDecoderStrictValid(t *testing.T) {
+	input := `
+[decoded]
+  key = ""
+`
+	var doc struct {
+		Decoded struct {
+			Key string
+		}
+	}
+
+	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+}
