@@ -512,6 +512,8 @@ type Decoder struct {
 	tval *Tree
 	encOpts
 	tagName string
+	strict  bool
+	visitor visitorState
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -542,6 +544,13 @@ func (d *Decoder) SetTagName(v string) *Decoder {
 	return d
 }
 
+// Strict allows changing to strict decoding. Any fields that are found in the
+// input data and do not have a corresponding struct member cause an error.
+func (d *Decoder) Strict(strict bool) *Decoder {
+	d.strict = strict
+	return d
+}
+
 func (d *Decoder) unmarshal(v interface{}) error {
 	mtype := reflect.TypeOf(v)
 	if mtype == nil {
@@ -565,8 +574,15 @@ func (d *Decoder) unmarshal(v interface{}) error {
 
 	vv := reflect.ValueOf(v).Elem()
 
+	if d.strict {
+		d.visitor = newVisitorState(d.tval)
+	}
+
 	sval, err := d.valueFromTree(elem, d.tval, &vv)
 	if err != nil {
+		return err
+	}
+	if err := d.visitor.validate(); err != nil {
 		return err
 	}
 	reflect.ValueOf(v).Elem().Set(sval)
@@ -614,6 +630,8 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 						if !exists {
 							continue
 						}
+
+						d.visitor.push(key)
 						val := tval.Get(key)
 						fval := mval.Field(i)
 						mvalf, err := d.valueFromToml(mtypef.Type, val, &fval)
@@ -622,6 +640,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 						}
 						mval.Field(i).Set(mvalf)
 						found = true
+						d.visitor.pop()
 						break
 					}
 				}
@@ -654,7 +673,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 							return mval.Field(i), err
 						}
 					default:
-						return mval.Field(i), fmt.Errorf("unsuported field type for default option")
+						return mval.Field(i), fmt.Errorf("unsupported field type for default option")
 					}
 					mval.Field(i).Set(reflect.ValueOf(val))
 				}
@@ -676,6 +695,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 	case reflect.Map:
 		mval = reflect.MakeMap(mtype)
 		for _, key := range tval.Keys() {
+			d.visitor.push(key)
 			// TODO: path splits key
 			val := tval.GetPath([]string{key})
 			mvalf, err := d.valueFromToml(mtype.Elem(), val, nil)
@@ -683,6 +703,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 				return mval, formatError(err, tval.GetPosition(key))
 			}
 			mval.SetMapIndex(reflect.ValueOf(key).Convert(mtype.Key()), mvalf)
+			d.visitor.pop()
 		}
 	}
 	return mval, nil
@@ -692,11 +713,13 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 func (d *Decoder) valueFromTreeSlice(mtype reflect.Type, tval []*Tree) (reflect.Value, error) {
 	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
 	for i := 0; i < len(tval); i++ {
+		d.visitor.push(strconv.Itoa(i))
 		val, err := d.valueFromTree(mtype.Elem(), tval[i], nil)
 		if err != nil {
 			return mval, err
 		}
 		mval.Index(i).Set(val)
+		d.visitor.pop()
 	}
 	return mval, nil
 }
@@ -771,6 +794,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to trees", tval, tval)
 	case []interface{}:
+		d.visitor.visit()
 		if isOtherSequence(mtype) {
 			return d.valueFromOtherSlice(mtype, t)
 		}
@@ -784,6 +808,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		}
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
 	default:
+		d.visitor.visit()
 		switch mtype.Kind() {
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
@@ -957,4 +982,71 @@ func formatError(err error, pos Position) error {
 		return err
 	}
 	return fmt.Errorf("%s: %s", pos, err)
+}
+
+// visitorState keeps track of which keys were unmarshaled.
+type visitorState struct {
+	tree   *Tree
+	path   []string
+	keys   map[string]struct{}
+	active bool
+}
+
+func newVisitorState(tree *Tree) visitorState {
+	path, result := []string{}, map[string]struct{}{}
+	insertKeys(path, result, tree)
+	return visitorState{
+		tree:   tree,
+		path:   path[:0],
+		keys:   result,
+		active: true,
+	}
+}
+
+func (s *visitorState) push(key string) {
+	if s.active {
+		s.path = append(s.path, key)
+	}
+}
+
+func (s *visitorState) pop() {
+	if s.active {
+		s.path = s.path[:len(s.path)-1]
+	}
+}
+
+func (s *visitorState) visit() {
+	if s.active {
+		delete(s.keys, strings.Join(s.path, "."))
+	}
+}
+
+func (s *visitorState) validate() error {
+	if !s.active {
+		return nil
+	}
+	undecoded := make([]string, 0, len(s.keys))
+	for key := range s.keys {
+		undecoded = append(undecoded, key)
+	}
+	sort.Strings(undecoded)
+	if len(undecoded) > 0 {
+		return fmt.Errorf("undecoded keys: %q", undecoded)
+	}
+	return nil
+}
+
+func insertKeys(path []string, m map[string]struct{}, tree *Tree) {
+	for k, v := range tree.values {
+		switch node := v.(type) {
+		case []*Tree:
+			for i, item := range node {
+				insertKeys(append(path, k, strconv.Itoa(i)), m, item)
+			}
+		case *Tree:
+			insertKeys(append(path, k), m, node)
+		case *tomlValue:
+			m[strings.Join(append(path, k), ".")] = struct{}{}
+		}
+	}
 }
