@@ -696,6 +696,13 @@ func TestInlineTableDoubleComma(t *testing.T) {
 	}
 }
 
+func TestInlineTableTrailingComma(t *testing.T) {
+	_, err := Load("foo = {hello = 53, foo = 17,}")
+	if err.Error() != "(1, 28): trailing comma at the end of inline table" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
 	if err.Error() != "(3, 2): duplicated tables" {
