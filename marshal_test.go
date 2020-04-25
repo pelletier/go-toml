@@ -2011,9 +2011,30 @@ func TestMarshalNestedAnonymousStructs(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err.Error())
 	}
 	if !bytes.Equal(result, []byte(expected)) {
-		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", string(expected), string(result))
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
+	}
+}
+
+func TestEncoderPromoteNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
 	}
 
+	var doc struct {
+		Embedded
+	}
+
+	expected := `
+[Embedded]
+  value = ""
+`
+	var buf bytes.Buffer
+	if err := NewEncoder(&buf).PromoteAnonymous(true).Encode(doc); err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(buf.Bytes(), []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, buf.String())
+	}
 }
 
 func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
@@ -2025,11 +2046,24 @@ func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
 	}
 
 	var doc struct {
-		Value int `toml:"value"`
+		Value string `toml:"value"`
 		Embedded
 	}
-	if rest, err := Marshal(doc); err == nil {
-		t.Fatal("should error", string(rest))
+	doc.Embedded.Value = "shadowed"
+	doc.Value = "shadows"
+
+	expected := `value = "shadows"
+
+[top]
+  value = ""
+`
+
+	result, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
 	}
 }
 

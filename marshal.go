@@ -191,9 +191,10 @@ type Encoder struct {
 	w io.Writer
 	encOpts
 	annotation
-	line  int
-	col   int
-	order marshalOrder
+	line        int
+	col         int
+	order       marshalOrder
+	promoteAnon bool
 }
 
 // NewEncoder returns a new encoder that writes to w.
@@ -280,6 +281,19 @@ func (e *Encoder) SetTagMultiline(v string) *Encoder {
 	return e
 }
 
+// PromoteAnonymous allows to change how anonymous struct fields are marshaled.
+// Usually, they are marshaled as if the inner exported fields were fields in
+// the outer struct. However, if an anonymous struct field is given a name in
+// its TOML tag, it is treated like a regular struct field with that name.
+// rather than being anonymous.
+//
+// In case anonymous promotion is enabled, all anonymous structs are promoted
+// and treated like regular struct fields.
+func (e *Encoder) PromoteAnonymous(promote bool) *Encoder {
+	e.promoteAnon = promote
+	return e
+}
+
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
 	if mtype == nil {
@@ -339,10 +353,8 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 					if err != nil {
 						return nil, err
 					}
-					if tree, ok := val.(*Tree); ok && mtypef.Anonymous && !opts.nameFromTag {
-						if err := e.appendTree(tval, tree); err != nil {
-							return nil, err
-						}
+					if tree, ok := val.(*Tree); ok && mtypef.Anonymous && !opts.nameFromTag && !e.promoteAnon {
+						e.appendTree(tval, tree)
 					} else {
 						tval.SetWithOptions(opts.name, SetOptions{
 							Comment:   opts.comment,
@@ -469,7 +481,7 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 func (e *Encoder) appendTree(t, o *Tree) error {
 	for key, value := range o.values {
 		if _, ok := t.values[key]; ok {
-			return fmt.Errorf("Duplicate field due to embedding %s", key)
+			continue
 		}
 		if tomlValue, ok := value.(*tomlValue); ok {
 			tomlValue.position.Col = t.position.Col
