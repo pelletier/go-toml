@@ -416,7 +416,7 @@ Loop:
 
 func (p *tomlParser) parseArray() interface{} {
 	var array []interface{}
-	arrayType := reflect.TypeOf(nil)
+	arrayType := reflect.TypeOf(newTree())
 	for {
 		follow := p.peek()
 		if follow == nil || follow.typ == tokenEOF {
@@ -427,11 +427,8 @@ func (p *tomlParser) parseArray() interface{} {
 			break
 		}
 		val := p.parseRvalue()
-		if arrayType == nil {
-			arrayType = reflect.TypeOf(val)
-		}
 		if reflect.TypeOf(val) != arrayType {
-			p.raiseError(follow, "mixed types in array")
+			arrayType = nil
 		}
 		array = append(array, val)
 		follow = p.peek()
@@ -444,6 +441,12 @@ func (p *tomlParser) parseArray() interface{} {
 		if follow.typ == tokenComma {
 			p.getToken()
 		}
+	}
+
+	// if the array is a mixed-type array or its length is 0,
+	// don't convert it to a table array
+	if len(array) <= 0 {
+		arrayType = nil
 	}
 	// An array of Trees is actually an array of inline
 	// tables, which is a shorthand for a table array. If the
