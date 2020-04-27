@@ -115,10 +115,57 @@ func (t *Tree) GetPath(keys []string) interface{} {
 	// branch based on final node type
 	switch node := subtree.values[keys[len(keys)-1]].(type) {
 	case *tomlValue:
-		return node.value
+		switch n := node.value.(type) {
+		case []interface{}:
+			return getArray(n)
+		default:
+			return node.value
+		}
 	default:
 		return node
 	}
+}
+
+// if homogeneous array, then return array type obj. as resp. over []interface{}
+func getArray(n []interface{}) interface{} {
+	var str []string
+	var i32 []int32
+	var i64 []int64
+	var i []int
+	var f32 []float32
+	var f64 []float64
+	for _, value := range n {
+		switch v := value.(type) {
+		case string:
+			str = append(str, v)
+		case int32:
+			i32 = append(i32, v)
+		case int64:
+			i64 = append(i64, v)
+		case int:
+			i = append(i, v)
+		case float32:
+			f32 = append(f32, v)
+		case float64:
+			f64 = append(f64, v)
+		default:
+			return n
+		}
+	}
+	if len(str) == len(n) {
+		return str
+	} else if len(i32) == len(n) {
+		return i32
+	} else if len(i64) == len(n) {
+		return i64
+	} else if len(i) == len(n) {
+		return i
+	} else if len(f32) == len(n) {
+		return f32
+	} else if len(f64) == len(n) {
+		return f64
+	}
+	return n
 }
 
 // GetPosition returns the position of the given key.
