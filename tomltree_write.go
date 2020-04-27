@@ -30,9 +30,15 @@ type sortNode struct {
 // are preserved. Quotation marks and backslashes are also not escaped.
 func encodeMultilineTomlString(value string, commented string) string {
 	var b bytes.Buffer
+	adjacentQuoteCount := 0
 
 	b.WriteString(commented)
-	for _, rr := range value {
+	for i, rr := range value {
+		if rr != '"' {
+			adjacentQuoteCount = 0
+		} else {
+			adjacentQuoteCount++
+		}
 		switch rr {
 		case '\b':
 			b.WriteString(`\b`)
@@ -45,7 +51,12 @@ func encodeMultilineTomlString(value string, commented string) string {
 		case '\r':
 			b.WriteString("\r")
 		case '"':
-			b.WriteString(`"`)
+			if adjacentQuoteCount >= 3 || i == len(value)-1 {
+				adjacentQuoteCount = 0
+				b.WriteString(`\"`)
+			} else {
+				b.WriteString(`"`)
+			}
 		case '\\':
 			b.WriteString(`\`)
 		default:

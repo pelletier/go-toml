@@ -1419,26 +1419,54 @@ func TestMarshalDirectMultilineString(t *testing.T) {
 	}
 }
 
-//issue 354
-func TestUnmarshalMultilineStringWithTab(t *testing.T) {
-	input := []byte(`
-Field = """
-hello	world"""
-`)
-
+func TestUnmarshalTabInStringAndQuotedKey(t *testing.T) {
 	type Test struct {
-		Field string
+		Field1 string `toml:"Fie	ld1"`
+		Field2 string
 	}
 
-	expected := Test{"hello\tworld"}
-	result := Test{}
-	err := Unmarshal(input, &result)
-	if err != nil {
-		t.Fatal("unmarshal should not error:", err)
+	type TestCase struct {
+		desc     string
+		input    []byte
+		expected Test
 	}
 
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad unmarshal: expected\n-----\n%+v\n-----\ngot\n-----\n%+v\n-----\n", expected, result)
+	testCases := []TestCase{
+		{
+			desc:  "multiline string with tab",
+			input: []byte("Field2 = \"\"\"\nhello\tworld\"\"\""),
+			expected: Test{
+				Field2: "hello\tworld",
+			},
+		},
+		{
+			desc:  "quoted key with tab",
+			input: []byte("\"Fie\tld1\" = \"key with tab\""),
+			expected: Test{
+				Field1: "key with tab",
+			},
+		},
+		{
+			desc:  "basic string tab",
+			input: []byte("Field2 = \"hello\tworld\""),
+			expected: Test{
+				Field2: "hello\tworld",
+			},
+		},
+	}
+
+	for i := range testCases {
+		result := Test{}
+		err := Unmarshal(testCases[i].input, &result)
+		if err != nil {
+			t.Errorf("%s test error:%v", testCases[i].desc, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(result, testCases[i].expected) {
+			t.Errorf("%s test error: expected\n-----\n%+v\n-----\ngot\n-----\n%+v\n-----\n",
+				testCases[i].desc, testCases[i].expected, result)
+		}
 	}
 }
 
@@ -1464,6 +1492,55 @@ func TestMarshalCustomMultiline(t *testing.T) {
 	result := buf.Bytes()
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestMultilineWithAdjacentQuotationMarks(t *testing.T) {
+	type testStruct struct {
+		Str string `multiline:"true"`
+	}
+	type testCase struct {
+		expected []byte
+		data     testStruct
+	}
+
+	testCases := []testCase{
+		{
+			expected: []byte(`Str = """
+hello\""""
+`),
+			data: testStruct{
+				Str: "hello\"",
+			},
+		},
+		{
+			expected: []byte(`Str = """
+""\"""\"""\""""
+`),
+			data: testStruct{
+				Str: "\"\"\"\"\"\"\"\"\"",
+			},
+		},
+	}
+	for i := range testCases {
+		result, err := Marshal(testCases[i].data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !bytes.Equal(result, testCases[i].expected) {
+			t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n",
+				testCases[i].expected, result)
+		} else {
+			var data testStruct
+			if err = Unmarshal(result, &data); err != nil {
+				t.Fatal(err)
+			}
+			if data.Str != testCases[i].data.Str {
+				t.Errorf("Round trip test fail: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n",
+					testCases[i].data.Str, data.Str)
+			}
+		}
 	}
 }
 
@@ -1894,6 +1971,99 @@ func TestUnmarshalDefaultFailureUnsupported(t *testing.T) {
 	err := Unmarshal([]byte(``), &doc)
 	if err == nil {
 		t.Fatal("should error")
+	}
+}
+
+func TestMarshalNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	type Named struct {
+		Value string `toml:"value"`
+	}
+
+	var doc struct {
+		Embedded
+		Named     `toml:"named"`
+		Anonymous struct {
+			Value string `toml:"value"`
+		} `toml:"anonymous"`
+	}
+
+	expected := `value = ""
+
+[anonymous]
+  value = ""
+
+[named]
+  value = ""
+
+[top]
+  value = ""
+`
+
+	result, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
+	}
+}
+
+func TestEncoderPromoteNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+	}
+
+	var doc struct {
+		Embedded
+	}
+
+	expected := `
+[Embedded]
+  value = ""
+`
+	var buf bytes.Buffer
+	if err := NewEncoder(&buf).PromoteAnonymous(true).Encode(doc); err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(buf.Bytes(), []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, buf.String())
+	}
+}
+
+func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	var doc struct {
+		Value string `toml:"value"`
+		Embedded
+	}
+	doc.Embedded.Value = "shadowed"
+	doc.Value = "shadows"
+
+	expected := `value = "shadows"
+
+[top]
+  value = ""
+`
+
+	result, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
 	}
 }
 
@@ -2812,4 +2982,73 @@ func TestUnmarshalNil(t *testing.T) {
 	if err := Unmarshal([]byte(`whatever = "whatever"`), (*struct{})(nil)); err == nil {
 		t.Errorf("Expected err from nil marshal")
 	}
+}
+
+var sliceTomlDemo = []byte(`str_slice = ["Howdy","Hey There"]
+str_slice_ptr= ["Howdy","Hey There"]
+int_slice=[1,2]
+int_slice_ptr=[1,2]
+[[struct_slice]]
+String2="1"
+[[struct_slice]]
+String2="2"
+[[struct_slice_ptr]]
+String2="1"
+[[struct_slice_ptr]]
+String2="2"
+`)
+
+type sliceStruct struct {
+	Slice          []string                     `  toml:"str_slice"  `
+	SlicePtr       *[]string                    `  toml:"str_slice_ptr"  `
+	IntSlice       []int                        `  toml:"int_slice"  `
+	IntSlicePtr    *[]int                       `  toml:"int_slice_ptr"  `
+	StructSlice    []basicMarshalTestSubStruct  `  toml:"struct_slice"  `
+	StructSlicePtr *[]basicMarshalTestSubStruct `  toml:"struct_slice_ptr"  `
+}
+
+func TestUnmarshalSlice(t *testing.T) {
+	tree, _ := LoadBytes(sliceTomlDemo)
+	tree, _ = TreeFromMap(tree.ToMap())
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err != nil {
+		t.Error("shound not err", err)
+	}
+	expected := sliceStruct{
+		Slice:          []string{"Howdy", "Hey There"},
+		SlicePtr:       &[]string{"Howdy", "Hey There"},
+		IntSlice:       []int{1, 2},
+		IntSlicePtr:    &[]int{1, 2},
+		StructSlice:    []basicMarshalTestSubStruct{{"1"}, {"2"}},
+		StructSlicePtr: &[]basicMarshalTestSubStruct{{"1"}, {"2"}},
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
+	}
+
+}
+
+func TestUnmarshalSliceFail(t *testing.T) {
+	tree, _ := TreeFromMap(map[string]interface{}{
+		"str_slice": []int{1, 2},
+	})
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(0, 0): Can't convert 1(int64) to string" {
+		t.Error("expect err:(0, 0): Can't convert 1(int64) to string but got ", err)
+	}
+}
+
+func TestUnmarshalSliceFail2(t *testing.T) {
+	tree, _ := Load(`str_slice=[1,2]`)
+
+	var actual sliceStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(1, 1): Can't convert 1(int64) to string" {
+		t.Error("expect err:(1, 1): Can't convert 1(int64) to string but got ", err)
+	}
+
 }

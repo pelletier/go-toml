@@ -22,6 +22,7 @@ const (
 
 type tomlOpts struct {
 	name         string
+	nameFromTag  bool
 	comment      string
 	commented    bool
 	multiline    bool
@@ -190,9 +191,10 @@ type Encoder struct {
 	w io.Writer
 	encOpts
 	annotation
-	line  int
-	col   int
-	order marshalOrder
+	line        int
+	col         int
+	order       marshalOrder
+	promoteAnon bool
 }
 
 // NewEncoder returns a new encoder that writes to w.
@@ -279,6 +281,19 @@ func (e *Encoder) SetTagMultiline(v string) *Encoder {
 	return e
 }
 
+// PromoteAnonymous allows to change how anonymous struct fields are marshaled.
+// Usually, they are marshaled as if the inner exported fields were fields in
+// the outer struct. However, if an anonymous struct field is given a name in
+// its TOML tag, it is treated like a regular struct field with that name.
+// rather than being anonymous.
+//
+// In case anonymous promotion is enabled, all anonymous structs are promoted
+// and treated like regular struct fields.
+func (e *Encoder) PromoteAnonymous(promote bool) *Encoder {
+	e.promoteAnon = promote
+	return e
+}
+
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	mtype := reflect.TypeOf(v)
 	if mtype == nil {
@@ -338,12 +353,15 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 					if err != nil {
 						return nil, err
 					}
-
-					tval.SetWithOptions(opts.name, SetOptions{
-						Comment:   opts.comment,
-						Commented: opts.commented,
-						Multiline: opts.multiline,
-					}, val)
+					if tree, ok := val.(*Tree); ok && mtypef.Anonymous && !opts.nameFromTag && !e.promoteAnon {
+						e.appendTree(tval, tree)
+					} else {
+						tval.SetWithOptions(opts.name, SetOptions{
+							Comment:   opts.comment,
+							Commented: opts.commented,
+							Multiline: opts.multiline,
+						}, val)
+					}
 				}
 			}
 		}
@@ -458,6 +476,19 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 			return nil, fmt.Errorf("Marshal can't handle %v(%v)", mtype, mtype.Kind())
 		}
 	}
+}
+
+func (e *Encoder) appendTree(t, o *Tree) error {
+	for key, value := range o.values {
+		if _, ok := t.values[key]; ok {
+			continue
+		}
+		if tomlValue, ok := value.(*tomlValue); ok {
+			tomlValue.position.Col = t.position.Col
+		}
+		t.values[key] = value
+	}
+	return nil
 }
 
 // Unmarshal attempts to unmarshal the Tree into a Go struct pointed by v.
@@ -714,6 +745,22 @@ func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (r
 	return mval, nil
 }
 
+// Convert toml value to marshal primitive slice, using marshal type
+func (d *Decoder) valueFromOtherSliceI(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
+	val := reflect.ValueOf(tval)
+
+	lenght := val.Len()
+	mval := reflect.MakeSlice(mtype, lenght, lenght)
+	for i := 0; i < lenght; i++ {
+		val, err := d.valueFromToml(mtype.Elem(), val.Index(i).Interface(), nil)
+		if err != nil {
+			return mval, err
+		}
+		mval.Index(i).Set(val)
+	}
+	return mval, nil
+}
+
 // Convert toml value to marshal value, using marshal type. When mval1 is non-nil
 // and the given type is a struct value, merge fields into it.
 func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *reflect.Value) (reflect.Value, error) {
@@ -857,6 +904,11 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 				ival := mval1.Elem()
 				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
 			}
+		case reflect.Slice:
+			if isOtherSequence(mtype) && isOtherSequence(reflect.TypeOf(t)) {
+				return d.valueFromOtherSliceI(mtype, t)
+			}
+			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v(%v)", tval, tval, mtype, mtype.Kind())
 		default:
 			return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v(%v)", tval, tval, mtype, mtype.Kind())
 		}
@@ -892,6 +944,7 @@ func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
 	defaultValue := vf.Tag.Get(tagDefault)
 	result := tomlOpts{
 		name:         vf.Name,
+		nameFromTag:  false,
 		comment:      comment,
 		commented:    commented,
 		multiline:    multiline,
@@ -904,6 +957,7 @@ func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
 			result.include = false
 		} else {
 			result.name = strings.Trim(parse[0], " ")
+			result.nameFromTag = true
 		}
 	}
 	if vf.PkgPath != "" {
