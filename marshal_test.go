@@ -859,19 +859,19 @@ type customMarshalerParent struct {
 }
 
 type customMarshaler struct {
-	FirsName string
-	LastName string
+	FirstName string
+	LastName  string
 }
 
 func (c customMarshaler) MarshalTOML() ([]byte, error) {
-	fullName := fmt.Sprintf("%s %s", c.FirsName, c.LastName)
+	fullName := fmt.Sprintf("%s %s", c.FirstName, c.LastName)
 	return []byte(fullName), nil
 }
 
-var customMarshalerData = customMarshaler{FirsName: "Sally", LastName: "Fields"}
+var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
 var customMarshalerToml = []byte(`Sally Fields`)
 var nestedCustomMarshalerData = customMarshalerParent{
-	Self:    customMarshaler{FirsName: "Maiku", LastName: "Suteda"},
+	Self:    customMarshaler{FirstName: "Maiku", LastName: "Suteda"},
 	Friends: []customMarshaler{customMarshalerData},
 }
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
@@ -889,14 +889,128 @@ func TestCustomMarshaler(t *testing.T) {
 	}
 }
 
-func TestNestedCustomMarshaler(t *testing.T) {
-	result, err := Marshal(nestedCustomMarshalerData)
+type textMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m textMarshaler) MarshalText() ([]byte, error) {
+	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
+	return []byte(fullName), nil
+}
+
+func TestTextMarshaler(t *testing.T) {
+	m := textMarshaler{FirstName: "Sally", LastName: "Fields"}
+
+	result, err := Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := nestedCustomMarshalerToml
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad nested custom marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	expected := `Sally Fields`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestNestedTextMarshaler(t *testing.T) {
+	var parent = struct {
+		Self     textMarshaler   `toml:"me"`
+		Friends  []textMarshaler `toml:"friends"`
+		Stranger *textMarshaler  `toml:"stranger"`
+	}{
+		Self:     textMarshaler{FirstName: "Maiku", LastName: "Suteda"},
+		Friends:  []textMarshaler{textMarshaler{FirstName: "Sally", LastName: "Fields"}},
+		Stranger: &textMarshaler{FirstName: "Earl", LastName: "Henson"},
+	}
+
+	result, err := Marshal(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `friends = ["Sally Fields"]
+me = "Maiku Suteda"
+stranger = "Earl Henson"
+`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad nested text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+type precedentMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m precedentMarshaler) MarshalText() ([]byte, error) {
+	return []byte("shadowed"), nil
+}
+
+func (m precedentMarshaler) MarshalTOML() ([]byte, error) {
+	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
+	return []byte(fullName), nil
+}
+
+func TestPrecedentMarshaler(t *testing.T) {
+	m := textMarshaler{FirstName: "Sally", LastName: "Fields"}
+
+	result, err := Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `Sally Fields`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+type customPointerMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m *customPointerMarshaler) MarshalText() ([]byte, error) {
+	return []byte("hidden"), nil
+}
+
+type textPointerMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m *textPointerMarshaler) MarshalText() ([]byte, error) {
+	return []byte("hidden"), nil
+}
+
+func TestPointerMarshaler(t *testing.T) {
+	var parent = struct {
+		Self     customPointerMarshaler  `toml:"me"`
+		Stranger *customPointerMarshaler `toml:"stranger"`
+		Friend   textPointerMarshaler    `toml:"friend"`
+		Fiend    *textPointerMarshaler   `toml:"fiend"`
+	}{
+		Self:     customPointerMarshaler{FirstName: "Maiku", LastName: "Suteda"},
+		Stranger: &customPointerMarshaler{FirstName: "Earl", LastName: "Henson"},
+		Friend:   textPointerMarshaler{FirstName: "Sally", LastName: "Fields"},
+		Fiend:    &textPointerMarshaler{FirstName: "Casper", LastName: "Snider"},
+	}
+
+	result, err := Marshal(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `fiend = "hidden"
+stranger = "hidden"
+
+[friend]
+  FirstName = "Sally"
+  LastName = "Fields"
+
+[me]
+  FirstName = "Maiku"
+  LastName = "Suteda"
+`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad nested text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
 	}
 }
 

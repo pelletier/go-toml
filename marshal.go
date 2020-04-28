@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"encoding"
 	"errors"
 	"fmt"
 	"io"
@@ -69,6 +70,7 @@ const (
 
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
+var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 var localDateType = reflect.TypeOf(LocalDate{})
 var localTimeType = reflect.TypeOf(LocalTime{})
 var localDateTimeType = reflect.TypeOf(LocalDateTime{})
@@ -89,10 +91,14 @@ func isPrimitive(mtype reflect.Type) bool {
 	case reflect.String:
 		return true
 	case reflect.Struct:
-		return mtype == timeType || mtype == localDateType || mtype == localDateTimeType || mtype == localTimeType || isCustomMarshaler(mtype)
+		return isTimeType(mtype) || isCustomMarshaler(mtype) || isTextMarshaler(mtype)
 	default:
 		return false
 	}
+}
+
+func isTimeType(mtype reflect.Type) bool {
+	return mtype == timeType || mtype == localDateType || mtype == localDateTimeType || mtype == localTimeType
 }
 
 // Check if the given marshal type maps to a Tree slice or array
@@ -139,6 +145,14 @@ func isCustomMarshaler(mtype reflect.Type) bool {
 
 func callCustomMarshaler(mval reflect.Value) ([]byte, error) {
 	return mval.Interface().(Marshaler).MarshalTOML()
+}
+
+func isTextMarshaler(mtype reflect.Type) bool {
+	return mtype.Implements(textMarshalerType) && !isTimeType(mtype)
+}
+
+func callTextMarshaler(mval reflect.Value) ([]byte, error) {
+	return mval.Interface().(encoding.TextMarshaler).MarshalText()
 }
 
 // Marshaler is the interface implemented by types that
@@ -317,6 +331,9 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	if isCustomMarshaler(mtype) {
 		return callCustomMarshaler(sval)
 	}
+	if isTextMarshaler(mtype) {
+		return callTextMarshaler(sval)
+	}
 	t, err := e.valueToTree(mtype, sval)
 	if err != nil {
 		return []byte{}, err
@@ -441,7 +458,14 @@ func (e *Encoder) valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (int
 func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
 	e.line++
 	if mtype.Kind() == reflect.Ptr {
-		return e.valueToToml(mtype.Elem(), mval.Elem())
+		switch {
+		case isCustomMarshaler(mtype):
+			return callCustomMarshaler(mval)
+		case isTextMarshaler(mtype):
+			return callTextMarshaler(mval)
+		default:
+			return e.valueToToml(mtype.Elem(), mval.Elem())
+		}
 	}
 	if mtype.Kind() == reflect.Interface {
 		return e.valueToToml(mval.Elem().Type(), mval.Elem())
@@ -449,6 +473,8 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 	switch {
 	case isCustomMarshaler(mtype):
 		return callCustomMarshaler(mval)
+	case isTextMarshaler(mtype):
+		return callTextMarshaler(mval)
 	case isTree(mtype):
 		return e.valueToTree(mtype, mval)
 	case isTreeSequence(mtype):
