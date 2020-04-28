@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-var dateRegexp *regexp.Regexp
+var dateRegexp, bareKeyWithEqualRegexp *regexp.Regexp
 
 // Define state functions
 type tomlLexStateFn func() tomlLexStateFn
@@ -123,6 +123,8 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 	for {
 		next := l.peek()
 		switch next {
+		case '}': // after '{'
+			return l.lexRightCurlyBrace
 		case '[':
 			return l.lexTableKey
 		case '#':
@@ -192,8 +194,6 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 				return l.lexVoid
 			}
 			return l.lexRvalue
-		case '_':
-			return l.errorf("cannot start number with underscore")
 		}
 
 		if l.follow("true") {
@@ -232,12 +232,12 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexDate
 		}
 
-		if next == '+' || next == '-' || isDigit(next) {
-			return l.lexNumber
+		if bareKeyWithEqualRegexp.MatchString(string(l.input[l.inputIdx:])) {
+			return l.lexKey
 		}
 
-		if isAlphanumeric(next) {
-			return l.lexKey
+		if next == '+' || next == '-' || isDigit(next) {
+			return l.lexNumber
 		}
 
 		return l.errorf("no value can start with %c", next)
@@ -543,7 +543,6 @@ func (l *tomlLexer) lexString() tomlLexStateFn {
 	}
 
 	str, err := l.lexStringAsString(terminator, discardLeadingNewLine, acceptNewLines)
-
 	if err != nil {
 		return l.errorf(err.Error())
 	}
@@ -762,6 +761,8 @@ func init() {
 	//07:32:00
 	//00:32:00.999999
 	dateRegexp = regexp.MustCompile(`^(?:\d{1,4}-\d{2}-\d{2})?(?:[T ]?\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?)?`)
+
+	bareKeyWithEqualRegexp = regexp.MustCompile(`^[A-Za-z0-9_\-]+[ \t]*=`)
 }
 
 // Entry point

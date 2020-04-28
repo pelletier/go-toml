@@ -698,6 +698,7 @@ func TestUnicodeString(t *testing.T) {
 		{Position{1, 22}, tokenEOF, ""},
 	})
 }
+
 func TestEscapeInString(t *testing.T) {
 	testFlow(t, `foo = "\b\f\/"`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
@@ -772,6 +773,16 @@ func TestLexUnknownRvalue(t *testing.T) {
 	})
 }
 
+func TestLexInlineTableEmpty(t *testing.T) {
+	testFlow(t, `foo = {}`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 8}, tokenRightCurlyBrace, "}"},
+		{Position{1, 9}, tokenEOF, ""},
+	})
+}
+
 func TestLexInlineTableBareKey(t *testing.T) {
 	testFlow(t, `foo = { bar = "baz" }`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
@@ -795,6 +806,23 @@ func TestLexInlineTableBareKeyDash(t *testing.T) {
 		{Position{1, 17}, tokenString, "baz"},
 		{Position{1, 22}, tokenRightCurlyBrace, "}"},
 		{Position{1, 23}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableBareKeyWithComma(t *testing.T) {
+	testFlow(t, `foo = { -bar1 = "baz", -bar_ = "baz" }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "-bar1"},
+		{Position{1, 15}, tokenEqual, "="},
+		{Position{1, 18}, tokenString, "baz"},
+		{Position{1, 22}, tokenComma, ","},
+		{Position{1, 24}, tokenKey, "-bar_"},
+		{Position{1, 30}, tokenEqual, "="},
+		{Position{1, 33}, tokenString, "baz"},
+		{Position{1, 38}, tokenRightCurlyBrace, "}"},
+		{Position{1, 39}, tokenEOF, ""},
 	})
 }
 

@@ -239,7 +239,8 @@ func TestLocalDateTime(t *testing.T) {
 				Minute:     32,
 				Second:     0,
 				Nanosecond: 0,
-			}},
+			},
+		},
 	})
 }
 
@@ -257,7 +258,8 @@ func TestLocalDateTimeNano(t *testing.T) {
 				Minute:     32,
 				Second:     0,
 				Nanosecond: 999999000,
-			}},
+			},
+		},
 	})
 }
 
@@ -900,10 +902,8 @@ func TestTomlValueStringRepresentation(t *testing.T) {
 		{"hello world", "\"hello world\""},
 		{"\b\t\n\f\r\"\\", "\"\\b\\t\\n\\f\\r\\\"\\\\\""},
 		{"\x05", "\"\\u0005\""},
-		{time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC),
-			"1979-05-27T07:32:00Z"},
-		{[]interface{}{"gamma", "delta"},
-			"[\"gamma\",\"delta\"]"},
+		{time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC), "1979-05-27T07:32:00Z"},
+		{[]interface{}{"gamma", "delta"}, "[\"gamma\",\"delta\"]"},
 		{nil, ""},
 	} {
 		result, err := tomlValueStringRepresentation(item.Value, "", "", false)
@@ -1033,7 +1033,7 @@ func TestInvalidFloatParsing(t *testing.T) {
 	}
 
 	_, err = Load("a=_1_2")
-	if err.Error() != "(1, 3): cannot start number with underscore" {
+	if err.Error() != "(1, 3): no value can start with _" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -1097,10 +1097,10 @@ The quick brown \
     the lazy dog."""
 
 str3 = """\
-       The quick brown \ 
-       fox jumps over \ 
-       the lazy dog.\  
-       """`)
+       The quick brown \
+       fox jumps over \
+       the lazy dog.\
+	   """`)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
