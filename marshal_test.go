@@ -3272,7 +3272,6 @@ Float = 2.0
 		t.Fatalf("unexpected err: %s", err.Error())
 	}
 	if doc.UnixTime.Value != 12 {
-
 		t.Fatalf("expected UnixTime: 12 got: %d", doc.UnixTime.Value)
 	}
 	if doc.Version.Value != 42 {
