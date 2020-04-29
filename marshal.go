@@ -1004,19 +1004,6 @@ func (d *Decoder) unmarshalText(tval interface{}, mval reflect.Value) error {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, tval)
 	return callTextUnmarshaler(mval, buf.Bytes())
-	switch val := tval.(type) {
-	case string:
-		s = val
-	case bool:
-		s = fmt.Sprintf("%v", val)
-	case int64:
-		s = fmt.Sprintf("%d", val)
-	case float64:
-		s = fmt.Sprintf("%f", val)
-	default:
-		return fmt.Errorf("unspported type: %t", val)
-	}
-	return callTextUnmarshaler(mval, []byte(s))
 }
 
 func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
