@@ -809,6 +809,21 @@ func TestLexInlineTableBareKeyDash(t *testing.T) {
 	})
 }
 
+func TestLexInlineTableBareKeyInArray(t *testing.T) {
+	testFlow(t, `foo = [{ -bar_ = "baz" }]`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftBracket, "["},
+		{Position{1, 8}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 10}, tokenKey, "-bar_"},
+		{Position{1, 16}, tokenEqual, "="},
+		{Position{1, 19}, tokenString, "baz"},
+		{Position{1, 24}, tokenRightCurlyBrace, "}"},
+		{Position{1, 25}, tokenRightBracket, "]"},
+		{Position{1, 26}, tokenEOF, ""},
+	})
+}
+
 func TestLexInlineTableBareKeyWithComma(t *testing.T) {
 	testFlow(t, `foo = { -bar1 = "baz", -bar_ = "baz" }`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
