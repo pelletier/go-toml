@@ -1001,7 +1001,9 @@ func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}, mval1 *ref
 }
 
 func (d *Decoder) unmarshalText(tval interface{}, mval reflect.Value) error {
-	var s string
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, tval)
+	return callTextUnmarshaler(mval, buf.Bytes())
 	switch val := tval.(type) {
 	case string:
 		s = val
