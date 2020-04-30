@@ -877,6 +877,9 @@ var nestedCustomMarshalerData = customMarshalerParent{
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
 me = "Maiku Suteda"
 `)
+var nestedCustomMarshalerTomlForUnmarshal = []byte(`[friends]
+FirstName = "Sally"
+LastName = "Fields"`)
 
 func TestCustomMarshaler(t *testing.T) {
 	result, err := Marshal(customMarshalerData)
@@ -909,6 +912,26 @@ func TestTextMarshaler(t *testing.T) {
 	expected := `Sally Fields`
 	if !bytes.Equal(result, []byte(expected)) {
 		t.Errorf("Bad text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestUnmarshalTextMarshaler(t *testing.T) {
+	var nested = struct {
+		Friends textMarshaler `toml:"friends"`
+	}{}
+
+	var expected = struct {
+		Friends textMarshaler `toml:"friends"`
+	}{
+		Friends: textMarshaler{FirstName: "Sally", LastName: "Fields"},
+	}
+
+	err := Unmarshal(nestedCustomMarshalerTomlForUnmarshal, &nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(nested, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, nested)
 	}
 }
 
@@ -968,7 +991,7 @@ type customPointerMarshaler struct {
 	LastName  string
 }
 
-func (m *customPointerMarshaler) MarshalText() ([]byte, error) {
+func (m *customPointerMarshaler) MarshalTOML() ([]byte, error) {
 	return []byte("hidden"), nil
 }
 
@@ -2258,7 +2281,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
