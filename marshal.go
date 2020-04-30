@@ -768,7 +768,11 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 
 // Convert toml value to marshal struct/map slice, using marshal type
 func (d *Decoder) valueFromTreeSlice(mtype reflect.Type, tval []*Tree) (reflect.Value, error) {
-	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
+	mval, err := makeSliceOrArray(mtype, len(tval))
+	if err != nil {
+		return mval, err
+	}
+
 	for i := 0; i < len(tval); i++ {
 		d.visitor.push(strconv.Itoa(i))
 		val, err := d.valueFromTree(mtype.Elem(), tval[i], nil)
@@ -783,7 +787,11 @@ func (d *Decoder) valueFromTreeSlice(mtype reflect.Type, tval []*Tree) (reflect.
 
 // Convert toml value to marshal primitive slice, using marshal type
 func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (reflect.Value, error) {
-	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
+	mval, err := makeSliceOrArray(mtype, len(tval))
+	if err != nil {
+		return mval, err
+	}
+
 	for i := 0; i < len(tval); i++ {
 		val, err := d.valueFromToml(mtype.Elem(), tval[i], nil)
 		if err != nil {
@@ -797,15 +805,34 @@ func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (r
 // Convert toml value to marshal primitive slice, using marshal type
 func (d *Decoder) valueFromOtherSliceI(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
 	val := reflect.ValueOf(tval)
+	length := val.Len()
 
-	lenght := val.Len()
-	mval := reflect.MakeSlice(mtype, lenght, lenght)
-	for i := 0; i < lenght; i++ {
+	mval, err := makeSliceOrArray(mtype, length)
+	if err != nil {
+		return mval, err
+	}
+
+	for i := 0; i < length; i++ {
 		val, err := d.valueFromToml(mtype.Elem(), val.Index(i).Interface(), nil)
 		if err != nil {
 			return mval, err
 		}
 		mval.Index(i).Set(val)
+	}
+	return mval, nil
+}
+
+// Create a new slice or a new array with specified length
+func makeSliceOrArray(mtype reflect.Type, tLength int) (reflect.Value, error) {
+	var mval reflect.Value
+	switch mtype.Kind() {
+	case reflect.Slice:
+		mval = reflect.MakeSlice(mtype, tLength, tLength)
+	case reflect.Array:
+		mval = reflect.New(reflect.ArrayOf(mtype.Len(), mtype.Elem())).Elem()
+		if tLength > mtype.Len() {
+			return mval, fmt.Errorf("unmarshal: TOML array length (%v) exceeds destination array length (%v)", tLength, mtype.Len())
+		}
 	}
 	return mval, nil
 }
@@ -955,7 +982,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 				ival := mval1.Elem()
 				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
 			}
-		case reflect.Slice:
+		case reflect.Slice, reflect.Array:
 			if isOtherSequence(mtype) && isOtherSequence(reflect.TypeOf(t)) {
 				return d.valueFromOtherSliceI(mtype, t)
 			}
@@ -1025,11 +1052,7 @@ func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
 
 func isZero(val reflect.Value) bool {
 	switch val.Type().Kind() {
-	case reflect.Map:
-		fallthrough
-	case reflect.Array:
-		fallthrough
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array, reflect.Map:
 		return val.Len() == 0
 	default:
 		return reflect.DeepEqual(val.Interface(), reflect.Zero(val.Type()).Interface())
