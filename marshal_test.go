@@ -43,6 +43,19 @@ Zstring = "Hello"
   String2 = "One"
 `)
 
+var basicTestTomlCustomIndentation = []byte(`Ystrlist = ["Howdy","Hey There"]
+Zstring = "Hello"
+
+[[Wsublist]]
+	String2 = "Two"
+
+[[Wsublist]]
+	String2 = "Three"
+
+[Xsubdoc]
+	String2 = "One"
+`)
+
 var basicTestTomlOrdered = []byte(`Zstring = "Hello"
 Ystrlist = ["Howdy","Hey There"]
 
@@ -203,6 +216,26 @@ func TestBasicMarshal(t *testing.T) {
 	expected := basicTestToml
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestBasicMarshalCustomIndentation(t *testing.T) {
+	var result bytes.Buffer
+	err := NewEncoder(&result).Indentation("\t").Encode(basicTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := basicTestTomlCustomIndentation
+	if !bytes.Equal(result.Bytes(), expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
+	}
+}
+
+func TestBasicMarshalWrongIndentation(t *testing.T) {
+	var result bytes.Buffer
+	err := NewEncoder(&result).Indentation("  \n").Encode(basicTestData)
+	if err.Error() != "invalid indentation: must only contains space or tab characters" {
+		t.Error("expect err:invalid indentation: must only contains space or tab characters but got:", err)
 	}
 }
 
@@ -2258,7 +2291,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
