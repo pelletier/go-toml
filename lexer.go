@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-var dateRegexp, bareKeyWithEqualRegexp *regexp.Regexp
+var dateRegexp *regexp.Regexp
 
 // Define state functions
 type tomlLexStateFn func() tomlLexStateFn
@@ -26,7 +26,7 @@ type tomlLexer struct {
 	currentTokenStart int
 	currentTokenStop  int
 	tokens            []token
-	depth             int
+	brackets          []rune
 	line              int
 	col               int
 	endbufferLine     int
@@ -142,10 +142,6 @@ func (l *tomlLexer) lexVoid() tomlLexStateFn {
 			l.skip()
 		}
 
-		if l.depth > 0 {
-			return l.lexRvalue
-		}
-
 		if isKeyStartChar(next) {
 			return l.lexKey
 		}
@@ -169,10 +165,8 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 		case '=':
 			return l.lexEqual
 		case '[':
-			l.depth++
 			return l.lexLeftBracket
 		case ']':
-			l.depth--
 			return l.lexRightBracket
 		case '{':
 			return l.lexLeftCurlyBrace
@@ -190,10 +184,10 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			fallthrough
 		case '\n':
 			l.skip()
-			if l.depth == 0 {
-				return l.lexVoid
+			if len(l.brackets) > 0 && l.brackets[len(l.brackets)-1] == '[' {
+				return l.lexRvalue
 			}
-			return l.lexRvalue
+			return l.lexVoid
 		}
 
 		if l.follow("true") {
@@ -232,10 +226,6 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 			return l.lexDate
 		}
 
-		if bareKeyWithEqualRegexp.MatchString(string(l.input[l.inputIdx:])) {
-			return l.lexKey
-		}
-
 		if next == '+' || next == '-' || isDigit(next) {
 			return l.lexNumber
 		}
@@ -250,12 +240,17 @@ func (l *tomlLexer) lexRvalue() tomlLexStateFn {
 func (l *tomlLexer) lexLeftCurlyBrace() tomlLexStateFn {
 	l.next()
 	l.emit(tokenLeftCurlyBrace)
+	l.brackets = append(l.brackets, '{')
 	return l.lexVoid
 }
 
 func (l *tomlLexer) lexRightCurlyBrace() tomlLexStateFn {
 	l.next()
 	l.emit(tokenRightCurlyBrace)
+	if len(l.brackets) == 0 || l.brackets[len(l.brackets)-1] != '{' {
+		return l.errorf("cannot have '}' here")
+	}
+	l.brackets = l.brackets[:len(l.brackets)-1]
 	return l.lexRvalue
 }
 
@@ -302,6 +297,9 @@ func (l *tomlLexer) lexEqual() tomlLexStateFn {
 func (l *tomlLexer) lexComma() tomlLexStateFn {
 	l.next()
 	l.emit(tokenComma)
+	if len(l.brackets) > 0 && l.brackets[len(l.brackets)-1] == '{' {
+		return l.lexVoid
+	}
 	return l.lexRvalue
 }
 
@@ -361,6 +359,7 @@ func (l *tomlLexer) lexComment(previousState tomlLexStateFn) tomlLexStateFn {
 func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
 	l.next()
 	l.emit(tokenLeftBracket)
+	l.brackets = append(l.brackets, '[')
 	return l.lexRvalue
 }
 
@@ -614,6 +613,10 @@ func (l *tomlLexer) lexInsideTableKey() tomlLexStateFn {
 func (l *tomlLexer) lexRightBracket() tomlLexStateFn {
 	l.next()
 	l.emit(tokenRightBracket)
+	if len(l.brackets) == 0 || l.brackets[len(l.brackets)-1] != '[' {
+		return l.errorf("cannot have ']' here")
+	}
+	l.brackets = l.brackets[:len(l.brackets)-1]
 	return l.lexRvalue
 }
 
@@ -761,8 +764,6 @@ func init() {
 	//07:32:00
 	//00:32:00.999999
 	dateRegexp = regexp.MustCompile(`^(?:\d{1,4}-\d{2}-\d{2})?(?:[T ]?\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?)?`)
-
-	bareKeyWithEqualRegexp = regexp.MustCompile(`^[A-Za-z0-9_\-]+[ \t]*=`)
 }
 
 // Entry point

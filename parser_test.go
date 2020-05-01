@@ -679,7 +679,7 @@ func TestInlineTableUnterminated(t *testing.T) {
 
 func TestInlineTableCommaExpected(t *testing.T) {
 	_, err := Load("foo = {hello = 53 test = foo}")
-	if err.Error() != "(1, 19): comma expected between fields in inline table" {
+	if err.Error() != "(1, 19): unexpected token type in inline table: no value can start with t" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -693,7 +693,7 @@ func TestInlineTableCommaStart(t *testing.T) {
 
 func TestInlineTableDoubleComma(t *testing.T) {
 	_, err := Load("foo = {hello = 53,, foo = 17}")
-	if err.Error() != "(1, 19): need field between two commas in inline table" {
+	if err.Error() != "(1, 19): unexpected token type in inline table: keys cannot contain , character" {
 		t.Error("Bad error message:", err.Error())
 	}
 }
@@ -1101,7 +1101,6 @@ str3 = """\
        fox jumps over \
        the lazy dog.\
 	   """`)
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
