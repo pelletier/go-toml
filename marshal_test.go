@@ -1994,16 +1994,28 @@ func TestUnmarshalDefault(t *testing.T) {
 		StringField string `default:"c"`
 	}
 
+	type aliasUint uint
+
 	var doc struct {
 		StringField       string  `default:"a"`
 		BoolField         bool    `default:"true"`
-		IntField          int     `default:"1"`
-		Int64Field        int64   `default:"2"`
-		Float64Field      float64 `default:"3.1"`
+		UintField         uint    `default:"1"`
+		Uint8Field        uint8   `default:"8"`
+		Uint16Field       uint16  `default:"16"`
+		Uint32Field       uint32  `default:"32"`
+		Uint64Field       uint64  `default:"64"`
+		IntField          int     `default:"-1"`
+		Int8Field         int8    `default:"-8"`
+		Int16Field        int16   `default:"-16"`
+		Int32Field        int32   `default:"-32"`
+		Int64Field        int64   `default:"-64"`
+		Float32Field      float32 `default:"32.1"`
+		Float64Field      float64 `default:"64.1"`
 		NonEmbeddedStruct struct {
 			StringField string `default:"b"`
 		}
 		EmbeddedStruct
+		AliasUintField aliasUint `default:"1000"`
 	}
 
 	err := Unmarshal([]byte(``), &doc)
@@ -2016,20 +2028,50 @@ func TestUnmarshalDefault(t *testing.T) {
 	if doc.StringField != "a" {
 		t.Errorf("StringField should be \"a\", not %s", doc.StringField)
 	}
-	if doc.IntField != 1 {
-		t.Errorf("IntField should be 1, not %d", doc.IntField)
+	if doc.UintField != 1 {
+		t.Errorf("UintField should be 1, not %d", doc.UintField)
 	}
-	if doc.Int64Field != 2 {
-		t.Errorf("Int64Field should be 2, not %d", doc.Int64Field)
+	if doc.Uint8Field != 8 {
+		t.Errorf("Uint8Field should be 8, not %d", doc.Uint8Field)
 	}
-	if doc.Float64Field != 3.1 {
-		t.Errorf("Float64Field should be 3.1, not %f", doc.Float64Field)
+	if doc.Uint16Field != 16 {
+		t.Errorf("Uint16Field should be 16, not %d", doc.Uint16Field)
+	}
+	if doc.Uint32Field != 32 {
+		t.Errorf("Uint32Field should be 32, not %d", doc.Uint32Field)
+	}
+	if doc.Uint64Field != 64 {
+		t.Errorf("Uint64Field should be 64, not %d", doc.Uint64Field)
+	}
+	if doc.IntField != -1 {
+		t.Errorf("IntField should be -1, not %d", doc.IntField)
+	}
+	if doc.Int8Field != -8 {
+		t.Errorf("Int8Field should be -8, not %d", doc.Int8Field)
+	}
+	if doc.Int16Field != -16 {
+		t.Errorf("Int16Field should be -16, not %d", doc.Int16Field)
+	}
+	if doc.Int32Field != -32 {
+		t.Errorf("Int32Field should be -32, not %d", doc.Int32Field)
+	}
+	if doc.Int64Field != -64 {
+		t.Errorf("Int64Field should be -64, not %d", doc.Int64Field)
+	}
+	if doc.Float32Field != 32.1 {
+		t.Errorf("Float32Field should be 32.1, not %f", doc.Float32Field)
+	}
+	if doc.Float64Field != 64.1 {
+		t.Errorf("Float64Field should be 64.1, not %f", doc.Float64Field)
 	}
 	if doc.NonEmbeddedStruct.StringField != "b" {
 		t.Errorf("StringField should be \"b\", not %s", doc.NonEmbeddedStruct.StringField)
 	}
 	if doc.EmbeddedStruct.StringField != "c" {
 		t.Errorf("StringField should be \"c\", not %s", doc.EmbeddedStruct.StringField)
+	}
+	if doc.AliasUintField != 1000 {
+		t.Errorf("AliasUintField should be 1000, not %d", doc.AliasUintField)
 	}
 }
 
@@ -2258,7 +2300,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
