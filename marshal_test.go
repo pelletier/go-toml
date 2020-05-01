@@ -1989,6 +1989,32 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 	}
 }
 
+func TestUnmarshalOverflow(t *testing.T) {
+	type overflow struct {
+		U8  uint8
+		I8  int8
+		F32 float32
+	}
+
+	treeU8, _ := Load("u8 = 300")
+	treeI8, _ := Load("i8 = 300")
+	treeF32, _ := Load("f32 = 1e300")
+
+	errU8 := treeU8.Unmarshal(&overflow{})
+	errI8 := treeI8.Unmarshal(&overflow{})
+	errF32 := treeF32.Unmarshal(&overflow{})
+
+	if errU8.Error() != "(1, 1): 300(int64) would overflow uint8" {
+		t.Error("expect err:(1, 1): 300(int64) would overflow uint8 but got:", errU8)
+	}
+	if errI8.Error() != "(1, 1): 300(int64) would overflow int8" {
+		t.Error("expect err:(1, 1): 300(int64) would overflow int8 but got:", errI8)
+	}
+	if errF32.Error() != "(1, 1): 1e+300(float64) would overflow float32" {
+		t.Error("expect err:(1, 1): 1e+300(float64) would overflow float32 but got:", errF32)
+	}
+}
+
 func TestUnmarshalDefault(t *testing.T) {
 	type EmbeddedStruct struct {
 		StringField string `default:"c"`
@@ -2258,7 +2284,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
