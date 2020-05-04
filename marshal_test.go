@@ -911,6 +911,9 @@ var nestedCustomMarshalerData = customMarshalerParent{
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
 me = "Maiku Suteda"
 `)
+var nestedCustomMarshalerTomlForUnmarshal = []byte(`[friends]
+FirstName = "Sally"
+LastName = "Fields"`)
 
 func TestCustomMarshaler(t *testing.T) {
 	result, err := Marshal(customMarshalerData)
@@ -943,6 +946,26 @@ func TestTextMarshaler(t *testing.T) {
 	expected := `Sally Fields`
 	if !bytes.Equal(result, []byte(expected)) {
 		t.Errorf("Bad text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestUnmarshalTextMarshaler(t *testing.T) {
+	var nested = struct {
+		Friends textMarshaler `toml:"friends"`
+	}{}
+
+	var expected = struct {
+		Friends textMarshaler `toml:"friends"`
+	}{
+		Friends: textMarshaler{FirstName: "Sally", LastName: "Fields"},
+	}
+
+	err := Unmarshal(nestedCustomMarshalerTomlForUnmarshal, &nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(nested, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, nested)
 	}
 }
 
@@ -1002,7 +1025,7 @@ type customPointerMarshaler struct {
 	LastName  string
 }
 
-func (m *customPointerMarshaler) MarshalText() ([]byte, error) {
+func (m *customPointerMarshaler) MarshalTOML() ([]byte, error) {
 	return []byte("hidden"), nil
 }
 
@@ -1045,6 +1068,30 @@ stranger = "hidden"
 `
 	if !bytes.Equal(result, []byte(expected)) {
 		t.Errorf("Bad nested text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestPointerCustomMarshalerSequence(t *testing.T) {
+	var customPointerMarshalerSlice *[]*customPointerMarshaler
+	var customPointerMarshalerArray *[2]*customPointerMarshaler
+
+	if !isCustomMarshalerSequence(reflect.TypeOf(customPointerMarshalerSlice)) {
+		t.Errorf("error: should be a sequence of custom marshaler interfaces")
+	}
+	if !isCustomMarshalerSequence(reflect.TypeOf(customPointerMarshalerArray)) {
+		t.Errorf("error: should be a sequence of custom marshaler interfaces")
+	}
+}
+
+func TestPointerTextMarshalerSequence(t *testing.T) {
+	var textPointerMarshalerSlice *[]*textPointerMarshaler
+	var textPointerMarshalerArray *[2]*textPointerMarshaler
+
+	if !isTextMarshalerSequence(reflect.TypeOf(textPointerMarshalerSlice)) {
+		t.Errorf("error: should be a sequence of text marshaler interfaces")
+	}
+	if !isTextMarshalerSequence(reflect.TypeOf(textPointerMarshalerArray)) {
+		t.Errorf("error: should be a sequence of text marshaler interfaces")
 	}
 }
 

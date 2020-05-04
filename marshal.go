@@ -93,7 +93,7 @@ func isPrimitive(mtype reflect.Type) bool {
 	case reflect.String:
 		return true
 	case reflect.Struct:
-		return isTimeType(mtype) || isCustomMarshaler(mtype) || isTextMarshaler(mtype)
+		return isTimeType(mtype)
 	default:
 		return false
 	}
@@ -110,6 +110,30 @@ func isTreeSequence(mtype reflect.Type) bool {
 		return isTreeSequence(mtype.Elem())
 	case reflect.Slice, reflect.Array:
 		return isTree(mtype.Elem())
+	default:
+		return false
+	}
+}
+
+// Check if the given marshal type maps to a slice or array of a custom marshaler type
+func isCustomMarshalerSequence(mtype reflect.Type) bool {
+	switch mtype.Kind() {
+	case reflect.Ptr:
+		return isCustomMarshalerSequence(mtype.Elem())
+	case reflect.Slice, reflect.Array:
+		return isCustomMarshaler(mtype.Elem()) || isCustomMarshaler(reflect.New(mtype.Elem()).Type())
+	default:
+		return false
+	}
+}
+
+// Check if the given marshal type maps to a slice or array of a text marshaler type
+func isTextMarshalerSequence(mtype reflect.Type) bool {
+	switch mtype.Kind() {
+	case reflect.Ptr:
+		return isTextMarshalerSequence(mtype.Elem())
+	case reflect.Slice, reflect.Array:
+		return isTextMarshaler(mtype.Elem()) || isTextMarshaler(reflect.New(mtype.Elem()).Type())
 	default:
 		return false
 	}
@@ -516,10 +540,10 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 		return callTextMarshaler(mval)
 	case isTree(mtype):
 		return e.valueToTree(mtype, mval)
+	case isOtherSequence(mtype), isCustomMarshalerSequence(mtype), isTextMarshalerSequence(mtype):
+		return e.valueToOtherSlice(mtype, mval)
 	case isTreeSequence(mtype):
 		return e.valueToTreeSlice(mtype, mval)
-	case isOtherSequence(mtype):
-		return e.valueToOtherSlice(mtype, mval)
 	default:
 		switch mtype.Kind() {
 		case reflect.Bool:
