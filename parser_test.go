@@ -703,6 +703,34 @@ func TestInlineTableTrailingComma(t *testing.T) {
 	}
 }
 
+func TestAddKeyToInlineTable(t *testing.T) {
+	_, err := Load("type = { name = \"Nail\" }\ntype.edible = false")
+	if err.Error() != "(2, 1): could not add key or sub-table to exist inline table or its sub-table : type" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestAddSubTableToInlineTable(t *testing.T) {
+	_, err := Load("a = { b = \"c\" }\na.d.e = \"f\"")
+	if err.Error() != "(2, 1): could not add key or sub-table to exist inline table or its sub-table : a.d" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestAddKeyToSubTableOfInlineTable(t *testing.T) {
+	_, err := Load("a = { b = { c = \"d\" } }\na.b.e = \"f\"")
+	if err.Error() != "(2, 1): could not add key or sub-table to exist inline table or its sub-table : a.b" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
+func TestReDefineInlineTable(t *testing.T) {
+	_, err := Load("a = { b = \"c\" }\n[a]\n  d = \"e\"")
+	if err.Error() != "(2, 2): could not re-define exist inline table or its sub-table : a" {
+		t.Error("Bad error message:", err.Error())
+	}
+}
+
 func TestDuplicateGroups(t *testing.T) {
 	_, err := Load("[foo]\na=2\n[foo]b=3")
 	if err.Error() != "(3, 2): duplicated tables" {
