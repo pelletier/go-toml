@@ -1037,6 +1037,30 @@ stranger = "hidden"
 	}
 }
 
+func TestPointerCustomMarshalerSequence(t *testing.T) {
+	var customPointerMarshalerSlice *[]*customPointerMarshaler
+	var customPointerMarshalerArray *[2]*customPointerMarshaler
+
+	if !isCustomMarshalerSequence(reflect.TypeOf(customPointerMarshalerSlice)) {
+		t.Errorf("error: should be a sequence of custom marshaler interfaces")
+	}
+	if !isCustomMarshalerSequence(reflect.TypeOf(customPointerMarshalerArray)) {
+		t.Errorf("error: should be a sequence of custom marshaler interfaces")
+	}
+}
+
+func TestPointerTextMarshalerSequence(t *testing.T) {
+	var textPointerMarshalerSlice *[]*textPointerMarshaler
+	var textPointerMarshalerArray *[2]*textPointerMarshaler
+
+	if !isTextMarshalerSequence(reflect.TypeOf(textPointerMarshalerSlice)) {
+		t.Errorf("error: should be a sequence of text marshaler interfaces")
+	}
+	if !isTextMarshalerSequence(reflect.TypeOf(textPointerMarshalerArray)) {
+		t.Errorf("error: should be a sequence of text marshaler interfaces")
+	}
+}
+
 var commentTestToml = []byte(`
 # it's a comment on type
 [postgres]
