@@ -731,32 +731,42 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 					var val interface{}
 					var err error
 					switch mvalf.Kind() {
-					case reflect.Bool:
-						val, err = strconv.ParseBool(opts.defaultValue)
-						if err != nil {
-							return mval.Field(i), err
-						}
-					case reflect.Int:
-						val, err = strconv.Atoi(opts.defaultValue)
-						if err != nil {
-							return mval.Field(i), err
-						}
 					case reflect.String:
 						val = opts.defaultValue
+					case reflect.Bool:
+						val, err = strconv.ParseBool(opts.defaultValue)
+					case reflect.Uint:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 0)
+					case reflect.Uint8:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 8)
+					case reflect.Uint16:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 16)
+					case reflect.Uint32:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 32)
+					case reflect.Uint64:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 64)
+					case reflect.Int:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 0)
+					case reflect.Int8:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 8)
+					case reflect.Int16:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 16)
+					case reflect.Int32:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 32)
 					case reflect.Int64:
 						val, err = strconv.ParseInt(opts.defaultValue, 10, 64)
-						if err != nil {
-							return mval.Field(i), err
-						}
+					case reflect.Float32:
+						val, err = strconv.ParseFloat(opts.defaultValue, 32)
 					case reflect.Float64:
 						val, err = strconv.ParseFloat(opts.defaultValue, 64)
-						if err != nil {
-							return mval.Field(i), err
-						}
 					default:
-						return mval.Field(i), fmt.Errorf("unsupported field type for default option")
+						return mvalf, fmt.Errorf("unsupported field type for default option")
 					}
-					mval.Field(i).Set(reflect.ValueOf(val))
+
+					if err != nil {
+						return mvalf, err
+					}
+					mvalf.Set(reflect.ValueOf(val).Convert(mvalf.Type()))
 				}
 
 				// save the old behavior above and try to check structs
