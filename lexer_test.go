@@ -698,6 +698,7 @@ func TestUnicodeString(t *testing.T) {
 		{Position{1, 22}, tokenEOF, ""},
 	})
 }
+
 func TestEscapeInString(t *testing.T) {
 	testFlow(t, `foo = "\b\f\/"`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
@@ -772,6 +773,16 @@ func TestLexUnknownRvalue(t *testing.T) {
 	})
 }
 
+func TestLexInlineTableEmpty(t *testing.T) {
+	testFlow(t, `foo = {}`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 8}, tokenRightCurlyBrace, "}"},
+		{Position{1, 9}, tokenEOF, ""},
+	})
+}
+
 func TestLexInlineTableBareKey(t *testing.T) {
 	testFlow(t, `foo = { bar = "baz" }`, []token{
 		{Position{1, 1}, tokenKey, "foo"},
@@ -795,6 +806,116 @@ func TestLexInlineTableBareKeyDash(t *testing.T) {
 		{Position{1, 17}, tokenString, "baz"},
 		{Position{1, 22}, tokenRightCurlyBrace, "}"},
 		{Position{1, 23}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableBareKeyInArray(t *testing.T) {
+	testFlow(t, `foo = [{ -bar_ = "baz" }]`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftBracket, "["},
+		{Position{1, 8}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 10}, tokenKey, "-bar_"},
+		{Position{1, 16}, tokenEqual, "="},
+		{Position{1, 19}, tokenString, "baz"},
+		{Position{1, 24}, tokenRightCurlyBrace, "}"},
+		{Position{1, 25}, tokenRightBracket, "]"},
+		{Position{1, 26}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableError1(t *testing.T) {
+	testFlow(t, `foo = { 123 = 0 ]`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "123"},
+		{Position{1, 13}, tokenEqual, "="},
+		{Position{1, 15}, tokenInteger, "0"},
+		{Position{1, 17}, tokenRightBracket, "]"},
+		{Position{1, 18}, tokenError, "cannot have ']' here"},
+	})
+}
+
+func TestLexInlineTableError2(t *testing.T) {
+	testFlow(t, `foo = { 123 = 0 }}`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "123"},
+		{Position{1, 13}, tokenEqual, "="},
+		{Position{1, 15}, tokenInteger, "0"},
+		{Position{1, 17}, tokenRightCurlyBrace, "}"},
+		{Position{1, 18}, tokenRightCurlyBrace, "}"},
+		{Position{1, 19}, tokenError, "cannot have '}' here"},
+	})
+}
+
+func TestLexInlineTableDottedKey1(t *testing.T) {
+	testFlow(t, `foo = { a = 0, 123.45abc = 0 }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "a"},
+		{Position{1, 11}, tokenEqual, "="},
+		{Position{1, 13}, tokenInteger, "0"},
+		{Position{1, 14}, tokenComma, ","},
+		{Position{1, 16}, tokenKey, "123.45abc"},
+		{Position{1, 26}, tokenEqual, "="},
+		{Position{1, 28}, tokenInteger, "0"},
+		{Position{1, 30}, tokenRightCurlyBrace, "}"},
+		{Position{1, 31}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableDottedKey2(t *testing.T) {
+	testFlow(t, `foo = { a = 0, '123'.'45abc' = 0 }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "a"},
+		{Position{1, 11}, tokenEqual, "="},
+		{Position{1, 13}, tokenInteger, "0"},
+		{Position{1, 14}, tokenComma, ","},
+		{Position{1, 16}, tokenKey, "'123'.'45abc'"},
+		{Position{1, 30}, tokenEqual, "="},
+		{Position{1, 32}, tokenInteger, "0"},
+		{Position{1, 34}, tokenRightCurlyBrace, "}"},
+		{Position{1, 35}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableDottedKey3(t *testing.T) {
+	testFlow(t, `foo = { a = 0, "123"."45ʎǝʞ" = 0 }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "a"},
+		{Position{1, 11}, tokenEqual, "="},
+		{Position{1, 13}, tokenInteger, "0"},
+		{Position{1, 14}, tokenComma, ","},
+		{Position{1, 16}, tokenKey, `"123"."45ʎǝʞ"`},
+		{Position{1, 30}, tokenEqual, "="},
+		{Position{1, 32}, tokenInteger, "0"},
+		{Position{1, 34}, tokenRightCurlyBrace, "}"},
+		{Position{1, 35}, tokenEOF, ""},
+	})
+}
+
+func TestLexInlineTableBareKeyWithComma(t *testing.T) {
+	testFlow(t, `foo = { -bar1 = "baz", -bar_ = "baz" }`, []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLeftCurlyBrace, "{"},
+		{Position{1, 9}, tokenKey, "-bar1"},
+		{Position{1, 15}, tokenEqual, "="},
+		{Position{1, 18}, tokenString, "baz"},
+		{Position{1, 22}, tokenComma, ","},
+		{Position{1, 24}, tokenKey, "-bar_"},
+		{Position{1, 30}, tokenEqual, "="},
+		{Position{1, 33}, tokenString, "baz"},
+		{Position{1, 38}, tokenRightCurlyBrace, "}"},
+		{Position{1, 39}, tokenEOF, ""},
 	})
 }
 
