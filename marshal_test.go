@@ -3449,6 +3449,81 @@ func TestDecoderStrictValid(t *testing.T) {
 	}
 }
 
+type docUnmarshalTOML struct {
+	Decoded struct {
+		Key string
+	}
+}
+
+func (d *docUnmarshalTOML) UnmarshalTOML(i interface{}) error {
+	if iMap, ok := i.(map[string]interface{}); !ok {
+		return fmt.Errorf("type assertion error: wants %T, have %T", map[string]interface{}{}, i)
+	} else if key, ok := iMap["key"]; !ok {
+		return fmt.Errorf("key '%s' not in map", "key")
+	} else if keyString, ok := key.(string); !ok {
+		return fmt.Errorf("type assertion error: wants %T, have %T", "", key)
+	} else {
+		d.Decoded.Key = keyString
+	}
+	return nil
+}
+
+func TestDecoderStrictCustomUnmarshal(t *testing.T) {
+	input := `key = "ok"`
+	var doc docUnmarshalTOML
+	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if doc.Decoded.Key != "ok" {
+		t.Errorf("Bad unmarshal: expected ok, got %v", doc.Decoded.Key)
+	}
+}
+
+type parent struct {
+	Doc        docUnmarshalTOML
+	DocPointer *docUnmarshalTOML
+}
+
+func TestCustomUnmarshal(t *testing.T) {
+	input := `
+[Doc]
+    key = "ok1"
+[DocPointer]
+    key = "ok2"
+`
+
+	var d parent
+	if err := Unmarshal([]byte(input), &d); err != nil {
+		t.Fatalf("unexpected err: %s", err.Error())
+	}
+	if d.Doc.Decoded.Key != "ok1" {
+		t.Errorf("Bad unmarshal: expected ok, got %v", d.Doc.Decoded.Key)
+	}
+	if d.DocPointer.Decoded.Key != "ok2" {
+		t.Errorf("Bad unmarshal: expected ok, got %v", d.DocPointer.Decoded.Key)
+	}
+}
+
+func TestCustomUnmarshalError(t *testing.T) {
+	input := `
+[Doc]
+    key = 1
+[DocPointer]
+    key = "ok2"
+`
+
+	expected := "(2, 1): unmarshal toml: type assertion error: wants string, have int64"
+
+	var d parent
+	err := Unmarshal([]byte(input), &d)
+	if err == nil {
+		t.Error("expected error, got none")
+	} else if err.Error() != expected {
+		t.Errorf("expect err: %s, got: %s", expected, err.Error())
+	}
+}
+
 type intWrapper struct {
 	Value int
 }
