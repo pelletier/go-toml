@@ -70,8 +70,9 @@ const (
 
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
-var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 var unmarshalerType = reflect.TypeOf(new(Unmarshaler)).Elem()
+var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 var localDateType = reflect.TypeOf(LocalDate{})
 var localTimeType = reflect.TypeOf(LocalTime{})
 var localDateTimeType = reflect.TypeOf(LocalDateTime{})
@@ -164,6 +165,14 @@ func callCustomUnmarshaler(mval reflect.Value, tval interface{}) error {
 	return mval.Interface().(Unmarshaler).UnmarshalTOML(tval)
 }
 
+func isTextUnmarshaler(mtype reflect.Type) bool {
+	return mtype.Implements(textUnmarshalerType)
+}
+
+func callTextUnmarshaler(mval reflect.Value, text []byte) error {
+	return mval.Interface().(encoding.TextUnmarshaler).UnmarshalText(text)
+}
+
 // Marshaler is the interface implemented by types that
 // can marshal themselves into valid TOML.
 type Marshaler interface {
@@ -224,17 +233,19 @@ type Encoder struct {
 	col         int
 	order       marshalOrder
 	promoteAnon bool
+	indentation string
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		w:          w,
-		encOpts:    encOptsDefaults,
-		annotation: annotationDefault,
-		line:       0,
-		col:        1,
-		order:      OrderAlphabetical,
+		w:           w,
+		encOpts:     encOptsDefaults,
+		annotation:  annotationDefault,
+		line:        0,
+		col:         1,
+		order:       OrderAlphabetical,
+		indentation: "  ",
 	}
 }
 
@@ -286,6 +297,12 @@ func (e *Encoder) Order(ord marshalOrder) *Encoder {
 	return e
 }
 
+// Indentation allows to change indentation when marshalling.
+func (e *Encoder) Indentation(indent string) *Encoder {
+	e.indentation = indent
+	return e
+}
+
 // SetTagName allows changing default tag "toml"
 func (e *Encoder) SetTagName(v string) *Encoder {
 	e.tag = v
@@ -324,6 +341,13 @@ func (e *Encoder) PromoteAnonymous(promote bool) *Encoder {
 }
 
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
+	// Check if indentation is valid
+	for _, char := range e.indentation {
+		if !(char == ' ' || char == '\t') {
+			return []byte{}, fmt.Errorf("invalid indentation: must only contains space or tab characters")
+		}
+	}
+
 	mtype := reflect.TypeOf(v)
 	if mtype == nil {
 		return []byte{}, errors.New("nil cannot be marshaled to TOML")
@@ -355,7 +379,7 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order, false)
+	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order, e.indentation, false)
 
 	return buf.Bytes(), err
 }
@@ -733,32 +757,42 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 					var val interface{}
 					var err error
 					switch mvalf.Kind() {
-					case reflect.Bool:
-						val, err = strconv.ParseBool(opts.defaultValue)
-						if err != nil {
-							return mval.Field(i), err
-						}
-					case reflect.Int:
-						val, err = strconv.Atoi(opts.defaultValue)
-						if err != nil {
-							return mval.Field(i), err
-						}
 					case reflect.String:
 						val = opts.defaultValue
+					case reflect.Bool:
+						val, err = strconv.ParseBool(opts.defaultValue)
+					case reflect.Uint:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 0)
+					case reflect.Uint8:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 8)
+					case reflect.Uint16:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 16)
+					case reflect.Uint32:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 32)
+					case reflect.Uint64:
+						val, err = strconv.ParseUint(opts.defaultValue, 10, 64)
+					case reflect.Int:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 0)
+					case reflect.Int8:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 8)
+					case reflect.Int16:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 16)
+					case reflect.Int32:
+						val, err = strconv.ParseInt(opts.defaultValue, 10, 32)
 					case reflect.Int64:
 						val, err = strconv.ParseInt(opts.defaultValue, 10, 64)
-						if err != nil {
-							return mval.Field(i), err
-						}
+					case reflect.Float32:
+						val, err = strconv.ParseFloat(opts.defaultValue, 32)
 					case reflect.Float64:
 						val, err = strconv.ParseFloat(opts.defaultValue, 64)
-						if err != nil {
-							return mval.Field(i), err
-						}
 					default:
-						return mval.Field(i), fmt.Errorf("unsupported field type for default option")
+						return mvalf, fmt.Errorf("unsupported field type for default option")
 					}
-					mval.Field(i).Set(reflect.ValueOf(val))
+
+					if err != nil {
+						return mvalf, err
+					}
+					mvalf.Set(reflect.ValueOf(val).Convert(mvalf.Type()))
 				}
 
 				// save the old behavior above and try to check structs
@@ -794,7 +828,11 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 
 // Convert toml value to marshal struct/map slice, using marshal type
 func (d *Decoder) valueFromTreeSlice(mtype reflect.Type, tval []*Tree) (reflect.Value, error) {
-	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
+	mval, err := makeSliceOrArray(mtype, len(tval))
+	if err != nil {
+		return mval, err
+	}
+
 	for i := 0; i < len(tval); i++ {
 		d.visitor.push(strconv.Itoa(i))
 		val, err := d.valueFromTree(mtype.Elem(), tval[i], nil)
@@ -809,7 +847,11 @@ func (d *Decoder) valueFromTreeSlice(mtype reflect.Type, tval []*Tree) (reflect.
 
 // Convert toml value to marshal primitive slice, using marshal type
 func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (reflect.Value, error) {
-	mval := reflect.MakeSlice(mtype, len(tval), len(tval))
+	mval, err := makeSliceOrArray(mtype, len(tval))
+	if err != nil {
+		return mval, err
+	}
+
 	for i := 0; i < len(tval); i++ {
 		val, err := d.valueFromToml(mtype.Elem(), tval[i], nil)
 		if err != nil {
@@ -823,15 +865,34 @@ func (d *Decoder) valueFromOtherSlice(mtype reflect.Type, tval []interface{}) (r
 // Convert toml value to marshal primitive slice, using marshal type
 func (d *Decoder) valueFromOtherSliceI(mtype reflect.Type, tval interface{}) (reflect.Value, error) {
 	val := reflect.ValueOf(tval)
+	length := val.Len()
 
-	lenght := val.Len()
-	mval := reflect.MakeSlice(mtype, lenght, lenght)
-	for i := 0; i < lenght; i++ {
+	mval, err := makeSliceOrArray(mtype, length)
+	if err != nil {
+		return mval, err
+	}
+
+	for i := 0; i < length; i++ {
 		val, err := d.valueFromToml(mtype.Elem(), val.Index(i).Interface(), nil)
 		if err != nil {
 			return mval, err
 		}
 		mval.Index(i).Set(val)
+	}
+	return mval, nil
+}
+
+// Create a new slice or a new array with specified length
+func makeSliceOrArray(mtype reflect.Type, tLength int) (reflect.Value, error) {
+	var mval reflect.Value
+	switch mtype.Kind() {
+	case reflect.Slice:
+		mval = reflect.MakeSlice(mtype, tLength, tLength)
+	case reflect.Array:
+		mval = reflect.New(reflect.ArrayOf(mtype.Len(), mtype.Elem())).Elem()
+		if tLength > mtype.Len() {
+			return mval, fmt.Errorf("unmarshal: TOML array length (%v) exceeds destination array length (%v)", tLength, mtype.Len())
+		}
 	}
 	return mval, nil
 }
@@ -892,6 +953,14 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
 	default:
 		d.visitor.visit()
+		// Check if pointer to value implements the encoding.TextUnmarshaler.
+		if mvalPtr := reflect.New(mtype); isTextUnmarshaler(mvalPtr.Type()) && !isTimeType(mtype) {
+			if err := d.unmarshalText(tval, mvalPtr); err != nil {
+				return reflect.ValueOf(nil), fmt.Errorf("unmarshal text: %v", err)
+			}
+			return mvalPtr.Elem(), nil
+		}
+
 		switch mtype.Kind() {
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
@@ -945,7 +1014,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			if !val.Type().ConvertibleTo(mtype) {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
-			if reflect.Indirect(reflect.New(mtype)).OverflowInt(val.Convert(mtype).Int()) {
+			if reflect.Indirect(reflect.New(mtype)).OverflowInt(val.Convert(reflect.TypeOf(int64(0))).Int()) {
 				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) would overflow %v", tval, tval, mtype.String())
 			}
 
@@ -959,7 +1028,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			if val.Convert(reflect.TypeOf(int(1))).Int() < 0 {
 				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) is negative so does not fit in %v", tval, tval, mtype.String())
 			}
-			if reflect.Indirect(reflect.New(mtype)).OverflowUint(uint64(val.Convert(mtype).Uint())) {
+			if reflect.Indirect(reflect.New(mtype)).OverflowUint(val.Convert(reflect.TypeOf(uint64(0))).Uint()) {
 				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) would overflow %v", tval, tval, mtype.String())
 			}
 
@@ -969,7 +1038,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			if !val.Type().ConvertibleTo(mtype) {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
-			if reflect.Indirect(reflect.New(mtype)).OverflowFloat(val.Convert(mtype).Float()) {
+			if reflect.Indirect(reflect.New(mtype)).OverflowFloat(val.Convert(reflect.TypeOf(float64(0))).Float()) {
 				return reflect.ValueOf(nil), fmt.Errorf("%v(%T) would overflow %v", tval, tval, mtype.String())
 			}
 
@@ -981,7 +1050,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 				ival := mval1.Elem()
 				return d.valueFromToml(mval1.Elem().Type(), t, &ival)
 			}
-		case reflect.Slice:
+		case reflect.Slice, reflect.Array:
 			if isOtherSequence(mtype) && isOtherSequence(reflect.TypeOf(t)) {
 				return d.valueFromOtherSliceI(mtype, t)
 			}
@@ -1007,6 +1076,12 @@ func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}, mval1 *ref
 	mval := reflect.New(mtype.Elem())
 	mval.Elem().Set(val)
 	return mval, nil
+}
+
+func (d *Decoder) unmarshalText(tval interface{}, mval reflect.Value) error {
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, tval)
+	return callTextUnmarshaler(mval, buf.Bytes())
 }
 
 func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
@@ -1051,11 +1126,7 @@ func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
 
 func isZero(val reflect.Value) bool {
 	switch val.Type().Kind() {
-	case reflect.Map:
-		fallthrough
-	case reflect.Array:
-		fallthrough
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array, reflect.Map:
 		return val.Len() == 0
 	default:
 		return reflect.DeepEqual(val.Interface(), reflect.Zero(val.Type()).Interface())
