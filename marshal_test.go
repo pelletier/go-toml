@@ -2023,6 +2023,43 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 	}
 }
 
+
+func TestUnmarshalNegativeUint(t *testing.T) {
+	type check struct{ U uint }
+
+	tree, _ := Load("u = -1")
+	err := tree.Unmarshal(&check{})
+	if err.Error() != "(1, 1): -1(int64) is negative so does not fit in uint" {
+		t.Error("expect err:(1, 1): -1(int64) is negative so does not fit in uint but got:", err)
+	}
+}
+
+func TestUnmarshalCheckConversionFloatInt(t *testing.T) {
+	type conversionCheck struct {
+		U uint
+		I int
+		F float64
+	}
+
+	treeU, _ := Load("u = 1e300")
+	treeI, _ := Load("i = 1e300")
+	treeF, _ := Load("f = 9223372036854775806")
+
+	errU := treeU.Unmarshal(&conversionCheck{})
+	errI := treeI.Unmarshal(&conversionCheck{})
+	errF := treeF.Unmarshal(&conversionCheck{})
+
+	if errU.Error() != "(1, 1): Can't convert 1e+300(float64) to uint" {
+		t.Error("expect err:(1, 1): Can't convert 1e+300(float64) to uint but got:", errU)
+	}
+	if errI.Error() != "(1, 1): Can't convert 1e+300(float64) to int" {
+		t.Error("expect err:(1, 1): Can't convert 1e+300(float64) to int but got:", errI)
+	}
+	if errF.Error() != "(1, 1): Can't convert 9223372036854775806(int64) to float64" {
+		t.Error("expect err:(1, 1): Can't convert 9223372036854775806(int64) to float64 but got:", errF)
+	}
+}
+
 func TestUnmarshalOverflow(t *testing.T) {
 	type overflow struct {
 		U8  uint8

@@ -985,7 +985,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 				}
 				return reflect.ValueOf(d), nil
 			}
-			if !val.Type().ConvertibleTo(mtype) {
+			if !val.Type().ConvertibleTo(mtype) || val.Kind() == reflect.Float64 {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
 			if reflect.Indirect(reflect.New(mtype)).OverflowInt(val.Convert(reflect.TypeOf(int64(0))).Int()) {
@@ -995,7 +995,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			return val.Convert(mtype), nil
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 			val := reflect.ValueOf(tval)
-			if !val.Type().ConvertibleTo(mtype) {
+			if !val.Type().ConvertibleTo(mtype) || val.Kind() == reflect.Float64 {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
 
@@ -1009,7 +1009,7 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 			return val.Convert(mtype), nil
 		case reflect.Float32, reflect.Float64:
 			val := reflect.ValueOf(tval)
-			if !val.Type().ConvertibleTo(mtype) {
+			if !val.Type().ConvertibleTo(mtype) || val.Kind() == reflect.Int64 {
 				return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to %v", tval, tval, mtype.String())
 			}
 			if reflect.Indirect(reflect.New(mtype)).OverflowFloat(val.Convert(reflect.TypeOf(float64(0))).Float()) {
