@@ -71,6 +71,7 @@ const (
 var timeType = reflect.TypeOf(time.Time{})
 var marshalerType = reflect.TypeOf(new(Marshaler)).Elem()
 var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 var localDateType = reflect.TypeOf(LocalDate{})
 var localTimeType = reflect.TypeOf(LocalTime{})
 var localDateTimeType = reflect.TypeOf(LocalDateTime{})
@@ -153,6 +154,14 @@ func isTextMarshaler(mtype reflect.Type) bool {
 
 func callTextMarshaler(mval reflect.Value) ([]byte, error) {
 	return mval.Interface().(encoding.TextMarshaler).MarshalText()
+}
+
+func isTextUnmarshaler(mtype reflect.Type) bool {
+	return mtype.Implements(textUnmarshalerType)
+}
+
+func callTextUnmarshaler(mval reflect.Value, text []byte) error {
+	return mval.Interface().(encoding.TextUnmarshaler).UnmarshalText(text)
 }
 
 // Marshaler is the interface implemented by types that
@@ -866,6 +875,14 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
 	default:
 		d.visitor.visit()
+		// Check if pointer to value implements the encoding.TextUnmarshaler.
+		if mvalPtr := reflect.New(mtype); isTextUnmarshaler(mvalPtr.Type()) && !isTimeType(mtype) {
+			if err := d.unmarshalText(tval, mvalPtr); err != nil {
+				return reflect.ValueOf(nil), fmt.Errorf("unmarshal text: %v", err)
+			}
+			return mvalPtr.Elem(), nil
+		}
+
 		switch mtype.Kind() {
 		case reflect.Bool, reflect.Struct:
 			val := reflect.ValueOf(tval)
@@ -981,6 +998,12 @@ func (d *Decoder) unwrapPointer(mtype reflect.Type, tval interface{}, mval1 *ref
 	mval := reflect.New(mtype.Elem())
 	mval.Elem().Set(val)
 	return mval, nil
+}
+
+func (d *Decoder) unmarshalText(tval interface{}, mval reflect.Value) error {
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, tval)
+	return callTextUnmarshaler(mval, buf.Bytes())
 }
 
 func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {

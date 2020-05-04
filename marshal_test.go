@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -3224,5 +3225,76 @@ func TestDecoderStrictValid(t *testing.T) {
 	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
 	if err != nil {
 		t.Fatal("unexpected error:", err)
+	}
+}
+
+type intWrapper struct {
+	Value int
+}
+
+func (w *intWrapper) UnmarshalText(text []byte) error {
+	var err error
+	if w.Value, err = strconv.Atoi(string(text)); err == nil {
+		return nil
+	}
+	if b, err := strconv.ParseBool(string(text)); err == nil {
+		if b {
+			w.Value = 1
+		}
+		return nil
+	}
+	if f, err := strconv.ParseFloat(string(text), 32); err == nil {
+		w.Value = int(f)
+		return nil
+	}
+	return fmt.Errorf("unsupported: %s", text)
+}
+
+func TestTextUnmarshal(t *testing.T) {
+	var doc struct {
+		UnixTime intWrapper
+		Version  *intWrapper
+
+		Bool  intWrapper
+		Int   intWrapper
+		Float intWrapper
+	}
+
+	input := `
+UnixTime = "12"
+Version = "42"
+Bool = true
+Int = 21
+Float = 2.0
+`
+
+	if err := Unmarshal([]byte(input), &doc); err != nil {
+		t.Fatalf("unexpected err: %s", err.Error())
+	}
+	if doc.UnixTime.Value != 12 {
+		t.Fatalf("expected UnixTime: 12 got: %d", doc.UnixTime.Value)
+	}
+	if doc.Version.Value != 42 {
+		t.Fatalf("expected Version: 42 got: %d", doc.Version.Value)
+	}
+	if doc.Bool.Value != 1 {
+		t.Fatalf("expected Bool: 1 got: %d", doc.Bool.Value)
+	}
+	if doc.Int.Value != 21 {
+		t.Fatalf("expected Int: 21 got: %d", doc.Int.Value)
+	}
+	if doc.Float.Value != 2 {
+		t.Fatalf("expected Float: 2 got: %d", doc.Float.Value)
+	}
+}
+
+func TestTextUnmarshalError(t *testing.T) {
+	var doc struct {
+		Failer intWrapper
+	}
+
+	input := `Failer = "hello"`
+	if err := Unmarshal([]byte(input), &doc); err == nil {
+		t.Fatalf("expected err, got none")
 	}
 }
