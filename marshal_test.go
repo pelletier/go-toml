@@ -2259,7 +2259,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
@@ -3122,6 +3122,20 @@ type sliceStruct struct {
 	StructSlicePtr *[]basicMarshalTestSubStruct `  toml:"struct_slice_ptr"  `
 }
 
+type arrayStruct struct {
+	Slice          [4]string                     `  toml:"str_slice"  `
+	SlicePtr       *[4]string                    `  toml:"str_slice_ptr"  `
+	IntSlice       [4]int                        `  toml:"int_slice"  `
+	IntSlicePtr    *[4]int                       `  toml:"int_slice_ptr"  `
+	StructSlice    [4]basicMarshalTestSubStruct  `  toml:"struct_slice"  `
+	StructSlicePtr *[4]basicMarshalTestSubStruct `  toml:"struct_slice_ptr"  `
+}
+
+type arrayTooSmallStruct struct {
+	Slice       [1]string                    `  toml:"str_slice"  `
+	StructSlice [1]basicMarshalTestSubStruct `  toml:"struct_slice"  `
+}
+
 func TestUnmarshalSlice(t *testing.T) {
 	tree, _ := LoadBytes(sliceTomlDemo)
 	tree, _ = TreeFromMap(tree.ToMap())
@@ -3166,6 +3180,75 @@ func TestUnmarshalSliceFail2(t *testing.T) {
 		t.Error("expect err:(1, 1): Can't convert 1(int64) to string but got ", err)
 	}
 
+}
+
+func TestUnmarshalArray(t *testing.T) {
+	var tree *Tree
+	var err error
+
+	tree, _ = LoadBytes(sliceTomlDemo)
+	var actual1 arrayStruct
+	err = tree.Unmarshal(&actual1)
+	if err != nil {
+		t.Error("shound not err", err)
+	}
+
+	tree, _ = TreeFromMap(tree.ToMap())
+	var actual2 arrayStruct
+	err = tree.Unmarshal(&actual2)
+	if err != nil {
+		t.Error("shound not err", err)
+	}
+
+	expected := arrayStruct{
+		Slice:          [4]string{"Howdy", "Hey There"},
+		SlicePtr:       &[4]string{"Howdy", "Hey There"},
+		IntSlice:       [4]int{1, 2},
+		IntSlicePtr:    &[4]int{1, 2},
+		StructSlice:    [4]basicMarshalTestSubStruct{{"1"}, {"2"}},
+		StructSlicePtr: &[4]basicMarshalTestSubStruct{{"1"}, {"2"}},
+	}
+	if !reflect.DeepEqual(actual1, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual1)
+	}
+	if !reflect.DeepEqual(actual2, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual2)
+	}
+}
+
+func TestUnmarshalArrayFail(t *testing.T) {
+	tree, _ := TreeFromMap(map[string]interface{}{
+		"str_slice": []string{"Howdy", "Hey There"},
+	})
+
+	var actual arrayTooSmallStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(0, 0): unmarshal: TOML array length (2) exceeds destination array length (1)" {
+		t.Error("expect err:(0, 0): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
+	}
+}
+
+func TestUnmarshalArrayFail2(t *testing.T) {
+	tree, _ := Load(`str_slice=["Howdy","Hey There"]`)
+
+	var actual arrayTooSmallStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(1, 1): unmarshal: TOML array length (2) exceeds destination array length (1)" {
+		t.Error("expect err:(1, 1): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
+	}
+}
+
+func TestUnmarshalArrayFail3(t *testing.T) {
+	tree, _ := Load(`[[struct_slice]]
+String2="1"
+[[struct_slice]]
+String2="2"`)
+
+	var actual arrayTooSmallStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(3, 1): unmarshal: TOML array length (2) exceeds destination array length (1)" {
+		t.Error("expect err:(3, 1): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
+	}
 }
 
 func TestDecoderStrict(t *testing.T) {
