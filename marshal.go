@@ -218,17 +218,19 @@ type Encoder struct {
 	col         int
 	order       marshalOrder
 	promoteAnon bool
+	indentation string
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		w:          w,
-		encOpts:    encOptsDefaults,
-		annotation: annotationDefault,
-		line:       0,
-		col:        1,
-		order:      OrderAlphabetical,
+		w:           w,
+		encOpts:     encOptsDefaults,
+		annotation:  annotationDefault,
+		line:        0,
+		col:         1,
+		order:       OrderAlphabetical,
+		indentation: "  ",
 	}
 }
 
@@ -280,6 +282,12 @@ func (e *Encoder) Order(ord marshalOrder) *Encoder {
 	return e
 }
 
+// Indentation allows to change indentation when marshalling.
+func (e *Encoder) Indentation(indent string) *Encoder {
+	e.indentation = indent
+	return e
+}
+
 // SetTagName allows changing default tag "toml"
 func (e *Encoder) SetTagName(v string) *Encoder {
 	e.tag = v
@@ -318,6 +326,13 @@ func (e *Encoder) PromoteAnonymous(promote bool) *Encoder {
 }
 
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
+	// Check if indentation is valid
+	for _, char := range e.indentation {
+		if !(char == ' ' || char == '\t') {
+			return []byte{}, fmt.Errorf("invalid indentation: must only contains space or tab characters")
+		}
+	}
+
 	mtype := reflect.TypeOf(v)
 	if mtype == nil {
 		return []byte{}, errors.New("nil cannot be marshaled to TOML")
@@ -349,7 +364,7 @@ func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order, false)
+	_, err = t.writeToOrdered(&buf, "", "", 0, e.arraysOneElementPerLine, e.order, e.indentation, false)
 
 	return buf.Bytes(), err
 }
