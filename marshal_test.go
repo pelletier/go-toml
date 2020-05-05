@@ -288,10 +288,10 @@ func TestBasicUnmarshal(t *testing.T) {
 }
 
 type quotedKeyMarshalTestStruct struct {
-	String  string                      `toml:"Zstring-àéù"`
-	Float   float64                     `toml:"Yfloat-𝟘"`
-	Sub     basicMarshalTestSubStruct   `toml:"Xsubdoc-àéù"`
-	SubList []basicMarshalTestSubStruct `toml:"Wsublist-𝟘"`
+	String  string                      `toml:"Z.string-àéù"`
+	Float   float64                     `toml:"Y.float-𝟘"`
+	Sub     basicMarshalTestSubStruct   `toml:"X.subdoc-àéù"`
+	SubList []basicMarshalTestSubStruct `toml:"W.sublist-𝟘"`
 }
 
 var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
@@ -301,21 +301,20 @@ var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	SubList: []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
 }
 
-var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
-"Zstring-àéù" = "Hello"
+var quotedKeyMarshalTestToml = []byte(`"Y.float-𝟘" = 3.5
+"Z.string-àéù" = "Hello"
 
-[["Wsublist-𝟘"]]
+[["W.sublist-𝟘"]]
   String2 = "Two"
 
-[["Wsublist-𝟘"]]
+[["W.sublist-𝟘"]]
   String2 = "Three"
 
-["Xsubdoc-àéù"]
+["X.subdoc-àéù"]
   String2 = "One"
 `)
 
 func TestBasicMarshalQuotedKey(t *testing.T) {
-
 	result, err := Marshal(quotedKeyMarshalTestData)
 	if err != nil {
 		t.Fatal(err)
@@ -323,6 +322,21 @@ func TestBasicMarshalQuotedKey(t *testing.T) {
 	expected := quotedKeyMarshalTestToml
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestBasicUnmarshalQuotedKey(t *testing.T) {
+	tree, err := LoadBytes(quotedKeyMarshalTestToml)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var q quotedKeyMarshalTestStruct
+	tree.Unmarshal(&q)
+	fmt.Println(q)
+
+	if !reflect.DeepEqual(quotedKeyMarshalTestData, q) {
+		t.Errorf("Bad unmarshal: expected\n-----\n%v\n-----\ngot\n-----\n%v\n-----\n", quotedKeyMarshalTestData, q)
 	}
 }
 

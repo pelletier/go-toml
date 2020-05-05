@@ -436,7 +436,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 					if tree, ok := val.(*Tree); ok && mtypef.Anonymous && !opts.nameFromTag && !e.promoteAnon {
 						e.appendTree(tval, tree)
 					} else {
-						tval.SetWithOptions(opts.name, SetOptions{
+						tval.SetPathWithOptions([]string{opts.name}, SetOptions{
 							Comment:   opts.comment,
 							Commented: opts.commented,
 							Multiline: opts.multiline,
@@ -481,7 +481,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				}
 				tval.SetPath([]string{keyStr}, val)
 			} else {
-				tval.Set(key.String(), val)
+				tval.SetPath([]string{key.String()}, val)
 			}
 		}
 	}
@@ -757,17 +757,17 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 				found := false
 				if tval != nil {
 					for _, key := range keysToTry {
-						exists := tval.Has(key)
+						exists := tval.HasPath([]string{key})
 						if !exists {
 							continue
 						}
 
 						d.visitor.push(key)
-						val := tval.Get(key)
+						val := tval.GetPath([]string{key})
 						fval := mval.Field(i)
 						mvalf, err := d.valueFromToml(mtypef.Type, val, &fval)
 						if err != nil {
-							return mval, formatError(err, tval.GetPosition(key))
+							return mval, formatError(err, tval.GetPositionPath([]string{key}))
 						}
 						mval.Field(i).Set(mvalf)
 						found = true
@@ -841,7 +841,7 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 			val := tval.GetPath([]string{key})
 			mvalf, err := d.valueFromToml(mtype.Elem(), val, nil)
 			if err != nil {
-				return mval, formatError(err, tval.GetPosition(key))
+				return mval, formatError(err, tval.GetPositionPath([]string{key}))
 			}
 			mval.SetMapIndex(reflect.ValueOf(key).Convert(mtype.Key()), mvalf)
 			d.visitor.pop()
