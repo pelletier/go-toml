@@ -105,9 +105,9 @@ func TestBasicKeyWithUppercaseMix(t *testing.T) {
 }
 
 func TestBasicKeyWithInternationalCharacters(t *testing.T) {
-	testFlow(t, "héllÖ", []token{
-		{Position{1, 1}, tokenKey, "héllÖ"},
-		{Position{1, 6}, tokenEOF, ""},
+	testFlow(t, "'héllÖ'", []token{
+		{Position{1, 1}, tokenKey, "'héllÖ'"},
+		{Position{1, 8}, tokenEOF, ""},
 	})
 }
 
