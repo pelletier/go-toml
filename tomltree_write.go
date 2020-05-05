@@ -301,7 +301,7 @@ func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount i
 			k := node.key
 			v := t.values[k]
 
-			combinedKey := k
+			combinedKey := quoteKeyIfNeeded(k)
 			if keyspace != "" {
 				combinedKey = keyspace + "." + combinedKey
 			}

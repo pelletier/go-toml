@@ -304,13 +304,13 @@ var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
 "Zstring-àéù" = "Hello"
 
-[[Wsublist-𝟘]]
+[["Wsublist-𝟘"]]
   String2 = "Two"
 
-[[Wsublist-𝟘]]
+[["Wsublist-𝟘"]]
   String2 = "Three"
 
-[Xsubdoc-àéù]
+["Xsubdoc-àéù"]
   String2 = "One"
 `)
 
