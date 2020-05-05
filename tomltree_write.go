@@ -105,7 +105,6 @@ func encodeTomlString(value string) string {
 
 func tomlTreeStringRepresentation(t *Tree, ord marshalOrder) (string, error) {
 	var orderedVals []sortNode
-
 	switch ord {
 	case OrderPreserve:
 		orderedVals = sortByLines(t)
@@ -113,29 +112,18 @@ func tomlTreeStringRepresentation(t *Tree, ord marshalOrder) (string, error) {
 		orderedVals = sortAlphabetical(t)
 	}
 
-	stringBuffer := bytes.Buffer{}
-	stringBuffer.WriteString(`{`)
-	first := true
-	for i := range orderedVals {
-		v := t.values[orderedVals[i].key]
-		quotedKey := quoteKeyIfNeeded(orderedVals[i].key)
-		valueStr, err := tomlValueStringRepresentation(v, "", "", ord, false)
+	var values []string
+	for _, node := range orderedVals {
+		k := node.key
+		v := t.values[k]
+
+		repr, err := tomlValueStringRepresentation(v, "", "", ord, false)
 		if err != nil {
 			return "", err
 		}
-		if first {
-			first = false
-		} else {
-			stringBuffer.WriteString(`,`)
-		}
-
-		stringBuffer.WriteString(quotedKey)
-		stringBuffer.WriteString(" = ")
-		stringBuffer.WriteString(valueStr)
+		values = append(values, quoteKeyIfNeeded(k)+" = "+repr)
 	}
-	stringBuffer.WriteString(`}`)
-
-	return stringBuffer.String(), nil
+	return "{ " + strings.Join(values, ", ") + " }", nil
 }
 
 func tomlValueStringRepresentation(v interface{}, commented string, indent string, ord marshalOrder, arraysOneElementPerLine bool) (string, error) {
@@ -224,7 +212,7 @@ func tomlValueStringRepresentation(v interface{}, commented string, indent strin
 
 			return stringBuffer.String(), nil
 		}
-		return "[" + strings.Join(values, ",") + "]", nil
+		return "[" + strings.Join(values, ", ") + "]", nil
 	}
 	return "", fmt.Errorf("unsupported value type %T: %v", v, v)
 }
