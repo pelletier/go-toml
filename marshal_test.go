@@ -289,8 +289,8 @@ func TestBasicUnmarshal(t *testing.T) {
 
 type quotedKeyMarshalTestStruct struct {
 	String  string                      `toml:"Z.string-àéù"`
-	Float   float64                     `toml:"Y.float-𝟘"`
-	Sub     basicMarshalTestSubStruct   `toml:"X.subdoc-àéù"`
+	Float   float64                     `toml:"Yfloat-𝟘"`
+	Sub     basicMarshalTestSubStruct   `toml:"Xsubdoc-àéù"`
 	SubList []basicMarshalTestSubStruct `toml:"W.sublist-𝟘"`
 }
 
@@ -301,7 +301,7 @@ var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	SubList: []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
 }
 
-var quotedKeyMarshalTestToml = []byte(`"Y.float-𝟘" = 3.5
+var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
 "Z.string-àéù" = "Hello"
 
 [["W.sublist-𝟘"]]
@@ -310,7 +310,7 @@ var quotedKeyMarshalTestToml = []byte(`"Y.float-𝟘" = 3.5
 [["W.sublist-𝟘"]]
   String2 = "Three"
 
-["X.subdoc-àéù"]
+["Xsubdoc-àéù"]
   String2 = "One"
 `)
 
