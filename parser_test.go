@@ -1125,9 +1125,9 @@ The quick brown \
     the lazy dog."""
 
 str3 = """\
-       The quick brown \
-       fox jumps over \
-       the lazy dog.\
+       The quick brown \` + "   " + `
+       fox jumps over \` + "   " + `
+       the lazy dog.\` + "   " + `
 	   """`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
