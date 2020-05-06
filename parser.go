@@ -158,6 +158,11 @@ func (p *tomlParser) parseGroup() tomlParserStateFn {
 	if err := p.tree.createSubTree(keys, startToken.Position); err != nil {
 		p.raiseError(key, "%s", err)
 	}
+	destTree := p.tree.GetPath(keys)
+	if target, ok := destTree.(*Tree); ok && target != nil && target.inline {
+		p.raiseError(key, "could not re-define exist inline table or its sub-table : %s",
+			strings.Join(keys, "."))
+	}
 	p.assume(tokenRightBracket)
 	p.currentTable = keys
 	return p.parseStart
@@ -198,6 +203,11 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 		targetNode = p.tree.GetPath(tableKey).(*Tree)
 	default:
 		p.raiseError(key, "Unknown table type for path: %s",
+			strings.Join(tableKey, "."))
+	}
+
+	if targetNode.inline {
+		p.raiseError(key, "could not add key or sub-table to exist inline table or its sub-table : %s",
 			strings.Join(tableKey, "."))
 	}
 
@@ -411,6 +421,7 @@ Loop:
 	if tokenIsComma(previous) {
 		p.raiseError(previous, "trailing comma at the end of inline table")
 	}
+	tree.inline = true
 	return tree
 }
 

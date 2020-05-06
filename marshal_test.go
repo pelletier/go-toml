@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,19 @@ Zstring = "Hello"
 
 [Xsubdoc]
   String2 = "One"
+`)
+
+var basicTestTomlCustomIndentation = []byte(`Ystrlist = ["Howdy","Hey There"]
+Zstring = "Hello"
+
+[[Wsublist]]
+	String2 = "Two"
+
+[[Wsublist]]
+	String2 = "Three"
+
+[Xsubdoc]
+	String2 = "One"
 `)
 
 var basicTestTomlOrdered = []byte(`Zstring = "Hello"
@@ -203,6 +217,26 @@ func TestBasicMarshal(t *testing.T) {
 	expected := basicTestToml
 	if !bytes.Equal(result, expected) {
 		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestBasicMarshalCustomIndentation(t *testing.T) {
+	var result bytes.Buffer
+	err := NewEncoder(&result).Indentation("\t").Encode(basicTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := basicTestTomlCustomIndentation
+	if !bytes.Equal(result.Bytes(), expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result.Bytes())
+	}
+}
+
+func TestBasicMarshalWrongIndentation(t *testing.T) {
+	var result bytes.Buffer
+	err := NewEncoder(&result).Indentation("  \n").Encode(basicTestData)
+	if err.Error() != "invalid indentation: must only contains space or tab characters" {
+		t.Error("expect err:invalid indentation: must only contains space or tab characters but got:", err)
 	}
 }
 
@@ -859,24 +893,27 @@ type customMarshalerParent struct {
 }
 
 type customMarshaler struct {
-	FirsName string
-	LastName string
+	FirstName string
+	LastName  string
 }
 
 func (c customMarshaler) MarshalTOML() ([]byte, error) {
-	fullName := fmt.Sprintf("%s %s", c.FirsName, c.LastName)
+	fullName := fmt.Sprintf("%s %s", c.FirstName, c.LastName)
 	return []byte(fullName), nil
 }
 
-var customMarshalerData = customMarshaler{FirsName: "Sally", LastName: "Fields"}
+var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
 var customMarshalerToml = []byte(`Sally Fields`)
 var nestedCustomMarshalerData = customMarshalerParent{
-	Self:    customMarshaler{FirsName: "Maiku", LastName: "Suteda"},
+	Self:    customMarshaler{FirstName: "Maiku", LastName: "Suteda"},
 	Friends: []customMarshaler{customMarshalerData},
 }
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
 me = "Maiku Suteda"
 `)
+var nestedCustomMarshalerTomlForUnmarshal = []byte(`[friends]
+FirstName = "Sally"
+LastName = "Fields"`)
 
 func TestCustomMarshaler(t *testing.T) {
 	result, err := Marshal(customMarshalerData)
@@ -889,14 +926,172 @@ func TestCustomMarshaler(t *testing.T) {
 	}
 }
 
-func TestNestedCustomMarshaler(t *testing.T) {
-	result, err := Marshal(nestedCustomMarshalerData)
+type textMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m textMarshaler) MarshalText() ([]byte, error) {
+	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
+	return []byte(fullName), nil
+}
+
+func TestTextMarshaler(t *testing.T) {
+	m := textMarshaler{FirstName: "Sally", LastName: "Fields"}
+
+	result, err := Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := nestedCustomMarshalerToml
-	if !bytes.Equal(result, expected) {
-		t.Errorf("Bad nested custom marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	expected := `Sally Fields`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestUnmarshalTextMarshaler(t *testing.T) {
+	var nested = struct {
+		Friends textMarshaler `toml:"friends"`
+	}{}
+
+	var expected = struct {
+		Friends textMarshaler `toml:"friends"`
+	}{
+		Friends: textMarshaler{FirstName: "Sally", LastName: "Fields"},
+	}
+
+	err := Unmarshal(nestedCustomMarshalerTomlForUnmarshal, &nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(nested, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, nested)
+	}
+}
+
+func TestNestedTextMarshaler(t *testing.T) {
+	var parent = struct {
+		Self     textMarshaler   `toml:"me"`
+		Friends  []textMarshaler `toml:"friends"`
+		Stranger *textMarshaler  `toml:"stranger"`
+	}{
+		Self:     textMarshaler{FirstName: "Maiku", LastName: "Suteda"},
+		Friends:  []textMarshaler{textMarshaler{FirstName: "Sally", LastName: "Fields"}},
+		Stranger: &textMarshaler{FirstName: "Earl", LastName: "Henson"},
+	}
+
+	result, err := Marshal(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `friends = ["Sally Fields"]
+me = "Maiku Suteda"
+stranger = "Earl Henson"
+`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad nested text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+type precedentMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m precedentMarshaler) MarshalText() ([]byte, error) {
+	return []byte("shadowed"), nil
+}
+
+func (m precedentMarshaler) MarshalTOML() ([]byte, error) {
+	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
+	return []byte(fullName), nil
+}
+
+func TestPrecedentMarshaler(t *testing.T) {
+	m := textMarshaler{FirstName: "Sally", LastName: "Fields"}
+
+	result, err := Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `Sally Fields`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+type customPointerMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m *customPointerMarshaler) MarshalTOML() ([]byte, error) {
+	return []byte("hidden"), nil
+}
+
+type textPointerMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m *textPointerMarshaler) MarshalText() ([]byte, error) {
+	return []byte("hidden"), nil
+}
+
+func TestPointerMarshaler(t *testing.T) {
+	var parent = struct {
+		Self     customPointerMarshaler  `toml:"me"`
+		Stranger *customPointerMarshaler `toml:"stranger"`
+		Friend   textPointerMarshaler    `toml:"friend"`
+		Fiend    *textPointerMarshaler   `toml:"fiend"`
+	}{
+		Self:     customPointerMarshaler{FirstName: "Maiku", LastName: "Suteda"},
+		Stranger: &customPointerMarshaler{FirstName: "Earl", LastName: "Henson"},
+		Friend:   textPointerMarshaler{FirstName: "Sally", LastName: "Fields"},
+		Fiend:    &textPointerMarshaler{FirstName: "Casper", LastName: "Snider"},
+	}
+
+	result, err := Marshal(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `fiend = "hidden"
+stranger = "hidden"
+
+[friend]
+  FirstName = "Sally"
+  LastName = "Fields"
+
+[me]
+  FirstName = "Maiku"
+  LastName = "Suteda"
+`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad nested text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestPointerCustomMarshalerSequence(t *testing.T) {
+	var customPointerMarshalerSlice *[]*customPointerMarshaler
+	var customPointerMarshalerArray *[2]*customPointerMarshaler
+
+	if !isCustomMarshalerSequence(reflect.TypeOf(customPointerMarshalerSlice)) {
+		t.Errorf("error: should be a sequence of custom marshaler interfaces")
+	}
+	if !isCustomMarshalerSequence(reflect.TypeOf(customPointerMarshalerArray)) {
+		t.Errorf("error: should be a sequence of custom marshaler interfaces")
+	}
+}
+
+func TestPointerTextMarshalerSequence(t *testing.T) {
+	var textPointerMarshalerSlice *[]*textPointerMarshaler
+	var textPointerMarshalerArray *[2]*textPointerMarshaler
+
+	if !isTextMarshalerSequence(reflect.TypeOf(textPointerMarshalerSlice)) {
+		t.Errorf("error: should be a sequence of text marshaler interfaces")
+	}
+	if !isTextMarshalerSequence(reflect.TypeOf(textPointerMarshalerArray)) {
+		t.Errorf("error: should be a sequence of text marshaler interfaces")
 	}
 }
 
@@ -1875,21 +2070,96 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 	}
 }
 
+
+func TestUnmarshalNegativeUint(t *testing.T) {
+	type check struct{ U uint }
+
+	tree, _ := Load("u = -1")
+	err := tree.Unmarshal(&check{})
+	if err.Error() != "(1, 1): -1(int64) is negative so does not fit in uint" {
+		t.Error("expect err:(1, 1): -1(int64) is negative so does not fit in uint but got:", err)
+	}
+}
+
+func TestUnmarshalCheckConversionFloatInt(t *testing.T) {
+	type conversionCheck struct {
+		U uint
+		I int
+		F float64
+	}
+
+	treeU, _ := Load("u = 1e300")
+	treeI, _ := Load("i = 1e300")
+	treeF, _ := Load("f = 9223372036854775806")
+
+	errU := treeU.Unmarshal(&conversionCheck{})
+	errI := treeI.Unmarshal(&conversionCheck{})
+	errF := treeF.Unmarshal(&conversionCheck{})
+
+	if errU.Error() != "(1, 1): Can't convert 1e+300(float64) to uint" {
+		t.Error("expect err:(1, 1): Can't convert 1e+300(float64) to uint but got:", errU)
+	}
+	if errI.Error() != "(1, 1): Can't convert 1e+300(float64) to int" {
+		t.Error("expect err:(1, 1): Can't convert 1e+300(float64) to int but got:", errI)
+	}
+	if errF.Error() != "(1, 1): Can't convert 9223372036854775806(int64) to float64" {
+		t.Error("expect err:(1, 1): Can't convert 9223372036854775806(int64) to float64 but got:", errF)
+	}
+}
+
+func TestUnmarshalOverflow(t *testing.T) {
+	type overflow struct {
+		U8  uint8
+		I8  int8
+		F32 float32
+	}
+
+	treeU8, _ := Load("u8 = 300")
+	treeI8, _ := Load("i8 = 300")
+	treeF32, _ := Load("f32 = 1e300")
+
+	errU8 := treeU8.Unmarshal(&overflow{})
+	errI8 := treeI8.Unmarshal(&overflow{})
+	errF32 := treeF32.Unmarshal(&overflow{})
+
+	if errU8.Error() != "(1, 1): 300(int64) would overflow uint8" {
+		t.Error("expect err:(1, 1): 300(int64) would overflow uint8 but got:", errU8)
+	}
+	if errI8.Error() != "(1, 1): 300(int64) would overflow int8" {
+		t.Error("expect err:(1, 1): 300(int64) would overflow int8 but got:", errI8)
+	}
+	if errF32.Error() != "(1, 1): 1e+300(float64) would overflow float32" {
+		t.Error("expect err:(1, 1): 1e+300(float64) would overflow float32 but got:", errF32)
+	}
+}
+
 func TestUnmarshalDefault(t *testing.T) {
 	type EmbeddedStruct struct {
 		StringField string `default:"c"`
 	}
 
+	type aliasUint uint
+
 	var doc struct {
 		StringField       string  `default:"a"`
 		BoolField         bool    `default:"true"`
-		IntField          int     `default:"1"`
-		Int64Field        int64   `default:"2"`
-		Float64Field      float64 `default:"3.1"`
+		UintField         uint    `default:"1"`
+		Uint8Field        uint8   `default:"8"`
+		Uint16Field       uint16  `default:"16"`
+		Uint32Field       uint32  `default:"32"`
+		Uint64Field       uint64  `default:"64"`
+		IntField          int     `default:"-1"`
+		Int8Field         int8    `default:"-8"`
+		Int16Field        int16   `default:"-16"`
+		Int32Field        int32   `default:"-32"`
+		Int64Field        int64   `default:"-64"`
+		Float32Field      float32 `default:"32.1"`
+		Float64Field      float64 `default:"64.1"`
 		NonEmbeddedStruct struct {
 			StringField string `default:"b"`
 		}
 		EmbeddedStruct
+		AliasUintField aliasUint `default:"1000"`
 	}
 
 	err := Unmarshal([]byte(``), &doc)
@@ -1902,20 +2172,50 @@ func TestUnmarshalDefault(t *testing.T) {
 	if doc.StringField != "a" {
 		t.Errorf("StringField should be \"a\", not %s", doc.StringField)
 	}
-	if doc.IntField != 1 {
-		t.Errorf("IntField should be 1, not %d", doc.IntField)
+	if doc.UintField != 1 {
+		t.Errorf("UintField should be 1, not %d", doc.UintField)
 	}
-	if doc.Int64Field != 2 {
-		t.Errorf("Int64Field should be 2, not %d", doc.Int64Field)
+	if doc.Uint8Field != 8 {
+		t.Errorf("Uint8Field should be 8, not %d", doc.Uint8Field)
 	}
-	if doc.Float64Field != 3.1 {
-		t.Errorf("Float64Field should be 3.1, not %f", doc.Float64Field)
+	if doc.Uint16Field != 16 {
+		t.Errorf("Uint16Field should be 16, not %d", doc.Uint16Field)
+	}
+	if doc.Uint32Field != 32 {
+		t.Errorf("Uint32Field should be 32, not %d", doc.Uint32Field)
+	}
+	if doc.Uint64Field != 64 {
+		t.Errorf("Uint64Field should be 64, not %d", doc.Uint64Field)
+	}
+	if doc.IntField != -1 {
+		t.Errorf("IntField should be -1, not %d", doc.IntField)
+	}
+	if doc.Int8Field != -8 {
+		t.Errorf("Int8Field should be -8, not %d", doc.Int8Field)
+	}
+	if doc.Int16Field != -16 {
+		t.Errorf("Int16Field should be -16, not %d", doc.Int16Field)
+	}
+	if doc.Int32Field != -32 {
+		t.Errorf("Int32Field should be -32, not %d", doc.Int32Field)
+	}
+	if doc.Int64Field != -64 {
+		t.Errorf("Int64Field should be -64, not %d", doc.Int64Field)
+	}
+	if doc.Float32Field != 32.1 {
+		t.Errorf("Float32Field should be 32.1, not %f", doc.Float32Field)
+	}
+	if doc.Float64Field != 64.1 {
+		t.Errorf("Float64Field should be 64.1, not %f", doc.Float64Field)
 	}
 	if doc.NonEmbeddedStruct.StringField != "b" {
 		t.Errorf("StringField should be \"b\", not %s", doc.NonEmbeddedStruct.StringField)
 	}
 	if doc.EmbeddedStruct.StringField != "c" {
 		t.Errorf("StringField should be \"c\", not %s", doc.EmbeddedStruct.StringField)
+	}
+	if doc.AliasUintField != 1000 {
+		t.Errorf("AliasUintField should be 1000, not %d", doc.AliasUintField)
 	}
 }
 
@@ -2144,7 +2444,7 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 
 	[[slice1]]
 	exported1 = "visible3"
-	
+
 	[[slice1]]
 	exported1 = "visible4"
 
@@ -2998,6 +3298,20 @@ type sliceStruct struct {
 	StructSlicePtr *[]basicMarshalTestSubStruct `  toml:"struct_slice_ptr"  `
 }
 
+type arrayStruct struct {
+	Slice          [4]string                     `  toml:"str_slice"  `
+	SlicePtr       *[4]string                    `  toml:"str_slice_ptr"  `
+	IntSlice       [4]int                        `  toml:"int_slice"  `
+	IntSlicePtr    *[4]int                       `  toml:"int_slice_ptr"  `
+	StructSlice    [4]basicMarshalTestSubStruct  `  toml:"struct_slice"  `
+	StructSlicePtr *[4]basicMarshalTestSubStruct `  toml:"struct_slice_ptr"  `
+}
+
+type arrayTooSmallStruct struct {
+	Slice       [1]string                    `  toml:"str_slice"  `
+	StructSlice [1]basicMarshalTestSubStruct `  toml:"struct_slice"  `
+}
+
 func TestUnmarshalSlice(t *testing.T) {
 	tree, _ := LoadBytes(sliceTomlDemo)
 	tree, _ = TreeFromMap(tree.ToMap())
@@ -3112,5 +3426,280 @@ func TestUnmarshalMixedTypeArray(t *testing.T) {
 		}
 	} else {
 		t.Fatal(err)
+	}
+}
+
+func TestUnmarshalArray(t *testing.T) {
+	var tree *Tree
+	var err error
+
+	tree, _ = LoadBytes(sliceTomlDemo)
+	var actual1 arrayStruct
+	err = tree.Unmarshal(&actual1)
+	if err != nil {
+		t.Error("shound not err", err)
+	}
+
+	tree, _ = TreeFromMap(tree.ToMap())
+	var actual2 arrayStruct
+	err = tree.Unmarshal(&actual2)
+	if err != nil {
+		t.Error("shound not err", err)
+	}
+
+	expected := arrayStruct{
+		Slice:          [4]string{"Howdy", "Hey There"},
+		SlicePtr:       &[4]string{"Howdy", "Hey There"},
+		IntSlice:       [4]int{1, 2},
+		IntSlicePtr:    &[4]int{1, 2},
+		StructSlice:    [4]basicMarshalTestSubStruct{{"1"}, {"2"}},
+		StructSlicePtr: &[4]basicMarshalTestSubStruct{{"1"}, {"2"}},
+	}
+	if !reflect.DeepEqual(actual1, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual1)
+	}
+	if !reflect.DeepEqual(actual2, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual2)
+	}
+}
+
+func TestUnmarshalArrayFail(t *testing.T) {
+	tree, _ := TreeFromMap(map[string]interface{}{
+		"str_slice": []string{"Howdy", "Hey There"},
+	})
+
+	var actual arrayTooSmallStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(0, 0): unmarshal: TOML array length (2) exceeds destination array length (1)" {
+		t.Error("expect err:(0, 0): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
+	}
+}
+
+func TestUnmarshalArrayFail2(t *testing.T) {
+	tree, _ := Load(`str_slice=["Howdy","Hey There"]`)
+
+	var actual arrayTooSmallStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(1, 1): unmarshal: TOML array length (2) exceeds destination array length (1)" {
+		t.Error("expect err:(1, 1): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
+	}
+}
+
+func TestUnmarshalArrayFail3(t *testing.T) {
+	tree, _ := Load(`[[struct_slice]]
+String2="1"
+[[struct_slice]]
+String2="2"`)
+
+	var actual arrayTooSmallStruct
+	err := tree.Unmarshal(&actual)
+	if err.Error() != "(3, 1): unmarshal: TOML array length (2) exceeds destination array length (1)" {
+		t.Error("expect err:(3, 1): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
+	}
+}
+
+func TestDecoderStrict(t *testing.T) {
+	input := `
+[decoded]
+  key = ""
+
+[undecoded]
+  key = ""
+
+  [undecoded.inner]
+	key = ""
+
+  [[undecoded.array]]
+	key = ""
+
+  [[undecoded.array]]
+	key = ""
+
+`
+	var doc struct {
+		Decoded struct {
+			Key string
+		}
+	}
+
+	expected := `undecoded keys: ["undecoded.array.0.key" "undecoded.array.1.key" "undecoded.inner.key" "undecoded.key"]`
+
+	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
+	if err == nil {
+		t.Error("expected error, got none")
+	} else if err.Error() != expected {
+		t.Errorf("expect err: %s, got: %s", expected, err.Error())
+	}
+
+	if err := NewDecoder(bytes.NewReader([]byte(input))).Decode(&doc); err != nil {
+		t.Errorf("unexpected err: %s", err)
+	}
+
+	var m map[string]interface{}
+	if err := NewDecoder(bytes.NewReader([]byte(input))).Decode(&m); err != nil {
+		t.Errorf("unexpected err: %s", err)
+	}
+}
+
+func TestDecoderStrictValid(t *testing.T) {
+	input := `
+[decoded]
+  key = ""
+`
+	var doc struct {
+		Decoded struct {
+			Key string
+		}
+	}
+
+	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+}
+
+type docUnmarshalTOML struct {
+	Decoded struct {
+		Key string
+	}
+}
+
+func (d *docUnmarshalTOML) UnmarshalTOML(i interface{}) error {
+	if iMap, ok := i.(map[string]interface{}); !ok {
+		return fmt.Errorf("type assertion error: wants %T, have %T", map[string]interface{}{}, i)
+	} else if key, ok := iMap["key"]; !ok {
+		return fmt.Errorf("key '%s' not in map", "key")
+	} else if keyString, ok := key.(string); !ok {
+		return fmt.Errorf("type assertion error: wants %T, have %T", "", key)
+	} else {
+		d.Decoded.Key = keyString
+	}
+	return nil
+}
+
+func TestDecoderStrictCustomUnmarshal(t *testing.T) {
+	input := `key = "ok"`
+	var doc docUnmarshalTOML
+	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if doc.Decoded.Key != "ok" {
+		t.Errorf("Bad unmarshal: expected ok, got %v", doc.Decoded.Key)
+	}
+}
+
+type parent struct {
+	Doc        docUnmarshalTOML
+	DocPointer *docUnmarshalTOML
+}
+
+func TestCustomUnmarshal(t *testing.T) {
+	input := `
+[Doc]
+    key = "ok1"
+[DocPointer]
+    key = "ok2"
+`
+
+	var d parent
+	if err := Unmarshal([]byte(input), &d); err != nil {
+		t.Fatalf("unexpected err: %s", err.Error())
+	}
+	if d.Doc.Decoded.Key != "ok1" {
+		t.Errorf("Bad unmarshal: expected ok, got %v", d.Doc.Decoded.Key)
+	}
+	if d.DocPointer.Decoded.Key != "ok2" {
+		t.Errorf("Bad unmarshal: expected ok, got %v", d.DocPointer.Decoded.Key)
+	}
+}
+
+func TestCustomUnmarshalError(t *testing.T) {
+	input := `
+[Doc]
+    key = 1
+[DocPointer]
+    key = "ok2"
+`
+
+	expected := "(2, 1): unmarshal toml: type assertion error: wants string, have int64"
+
+	var d parent
+	err := Unmarshal([]byte(input), &d)
+	if err == nil {
+		t.Error("expected error, got none")
+	} else if err.Error() != expected {
+		t.Errorf("expect err: %s, got: %s", expected, err.Error())
+	}
+}
+
+type intWrapper struct {
+	Value int
+}
+
+func (w *intWrapper) UnmarshalText(text []byte) error {
+	var err error
+	if w.Value, err = strconv.Atoi(string(text)); err == nil {
+		return nil
+	}
+	if b, err := strconv.ParseBool(string(text)); err == nil {
+		if b {
+			w.Value = 1
+		}
+		return nil
+	}
+	if f, err := strconv.ParseFloat(string(text), 32); err == nil {
+		w.Value = int(f)
+		return nil
+	}
+	return fmt.Errorf("unsupported: %s", text)
+}
+
+func TestTextUnmarshal(t *testing.T) {
+	var doc struct {
+		UnixTime intWrapper
+		Version  *intWrapper
+
+		Bool  intWrapper
+		Int   intWrapper
+		Float intWrapper
+	}
+
+	input := `
+UnixTime = "12"
+Version = "42"
+Bool = true
+Int = 21
+Float = 2.0
+`
+
+	if err := Unmarshal([]byte(input), &doc); err != nil {
+		t.Fatalf("unexpected err: %s", err.Error())
+	}
+	if doc.UnixTime.Value != 12 {
+		t.Fatalf("expected UnixTime: 12 got: %d", doc.UnixTime.Value)
+	}
+	if doc.Version.Value != 42 {
+		t.Fatalf("expected Version: 42 got: %d", doc.Version.Value)
+	}
+	if doc.Bool.Value != 1 {
+		t.Fatalf("expected Bool: 1 got: %d", doc.Bool.Value)
+	}
+	if doc.Int.Value != 21 {
+		t.Fatalf("expected Int: 21 got: %d", doc.Int.Value)
+	}
+	if doc.Float.Value != 2 {
+		t.Fatalf("expected Float: 2 got: %d", doc.Float.Value)
+	}
+}
+
+func TestTextUnmarshalError(t *testing.T) {
+	var doc struct {
+		Failer intWrapper
+	}
+
+	input := `Failer = "hello"`
+	if err := Unmarshal([]byte(input), &doc); err == nil {
+		t.Fatalf("expected err, got none")
 	}
 }
