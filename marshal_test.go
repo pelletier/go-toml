@@ -287,6 +287,59 @@ func TestBasicUnmarshal(t *testing.T) {
 	}
 }
 
+type quotedKeyMarshalTestStruct struct {
+	String  string                      `toml:"Z.string-àéù"`
+	Float   float64                     `toml:"Yfloat-𝟘"`
+	Sub     basicMarshalTestSubStruct   `toml:"Xsubdoc-àéù"`
+	SubList []basicMarshalTestSubStruct `toml:"W.sublist-𝟘"`
+}
+
+var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
+	String:  "Hello",
+	Float:   3.5,
+	Sub:     basicMarshalTestSubStruct{"One"},
+	SubList: []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
+}
+
+var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
+"Z.string-àéù" = "Hello"
+
+[["W.sublist-𝟘"]]
+  String2 = "Two"
+
+[["W.sublist-𝟘"]]
+  String2 = "Three"
+
+["Xsubdoc-àéù"]
+  String2 = "One"
+`)
+
+func TestBasicMarshalQuotedKey(t *testing.T) {
+	result, err := Marshal(quotedKeyMarshalTestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := quotedKeyMarshalTestToml
+	if !bytes.Equal(result, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
+func TestBasicUnmarshalQuotedKey(t *testing.T) {
+	tree, err := LoadBytes(quotedKeyMarshalTestToml)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var q quotedKeyMarshalTestStruct
+	tree.Unmarshal(&q)
+	fmt.Println(q)
+
+	if !reflect.DeepEqual(quotedKeyMarshalTestData, q) {
+		t.Errorf("Bad unmarshal: expected\n-----\n%v\n-----\ngot\n-----\n%v\n-----\n", quotedKeyMarshalTestData, q)
+	}
+}
+
 type testDoc struct {
 	Title       string            `toml:"title"`
 	BasicLists  testDocBasicLists `toml:"basic_lists"`
@@ -2069,7 +2122,6 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 		t.Fatal("Did not set camelCase'd key")
 	}
 }
-
 
 func TestUnmarshalNegativeUint(t *testing.T) {
 	type check struct{ U uint }

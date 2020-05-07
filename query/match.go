@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+
 	"github.com/pelletier/go-toml"
 )
 
@@ -44,16 +45,16 @@ func newMatchKeyFn(name string) *matchKeyFn {
 func (f *matchKeyFn) call(node interface{}, ctx *queryContext) {
 	if array, ok := node.([]*toml.Tree); ok {
 		for _, tree := range array {
-			item := tree.Get(f.Name)
+			item := tree.GetPath([]string{f.Name})
 			if item != nil {
-				ctx.lastPosition = tree.GetPosition(f.Name)
+				ctx.lastPosition = tree.GetPositionPath([]string{f.Name})
 				f.next.call(item, ctx)
 			}
 		}
 	} else if tree, ok := node.(*toml.Tree); ok {
-		item := tree.Get(f.Name)
+		item := tree.GetPath([]string{f.Name})
 		if item != nil {
-			ctx.lastPosition = tree.GetPosition(f.Name)
+			ctx.lastPosition = tree.GetPositionPath([]string{f.Name})
 			f.next.call(item, ctx)
 		}
 	}
@@ -129,8 +130,8 @@ func newMatchAnyFn() *matchAnyFn {
 func (f *matchAnyFn) call(node interface{}, ctx *queryContext) {
 	if tree, ok := node.(*toml.Tree); ok {
 		for _, k := range tree.Keys() {
-			v := tree.Get(k)
-			ctx.lastPosition = tree.GetPosition(k)
+			v := tree.GetPath([]string{k})
+			ctx.lastPosition = tree.GetPositionPath([]string{k})
 			f.next.call(v, ctx)
 		}
 	}
@@ -168,8 +169,8 @@ func (f *matchRecursiveFn) call(node interface{}, ctx *queryContext) {
 		var visit func(tree *toml.Tree)
 		visit = func(tree *toml.Tree) {
 			for _, k := range tree.Keys() {
-				v := tree.Get(k)
-				ctx.lastPosition = tree.GetPosition(k)
+				v := tree.GetPath([]string{k})
+				ctx.lastPosition = tree.GetPositionPath([]string{k})
 				f.next.call(v, ctx)
 				switch node := v.(type) {
 				case *toml.Tree:
@@ -207,9 +208,9 @@ func (f *matchFilterFn) call(node interface{}, ctx *queryContext) {
 	switch castNode := node.(type) {
 	case *toml.Tree:
 		for _, k := range castNode.Keys() {
-			v := castNode.Get(k)
+			v := castNode.GetPath([]string{k})
 			if fn(v) {
-				ctx.lastPosition = castNode.GetPosition(k)
+				ctx.lastPosition = castNode.GetPositionPath([]string{k})
 				f.next.call(v, ctx)
 			}
 		}
