@@ -57,7 +57,7 @@
 //                    sub-expressions: index, key name, or filter.
 //   [start:end:step]
 //                    Slice operator - selects array elements from start to
-//                    end-1, at the given step.  All three arguments are
+//                    end-1, at the given step. All three arguments are
 //                    optional.
 //   [?(filter)]
 //                    Named filter expression - the function 'filter' is
@@ -80,25 +80,23 @@
 // Slice expressions also allow negative indexes for the start and stop
 // arguments.
 //
-//   // select all array elements.
+//   // select all array elements except the last one.
 //   query.CompileAndExecute("$.foo[0:-1]", tree)
 //
 // Slice expressions may have an optional stride/step parameter:
 //
 //   // select every other element
-//   query.CompileAndExecute("$.foo[0:-1:2]", tree)
+//   query.CompileAndExecute("$.foo[0::2]", tree)
 //
 // Slice start and end parameters are also optional:
 //
 //   // these are all equivalent and select all the values in the array
 //   query.CompileAndExecute("$.foo[:]", tree)
-//   query.CompileAndExecute("$.foo[0:]", tree)
-//   query.CompileAndExecute("$.foo[:-1]", tree)
-//   query.CompileAndExecute("$.foo[0:-1:]", tree)
+//   query.CompileAndExecute("$.foo[::]", tree)
 //   query.CompileAndExecute("$.foo[::1]", tree)
+//   query.CompileAndExecute("$.foo[0:]", tree)
+//   query.CompileAndExecute("$.foo[0::]", tree)
 //   query.CompileAndExecute("$.foo[0::1]", tree)
-//   query.CompileAndExecute("$.foo[:-1:1]", tree)
-//   query.CompileAndExecute("$.foo[0:-1:1]", tree)
 //
 // Query Filters
 //

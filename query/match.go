@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/pelletier/go-toml"
 )
@@ -71,51 +72,128 @@ func newMatchIndexFn(idx int) *matchIndexFn {
 }
 
 func (f *matchIndexFn) call(node interface{}, ctx *queryContext) {
-	if arr, ok := node.([]interface{}); ok {
-		if f.Idx < len(arr) && f.Idx >= 0 {
-			if treesArray, ok := node.([]*toml.Tree); ok {
-				if len(treesArray) > 0 {
-					ctx.lastPosition = treesArray[0].Position()
-				}
-			}
-			f.next.call(arr[f.Idx], ctx)
+	v := reflect.ValueOf(node)
+	if v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return
+		}
+
+		// Manage negative values
+		idx := f.Idx
+		if idx < 0 {
+			idx += v.Len()
+		}
+		if 0 <= idx && idx < v.Len() {
+			callNextIndexSlice(f.next, node, ctx, v.Index(idx).Interface())
 		}
 	}
+}
+
+func callNextIndexSlice(next pathFn, node interface{}, ctx *queryContext, value interface{}) {
+	if treesArray, ok := node.([]*toml.Tree); ok {
+		ctx.lastPosition = treesArray[0].Position()
+	}
+	next.call(value, ctx)
 }
 
 // filter by slicing
 type matchSliceFn struct {
 	matchBase
-	Start, End, Step int
+	Start, End, Step *int
 }
 
-func newMatchSliceFn(start, end, step int) *matchSliceFn {
-	return &matchSliceFn{Start: start, End: end, Step: step}
+func newMatchSliceFn() *matchSliceFn {
+	return &matchSliceFn{}
+}
+
+func (f *matchSliceFn) setStart(start int) *matchSliceFn {
+	f.Start = &start
+	return f
+}
+
+func (f *matchSliceFn) setEnd(end int) *matchSliceFn {
+	f.End = &end
+	return f
+}
+
+func (f *matchSliceFn) setStep(step int) *matchSliceFn {
+	f.Step = &step
+	return f
 }
 
 func (f *matchSliceFn) call(node interface{}, ctx *queryContext) {
-	if arr, ok := node.([]interface{}); ok {
-		// adjust indexes for negative values, reverse ordering
-		realStart, realEnd := f.Start, f.End
-		if realStart < 0 {
-			realStart = len(arr) + realStart
+	v := reflect.ValueOf(node)
+	if v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return
 		}
-		if realEnd < 0 {
-			realEnd = len(arr) + realEnd
+
+		var start, end, step int
+
+		// Initialize step
+		if f.Step != nil {
+			step = *f.Step
+		} else {
+			step = 1
 		}
-		if realEnd < realStart {
-			realEnd, realStart = realStart, realEnd // swap
-		}
-		// loop and gather
-		for idx := realStart; idx < realEnd; idx += f.Step {
-			if treesArray, ok := node.([]*toml.Tree); ok {
-				if len(treesArray) > 0 {
-					ctx.lastPosition = treesArray[0].Position()
-				}
+
+		// Initialize start
+		if f.Start != nil {
+			start = *f.Start
+			// Manage negative values
+			if start < 0 {
+				start += v.Len()
 			}
-			f.next.call(arr[idx], ctx)
+			// Manage out of range values
+			start = max(start, 0)
+			start = min(start, v.Len()-1)
+		} else if step > 0 {
+			start = 0
+		} else {
+			start = v.Len() - 1
+		}
+
+		// Initialize end
+		if f.End != nil {
+			end = *f.End
+			// Manage negative values
+			if end < 0 {
+				end += v.Len()
+			}
+			// Manage out of range values
+			end = max(end, -1)
+			end = min(end, v.Len())
+		} else if step > 0 {
+			end = v.Len()
+		} else {
+			end = -1
+		}
+
+		// Loop on values
+		if step > 0 {
+			for idx := start; idx < end; idx += step {
+				callNextIndexSlice(f.next, node, ctx, v.Index(idx).Interface())
+			}
+		} else {
+			for idx := start; idx > end; idx += step {
+				callNextIndexSlice(f.next, node, ctx, v.Index(idx).Interface())
+			}
 		}
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // match anything
