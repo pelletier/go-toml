@@ -22,20 +22,20 @@ func TestValidKeyGroup(t *testing.T) {
 }
 
 func TestNestedQuotedUnicodeKeyGroup(t *testing.T) {
-	testFlow(t, `[ j . "ʞ" . 'l' ]`, []token{
+	testFlow(t, `[ j . "ʞ" . l . 'ɯ' ]`, []token{
 		{Position{1, 1}, tokenLeftBracket, "["},
-		{Position{1, 2}, tokenKeyGroup, ` j . "ʞ" . 'l' `},
-		{Position{1, 17}, tokenRightBracket, "]"},
-		{Position{1, 18}, tokenEOF, ""},
+		{Position{1, 2}, tokenKeyGroup, ` j . "ʞ" . l . 'ɯ' `},
+		{Position{1, 21}, tokenRightBracket, "]"},
+		{Position{1, 22}, tokenEOF, ""},
 	})
 }
 
 func TestNestedQuotedUnicodeKeyAssign(t *testing.T) {
-	testFlow(t, ` j . "ʞ" . 'l' = 3`, []token{
-		{Position{1, 2}, tokenKey, `j . "ʞ" . 'l'`},
-		{Position{1, 16}, tokenEqual, "="},
-		{Position{1, 18}, tokenInteger, "3"},
-		{Position{1, 19}, tokenEOF, ""},
+	testFlow(t, ` j . "ʞ" . l . 'ɯ' = 3`, []token{
+		{Position{1, 2}, tokenKey, `j . "ʞ" . l . 'ɯ'`},
+		{Position{1, 20}, tokenEqual, "="},
+		{Position{1, 22}, tokenInteger, "3"},
+		{Position{1, 23}, tokenEOF, ""},
 	})
 }
 
