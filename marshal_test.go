@@ -31,7 +31,7 @@ var basicTestData = basicMarshalTestStruct{
 	SubList:    []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
 }
 
-var basicTestToml = []byte(`Ystrlist = ["Howdy","Hey There"]
+var basicTestToml = []byte(`Ystrlist = ["Howdy", "Hey There"]
 Zstring = "Hello"
 
 [[Wsublist]]
@@ -44,7 +44,7 @@ Zstring = "Hello"
   String2 = "One"
 `)
 
-var basicTestTomlCustomIndentation = []byte(`Ystrlist = ["Howdy","Hey There"]
+var basicTestTomlCustomIndentation = []byte(`Ystrlist = ["Howdy", "Hey There"]
 Zstring = "Hello"
 
 [[Wsublist]]
@@ -58,7 +58,7 @@ Zstring = "Hello"
 `)
 
 var basicTestTomlOrdered = []byte(`Zstring = "Hello"
-Ystrlist = ["Howdy","Hey There"]
+Ystrlist = ["Howdy", "Hey There"]
 
 [Xsubdoc]
   String2 = "One"
@@ -82,12 +82,12 @@ var marshalTestToml = []byte(`title = "TOML Marshal Testing"
   uint = 5001
 
 [basic_lists]
-  bools = [true,false,true]
-  dates = [1979-05-27T07:32:00Z,1980-05-27T07:32:00Z]
-  floats = [12.3,45.6,78.9]
-  ints = [8001,8001,8002]
-  strings = ["One","Two","Three"]
-  uints = [5002,5003]
+  bools = [true, false, true]
+  dates = [1979-05-27T07:32:00Z, 1980-05-27T07:32:00Z]
+  floats = [12.3, 45.6, 78.9]
+  ints = [8001, 8001, 8002]
+  strings = ["One", "Two", "Three"]
+  uints = [5002, 5003]
 
 [basic_map]
   one = "one"
@@ -114,12 +114,12 @@ var marshalTestToml = []byte(`title = "TOML Marshal Testing"
 var marshalOrderPreserveToml = []byte(`title = "TOML Marshal Testing"
 
 [basic_lists]
-  floats = [12.3,45.6,78.9]
-  bools = [true,false,true]
-  dates = [1979-05-27T07:32:00Z,1980-05-27T07:32:00Z]
-  ints = [8001,8001,8002]
-  uints = [5002,5003]
-  strings = ["One","Two","Three"]
+  floats = [12.3, 45.6, 78.9]
+  bools = [true, false, true]
+  dates = [1979-05-27T07:32:00Z, 1980-05-27T07:32:00Z]
+  ints = [8001, 8001, 8002]
+  uints = [5002, 5003]
+  strings = ["One", "Two", "Three"]
 
 [[subdocptrs]]
   name = "Second"
@@ -913,8 +913,8 @@ var nestedTestData = nestedMarshalTestStruct{
 	StringPtr: &strPtr2,
 }
 
-var nestedTestToml = []byte(`String = [["Five","Six"],["One","Two"]]
-StringPtr = [["Three","Four"]]
+var nestedTestToml = []byte(`String = [["Five", "Six"], ["One", "Two"]]
+StringPtr = [["Three", "Four"]]
 `)
 
 func TestNestedMarshal(t *testing.T) {
@@ -1491,7 +1491,7 @@ type structArrayNoTag struct {
 func TestMarshalArray(t *testing.T) {
 	expected := []byte(`
 [A]
-  B = [1,2,3]
+  B = [1, 2, 3]
   C = [1]
 `)
 
@@ -1985,6 +1985,58 @@ func TestMarshalSlicePointer(t *testing.T) {
 	}
 	if err.Error() != "Only a struct or map can be marshaled to TOML" {
 		t.Fail()
+	}
+}
+
+func TestMarshalNestedArrayInlineTables(t *testing.T) {
+	type table struct {
+		Value1 int `toml:"ZValue1"`
+		Value2 int `toml:"YValue2"`
+		Value3 int `toml:"XValue3"`
+	}
+
+	type nestedTable struct {
+		Table table
+	}
+
+	nestedArray := struct {
+		Simple        [][]table
+		SimplePointer *[]*[]table
+		Nested        [][]nestedTable
+		NestedPointer *[]*[]nestedTable
+	}{
+		Simple:        [][]table{{{Value1: 1}, {Value1: 10}}},
+		SimplePointer: &[]*[]table{{{Value2: 2}}},
+		Nested:        [][]nestedTable{{{Table: table{Value3: 3}}}},
+		NestedPointer: &[]*[]nestedTable{{{Table: table{Value3: -3}}}},
+	}
+
+	expectedPreserve := `Simple = [[{ ZValue1 = 1, YValue2 = 0, XValue3 = 0 }, { ZValue1 = 10, YValue2 = 0, XValue3 = 0 }]]
+SimplePointer = [[{ ZValue1 = 0, YValue2 = 2, XValue3 = 0 }]]
+Nested = [[{ Table = { ZValue1 = 0, YValue2 = 0, XValue3 = 3 } }]]
+NestedPointer = [[{ Table = { ZValue1 = 0, YValue2 = 0, XValue3 = -3 } }]]
+`
+
+	expectedAlphabetical := `Nested = [[{ Table = { XValue3 = 3, YValue2 = 0, ZValue1 = 0 } }]]
+NestedPointer = [[{ Table = { XValue3 = -3, YValue2 = 0, ZValue1 = 0 } }]]
+Simple = [[{ XValue3 = 0, YValue2 = 0, ZValue1 = 1 }, { XValue3 = 0, YValue2 = 0, ZValue1 = 10 }]]
+SimplePointer = [[{ XValue3 = 0, YValue2 = 2, ZValue1 = 0 }]]
+`
+
+	var bufPreserve bytes.Buffer
+	if err := NewEncoder(&bufPreserve).Order(OrderPreserve).Encode(nestedArray); err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(bufPreserve.Bytes(), []byte(expectedPreserve)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expectedPreserve, bufPreserve.String())
+	}
+
+	var bufAlphabetical bytes.Buffer
+	if err := NewEncoder(&bufAlphabetical).Order(OrderAlphabetical).Encode(nestedArray); err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(bufAlphabetical.Bytes(), []byte(expectedAlphabetical)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expectedAlphabetical, bufAlphabetical.String())
 	}
 }
 
@@ -2602,7 +2654,7 @@ func TestMarshalArrays(t *testing.T) {
 			}{
 				XY: [2]int{1, 2},
 			},
-			Expected: `XY = [1,2]
+			Expected: `XY = [1, 2]
 `,
 		},
 		{
@@ -2611,7 +2663,7 @@ func TestMarshalArrays(t *testing.T) {
 			}{
 				XY: [1][2]int{{1, 2}},
 			},
-			Expected: `XY = [[1,2]]
+			Expected: `XY = [[1, 2]]
 `,
 		},
 		{
@@ -2620,7 +2672,7 @@ func TestMarshalArrays(t *testing.T) {
 			}{
 				XY: [1][]int{{1, 2}},
 			},
-			Expected: `XY = [[1,2]]
+			Expected: `XY = [[1, 2]]
 `,
 		},
 		{
@@ -2629,7 +2681,7 @@ func TestMarshalArrays(t *testing.T) {
 			}{
 				XY: [][2]int{{1, 2}},
 			},
-			Expected: `XY = [[1,2]]
+			Expected: `XY = [[1, 2]]
 `,
 		},
 	}
@@ -3047,7 +3099,7 @@ func TestMarshalInterface(t *testing.T) {
 		InterfacePointerField *interface{}
 	}
 
-	expected := []byte(`ArrayField = [1,2,3]
+	expected := []byte(`ArrayField = [1, 2, 3]
 InterfacePointerField = "hello world"
 PrimitiveField = "string"
 
@@ -3420,22 +3472,22 @@ func TestMarshalMixedTypeArray(t *testing.T) {
 		ArrayField []interface{}
 	}
 
-	expected := []byte(`ArrayField = [3.14,100,true,"hello world",{IntField = 100,StrField = "inner1"},[{IntField = 200,StrField = "inner2"},{IntField = 300,StrField = "inner3"}]]
+	expected := []byte(`ArrayField = [3.14, 100, true, "hello world", { IntField = 100, StrField = "inner1" }, [{ IntField = 200, StrField = "inner2" }, { IntField = 300, StrField = "inner3" }]]
 `)
 
 	if result, err := Marshal(TestStruct{
-		ArrayField:[]interface{}{
+		ArrayField: []interface{}{
 			3.14,
 			100,
 			true,
 			"hello world",
 			InnerStruct{
-				IntField:100,
-				StrField:"inner1",
+				IntField: 100,
+				StrField: "inner1",
 			},
 			[]InnerStruct{
-				{IntField:200,StrField:"inner2"},
-				{IntField:300,StrField:"inner3"},
+				{IntField: 200, StrField: "inner2"},
+				{IntField: 300, StrField: "inner3"},
 			},
 		},
 	}); err == nil {
@@ -3457,17 +3509,17 @@ func TestUnmarshalMixedTypeArray(t *testing.T) {
 
 	actual := TestStruct{}
 	expected := TestStruct{
-		ArrayField:[]interface{}{
+		ArrayField: []interface{}{
 			3.14,
 			int64(100),
 			true,
 			"hello world",
 			map[string]interface{}{
-				"Field":"inner1",
+				"Field": "inner1",
 			},
 			[]map[string]interface{}{
-				{"Field":"inner2"},
-				{"Field":"inner3"},
+				{"Field": "inner2"},
+				{"Field": "inner3"},
 			},
 		},
 	}

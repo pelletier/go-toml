@@ -367,7 +367,7 @@ func (e *Encoder) PromoteAnonymous(promote bool) *Encoder {
 func (e *Encoder) marshal(v interface{}) ([]byte, error) {
 	// Check if indentation is valid
 	for _, char := range e.indentation {
-		if !(char == ' ' || char == '\t') {
+		if !isSpace(char) {
 			return []byte{}, fmt.Errorf("invalid indentation: must only contains space or tab characters")
 		}
 	}
@@ -475,7 +475,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				return nil, err
 			}
 			if e.quoteMapKeys {
-				keyStr, err := tomlValueStringRepresentation(key.String(), "", "", OrderPreserve, e.arraysOneElementPerLine)
+				keyStr, err := tomlValueStringRepresentation(key.String(), "", "", e.order, e.arraysOneElementPerLine)
 				if err != nil {
 					return nil, err
 				}

@@ -105,7 +105,7 @@ func TestTreeCreateToTreeInvalidTableGroupType(t *testing.T) {
 }
 
 func TestRoundTripArrayOfTables(t *testing.T) {
-	orig := "\n[[stuff]]\n  name = \"foo\"\n  things = [\"a\",\"b\"]\n"
+	orig := "\n[[stuff]]\n  name = \"foo\"\n  things = [\"a\", \"b\"]\n"
 	tree, err := Load(orig)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)

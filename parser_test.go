@@ -919,10 +919,10 @@ func TestTomlValueStringRepresentation(t *testing.T) {
 		{"\b\t\n\f\r\"\\", "\"\\b\\t\\n\\f\\r\\\"\\\\\""},
 		{"\x05", "\"\\u0005\""},
 		{time.Date(1979, time.May, 27, 7, 32, 0, 0, time.UTC), "1979-05-27T07:32:00Z"},
-		{[]interface{}{"gamma", "delta"}, "[\"gamma\",\"delta\"]"},
+		{[]interface{}{"gamma", "delta"}, "[\"gamma\", \"delta\"]"},
 		{nil, ""},
 	} {
-		result, err := tomlValueStringRepresentation(item.Value, "", "", OrderPreserve, false)
+		result, err := tomlValueStringRepresentation(item.Value, "", "", OrderAlphabetical, false)
 		if err != nil {
 			t.Errorf("Test %d - unexpected error: %s", idx, err)
 		}
