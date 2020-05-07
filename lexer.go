@@ -330,7 +330,26 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 		} else if r == '\n' {
 			return l.errorf("keys cannot contain new lines")
 		} else if isSpace(r) {
-			break
+			str := " "
+			// skip trailing whitespace
+			l.next()
+			for r = l.peek(); isSpace(r); r = l.peek() {
+				str += string(r)
+				l.next()
+			}
+			// break loop if not a dot
+			if r != '.' {
+				break
+			}
+			str += "."
+			// skip trailing whitespace after dot
+			l.next()
+			for r = l.peek(); isSpace(r); r = l.peek() {
+				str += string(r)
+				l.next()
+			}
+			growingString += str
+			continue
 		} else if r == '.' {
 			// skip
 		} else if !isValidBareChar(r) {
