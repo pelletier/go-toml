@@ -475,7 +475,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 				return nil, err
 			}
 			if e.quoteMapKeys {
-				keyStr, err := tomlValueStringRepresentation(key.String(), "", "", e.arraysOneElementPerLine)
+				keyStr, err := tomlValueStringRepresentation(key.String(), "", "", OrderPreserve, e.arraysOneElementPerLine)
 				if err != nil {
 					return nil, err
 				}
@@ -503,9 +503,6 @@ func (e *Encoder) valueToTreeSlice(mtype reflect.Type, mval reflect.Value) ([]*T
 
 // Convert given marshal slice to slice of toml values
 func (e *Encoder) valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
-	if mtype.Elem().Kind() == reflect.Interface {
-		return nil, fmt.Errorf("marshal can't handle []interface{}")
-	}
 	tval := make([]interface{}, mval.Len(), mval.Len())
 	for i := 0; i < mval.Len(); i++ {
 		val, err := e.valueToToml(mtype.Elem(), mval.Index(i))

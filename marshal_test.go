@@ -2995,10 +2995,6 @@ func TestMarshalInterface(t *testing.T) {
 		InterfacePointerField *interface{}
 	}
 
-	type ShouldNotSupportStruct struct {
-		InterfaceArray []interface{}
-	}
-
 	expected := []byte(`ArrayField = [1,2,3]
 InterfacePointerField = "hello world"
 PrimitiveField = "string"
@@ -3048,11 +3044,6 @@ PrimitiveField = "string"
 		}
 	} else {
 		t.Fatal(err)
-	}
-
-	// according to the toml standard, data types of array may not be mixed
-	if _, err := Marshal(ShouldNotSupportStruct{[]interface{}{1, "a", true}}); err == nil {
-		t.Errorf("Should not support []interface{} marshaling")
 	}
 }
 
@@ -3365,6 +3356,77 @@ func TestUnmarshalSliceFail2(t *testing.T) {
 		t.Error("expect err:(1, 1): Can't convert 1(int64) to string but got ", err)
 	}
 
+}
+
+func TestMarshalMixedTypeArray(t *testing.T) {
+	type InnerStruct struct {
+		IntField int
+		StrField string
+	}
+
+	type TestStruct struct {
+		ArrayField []interface{}
+	}
+
+	expected := []byte(`ArrayField = [3.14,100,true,"hello world",{IntField = 100,StrField = "inner1"},[{IntField = 200,StrField = "inner2"},{IntField = 300,StrField = "inner3"}]]
+`)
+
+	if result, err := Marshal(TestStruct{
+		ArrayField:[]interface{}{
+			3.14,
+			100,
+			true,
+			"hello world",
+			InnerStruct{
+				IntField:100,
+				StrField:"inner1",
+			},
+			[]InnerStruct{
+				{IntField:200,StrField:"inner2"},
+				{IntField:300,StrField:"inner3"},
+			},
+		},
+	}); err == nil {
+		if !bytes.Equal(result, expected) {
+			t.Errorf("Bad marshal: expected\n----\n%s\n----\ngot\n----\n%s\n----\n", expected, result)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}
+
+func TestUnmarshalMixedTypeArray(t *testing.T) {
+	type TestStruct struct {
+		ArrayField []interface{}
+	}
+
+	toml := []byte(`ArrayField = [3.14,100,true,"hello world",{Field = "inner1"},[{Field = "inner2"},{Field = "inner3"}]]
+`)
+
+	actual := TestStruct{}
+	expected := TestStruct{
+		ArrayField:[]interface{}{
+			3.14,
+			int64(100),
+			true,
+			"hello world",
+			map[string]interface{}{
+				"Field":"inner1",
+			},
+			[]map[string]interface{}{
+				{"Field":"inner2"},
+				{"Field":"inner3"},
+			},
+		},
+	}
+
+	if err := Unmarshal(toml, &actual); err == nil {
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Bad unmarshal: expected %#v, got %#v", expected, actual)
+		}
+	} else {
+		t.Fatal(err)
+	}
 }
 
 func TestUnmarshalArray(t *testing.T) {
