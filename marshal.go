@@ -822,7 +822,8 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 					if !mtypef.Anonymous {
 						tmpTval = nil
 					}
-					v, err := d.valueFromTree(mtypef.Type, tmpTval, nil)
+					fval := mval.Field(i)
+					v, err := d.valueFromTree(mtypef.Type, tmpTval, &fval)
 					if err != nil {
 						return v, err
 					}

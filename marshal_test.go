@@ -3807,3 +3807,44 @@ func TestTextUnmarshalError(t *testing.T) {
 		t.Fatalf("expected err, got none")
 	}
 }
+
+// issue406
+func TestPreserveNotEmptyField(t *testing.T) {
+	toml := []byte(`Field1 = "ccc"`)
+	type Inner struct {
+		InnerField1 string
+		InnerField2 int
+	}
+	type TestStruct struct {
+		Field1 string
+		Field2 int
+		Field3 Inner
+	}
+
+	actual := TestStruct{
+		"aaa",
+		100,
+		Inner{
+			"bbb",
+			200,
+		},
+	}
+
+	expected := TestStruct{
+		"ccc",
+		100,
+		Inner{
+			"bbb",
+			200,
+		},
+	}
+
+	err := Unmarshal(toml, &actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
+	}
+}
