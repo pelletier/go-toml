@@ -26,6 +26,14 @@ func assertArrayContainsInAnyOrder(t *testing.T, array []interface{}, objects ..
 	}
 }
 
+func checkQuery(t *testing.T, tree *toml.Tree, query string, objects ...interface{}) {
+	results, err := CompileAndExecute(query, tree)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	assertArrayContainsInAnyOrder(t, results.Values(), objects...)
+}
+
 func TestQueryExample(t *testing.T) {
 	config, _ := toml.Load(`
       [[book]]
@@ -37,16 +45,18 @@ func TestQueryExample(t *testing.T) {
       [[book]]
       title = "Neuromancer"
       author = "William Gibson"
-    `)
-	authors, err := CompileAndExecute("$.book.author", config)
-	if err != nil {
-		t.Fatal("unexpected error:", err)
-	}
-	names := authors.Values()
-	if len(names) != 3 {
-		t.Fatalf("query should return 3 names but returned %d", len(names))
-	}
-	assertArrayContainsInAnyOrder(t, names, "Stephen King", "Ernest Hemmingway", "William Gibson")
+	`)
+
+	checkQuery(t, config, "$.book.author", "Stephen King", "Ernest Hemmingway", "William Gibson")
+
+	checkQuery(t, config, "$.book[0].author", "Stephen King")
+	checkQuery(t, config, "$.book[-1].author", "William Gibson")
+	checkQuery(t, config, "$.book[1:].author", "Ernest Hemmingway", "William Gibson")
+	checkQuery(t, config, "$.book[-1:].author", "William Gibson")
+	checkQuery(t, config, "$.book[::2].author", "William Gibson", "Stephen King")
+	checkQuery(t, config, "$.book[::-1].author", "William Gibson", "Ernest Hemmingway", "Stephen King")
+	checkQuery(t, config, "$.book[:].author", "Stephen King", "Ernest Hemmingway", "William Gibson")
+	checkQuery(t, config, "$.book[::].author", "Stephen King", "Ernest Hemmingway", "William Gibson")
 }
 
 func TestQueryReadmeExample(t *testing.T) {
@@ -56,16 +66,7 @@ user = "pelletier"
 password = "mypassword"
 `)
 
-	query, err := Compile("$..[user,password]")
-	if err != nil {
-		t.Fatal("unexpected error:", err)
-	}
-	results := query.Execute(config)
-	values := results.Values()
-	if len(values) != 2 {
-		t.Fatalf("query should return 2 values but returned %d", len(values))
-	}
-	assertArrayContainsInAnyOrder(t, values, "pelletier", "mypassword")
+	checkQuery(t, config, "$..[user,password]", "pelletier", "mypassword")
 }
 
 func TestQueryPathNotPresent(t *testing.T) {

@@ -25,7 +25,7 @@
 // items.
 //
 // As illustrated above, the query path is much more efficient, especially since
-// the structure of the TOML file can vary.  Rather than making assumptions about
+// the structure of the TOML file can vary. Rather than making assumptions about
 // a document's structure, a query allows the programmer to make structured
 // requests into the document, and get zero or more values as a result.
 //
@@ -35,7 +35,7 @@
 // sub-expressions:
 //
 //   $
-//                    Root of the TOML tree.  This must always come first.
+//                    Root of the TOML tree. This must always come first.
 //   .name
 //                    Selects child of this node, where 'name' is a TOML key
 //                    name.
@@ -57,7 +57,7 @@
 //                    sub-expressions: index, key name, or filter.
 //   [start:end:step]
 //                    Slice operator - selects array elements from start to
-//                    end-1, at the given step.  All three arguments are
+//                    end-1, at the given step. All three arguments are
 //                    optional.
 //   [?(filter)]
 //                    Named filter expression - the function 'filter' is
@@ -80,25 +80,23 @@
 // Slice expressions also allow negative indexes for the start and stop
 // arguments.
 //
-//   // select all array elements.
+//   // select all array elements except the last one.
 //   query.CompileAndExecute("$.foo[0:-1]", tree)
 //
 // Slice expressions may have an optional stride/step parameter:
 //
 //   // select every other element
-//   query.CompileAndExecute("$.foo[0:-1:2]", tree)
+//   query.CompileAndExecute("$.foo[0::2]", tree)
 //
 // Slice start and end parameters are also optional:
 //
 //   // these are all equivalent and select all the values in the array
 //   query.CompileAndExecute("$.foo[:]", tree)
-//   query.CompileAndExecute("$.foo[0:]", tree)
-//   query.CompileAndExecute("$.foo[:-1]", tree)
-//   query.CompileAndExecute("$.foo[0:-1:]", tree)
+//   query.CompileAndExecute("$.foo[::]", tree)
 //   query.CompileAndExecute("$.foo[::1]", tree)
+//   query.CompileAndExecute("$.foo[0:]", tree)
+//   query.CompileAndExecute("$.foo[0::]", tree)
 //   query.CompileAndExecute("$.foo[0::1]", tree)
-//   query.CompileAndExecute("$.foo[:-1:1]", tree)
-//   query.CompileAndExecute("$.foo[0:-1:1]", tree)
 //
 // Query Filters
 //
@@ -126,8 +124,8 @@
 //
 // Query Results
 //
-// An executed query returns a Result object.  This contains the nodes
-// in the TOML tree that qualify the query expression.  Position information
+// An executed query returns a Result object. This contains the nodes
+// in the TOML tree that qualify the query expression. Position information
 // is also available for each value in the set.
 //
 //   // display the results of a query
@@ -139,7 +137,7 @@
 // Compiled Queries
 //
 // Queries may be executed directly on a Tree object, or compiled ahead
-// of time and executed discretely.  The former is more convenient, but has the
+// of time and executed discretely. The former is more convenient, but has the
 // penalty of having to recompile the query expression each time.
 //
 //   // basic query
@@ -155,7 +153,7 @@
 // User Defined Query Filters
 //
 // Filter expressions may also be user defined by using the SetFilter()
-// function on the Query object.  The function must return true/false, which
+// function on the Query object. The function must return true/false, which
 // signifies if the passed node is kept or discarded, respectively.
 //
 //   // create a query that references a user-defined filter
@@ -166,7 +164,7 @@
 //       if tree, ok := node.(*Tree); ok {
 //           return tree.Has("baz")
 //       }
-//       return false  // reject all other node types
+//       return false // reject all other node types
 //   })
 //
 //   // run the query

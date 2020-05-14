@@ -2,8 +2,10 @@ package query
 
 import (
 	"fmt"
-	"github.com/pelletier/go-toml"
+	"strconv"
 	"testing"
+
+	"github.com/pelletier/go-toml"
 )
 
 // dump path tree to a string
@@ -19,8 +21,17 @@ func pathString(root pathFn) string {
 		result += fmt.Sprintf("{%d}", fn.Idx)
 		result += pathString(fn.next)
 	case *matchSliceFn:
-		result += fmt.Sprintf("{%d:%d:%d}",
-			fn.Start, fn.End, fn.Step)
+		startString, endString, stepString := "nil", "nil", "nil"
+		if fn.Start != nil {
+			startString = strconv.Itoa(*fn.Start)
+		}
+		if fn.End != nil {
+			endString = strconv.Itoa(*fn.End)
+		}
+		if fn.Step != nil {
+			stepString = strconv.Itoa(*fn.Step)
+		}
+		result += fmt.Sprintf("{%s:%s:%s}", startString, endString, stepString)
 		result += pathString(fn.next)
 	case *matchAnyFn:
 		result += "{}"
@@ -110,7 +121,7 @@ func TestPathSliceStart(t *testing.T) {
 	assertPath(t,
 		"$[123:]",
 		buildPath(
-			newMatchSliceFn(123, maxInt, 1),
+			newMatchSliceFn().setStart(123),
 		))
 }
 
@@ -118,7 +129,7 @@ func TestPathSliceStartEnd(t *testing.T) {
 	assertPath(t,
 		"$[123:456]",
 		buildPath(
-			newMatchSliceFn(123, 456, 1),
+			newMatchSliceFn().setStart(123).setEnd(456),
 		))
 }
 
@@ -126,7 +137,7 @@ func TestPathSliceStartEndColon(t *testing.T) {
 	assertPath(t,
 		"$[123:456:]",
 		buildPath(
-			newMatchSliceFn(123, 456, 1),
+			newMatchSliceFn().setStart(123).setEnd(456),
 		))
 }
 
@@ -134,7 +145,7 @@ func TestPathSliceStartStep(t *testing.T) {
 	assertPath(t,
 		"$[123::7]",
 		buildPath(
-			newMatchSliceFn(123, maxInt, 7),
+			newMatchSliceFn().setStart(123).setStep(7),
 		))
 }
 
@@ -142,7 +153,7 @@ func TestPathSliceEndStep(t *testing.T) {
 	assertPath(t,
 		"$[:456:7]",
 		buildPath(
-			newMatchSliceFn(0, 456, 7),
+			newMatchSliceFn().setEnd(456).setStep(7),
 		))
 }
 
@@ -150,7 +161,7 @@ func TestPathSliceStep(t *testing.T) {
 	assertPath(t,
 		"$[::7]",
 		buildPath(
-			newMatchSliceFn(0, maxInt, 7),
+			newMatchSliceFn().setStep(7),
 		))
 }
 
@@ -158,7 +169,7 @@ func TestPathSliceAll(t *testing.T) {
 	assertPath(t,
 		"$[123:456:7]",
 		buildPath(
-			newMatchSliceFn(123, 456, 7),
+			newMatchSliceFn().setStart(123).setEnd(456).setStep(7),
 		))
 }
 

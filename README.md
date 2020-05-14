@@ -74,7 +74,7 @@ Or use a query:
 q, _ := query.Compile("$..[user,password]")
 results := q.Execute(config)
 for ii, item := range results.Values() {
-    fmt.Println("Query result %d: %v", ii, item)
+    fmt.Printf("Query result %d: %v\n", ii, item)
 }
 ```
 
@@ -99,9 +99,9 @@ Go-toml provides two handy command line tools:
     go install github.com/pelletier/go-toml/cmd/tomljson
     tomljson --help
     ```
-  
+
  * `jsontoml`: Reads a JSON file and outputs a TOML representation.
- 
+
     ```
     go install github.com/pelletier/go-toml/cmd/jsontoml
     jsontoml --help
