@@ -18,7 +18,7 @@ Go-toml provides the following features for using data parsed from TOML document
 
 * Load TOML documents from files and string data
 * Easily navigate TOML structure using Tree
-* Mashaling and unmarshaling to and from data structures
+* Marshaling and unmarshaling to and from data structures
 * Line & column position data for all parsed elements
 * [Query support similar to JSON-Path](query/)
 * Syntax errors contain line and column numbers
@@ -87,7 +87,7 @@ The documentation and additional examples are available at
 
 Go-toml provides two handy command line tools:
 
-* `tomll`: Reads TOML files and lint them.
+* `tomll`: Reads TOML files and lints them.
 
     ```
     go install github.com/pelletier/go-toml/cmd/tomll
