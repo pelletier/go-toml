@@ -7,21 +7,14 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-func assertArrayContainsInAnyOrder(t *testing.T, array []interface{}, objects ...interface{}) {
+func assertArrayContainsInOrder(t *testing.T, array []interface{}, objects ...interface{}) {
 	if len(array) != len(objects) {
 		t.Fatalf("array contains %d objects but %d are expected", len(array), len(objects))
 	}
 
-	for _, o := range objects {
-		found := false
-		for _, a := range array {
-			if a == o {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal(o, "not found in array", array)
+	for i := 0; i < len(array); i++ {
+		if array[i] != objects[i] {
+			t.Fatalf("wanted '%s', have '%s'", objects[i], array[i])
 		}
 	}
 }
@@ -31,7 +24,7 @@ func checkQuery(t *testing.T, tree *toml.Tree, query string, objects ...interfac
 	if err != nil {
 		t.Fatal("unexpected error:", err)
 	}
-	assertArrayContainsInAnyOrder(t, results.Values(), objects...)
+	assertArrayContainsInOrder(t, results.Values(), objects...)
 }
 
 func TestQueryExample(t *testing.T) {
@@ -53,7 +46,7 @@ func TestQueryExample(t *testing.T) {
 	checkQuery(t, config, "$.book[-1].author", "William Gibson")
 	checkQuery(t, config, "$.book[1:].author", "Ernest Hemmingway", "William Gibson")
 	checkQuery(t, config, "$.book[-1:].author", "William Gibson")
-	checkQuery(t, config, "$.book[::2].author", "William Gibson", "Stephen King")
+	checkQuery(t, config, "$.book[::2].author", "Stephen King", "William Gibson")
 	checkQuery(t, config, "$.book[::-1].author", "William Gibson", "Ernest Hemmingway", "Stephen King")
 	checkQuery(t, config, "$.book[:].author", "Stephen King", "Ernest Hemmingway", "William Gibson")
 	checkQuery(t, config, "$.book[::].author", "Stephen King", "Ernest Hemmingway", "William Gibson")
