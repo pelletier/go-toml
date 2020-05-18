@@ -5,21 +5,6 @@ import (
 	"testing"
 )
 
-func TestInvalidArrayMixedTypesArraysAndInts(t *testing.T) {
-	input := `arrays-and-ints =  [1, ["Arrays are not integers."]]`
-	testgenInvalid(t, input)
-}
-
-func TestInvalidArrayMixedTypesIntsAndFloats(t *testing.T) {
-	input := `ints-and-floats = [1, 1.1]`
-	testgenInvalid(t, input)
-}
-
-func TestInvalidArrayMixedTypesStringsAndInts(t *testing.T) {
-	input := `strings-and-ints = ["hi", 42]`
-	testgenInvalid(t, input)
-}
-
 func TestInvalidDatetimeMalformedNoLeads(t *testing.T) {
 	input := `no-leads = 1987-7-05T17:45:00Z`
 	testgenInvalid(t, input)

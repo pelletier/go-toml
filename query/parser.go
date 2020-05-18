@@ -203,12 +203,13 @@ loop: // labeled loop for easy breaking
 
 func (p *queryParser) parseSliceExpr() queryParserStateFn {
 	// init slice to grab all elements
-	start, end, step := 0, maxInt, 1
+	var start, end, step *int = nil, nil, nil
 
 	// parse optional start
 	tok := p.getToken()
 	if tok.typ == tokenInteger {
-		start = tok.Int()
+		v := tok.Int()
+		start = &v
 		tok = p.getToken()
 	}
 	if tok.typ != tokenColon {
@@ -218,11 +219,12 @@ func (p *queryParser) parseSliceExpr() queryParserStateFn {
 	// parse optional end
 	tok = p.getToken()
 	if tok.typ == tokenInteger {
-		end = tok.Int()
+		v := tok.Int()
+		end = &v
 		tok = p.getToken()
 	}
 	if tok.typ == tokenRightBracket {
-		p.query.appendPath(newMatchSliceFn(start, end, step))
+		p.query.appendPath(&matchSliceFn{Start: start, End: end, Step: step})
 		return p.parseMatchExpr
 	}
 	if tok.typ != tokenColon {
@@ -232,17 +234,18 @@ func (p *queryParser) parseSliceExpr() queryParserStateFn {
 	// parse optional step
 	tok = p.getToken()
 	if tok.typ == tokenInteger {
-		step = tok.Int()
-		if step < 0 {
-			return p.parseError(tok, "step must be a positive value")
+		v := tok.Int()
+		if v == 0 {
+			return p.parseError(tok, "step cannot be zero")
 		}
+		step = &v
 		tok = p.getToken()
 	}
 	if tok.typ != tokenRightBracket {
 		return p.parseError(tok, "expected ']'")
 	}
 
-	p.query.appendPath(newMatchSliceFn(start, end, step))
+	p.query.appendPath(&matchSliceFn{Start: start, End: end, Step: step})
 	return p.parseMatchExpr
 }
 

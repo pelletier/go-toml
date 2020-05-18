@@ -2,9 +2,9 @@ package query
 
 import (
 	"fmt"
-	"github.com/pelletier/go-toml"
 	"strconv"
-	"unicode"
+
+	"github.com/pelletier/go-toml"
 )
 
 // Define tokens
@@ -92,11 +92,11 @@ func isSpace(r rune) bool {
 }
 
 func isAlphanumeric(r rune) bool {
-	return unicode.IsLetter(r) || r == '_'
+	return 'a' <= r && r <= 'z' || 'A' <= r && r <= 'Z' || r == '_'
 }
 
 func isDigit(r rune) bool {
-	return unicode.IsNumber(r)
+	return '0' <= r && r <= '9'
 }
 
 func isHexDigit(r rune) bool {
