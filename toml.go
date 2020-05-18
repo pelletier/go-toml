@@ -115,6 +115,52 @@ func (t *Tree) GetPath(keys []string) interface{} {
 	// branch based on final node type
 	switch node := subtree.values[keys[len(keys)-1]].(type) {
 	case *tomlValue:
+		return node.value
+	default:
+		return node
+	}
+}
+
+// GetArray returns the value at key in the Tree.
+// It returns []string, []int64, etc type if key has homogeneous lists
+// Key is a dot-separated path (e.g. a.b.c) without single/double quoted strings.
+// Returns nil if the path does not exist in the tree.
+// If keys is of length zero, the current tree is returned.
+func (t *Tree) GetArray(key string) interface{} {
+	if key == "" {
+		return t
+	}
+	return t.GetArrayPath(strings.Split(key, "."))
+}
+
+// GetArrayPath returns the element in the tree indicated by 'keys'.
+// If keys is of length zero, the current tree is returned.
+func (t *Tree) GetArrayPath(keys []string) interface{} {
+	if len(keys) == 0 {
+		return t
+	}
+	subtree := t
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		value, exists := subtree.values[intermediateKey]
+		if !exists {
+			return nil
+		}
+		switch node := value.(type) {
+		case *Tree:
+			subtree = node
+		case []*Tree:
+			// go to most recent element
+			if len(node) == 0 {
+				return nil
+			}
+			subtree = node[len(node)-1]
+		default:
+			return nil // cannot navigate through other node types
+		}
+	}
+	// branch based on final node type
+	switch node := subtree.values[keys[len(keys)-1]].(type) {
+	case *tomlValue:
 		switch n := node.value.(type) {
 		case []interface{}:
 			return getArray(n)
@@ -126,18 +172,22 @@ func (t *Tree) GetPath(keys []string) interface{} {
 	}
 }
 
-// if homogeneous array, then return array type obj. as resp. over []interface{}
+// if homogeneous array, then return slice type object over []interface{}
 func getArray(n []interface{}) interface{} {
-	var str []string
+	var s []string
+	var b []byte
 	var i32 []int32
 	var i64 []int64
 	var i []int
 	var f32 []float32
 	var f64 []float64
+	var bl []bool
 	for _, value := range n {
 		switch v := value.(type) {
 		case string:
-			str = append(str, v)
+			s = append(s, v)
+		case byte:
+			b = append(b, v)
 		case int32:
 			i32 = append(i32, v)
 		case int64:
@@ -148,12 +198,16 @@ func getArray(n []interface{}) interface{} {
 			f32 = append(f32, v)
 		case float64:
 			f64 = append(f64, v)
+		case bool:
+			bl = append(bl, v)
 		default:
 			return n
 		}
 	}
-	if len(str) == len(n) {
-		return str
+	if len(s) == len(n) {
+		return s
+	} else if len(b) == len(n) {
+		return b
 	} else if len(i32) == len(n) {
 		return i32
 	} else if len(i64) == len(n) {
@@ -164,6 +218,8 @@ func getArray(n []interface{}) interface{} {
 		return f32
 	} else if len(f64) == len(n) {
 		return f64
+	} else if len(bl) == len(n) {
+		return bl
 	}
 	return n
 }
