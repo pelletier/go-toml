@@ -45,6 +45,7 @@ func TestTomlGetArray(t *testing.T) {
 		[test]
 		key = ["one", "two"]
 		key2 = [true, false, false]
+		key3 = [1.5,2.5]
 	`)
 
 	if tree.GetArray("") != tree {
@@ -60,7 +61,13 @@ func TestTomlGetArray(t *testing.T) {
 	expect2 := []bool{true, false, false}
 	actual2 := tree.GetArray("test.key2").([]bool)
 	if !reflect.DeepEqual(actual2, expect2) {
-		t.Errorf("GetArray should return the []string value")
+		t.Errorf("GetArray should return the []bool value")
+	}
+
+	expect3 := []float64{1.5,2.5}
+	actual3 := tree.GetArray("test.key3").([]float64)
+	if !reflect.DeepEqual(actual3, expect3) {
+		t.Errorf("GetArray should return the []float64 value")
 	}
 
 	if tree.GetArray(`\`) != nil {

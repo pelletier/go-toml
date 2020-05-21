@@ -177,10 +177,7 @@ func (t *Tree) GetArrayPath(keys []string) interface{} {
 func getArray(n []interface{}) interface{} {
 	var s []string
 	var b []byte
-	var i32 []int32
 	var i64 []int64
-	var i []int
-	var f32 []float32
 	var f64 []float64
 	var bl []bool
 	for _, value := range n {
@@ -189,14 +186,8 @@ func getArray(n []interface{}) interface{} {
 			s = append(s, v)
 		case byte:
 			b = append(b, v)
-		case int32:
-			i32 = append(i32, v)
 		case int64:
 			i64 = append(i64, v)
-		case int:
-			i = append(i, v)
-		case float32:
-			f32 = append(f32, v)
 		case float64:
 			f64 = append(f64, v)
 		case bool:
@@ -209,14 +200,8 @@ func getArray(n []interface{}) interface{} {
 		return s
 	} else if len(b) == len(n) {
 		return b
-	} else if len(i32) == len(n) {
-		return i32
 	} else if len(i64) == len(n) {
 		return i64
-	} else if len(i) == len(n) {
-		return i
-	} else if len(f32) == len(n) {
-		return f32
 	} else if len(f64) == len(n) {
 		return f64
 	} else if len(bl) == len(n) {
