@@ -176,7 +176,6 @@ func (t *Tree) GetArrayPath(keys []string) interface{} {
 // if homogeneous array, then return slice type object over []interface{}
 func getArray(n []interface{}) interface{} {
 	var s []string
-	var b []byte
 	var i64 []int64
 	var f64 []float64
 	var bl []bool
@@ -184,8 +183,6 @@ func getArray(n []interface{}) interface{} {
 		switch v := value.(type) {
 		case string:
 			s = append(s, v)
-		case byte:
-			b = append(b, v)
 		case int64:
 			i64 = append(i64, v)
 		case float64:
@@ -198,8 +195,6 @@ func getArray(n []interface{}) interface{} {
 	}
 	if len(s) == len(n) {
 		return s
-	} else if len(b) == len(n) {
-		return b
 	} else if len(i64) == len(n) {
 		return i64
 	} else if len(f64) == len(n) {

@@ -64,7 +64,7 @@ func TestTomlGetArray(t *testing.T) {
 		t.Errorf("GetArray should return the []bool value")
 	}
 
-	expect3 := []float64{1.5,2.5}
+	expect3 := []float64{1.5, 2.5}
 	actual3 := tree.GetArray("test.key3").([]float64)
 	if !reflect.DeepEqual(actual3, expect3) {
 		t.Errorf("GetArray should return the []float64 value")
@@ -185,22 +185,41 @@ func TestTomlGetPath(t *testing.T) {
 }
 
 func TestTomlGetArrayPath(t *testing.T) {
-	node := newTree()
-	//TODO: set other node data
-
 	for idx, item := range []struct {
-		Path     []string
-		Expected *Tree
+		Name string
+		Path []string
+		Make func() (tree *Tree, expected interface{})
 	}{
-		{ // empty path test
-			[]string{},
-			node,
+		{
+			Name: "empty",
+			Path: []string{},
+			Make: func() (tree *Tree, expected interface{}) {
+				tree = newTree()
+				expected = tree
+				return
+			},
+		},
+		{
+			Name: "int64",
+			Path: []string{"a"},
+			Make: func() (tree *Tree, expected interface{}) {
+				var err error
+				tree, err = Load(`a = [1,2,3]`)
+				if err != nil {
+					panic(err)
+				}
+				expected = []int64{1, 2, 3}
+				return
+			},
 		},
 	} {
-		result := node.GetArrayPath(item.Path)
-		if result != item.Expected {
-			t.Errorf("GetArrayPath[%d] %v - expected %v, got %v instead.", idx, item.Path, item.Expected, result)
-		}
+		t.Run(item.Name, func(t *testing.T) {
+			tree, expected := item.Make()
+			result := tree.GetArrayPath(item.Path)
+			if !reflect.DeepEqual(result, expected) {
+				t.Errorf("GetArrayPath[%d] %v - expected %#v, got %#v instead.", idx, item.Path, expected, result)
+			}
+		})
 	}
 
 	tree, _ := Load("[foo.bar]\na=1\nb=2\n[baz.foo]\na=3\nb=4\n[gorf.foo]\na=5\nb=6")
