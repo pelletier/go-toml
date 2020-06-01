@@ -3,6 +3,7 @@
 package toml
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -35,6 +36,41 @@ func TestTomlGet(t *testing.T) {
 		t.Errorf("Get should return the value")
 	}
 	if tree.Get(`\`) != nil {
+		t.Errorf("should return nil when the key is malformed")
+	}
+}
+
+func TestTomlGetArray(t *testing.T) {
+	tree, _ := Load(`
+		[test]
+		key = ["one", "two"]
+		key2 = [true, false, false]
+		key3 = [1.5,2.5]
+	`)
+
+	if tree.GetArray("") != tree {
+		t.Errorf("GetArray should return the tree itself when given an empty path")
+	}
+
+	expect := []string{"one", "two"}
+	actual := tree.GetArray("test.key").([]string)
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf("GetArray should return the []string value")
+	}
+
+	expect2 := []bool{true, false, false}
+	actual2 := tree.GetArray("test.key2").([]bool)
+	if !reflect.DeepEqual(actual2, expect2) {
+		t.Errorf("GetArray should return the []bool value")
+	}
+
+	expect3 := []float64{1.5, 2.5}
+	actual3 := tree.GetArray("test.key3").([]float64)
+	if !reflect.DeepEqual(actual3, expect3) {
+		t.Errorf("GetArray should return the []float64 value")
+	}
+
+	if tree.GetArray(`\`) != nil {
 		t.Errorf("should return nil when the key is malformed")
 	}
 }
@@ -146,6 +182,51 @@ func TestTomlGetPath(t *testing.T) {
 	if tree.GetPath([]string{"whatever"}) != nil {
 		t.Error("GetPath should return nil when the key does not exist")
 	}
+}
+
+func TestTomlGetArrayPath(t *testing.T) {
+	for idx, item := range []struct {
+		Name string
+		Path []string
+		Make func() (tree *Tree, expected interface{})
+	}{
+		{
+			Name: "empty",
+			Path: []string{},
+			Make: func() (tree *Tree, expected interface{}) {
+				tree = newTree()
+				expected = tree
+				return
+			},
+		},
+		{
+			Name: "int64",
+			Path: []string{"a"},
+			Make: func() (tree *Tree, expected interface{}) {
+				var err error
+				tree, err = Load(`a = [1,2,3]`)
+				if err != nil {
+					panic(err)
+				}
+				expected = []int64{1, 2, 3}
+				return
+			},
+		},
+	} {
+		t.Run(item.Name, func(t *testing.T) {
+			tree, expected := item.Make()
+			result := tree.GetArrayPath(item.Path)
+			if !reflect.DeepEqual(result, expected) {
+				t.Errorf("GetArrayPath[%d] %v - expected %#v, got %#v instead.", idx, item.Path, expected, result)
+			}
+		})
+	}
+
+	tree, _ := Load("[foo.bar]\na=1\nb=2\n[baz.foo]\na=3\nb=4\n[gorf.foo]\na=5\nb=6")
+	if tree.GetArrayPath([]string{"whatever"}) != nil {
+		t.Error("GetArrayPath should return nil when the key does not exist")
+	}
+
 }
 
 func TestTomlFromMap(t *testing.T) {
