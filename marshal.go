@@ -522,7 +522,8 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 		case isCustomMarshaler(mtype):
 			return callCustomMarshaler(mval)
 		case isTextMarshaler(mtype):
-			return callTextMarshaler(mval)
+			b, err := callTextMarshaler(mval)
+			return string(b), err
 		default:
 			return e.valueToToml(mtype.Elem(), mval.Elem())
 		}
@@ -534,7 +535,8 @@ func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface
 	case isCustomMarshaler(mtype):
 		return callCustomMarshaler(mval)
 	case isTextMarshaler(mtype):
-		return callTextMarshaler(mval)
+		b, err := callTextMarshaler(mval)
+		return string(b), err
 	case isTree(mtype):
 		return e.valueToTree(mtype, mval)
 	case isOtherSequence(mtype), isCustomMarshalerSequence(mtype), isTextMarshalerSequence(mtype):

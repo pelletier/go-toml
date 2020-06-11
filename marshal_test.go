@@ -979,6 +979,40 @@ func TestCustomMarshaler(t *testing.T) {
 	}
 }
 
+type IntOrString string
+
+func (x *IntOrString) MarshalTOML() ([]byte, error) {
+	s := *(*string)(x)
+	_, err := strconv.Atoi(s)
+	if err != nil {
+		return []byte(fmt.Sprintf(`"%s"`, s)), nil
+	}
+	return []byte(s), nil
+}
+
+func TestNestedCustomMarshaler(t *testing.T) {
+	num := IntOrString("100")
+	str := IntOrString("hello")
+	var parent = struct {
+		IntField    *IntOrString `toml:"int"`
+		StringField *IntOrString `toml:"string"`
+	}{
+		&num,
+		&str,
+	}
+
+	result, err := Marshal(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `int = 100
+string = "hello"
+`
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad nested text marshaler: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, result)
+	}
+}
+
 type textMarshaler struct {
 	FirstName string
 	LastName  string
@@ -1079,7 +1113,7 @@ type customPointerMarshaler struct {
 }
 
 func (m *customPointerMarshaler) MarshalTOML() ([]byte, error) {
-	return []byte("hidden"), nil
+	return []byte(`"hidden"`), nil
 }
 
 type textPointerMarshaler struct {
