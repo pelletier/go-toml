@@ -1,4 +1,4 @@
-package toml
+package benchmark
 
 import (
 	"bytes"
@@ -8,7 +8,8 @@ import (
 	"time"
 
 	burntsushi "github.com/BurntSushi/toml"
-	yaml "gopkg.in/yaml.v2"
+	"github.com/pelletier/go-toml"
+	"gopkg.in/yaml.v2"
 )
 
 type benchmarkDoc struct {
@@ -124,7 +125,7 @@ func BenchmarkParseToml(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := LoadReader(bytes.NewReader(fileBytes))
+		_, err := toml.LoadReader(bytes.NewReader(fileBytes))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -139,7 +140,7 @@ func BenchmarkUnmarshalToml(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		target := benchmarkDoc{}
-		err := Unmarshal(bytes, &target)
+		err := toml.Unmarshal(bytes, &target)
 		if err != nil {
 			b.Fatal(err)
 		}
