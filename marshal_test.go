@@ -14,60 +14,69 @@ import (
 )
 
 type basicMarshalTestStruct struct {
-	String     string                      `toml:"Zstring"`
-	StringList []string                    `toml:"Ystrlist"`
-	Sub        basicMarshalTestSubStruct   `toml:"Xsubdoc"`
-	SubList    []basicMarshalTestSubStruct `toml:"Wsublist"`
+	String     string   `toml:"Zstring"`
+	StringList []string `toml:"Ystrlist"`
+	BasicMarshalTestSubAnonymousStruct
+	Sub     basicMarshalTestSubStruct   `toml:"Xsubdoc"`
+	SubList []basicMarshalTestSubStruct `toml:"Wsublist"`
 }
 
 type basicMarshalTestSubStruct struct {
 	String2 string
 }
 
-var basicTestData = basicMarshalTestStruct{
-	String:     "Hello",
-	StringList: []string{"Howdy", "Hey There"},
-	Sub:        basicMarshalTestSubStruct{"One"},
-	SubList:    []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
+type BasicMarshalTestSubAnonymousStruct struct {
+	String3 string
 }
 
-var basicTestToml = []byte(`Ystrlist = ["Howdy", "Hey There"]
-Zstring = "Hello"
+var basicTestData = basicMarshalTestStruct{
+	String:                             "Hello",
+	StringList:                         []string{"Howdy", "Hey There"},
+	BasicMarshalTestSubAnonymousStruct: BasicMarshalTestSubAnonymousStruct{"One"},
+	Sub:                                basicMarshalTestSubStruct{"Two"},
+	SubList:                            []basicMarshalTestSubStruct{{"Three"}, {"Four"}},
+}
 
-[[Wsublist]]
-  String2 = "Two"
+var basicTestToml = []byte(`String3 = "One"
+Ystrlist = ["Howdy", "Hey There"]
+Zstring = "Hello"
 
 [[Wsublist]]
   String2 = "Three"
 
+[[Wsublist]]
+  String2 = "Four"
+
 [Xsubdoc]
-  String2 = "One"
+  String2 = "Two"
 `)
 
-var basicTestTomlCustomIndentation = []byte(`Ystrlist = ["Howdy", "Hey There"]
+var basicTestTomlCustomIndentation = []byte(`String3 = "One"
+Ystrlist = ["Howdy", "Hey There"]
 Zstring = "Hello"
-
-[[Wsublist]]
-	String2 = "Two"
 
 [[Wsublist]]
 	String2 = "Three"
 
+[[Wsublist]]
+	String2 = "Four"
+
 [Xsubdoc]
-	String2 = "One"
+	String2 = "Two"
 `)
 
 var basicTestTomlOrdered = []byte(`Zstring = "Hello"
 Ystrlist = ["Howdy", "Hey There"]
+String3 = "One"
 
 [Xsubdoc]
-  String2 = "One"
-
-[[Wsublist]]
   String2 = "Two"
 
 [[Wsublist]]
   String2 = "Three"
+
+[[Wsublist]]
+  String2 = "Four"
 `)
 
 var marshalTestToml = []byte(`title = "TOML Marshal Testing"

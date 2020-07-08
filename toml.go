@@ -315,6 +315,8 @@ func (t *Tree) SetPathWithOptions(keys []string, opts SetOptions, value interfac
 		toInsert = value
 	case *tomlValue:
 		v.comment = opts.Comment
+		v.commented = opts.Commented
+		v.multiline = opts.Multiline
 		toInsert = v
 	default:
 		toInsert = &tomlValue{value: value,

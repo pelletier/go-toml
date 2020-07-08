@@ -436,6 +436,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 					if tree, ok := val.(*Tree); ok && mtypef.Anonymous && !opts.nameFromTag && !e.promoteAnon {
 						e.appendTree(tval, tree)
 					} else {
+						val = e.wrapTomlValue(val, tval)
 						tval.SetPathWithOptions([]string{opts.name}, SetOptions{
 							Comment:   opts.comment,
 							Commented: opts.commented,
@@ -474,6 +475,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 			if err != nil {
 				return nil, err
 			}
+			val = e.wrapTomlValue(val, tval)
 			if e.quoteMapKeys {
 				keyStr, err := tomlValueStringRepresentation(key.String(), "", "", e.order, e.arraysOneElementPerLine)
 				if err != nil {
@@ -516,7 +518,6 @@ func (e *Encoder) valueToOtherSlice(mtype reflect.Type, mval reflect.Value) (int
 
 // Convert given marshal value to toml value
 func (e *Encoder) valueToToml(mtype reflect.Type, mval reflect.Value) (interface{}, error) {
-	e.line++
 	if mtype.Kind() == reflect.Ptr {
 		switch {
 		case isCustomMarshaler(mtype):
@@ -577,6 +578,25 @@ func (e *Encoder) appendTree(t, o *Tree) error {
 		t.values[key] = value
 	}
 	return nil
+}
+
+// Create a toml value with the current line number as the position line
+func (e *Encoder) wrapTomlValue(val interface{}, parent *Tree) interface{} {
+	_, isTree := val.(*Tree)
+	_, isTreeS := val.([]*Tree)
+	if isTree || isTreeS {
+		return val
+	}
+
+	ret := &tomlValue{
+		value: val,
+		position: Position{
+			e.line,
+			parent.position.Col,
+		},
+	}
+	e.line++
+	return ret
 }
 
 // Unmarshal attempts to unmarshal the Tree into a Go struct pointed by v.
