@@ -295,7 +295,8 @@ func (t *Tree) SetPathWithOptions(keys []string, opts SetOptions, value interfac
 			// go to most recent element
 			if len(node) == 0 {
 				// create element if it does not exist
-				subtree.values[intermediateKey] = append(node, newTreeWithPosition(Position{Line: t.position.Line + i, Col: t.position.Col}))
+				node = append(node, newTreeWithPosition(Position{Line: t.position.Line + i, Col: t.position.Col}))
+				subtree.values[intermediateKey] = node
 			}
 			subtree = node[len(node)-1]
 		}
