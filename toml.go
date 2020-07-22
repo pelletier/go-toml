@@ -213,6 +213,50 @@ func (t *Tree) GetPosition(key string) Position {
 	return t.GetPositionPath(strings.Split(key, "."))
 }
 
+// SetPositionPath sets the position of element in the tree indicated by 'keys'.
+// If keys is of length zero, the current tree position is set.
+func (t *Tree) SetPositionPath(keys []string, pos Position) {
+	if len(keys) == 0 {
+		t.position = pos
+		return
+	}
+	subtree := t
+	for _, intermediateKey := range keys[:len(keys)-1] {
+		value, exists := subtree.values[intermediateKey]
+		if !exists {
+			return
+		}
+		switch node := value.(type) {
+		case *Tree:
+			subtree = node
+		case []*Tree:
+			// go to most recent element
+			if len(node) == 0 {
+				return
+			}
+			subtree = node[len(node)-1]
+		default:
+			return
+		}
+	}
+	// branch based on final node type
+	switch node := subtree.values[keys[len(keys)-1]].(type) {
+	case *tomlValue:
+		node.position = pos
+		return
+	case *Tree:
+		node.position = pos
+		return
+	case []*Tree:
+		// go to most recent element
+		if len(node) == 0 {
+			return
+		}
+		node[len(node)-1].position = pos
+		return
+	}
+}
+
 // GetPositionPath returns the element in the tree indicated by 'keys'.
 // If keys is of length zero, the current tree is returned.
 func (t *Tree) GetPositionPath(keys []string) Position {
