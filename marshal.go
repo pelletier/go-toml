@@ -76,6 +76,7 @@ var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 var localDateType = reflect.TypeOf(LocalDate{})
 var localTimeType = reflect.TypeOf(LocalTime{})
 var localDateTimeType = reflect.TypeOf(LocalDateTime{})
+var mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 
 // Check if the given marshal type maps to a Tree primitive
 func isPrimitive(mtype reflect.Type) bool {
@@ -703,6 +704,8 @@ func (d *Decoder) unmarshal(v interface{}) error {
 
 	switch elem.Kind() {
 	case reflect.Struct, reflect.Map:
+	case reflect.Interface:
+		elem = mapStringInterfaceType
 	default:
 		return errors.New("only a pointer to struct or map can be unmarshaled from TOML")
 	}

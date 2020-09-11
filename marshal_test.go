@@ -3888,3 +3888,56 @@ func TestPreserveNotEmptyField(t *testing.T) {
 		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
 	}
 }
+
+// github issue 432
+func TestUnmarshalEmptyInterface(t *testing.T) {
+	doc := []byte(`User = "pelletier"`)
+
+	var v interface{}
+
+	err := Unmarshal(doc, &v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, ok := v.(map[string]interface{})
+	if !ok {
+		t.Fatal(err)
+	}
+
+	if x["User"] != "pelletier" {
+		t.Fatalf("expected User=pelletier, but got %v", x)
+	}
+}
+
+func TestUnmarshalEmptyInterfaceDeep(t *testing.T) {
+	doc := []byte(`
+User = "pelletier"
+Age = 99
+
+[foo]
+bar = 42
+`)
+
+	var v interface{}
+
+	err := Unmarshal(doc, &v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, ok := v.(map[string]interface{})
+	if !ok {
+		t.Fatal(err)
+	}
+
+	expected := map[string]interface{}{
+		"User": "pelletier",
+		"Age":  99,
+		"foo": map[string]interface{}{
+			"bar": 42,
+		},
+	}
+
+	reflect.DeepEqual(x, expected)
+}
