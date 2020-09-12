@@ -2,6 +2,7 @@ package toml
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -313,15 +314,20 @@ func TestDateRegexp(t *testing.T) {
 		"date-no-tz":          "1979-05-27",
 		"time-no-tz":          "07:32:00",
 		"time-no-tz-nano":     "00:32:00.999999",
+		"err:date-1year":      "9-05-27",
+		"err:date-2year":      "79-05-27",
+		"err:date-3year":      "979-05-27",
 	}
 
 	for name, value := range cases {
-		if dateRegexp.FindString(value) == "" {
+		res := dateRegexp.FindString(value)
+		if strings.HasPrefix(name, "err:") {
+			if res != "" {
+				t.Error("failed date regexp test", name)
+			}
+		} else if res == "" {
 			t.Error("failed date regexp test", name)
 		}
-	}
-	if dateRegexp.FindString("1979-05-27 07:32:00Z") == "" {
-		t.Error("space delimiter lexing")
 	}
 }
 
