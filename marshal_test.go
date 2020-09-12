@@ -3,6 +3,7 @@ package toml
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -3977,18 +3978,26 @@ func TestGithubIssue431(t *testing.T) {
 	}
 }
 
-type DurationString struct {
+type durationString struct {
 	time.Duration
 }
 
-func (d *DurationString) UnmarshalTOML(v interface{}) error {
+func (d *durationString) UnmarshalTOML(v interface{}) error {
 	d.Duration = 10 * time.Second
 	return nil
 }
 
-type Config437 struct {
+type config437Error struct {
+}
+
+func (e *config437Error) UnmarshalTOML(v interface{}) error {
+	return errors.New("expected")
+}
+
+type config437 struct {
 	HTTP struct {
-		PingTimeout DurationString `toml:"PingTimeout"`
+		PingTimeout durationString `toml:"PingTimeout"`
+		ErrorField  config437Error
 	} `toml:"HTTP"`
 }
 
@@ -3997,16 +4006,30 @@ func TestGithubIssue437(t *testing.T) {
 [HTTP]
 PingTimeout = "32m"
 `
-	cfg := &Config437{}
-	cfg.HTTP.PingTimeout = DurationString{time.Second}
+	cfg := &config437{}
+	cfg.HTTP.PingTimeout = durationString{time.Second}
 
 	r := strings.NewReader(src)
 	err := NewDecoder(r).Decode(cfg)
 	if err != nil {
 		t.Fatalf("unexpected errors %s", err)
 	}
-	expected := DurationString{10 * time.Second}
+	expected := durationString{10 * time.Second}
 	if cfg.HTTP.PingTimeout != expected {
 		t.Fatalf("expected '%s', got '%s'", expected, cfg.HTTP.PingTimeout)
+	}
+}
+
+func TestLeafUnmarshalerError(t *testing.T) {
+	src := `
+[HTTP]
+ErrorField = "foo"
+`
+	cfg := &config437{}
+
+	r := strings.NewReader(src)
+	err := NewDecoder(r).Decode(cfg)
+	if err == nil {
+		t.Fatalf("error was expected")
 	}
 }
