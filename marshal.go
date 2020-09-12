@@ -742,6 +742,10 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 	if mvalPtr := reflect.New(mtype); isCustomUnmarshaler(mvalPtr.Type()) {
 		d.visitor.visitAll()
 
+		if tval == nil {
+			return mvalPtr.Elem(), nil
+		}
+
 		if err := callCustomUnmarshaler(mvalPtr, tval.ToMap()); err != nil {
 			return reflect.ValueOf(nil), fmt.Errorf("unmarshal toml: %v", err)
 		}

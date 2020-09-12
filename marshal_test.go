@@ -3941,3 +3941,38 @@ bar = 42
 
 	reflect.DeepEqual(x, expected)
 }
+
+type Config struct {
+	Key string `toml:"key"`
+	Obj Custom `toml:"obj"`
+}
+
+type Custom struct {
+	v string
+}
+
+func (c *Custom) UnmarshalTOML(v interface{}) error {
+	c.v = "called"
+	return nil
+}
+
+func TestGithubIssue431(t *testing.T) {
+	doc := `key = "value"`
+	tree, err := LoadBytes([]byte(doc))
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	var c Config
+	if err := tree.Unmarshal(&c); err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if c.Key != "value" {
+		t.Errorf("expected c.Key='value', not '%s'", c.Key)
+	}
+
+	if c.Obj.v == "called" {
+		t.Errorf("UnmarshalTOML should not have been called")
+	}
+}
