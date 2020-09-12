@@ -3976,3 +3976,37 @@ func TestGithubIssue431(t *testing.T) {
 		t.Errorf("UnmarshalTOML should not have been called")
 	}
 }
+
+type DurationString struct {
+	time.Duration
+}
+
+func (d *DurationString) UnmarshalTOML(v interface{}) error {
+	d.Duration = 10 * time.Second
+	return nil
+}
+
+type Config437 struct {
+	HTTP struct {
+		PingTimeout DurationString `toml:"PingTimeout"`
+	} `toml:"HTTP"`
+}
+
+func TestGithubIssue437(t *testing.T) {
+	src := `
+[HTTP]
+PingTimeout = "32m"
+`
+	cfg := &Config437{}
+	cfg.HTTP.PingTimeout = DurationString{time.Second}
+
+	r := strings.NewReader(src)
+	err := NewDecoder(r).Decode(cfg)
+	if err != nil {
+		t.Fatalf("unexpected errors %s", err)
+	}
+	expected := DurationString{10 * time.Second}
+	if cfg.HTTP.PingTimeout != expected {
+		t.Fatalf("expected '%s', got '%s'", expected, cfg.HTTP.PingTimeout)
+	}
+}
