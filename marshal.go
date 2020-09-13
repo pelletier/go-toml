@@ -1004,8 +1004,18 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to a slice", tval, tval)
 	default:
 		d.visitor.visit()
+		mvalPtr := reflect.New(mtype)
+
+		// Check if pointer to value implements the Unmarshaler interface.
+		if isCustomUnmarshaler(mvalPtr.Type()) {
+			if err := callCustomUnmarshaler(mvalPtr, tval); err != nil {
+				return reflect.ValueOf(nil), fmt.Errorf("unmarshal toml: %v", err)
+			}
+			return mvalPtr.Elem(), nil
+		}
+
 		// Check if pointer to value implements the encoding.TextUnmarshaler.
-		if mvalPtr := reflect.New(mtype); isTextUnmarshaler(mvalPtr.Type()) && !isTimeType(mtype) {
+		if isTextUnmarshaler(mvalPtr.Type()) && !isTimeType(mtype) {
 			if err := d.unmarshalText(tval, mvalPtr); err != nil {
 				return reflect.ValueOf(nil), fmt.Errorf("unmarshal text: %v", err)
 			}
