@@ -317,6 +317,7 @@ func TestDateRegexp(t *testing.T) {
 		"err:date-1year":      "9-05-27",
 		"err:date-2year":      "79-05-27",
 		"err:date-3year":      "979-05-27",
+		"err:date-T-prefix":   "T07:32:00",
 	}
 
 	for name, value := range cases {
@@ -355,6 +356,24 @@ func TestKeyEqualDate(t *testing.T) {
 		{Position{1, 5}, tokenEqual, "="},
 		{Position{1, 7}, tokenDate, "1979-05-27 07:32:00Z"},
 		{Position{1, 27}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 07:32:00", []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenLocalDate, "07:32:00"},
+		{Position{1, 15}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 07:32:00Z", []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenDate, "07:32:00Z"},
+		{Position{1, 16}, tokenEOF, ""},
+	})
+	testFlow(t, "foo = 00:32:00.999999-07:00", []token{
+		{Position{1, 1}, tokenKey, "foo"},
+		{Position{1, 5}, tokenEqual, "="},
+		{Position{1, 7}, tokenDate, "00:32:00.999999-07:00"},
+		{Position{1, 28}, tokenEOF, ""},
 	})
 }
 
