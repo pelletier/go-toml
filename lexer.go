@@ -772,8 +772,6 @@ func init() {
 	// Group 1: nano precision
 	// Group 2: timezone
 	//
-	// /!\ also matches the empty string
-	//
 	// Example matches:
 	// 1979-05-27T07:32:00Z
 	// 1979-05-27T00:32:00-07:00
@@ -788,7 +786,7 @@ func init() {
 	// 1979-05-27
 	// 07:32:00
 	// 00:32:00.999999
-	dateRegexp = regexp.MustCompile(`^(?:\d{4}-\d{2}-\d{2})?(?:[T ]?\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?)?`)
+	dateRegexp = regexp.MustCompile(`^(?:\d{4}-\d{2}-\d{2}[T\s]?)?(?:\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})?)?`)
 }
 
 // Entry point
