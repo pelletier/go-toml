@@ -477,6 +477,148 @@ func TestKeyEqualDate(t *testing.T) {
 			{Position{1, 22}, tokenEOF, ""},
 		})
 	})
+
+	t.Run("local time invalid minute digit", func(t *testing.T) {
+		testFlow(t, "foo = 00:3x:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenError, "invalid minute digit in time: x"},
+		})
+	})
+
+	t.Run("local time invalid minute/second digit", func(t *testing.T) {
+		testFlow(t, "foo = 00:30x00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenError, "time minute/second separator should be :, not x"},
+		})
+	})
+
+	t.Run("local time invalid second digit", func(t *testing.T) {
+		testFlow(t, "foo = 00:30:x0.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenError, "invalid second digit in time: x"},
+		})
+	})
+
+	t.Run("local time invalid second digit", func(t *testing.T) {
+		testFlow(t, "foo = 00:30:00.F", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenError, "expected at least one digit in time's fraction, not F"},
+		})
+	})
+
+	t.Run("local date-time invalid minute digit", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:3x:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenError, "invalid minute digit in time: x"},
+		})
+	})
+
+	t.Run("local date-time invalid hour digit", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T0x:30:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenError, "invalid hour digit in time: x"},
+		})
+	})
+
+	t.Run("local date-time invalid hour digit", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T00x30:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenError, "time hour/minute separator should be :, not x"},
+		})
+	})
+
+	t.Run("local date-time invalid minute/second digit", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:30x00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenError, "time minute/second separator should be :, not x"},
+		})
+	})
+
+	t.Run("local date-time invalid second digit", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:30:x0.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenError, "invalid second digit in time: x"},
+		})
+	})
+
+	t.Run("local date-time invalid fraction", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:30:00.F", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenError, "expected at least one digit in time's fraction, not F"},
+		})
+	})
+
+	t.Run("local date-time invalid month-date separator", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05X27 00:30:00.F", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenError, "expected - to separate month of a date, not X"},
+		})
+	})
+
+	t.Run("local date-time extra whitespace", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27  ", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 19}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("local date-time extra whitespace", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27     ", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 22}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("offset date-time space separated offset", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:32:00-0x:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00"},
+			{Position{1, 26}, tokenError, "invalid hour digit in time offset: x"},
+		})
+	})
+
+	t.Run("offset date-time space separated offset", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:32:00-07x00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00"},
+			{Position{1, 26}, tokenError, "time offset hour/minute separator should be :, not x"},
+		})
+	})
+
+	t.Run("offset date-time space separated offset", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:32:00-07:x0", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00"},
+			{Position{1, 26}, tokenError, "invalid minute digit in time offset: x"},
+		})
+	})
 }
 
 func TestFloatEndingWithDot(t *testing.T) {

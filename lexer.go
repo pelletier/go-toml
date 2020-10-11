@@ -287,25 +287,18 @@ func (l *tomlLexer) lexDateTimeOrTime() tomlLexStateFn {
 	// 07:32:00
 	// 00:32:00.999999
 
-	r := l.next()
-	if !isDigit(r) {
-		return l.errorf("date/times should start with digits, not %c", r)
-	}
-	r = l.next()
-	if !isDigit(r) {
-		return l.errorf("date/times should start with digits, not %c", r)
-	}
+	// we already know those two are digits
+	l.next()
+	l.next()
+
 	// Got 2 digits. At that point it could be either a time or a date(-time).
 
-	r = l.next()
+	r := l.next()
 	if r == ':' {
 		return l.lexTime()
 	}
-	if isDigit(r) {
-		return l.lexDateTime()
-	}
 
-	return l.errorf("invalid date/time character: %c", r)
+	return l.lexDateTime()
 }
 
 func (l *tomlLexer) lexDateTime() tomlLexStateFn {
@@ -326,15 +319,9 @@ func (l *tomlLexer) lexDateTime() tomlLexStateFn {
 
 	// date
 
-	r := l.next()
-	if !isDigit(r) {
-		return l.errorf("fourth character of the year of a date should be a digit, not %c", r)
-	}
-
-	r = l.next()
-	if r != '-' {
-		return l.errorf("expected - to separate year of a date, not %c", r)
-	}
+	// already checked by lexRvalue
+	l.next() // digit
+	l.next() // -
 
 	for i := 0; i < 2; i++ {
 		r := l.next()
@@ -343,7 +330,7 @@ func (l *tomlLexer) lexDateTime() tomlLexStateFn {
 		}
 	}
 
-	r = l.next()
+	r := l.next()
 	if r != '-' {
 		return l.errorf("expected - to separate month of a date, not %c", r)
 	}
