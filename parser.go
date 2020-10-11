@@ -322,42 +322,44 @@ func (p *tomlParser) parseRvalue() interface{} {
 			p.raiseError(tok, "%s", err)
 		}
 		return val
-	case tokenDate:
-		layout := time.RFC3339Nano
-		if !strings.Contains(tok.val, "T") {
-			layout = strings.Replace(layout, "T", " ", 1)
-		}
-		val, err := time.ParseInLocation(layout, tok.val, time.UTC)
+	case tokenLocalTime:
+		val, err := ParseLocalTime(tok.val)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
 		return val
 	case tokenLocalDate:
-		v := strings.Replace(tok.val, " ", "T", -1)
-		isDateTime := false
-		isTime := false
-		for _, c := range v {
-			if c == 'T' || c == 't' {
-				isDateTime = true
-				break
+		// a local date may be followed by:
+		// * nothing: this is a local date
+		// * a local time: this is a local date-time
+
+		next := p.peek()
+		if next == nil || next.typ != tokenLocalTime {
+			val, err := ParseLocalDate(tok.val)
+			if err != nil {
+				p.raiseError(tok, "%s", err)
 			}
-			if c == ':' {
-				isTime = true
-				break
-			}
+			return val
 		}
 
-		var val interface{}
-		var err error
+		localDate := tok
+		localTime := p.getToken()
 
-		if isDateTime {
-			val, err = ParseLocalDateTime(v)
-		} else if isTime {
-			val, err = ParseLocalTime(v)
-		} else {
-			val, err = ParseLocalDate(v)
+		next = p.peek()
+		if next == nil || next.typ != tokenTimeOffset {
+			v := localDate.val + "T" + localTime.val
+			val, err := ParseLocalDateTime(v)
+			if err != nil {
+				p.raiseError(tok, "%s", err)
+			}
+			return val
 		}
 
+		offset := p.getToken()
+
+		layout := time.RFC3339Nano
+		v := localDate.val + "T" + localTime.val + offset.val
+		val, err := time.ParseInLocation(layout, v, time.UTC)
 		if err != nil {
 			p.raiseError(tok, "%s", err)
 		}
@@ -370,9 +372,9 @@ func (p *tomlParser) parseRvalue() interface{} {
 		p.raiseError(tok, "cannot have multiple equals for the same key")
 	case tokenError:
 		p.raiseError(tok, "%s", tok)
+	default:
+		panic(fmt.Errorf("unhandled token: %v", tok))
 	}
-
-	p.raiseError(tok, "never reached")
 
 	return nil
 }

@@ -1,16 +1,61 @@
 package toml
 
 import (
+	"bytes"
+	"fmt"
 	"reflect"
-	"strings"
 	"testing"
+	"text/tabwriter"
 )
 
 func testFlow(t *testing.T, input string, expectedFlow []token) {
 	tokens := lexToml([]byte(input))
+
 	if !reflect.DeepEqual(tokens, expectedFlow) {
-		t.Fatalf("Different flows.\nExpected:\n%v\nGot:\n%v", expectedFlow, tokens)
+		diffFlowsColumnsFatal(t, expectedFlow, tokens)
 	}
+}
+
+func diffFlowsColumnsFatal(t *testing.T, expectedFlow []token, actualFlow []token) {
+	max := len(expectedFlow)
+	if len(actualFlow) > max {
+		max = len(actualFlow)
+	}
+
+	b := &bytes.Buffer{}
+	w := tabwriter.NewWriter(b, 0, 0, 1, ' ', tabwriter.Debug)
+
+	fmt.Fprintln(w, "expected\tT\tP\tactual\tT\tP\tdiff")
+
+	for i := 0; i < max; i++ {
+		expected := ""
+		expectedType := ""
+		expectedPos := ""
+		if i < len(expectedFlow) {
+			expected = fmt.Sprintf("%s", expectedFlow[i])
+			expectedType = fmt.Sprintf("%s", expectedFlow[i].typ)
+			expectedPos = expectedFlow[i].Position.String()
+		}
+		actual := ""
+		actualType := ""
+		actualPos := ""
+		if i < len(actualFlow) {
+			actual = fmt.Sprintf("%s", actualFlow[i])
+			actualType = fmt.Sprintf("%s", actualFlow[i].typ)
+			actualPos = actualFlow[i].Position.String()
+		}
+		different := ""
+		if i >= len(expectedFlow) {
+			different = "+"
+		} else if i >= len(actualFlow) {
+			different = "-"
+		} else if !reflect.DeepEqual(expectedFlow[i], actualFlow[i]) {
+			different = "x"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", expected, expectedType, expectedPos, actual, actualType, actualPos, different)
+	}
+	w.Flush()
+	t.Errorf("Different flows:\n%s", b.String())
 }
 
 func TestValidKeyGroup(t *testing.T) {
@@ -299,81 +344,138 @@ func TestKeyEqualArrayBoolsWithComments(t *testing.T) {
 	})
 }
 
-func TestDateRegexp(t *testing.T) {
-	cases := map[string]string{
-		"basic":               "1979-05-27T07:32:00Z",
-		"offset":              "1979-05-27T00:32:00-07:00",
-		"nano precision":      "1979-05-27T00:32:00.999999-07:00",
-		"basic-no-T":          "1979-05-27 07:32:00Z",
-		"offset-no-T":         "1979-05-27 00:32:00-07:00",
-		"nano precision-no-T": "1979-05-27 00:32:00.999999-07:00",
-		"no-tz":               "1979-05-27T07:32:00",
-		"no-tz-nano":          "1979-05-27T00:32:00.999999",
-		"no-tz-no-t":          "1979-05-27 07:32:00",
-		"no-tz-no-t-nano":     "1979-05-27 00:32:00.999999",
-		"date-no-tz":          "1979-05-27",
-		"time-no-tz":          "07:32:00",
-		"time-no-tz-nano":     "00:32:00.999999",
-		"err:date-1year":      "9-05-27",
-		"err:date-2year":      "79-05-27",
-		"err:date-3year":      "979-05-27",
-		"err:date-T-prefix":   "T07:32:00",
-	}
-
-	for name, value := range cases {
-		res := dateRegexp.FindString(value)
-		if strings.HasPrefix(name, "err:") {
-			if res != "" {
-				t.Error("failed date regexp test", name)
-			}
-		} else if res == "" {
-			t.Error("failed date regexp test", name)
-		}
-	}
-}
-
 func TestKeyEqualDate(t *testing.T) {
-	testFlow(t, "foo = 1979-05-27T07:32:00Z", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenDate, "1979-05-27T07:32:00Z"},
-		{Position{1, 27}, tokenEOF, ""},
+	t.Run("local date time", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T07:32:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "07:32:00"},
+			{Position{1, 26}, tokenEOF, ""},
+		})
 	})
-	testFlow(t, "foo = 1979-05-27T00:32:00-07:00", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenDate, "1979-05-27T00:32:00-07:00"},
-		{Position{1, 32}, tokenEOF, ""},
+
+	t.Run("local date time space", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 07:32:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "07:32:00"},
+			{Position{1, 26}, tokenEOF, ""},
+		})
 	})
-	testFlow(t, "foo = 1979-05-27T00:32:00.999999-07:00", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenDate, "1979-05-27T00:32:00.999999-07:00"},
-		{Position{1, 39}, tokenEOF, ""},
+
+	t.Run("local date time fraction", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T00:32:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00.999999"},
+			{Position{1, 33}, tokenEOF, ""},
+		})
 	})
-	testFlow(t, "foo = 1979-05-27 07:32:00Z", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenDate, "1979-05-27 07:32:00Z"},
-		{Position{1, 27}, tokenEOF, ""},
+
+	t.Run("local date time fraction space", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:32:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00.999999"},
+			{Position{1, 33}, tokenEOF, ""},
+		})
 	})
-	testFlow(t, "foo = 07:32:00", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenLocalDate, "07:32:00"},
-		{Position{1, 15}, tokenEOF, ""},
+
+	t.Run("offset date-time utc", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T07:32:00Z", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "07:32:00"},
+			{Position{1, 26}, tokenTimeOffset, "Z"},
+			{Position{1, 27}, tokenEOF, ""},
+		})
 	})
-	testFlow(t, "foo = 07:32:00Z", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenDate, "07:32:00Z"},
-		{Position{1, 16}, tokenEOF, ""},
+
+	t.Run("offset date-time -07:00", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T00:32:00-07:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00"},
+			{Position{1, 26}, tokenTimeOffset, "-07:00"},
+			{Position{1, 32}, tokenEOF, ""},
+		})
 	})
-	testFlow(t, "foo = 00:32:00.999999-07:00", []token{
-		{Position{1, 1}, tokenKey, "foo"},
-		{Position{1, 5}, tokenEqual, "="},
-		{Position{1, 7}, tokenDate, "00:32:00.999999-07:00"},
-		{Position{1, 28}, tokenEOF, ""},
+
+	t.Run("offset date-time fractions -07:00", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27T00:32:00.999999-07:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00.999999"},
+			{Position{1, 33}, tokenTimeOffset, "-07:00"},
+			{Position{1, 39}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("offset date-time space separated utc", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 07:32:00Z", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "07:32:00"},
+			{Position{1, 26}, tokenTimeOffset, "Z"},
+			{Position{1, 27}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("offset date-time space separated offset", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:32:00-07:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00"},
+			{Position{1, 26}, tokenTimeOffset, "-07:00"},
+			{Position{1, 32}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("offset date-time space separated fraction offset", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27 00:32:00.999999-07:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 18}, tokenLocalTime, "00:32:00.999999"},
+			{Position{1, 33}, tokenTimeOffset, "-07:00"},
+			{Position{1, 39}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("local date", func(t *testing.T) {
+		testFlow(t, "foo = 1979-05-27", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalDate, "1979-05-27"},
+			{Position{1, 17}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("local time", func(t *testing.T) {
+		testFlow(t, "foo = 07:32:00", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalTime, "07:32:00"},
+			{Position{1, 15}, tokenEOF, ""},
+		})
+	})
+
+	t.Run("local time fraction", func(t *testing.T) {
+		testFlow(t, "foo = 00:32:00.999999", []token{
+			{Position{1, 1}, tokenKey, "foo"},
+			{Position{1, 5}, tokenEqual, "="},
+			{Position{1, 7}, tokenLocalTime, "00:32:00.999999"},
+			{Position{1, 22}, tokenEOF, ""},
+		})
 	})
 }
 
