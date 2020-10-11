@@ -1,9 +1,9 @@
 # go-toml
 
-Go library for the [TOML](https://github.com/mojombo/toml) format.
+Go library for the [TOML](https://toml.io/) format.
 
 This library supports TOML version
-[v1.0.0-rc.1](https://github.com/toml-lang/toml/blob/master/versions/en/toml-v1.0.0-rc.1.md)
+[v1.0.0-rc.3](https://toml.io/en/v1.0.0-rc.3)
 
 [![GoDoc](https://godoc.org/github.com/pelletier/go-toml?status.svg)](http://godoc.org/github.com/pelletier/go-toml)
 [![license](https://img.shields.io/github/license/pelletier/go-toml.svg)](https://github.com/pelletier/go-toml/blob/master/LICENSE)
