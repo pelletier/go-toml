@@ -274,6 +274,34 @@ func TestLocalDate(t *testing.T) {
 	})
 }
 
+func TestLocalDateError(t *testing.T) {
+	_, err := Load("a = 2020-09-31")
+	if err == nil {
+		t.Fatalf("should error")
+	}
+}
+
+func TestLocalTimeError(t *testing.T) {
+	_, err := Load("a = 07:99:00")
+	if err == nil {
+		t.Fatalf("should error")
+	}
+}
+
+func TestLocalDateTimeError(t *testing.T) {
+	_, err := Load("a = 2020-09-31T07:99:00")
+	if err == nil {
+		t.Fatalf("should error")
+	}
+}
+
+func TestDateTimeOffsetError(t *testing.T) {
+	_, err := Load("a = 2020-09-31T07:99:00Z")
+	if err == nil {
+		t.Fatalf("should error")
+	}
+}
+
 func TestLocalTime(t *testing.T) {
 	tree, err := Load("a = 07:32:00")
 	assertTree(t, tree, err, map[string]interface{}{

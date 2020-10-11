@@ -137,6 +137,7 @@ func BenchmarkUnmarshalToml(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		target := benchmarkDoc{}
