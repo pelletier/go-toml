@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -231,19 +230,38 @@ func (p *tomlParser) parseAssign() tomlParserStateFn {
 	return p.parseStart
 }
 
-var numberUnderscoreInvalidRegexp *regexp.Regexp
-var hexNumberUnderscoreInvalidRegexp *regexp.Regexp
+var errInvalidUnderscore = errors.New("invalid use of _ in number")
 
 func numberContainsInvalidUnderscore(value string) error {
-	if numberUnderscoreInvalidRegexp.MatchString(value) {
-		return errors.New("invalid use of _ in number")
+	// For large numbers, you may use underscores between digits to enhance
+	// readability. Each underscore must be surrounded by at least one digit on
+	// each side.
+
+	hasBefore := false
+	for idx, r := range value {
+		if r == '_' {
+			if !hasBefore || idx+1 >= len(value) {
+				// can't end with an underscore
+				return errInvalidUnderscore
+			}
+		}
+		hasBefore = isDigit(r)
 	}
 	return nil
 }
 
+var errInvalidUnderscoreHex = errors.New("invalid use of _ in hex number")
+
 func hexNumberContainsInvalidUnderscore(value string) error {
-	if hexNumberUnderscoreInvalidRegexp.MatchString(value) {
-		return errors.New("invalid use of _ in hex number")
+	hasBefore := false
+	for idx, r := range value {
+		if r == '_' {
+			if !hasBefore || idx+1 >= len(value) {
+				// can't end with an underscore
+				return errInvalidUnderscoreHex
+			}
+		}
+		hasBefore = isHexDigit(r)
 	}
 	return nil
 }
@@ -487,9 +505,4 @@ func parseToml(flow []token) *Tree {
 	}
 	parser.run()
 	return result
-}
-
-func init() {
-	numberUnderscoreInvalidRegexp = regexp.MustCompile(`([^\d]_|_[^\d])|_$|^_`)
-	hexNumberUnderscoreInvalidRegexp = regexp.MustCompile(`(^0x_)|([^\da-f]_|_[^\da-f])|_$|^_`)
 }
