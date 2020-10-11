@@ -2,30 +2,6 @@ trigger:
 - master
 
 stages:
-- stage: fuzzit
-  displayName: "Run Fuzzit"
-  dependsOn: []
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
-  jobs:
-  - job: submit
-    displayName: "Submit"
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-    - task: GoTool@0
-      displayName: "Install Go 1.15"
-      inputs:
-        version: "1.15"
-    - script: echo "##vso[task.setvariable variable=PATH]${PATH}:/home/vsts/go/bin/"
-    - script: mkdir -p ${HOME}/go/src/github.com/pelletier/go-toml
-    - script: cp -R . ${HOME}/go/src/github.com/pelletier/go-toml
-    - task: Bash@3
-      inputs:
-        filePath: './fuzzit.sh'
-      env:
-        TYPE: fuzzing
-        FUZZIT_API_KEY: $(FUZZIT_API_KEY)
-
 - stage: run_checks
   displayName: "Check"
   dependsOn: []
@@ -79,24 +55,6 @@ stages:
       inputs:
         filePath: './benchmark.sh'
         arguments: "master $(Build.Repository.Uri)"
-
-  - job: fuzzing
-    displayName: "fuzzing"
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-    - task: GoTool@0
-      displayName: "Install Go 1.15"
-      inputs:
-        version: "1.15"
-    - script: echo "##vso[task.setvariable variable=PATH]${PATH}:/home/vsts/go/bin/"
-    - script: mkdir -p ${HOME}/go/src/github.com/pelletier/go-toml
-    - script: cp -R . ${HOME}/go/src/github.com/pelletier/go-toml
-    - task: Bash@3
-      inputs:
-        filePath: './fuzzit.sh'
-      env:
-        TYPE: local-regression
 
   - job: go_unit_tests
     displayName: "unit tests"
