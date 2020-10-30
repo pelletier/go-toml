@@ -1,0 +1,559 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="46a5c6d8-5648-44f2-949d-b91373da7fad" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/bytealg.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_386.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_amd64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_amd64p32.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_arm.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_arm64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_generic.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_mipsx.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_native.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_ppc64x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_s390x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/compare_wasm.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/count_amd64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/count_arm64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/count_generic.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/count_native.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/count_ppc64x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_386.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_amd64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_amd64p32.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_arm.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_arm64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_mips64x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_mipsx.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_native.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_ppc64x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_s390x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/equal_wasm.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_amd64.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_amd64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_arm64.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_arm64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_generic.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_native.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_s390x.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/index_s390x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_386.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_amd64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_amd64p32.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_arm.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_arm64.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_generic.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_mips64x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_mipsx.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_native.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_ppc64x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_s390x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/bytealg/indexbyte_wasm.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_386.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_amd64.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_amd64p32.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_arm.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_arm64.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_mips.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_mips64.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_mips64le.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_mipsle.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_no_init.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_ppc64x.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_s390x.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_s390x.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_s390x_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_wasm.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_x86.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_x86.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/cpu_x86_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/internal/cpu/export_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/builder.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/builder_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/compare.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/compare_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/example_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/export_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/reader.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/reader_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/replace.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/replace_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/search.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/search_test.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/strings.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/strings.s" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/strings/strings_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/jsontoml/main_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/jsontoml/main_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/tomljson/main_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/tomljson/main_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/tomltestgen/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/tomltestgen/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/doc_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lexer.go" beforeDir="false" afterPath="$PROJECT_DIR$/lexer.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/marshal.go" beforeDir="false" afterPath="$PROJECT_DIR$/marshal.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/marshal_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/marshal_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/parser.go" beforeDir="false" afterPath="$PROJECT_DIR$/parser.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/query/lexer.go" beforeDir="false" afterPath="$PROJECT_DIR$/query/lexer.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/query/parser_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/query/parser_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/toml.go" beforeDir="false" afterPath="$PROJECT_DIR$/toml.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tomltree_write.go" beforeDir="false" afterPath="$PROJECT_DIR$/tomltree_write.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tomltree_write_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/tomltree_write_test.go" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FUSProjectUsageTrigger">
+    <session id="1853390368">
+      <usages-collector id="statistics.lifecycle.project">
+        <counts>
+          <entry key="project.open.time.2" value="1" />
+          <entry key="project.opened" value="1" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.extensions.open">
+        <counts>
+          <entry key="gitignore" value="1" />
+          <entry key="go" value="17" />
+          <entry key="s" value="1" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.types.open">
+        <counts>
+          <entry key="Go" value="17" />
+          <entry key="PLAIN_TEXT" value="1" />
+          <entry key="x86 Plan9 Assembly" value="1" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.extensions.edit">
+        <counts>
+          <entry key="gitignore" value="11" />
+          <entry key="go" value="227" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.types.edit">
+        <counts>
+          <entry key="Go" value="227" />
+          <entry key="PLAIN_TEXT" value="11" />
+        </counts>
+      </usages-collector>
+    </session>
+  </component>
+  <component name="FavoritesManager">
+    <favorites_list name="go-toml" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/tomltree_write_test.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-52">
+              <caret line="72" column="5" lean-forward="true" selection-start-line="72" selection-start-column="5" selection-end-line="72" selection-end-column="5" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/.gitignore">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="156">
+              <caret line="6" lean-forward="true" selection-start-line="6" selection-end-line="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/marshal.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="340">
+              <caret line="1240" column="35" lean-forward="true" selection-start-line="1240" selection-start-column="35" selection-end-line="1240" selection-end-column="35" />
+              <folding>
+                <element signature="e#14#117#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/strings/builder.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="312">
+              <caret line="12" column="42" lean-forward="true" selection-start-line="12" selection-start-column="42" selection-end-line="12" selection-end-column="42" />
+              <folding>
+                <element signature="e#177#213#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/lexer.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="184">
+              <caret line="557" lean-forward="true" selection-start-line="557" selection-end-line="557" />
+              <folding>
+                <element signature="e#136#194#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://E:/go1.12/src/strings/builder.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="311">
+              <caret line="15" column="49" selection-start-line="15" selection-start-column="49" selection-end-line="15" selection-end-column="49" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/cmd/tomltestgen/main.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-94">
+              <caret line="23" selection-start-line="23" selection-end-line="23" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/parser.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="192">
+              <caret line="10" column="13" lean-forward="true" selection-start-line="10" selection-start-column="13" selection-end-line="10" selection-end-column="13" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/doc_test.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="192">
+              <caret line="161" column="18" lean-forward="true" selection-start-line="161" selection-start-column="18" selection-end-line="161" selection-end-column="18" />
+              <folding>
+                <element signature="e#47#115#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/marshal_test.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-312" />
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Go File" />
+      </list>
+    </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>Builder struct \{\n\	addr \*Builder \/\/ of receiver\, to detect copies by value\n\	buf  \[\]byte\n\}</find>
+      <find>&quot;string&quot;</find>
+      <find>Builder</find>
+      <find>strings.Buil</find>
+      <find>&quot;strings&quot;</find>
+      <find>strings.Builder</find>
+      <find>strings2.Build</find>
+    </findStrings>
+    <replaceStrings>
+      <replace />
+    </replaceStrings>
+    <dirStrings>
+      <dir>G:\go_workspace\GOPATH\src\github.com\fwhezfwhez\go-toml</dir>
+    </dirStrings>
+  </component>
+  <component name="GOROOT" path="E:/go1.12" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/cmd/tomljson/main_test.go" />
+        <option value="$PROJECT_DIR$/strings/strings.go" />
+        <option value="$PROJECT_DIR$/internal/bytealg/bytealg.go" />
+        <option value="$PROJECT_DIR$/internal/bytealg/index_amd64.go" />
+        <option value="$PROJECT_DIR$/cmd/tomltestgen/main.go" />
+        <option value="$PROJECT_DIR$/parser.go" />
+        <option value="$PROJECT_DIR$/marshal.go" />
+        <option value="$PROJECT_DIR$/strings/builder.go" />
+        <option value="$PROJECT_DIR$/lexer.go" />
+        <option value="$PROJECT_DIR$/doc_test.go" />
+        <option value="$PROJECT_DIR$/.gitignore" />
+      </list>
+    </option>
+  </component>
+  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER" />
+  <component name="JsGulpfileManager">
+    <detection-done>true</detection-done>
+    <sorting>DEFINITION_ORDER</sorting>
+  </component>
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="width" value="1024" />
+    <option name="height" value="744" />
+  </component>
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="Scope" />
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="go-toml" type="b2602c69:ProjectViewProjectNode" />
+              <item name="go-toml" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="go-toml" type="b2602c69:ProjectViewProjectNode" />
+              <item name="go-toml" type="462c0819:PsiDirectoryNode" />
+              <item name="strings" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="DefaultGoTemplateProperty" value="Go File" />
+    <property name="go.gopath.indexing.explicitly.defined" value="true" />
+    <property name="go.sdk.automatically.set" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\go_workspace\GOPATH\src\github.com\fwhezfwhez\go-toml\internal\cpu" />
+      <recent name="G:\go_workspace\GOPATH\src\github.com\fwhezfwhez\go-toml\internal\bytealg" />
+      <recent name="G:\go_workspace\GOPATH\src\github.com\fwhezfwhez\go-toml\strings" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Go Test.TestTreeWriteToTomlString in github.com/fwhezfwhez/go-toml">
+    <configuration name="TestTreeWriteToEmptyTable in github.com/fwhezfwhez/go-toml" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="go-toml" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/fwhezfwhez/go-toml" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
+      <pattern value="^TestTreeWriteToEmptyTable$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestTreeWriteToTomlString in github.com/fwhezfwhez/go-toml" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="go-toml" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/fwhezfwhez/go-toml" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
+      <pattern value="^TestTreeWriteToTomlString$" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Go Test.TestTreeWriteToEmptyTable in github.com/fwhezfwhez/go-toml" />
+      <item itemvalue="Go Test.TestTreeWriteToTomlString in github.com/fwhezfwhez/go-toml" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Go Test.TestTreeWriteToTomlString in github.com/fwhezfwhez/go-toml" />
+        <item itemvalue="Go Test.TestTreeWriteToEmptyTable in github.com/fwhezfwhez/go-toml" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="TestHistory">
+    <history-entry file="TestTreeWriteToTomlString_in_github_com_fwhezfwhez_go-toml - 2020.10.30 at 11h 10m 03s.xml">
+      <configuration name="TestTreeWriteToTomlString in github.com/fwhezfwhez/go-toml" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+  </component>
+  <component name="TodoView">
+    <todo-panel id="selected-file">
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+    <todo-panel id="all">
+      <are-packages-shown value="true" />
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <editor active="true" />
+    <layout>
+      <window_info id="Favorites" sideWeight="0.114617944" side_tool="true" visible="true" weight="0.23827292" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.88538206" visible="true" weight="0.23827292" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info anchor="bottom" id="Database Changes" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Version Control" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Terminal" visible="true" weight="0.32962137" />
+      <window_info anchor="bottom" id="Event Log" side_tool="true" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Find" order="1" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.32998884" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.39910814" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" weight="0.32998884" />
+      <window_info anchor="right" id="Database" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+    </layout>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/cmd/tomljson/main_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="208">
+          <caret line="14" column="31" selection-start-line="14" selection-start-column="31" selection-end-line="14" selection-end-column="31" />
+          <folding>
+            <element signature="e#14#85#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/internal/bytealg/compare_amd64p32.s">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/strings/strings.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="260">
+          <caret line="10" column="23" selection-start-line="10" selection-start-column="23" selection-end-line="10" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/internal/cpu/cpu_arm64.go">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/internal/bytealg/bytealg.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="130">
+          <caret line="5" lean-forward="true" selection-start-line="5" selection-end-line="5" />
+          <folding>
+            <element signature="e#177#213#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/marshal_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-312" />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/internal/bytealg/index_amd64.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="234">
+          <caret line="9" lean-forward="true" selection-start-line="9" selection-end-line="9" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://E:/go1.12/src/strings/builder.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="311">
+          <caret line="15" column="49" selection-start-line="15" selection-start-column="49" selection-end-line="15" selection-end-column="49" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/cmd/tomltestgen/main.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-94">
+          <caret line="23" selection-start-line="23" selection-end-line="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/parser.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="192">
+          <caret line="10" column="13" lean-forward="true" selection-start-line="10" selection-start-column="13" selection-end-line="10" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/marshal.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="340">
+          <caret line="1240" column="35" lean-forward="true" selection-start-line="1240" selection-start-column="35" selection-end-line="1240" selection-end-column="35" />
+          <folding>
+            <element signature="e#14#117#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/strings/builder.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="312">
+          <caret line="12" column="42" lean-forward="true" selection-start-line="12" selection-start-column="42" selection-end-line="12" selection-end-column="42" />
+          <folding>
+            <element signature="e#177#213#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/lexer.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="184">
+          <caret line="557" lean-forward="true" selection-start-line="557" selection-end-line="557" />
+          <folding>
+            <element signature="e#136#194#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/doc_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="192">
+          <caret line="161" column="18" lean-forward="true" selection-start-line="161" selection-start-column="18" selection-end-line="161" selection-end-column="18" />
+          <folding>
+            <element signature="e#47#115#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tomltree_write_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-52">
+          <caret line="72" column="5" lean-forward="true" selection-start-line="72" selection-start-column="5" selection-end-line="72" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/.gitignore">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="156">
+          <caret line="6" lean-forward="true" selection-start-line="6" selection-end-line="6" />
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>

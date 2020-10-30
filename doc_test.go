@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	toml "github.com/pelletier/go-toml"
+	"github.com/fwhezfwhez/go-toml"
 )
 
 func Example_tree() {
