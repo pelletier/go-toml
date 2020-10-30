@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/fwhezfwhez/go-toml/strings"
 	"strconv"
 	"strings"
 )
@@ -554,7 +555,7 @@ func (l *tomlLexer) lexComma() tomlLexStateFn {
 // Parse the key and emits its value without escape sequences.
 // bare keys, basic string keys and literal string keys are supported.
 func (l *tomlLexer) lexKey() tomlLexStateFn {
-	var sb strings.Builder
+	var sb strings2.Builder
 
 	for r := l.peek(); isKeyChar(r) || r == '\n' || r == '\r'; r = l.peek() {
 		if r == '"' {
@@ -582,7 +583,7 @@ func (l *tomlLexer) lexKey() tomlLexStateFn {
 		} else if r == '\n' {
 			return l.errorf("keys cannot contain new lines")
 		} else if isSpace(r) {
-			var str strings.Builder
+			var str strings2.Builder
 			str.WriteString(" ")
 
 			// skip trailing whitespace
@@ -637,7 +638,7 @@ func (l *tomlLexer) lexLeftBracket() tomlLexStateFn {
 }
 
 func (l *tomlLexer) lexLiteralStringAsString(terminator string, discardLeadingNewLine bool) (string, error) {
-	var sb strings.Builder
+	var sb strings2.Builder
 
 	if discardLeadingNewLine {
 		if l.follow("\r\n") {
@@ -692,7 +693,7 @@ func (l *tomlLexer) lexLiteralString() tomlLexStateFn {
 // Terminator is the substring indicating the end of the token.
 // The resulting string does not include the terminator.
 func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, acceptNewLines bool) (string, error) {
-	var sb strings.Builder
+	var sb strings2.Builder
 
 	if discardLeadingNewLine {
 		if l.follow("\r\n") {
@@ -748,7 +749,7 @@ func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, 
 				l.next()
 			case 'u':
 				l.next()
-				var code strings.Builder
+				var code strings2.Builder
 				for i := 0; i < 4; i++ {
 					c := l.peek()
 					if !isHexDigit(c) {
@@ -764,7 +765,7 @@ func (l *tomlLexer) lexStringAsString(terminator string, discardLeadingNewLine, 
 				sb.WriteRune(rune(intcode))
 			case 'U':
 				l.next()
-				var code strings.Builder
+				var code strings2.Builder
 				for i := 0; i < 8; i++ {
 					c := l.peek()
 					if !isHexDigit(c) {

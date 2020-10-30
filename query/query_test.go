@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pelletier/go-toml"
+	"github.com/fwhezfwhez/go-toml"
 )
 
 func assertArrayContainsInOrder(t *testing.T, array []interface{}, objects ...interface{}) {
