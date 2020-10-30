@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/pelletier/go-toml"
+	"github.com/fwhezfwhez/go-toml"
 )
 
 // dump path tree to a string

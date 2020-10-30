@@ -8,7 +8,7 @@ import (
 	"time"
 
 	burntsushi "github.com/BurntSushi/toml"
-	"github.com/pelletier/go-toml"
+	"github.com/fwhezfwhez/go-toml"
 	"gopkg.in/yaml.v2"
 )
 
