@@ -295,6 +295,21 @@ func TestTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
 	testMaps(t, treeMap, expected)
 }
 
+func TestTreeWriteToMapWithTableInMixedArray(t *testing.T) {
+	tree, _ := Load(`a = ["foo", {bar = "baz"}]`)
+	expected := map[string]interface{}{
+		"a": []interface{}{
+			"foo",
+			map[string]interface{}{
+				"bar": "baz",
+			},
+		},
+	}
+	treeMap := tree.ToMap()
+
+	testMaps(t, treeMap, expected)
+}
+
 func TestTreeWriteToFloat(t *testing.T) {
 	tree, err := Load(`a = 3.0`)
 	if err != nil {
