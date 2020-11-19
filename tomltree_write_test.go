@@ -296,12 +296,33 @@ func TestTreeWriteToMapWithArrayOfInlineTables(t *testing.T) {
 }
 
 func TestTreeWriteToMapWithTableInMixedArray(t *testing.T) {
-	tree, _ := Load(`a = ["foo", {bar = "baz"}]`)
+	tree, _ := Load(`a = [
+		"foo",
+		[
+			"bar",
+			{baz = "quux"},
+		],
+		[
+			{a = "b"},
+			{c = "d"},
+		],
+	]`)
 	expected := map[string]interface{}{
 		"a": []interface{}{
 			"foo",
-			map[string]interface{}{
-				"bar": "baz",
+			[]interface{}{
+				"bar",
+				map[string]interface{}{
+					"baz": "quux",
+				},
+			},
+			[]interface{}{
+				map[string]interface{}{
+					"a": "b",
+				},
+				map[string]interface{}{
+					"c": "d",
+				},
 			},
 		},
 	}
