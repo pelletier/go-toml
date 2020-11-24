@@ -85,7 +85,7 @@ The documentation and additional examples are available at
 
 ## Tools
 
-Go-toml provides two handy command line tools:
+Go-toml provides three handy command line tools:
 
 * `tomll`: Reads TOML files and lints them.
 
