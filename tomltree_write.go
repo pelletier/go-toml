@@ -510,27 +510,29 @@ func (t *Tree) ToMap() map[string]interface{} {
 		case *Tree:
 			result[k] = node.ToMap()
 		case *tomlValue:
-			result[k] = node.toValue()
+			result[k] = tomlValueToGo(node.value)
 		}
 	}
 	return result
 }
 
-// toValue converts a tomlValue to a built-in Go type.
-func (t *tomlValue) toValue() interface{} {
-	switch v := t.value.(type) {
-	case []interface{}:
-		s := make([]interface{}, len(v))
-		for i := range s {
-			switch e := v[i].(type) {
-			case *Tree:
-				s[i] = e.ToMap()
-			default:
-				s[i] = e
-			}
-		}
-		return s
-	default:
+func tomlValueToGo(v interface{}) interface{} {
+	if tv, ok := v.(*tomlValue); ok {
+		v = tv.value
+	}
+	if tree, ok := v.(*Tree); ok {
+		return tree.ToMap()
+	}
+
+	rv := reflect.ValueOf(v)
+
+	if rv.Kind() != reflect.Slice {
 		return v
 	}
+	values := make([]interface{}, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		item := rv.Index(i).Interface()
+		values[i] = tomlValueToGo(item)
+	}
+	return values
 }
