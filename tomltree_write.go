@@ -517,9 +517,6 @@ func (t *Tree) ToMap() map[string]interface{} {
 }
 
 func tomlValueToGo(v interface{}) interface{} {
-	if tv, ok := v.(*tomlValue); ok {
-		v = tv.value
-	}
 	if tree, ok := v.(*Tree); ok {
 		return tree.ToMap()
 	}
