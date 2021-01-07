@@ -23,6 +23,7 @@ stages:
         arguments: './...'
   - job: coverage
     displayName: "coverage"
+    condition: ne(variables['Build.SourceBranchName'], 'master')
     pool:
       vmImage: ubuntu-latest
     steps:
