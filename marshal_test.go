@@ -2286,20 +2286,22 @@ func TestUnmarshalDefault(t *testing.T) {
 	type aliasUint uint
 
 	var doc struct {
-		StringField       string  `default:"a"`
-		BoolField         bool    `default:"true"`
-		UintField         uint    `default:"1"`
-		Uint8Field        uint8   `default:"8"`
-		Uint16Field       uint16  `default:"16"`
-		Uint32Field       uint32  `default:"32"`
-		Uint64Field       uint64  `default:"64"`
-		IntField          int     `default:"-1"`
-		Int8Field         int8    `default:"-8"`
-		Int16Field        int16   `default:"-16"`
-		Int32Field        int32   `default:"-32"`
-		Int64Field        int64   `default:"-64"`
-		Float32Field      float32 `default:"32.1"`
-		Float64Field      float64 `default:"64.1"`
+		StringField       string        `default:"a"`
+		BoolField         bool          `default:"true"`
+		UintField         uint          `default:"1"`
+		Uint8Field        uint8         `default:"8"`
+		Uint16Field       uint16        `default:"16"`
+		Uint32Field       uint32        `default:"32"`
+		Uint64Field       uint64        `default:"64"`
+		IntField          int           `default:"-1"`
+		Int8Field         int8          `default:"-8"`
+		Int16Field        int16         `default:"-16"`
+		Int32Field        int32         `default:"-32"`
+		Int64Field        int64         `default:"-64"`
+		Float32Field      float32       `default:"32.1"`
+		Float64Field      float64       `default:"64.1"`
+		DurationField     time.Duration `default:"120ms"`
+		DurationField2    time.Duration `default:"120000000"`
 		NonEmbeddedStruct struct {
 			StringField string `default:"b"`
 		}
@@ -2353,6 +2355,12 @@ func TestUnmarshalDefault(t *testing.T) {
 	if doc.Float64Field != 64.1 {
 		t.Errorf("Float64Field should be 64.1, not %f", doc.Float64Field)
 	}
+	if doc.DurationField != 120*time.Millisecond {
+		t.Errorf("DurationField should be 120ms, not %s", doc.DurationField.String())
+	}
+	if doc.DurationField2 != 120*time.Millisecond {
+		t.Errorf("DurationField2 should be 120000000, not %d", doc.DurationField2)
+	}
 	if doc.NonEmbeddedStruct.StringField != "b" {
 		t.Errorf("StringField should be \"b\", not %s", doc.NonEmbeddedStruct.StringField)
 	}
@@ -2400,6 +2408,17 @@ func TestUnmarshalDefaultFailureInt64(t *testing.T) {
 func TestUnmarshalDefaultFailureFloat64(t *testing.T) {
 	var doc struct {
 		Field float64 `default:"blah"`
+	}
+
+	err := Unmarshal([]byte(``), &doc)
+	if err == nil {
+		t.Fatal("should error")
+	}
+}
+
+func TestUnmarshalDefaultFailureDuration(t *testing.T) {
+	var doc struct {
+		Field time.Duration `default:"blah"`
 	}
 
 	err := Unmarshal([]byte(``), &doc)

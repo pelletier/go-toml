@@ -830,7 +830,21 @@ func (d *Decoder) valueFromTree(mtype reflect.Type, tval *Tree, mval1 *reflect.V
 					case reflect.Int32:
 						val, err = strconv.ParseInt(opts.defaultValue, 10, 32)
 					case reflect.Int64:
-						val, err = strconv.ParseInt(opts.defaultValue, 10, 64)
+						// Check if the provided number has a non-numeric extension.
+						var hasExtension bool
+						if len(opts.defaultValue) > 0 {
+							lastChar := opts.defaultValue[len(opts.defaultValue)-1]
+							if lastChar < '0' || lastChar > '9' {
+								hasExtension = true
+							}
+						}
+						// If the value is a time.Duration with extension, parse as duration.
+						// If the value is an int64 or a time.Duration without extension, parse as number.
+						if hasExtension && mvalf.Type().String() == "time.Duration" {
+							val, err = time.ParseDuration(opts.defaultValue)
+						} else {
+							val, err = strconv.ParseInt(opts.defaultValue, 10, 64)
+						}
 					case reflect.Float32:
 						val, err = strconv.ParseFloat(opts.defaultValue, 32)
 					case reflect.Float64:
