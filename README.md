@@ -5,7 +5,7 @@ Go library for the [TOML](https://toml.io/) format.
 This library supports TOML version
 [v1.0.0-rc.3](https://toml.io/en/v1.0.0-rc.3)
 
-[![GoDoc](https://godoc.org/github.com/pelletier/go-toml?status.svg)](http://godoc.org/github.com/pelletier/go-toml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pelletier/go-toml.svg)](https://pkg.go.dev/github.com/pelletier/go-toml)
 [![license](https://img.shields.io/github/license/pelletier/go-toml.svg)](https://github.com/pelletier/go-toml/blob/master/LICENSE)
 [![Build Status](https://dev.azure.com/pelletierthomas/go-toml-ci/_apis/build/status/pelletier.go-toml?branchName=master)](https://dev.azure.com/pelletierthomas/go-toml-ci/_build/latest?definitionId=1&branchName=master)
 [![codecov](https://codecov.io/gh/pelletier/go-toml/branch/master/graph/badge.svg)](https://codecov.io/gh/pelletier/go-toml)
@@ -81,7 +81,7 @@ for ii, item := range results.Values() {
 ## Documentation
 
 The documentation and additional examples are available at
-[godoc.org](http://godoc.org/github.com/pelletier/go-toml).
+[pkg.go.dev](https://pkg.go.dev/github.com/pelletier/go-toml).
 
 ## Tools
 
