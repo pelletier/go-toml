@@ -1,5 +1,5 @@
-module github.com/pelletier/go-toml
+module github.com/pelletier/go-toml/v2
 
-go 1.12
+go 1.14
 
-require github.com/davecgh/go-spew v1.1.1
+require github.com/stretchr/testify v1.7.0
