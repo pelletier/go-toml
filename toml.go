@@ -62,8 +62,8 @@ func (d *documentBuilder) Whitespace(b []byte) {
 
 func Parse(b []byte) (Document, error) {
 	builder := documentBuilder{}
-	p := parser{builder: &builder}
-	err := p.parse(b)
+	p := parser{builder: &builder, data: b}
+	err := p.parse()
 	if err != nil {
 		return Document{}, err
 	}
@@ -73,8 +73,93 @@ func Parse(b []byte) (Document, error) {
 // eof is a rune value indicating end-of-file.
 const eof = -1
 
+type lookahead struct {
+	r    rune
+	size int
+}
+
+func (l lookahead) empty() bool {
+	return l.r == 0
+}
+
 type parser struct {
 	builder builder
+
+	data  []byte
+	start int
+	end   int
+
+	lookahead lookahead
+}
+
+func (p *parser) peek() (rune, error) {
+	if p.lookahead.empty() {
+		p.lookahead.r, p.lookahead.size = utf8.DecodeRune(p.data[p.end:])
+		if p.lookahead.r == utf8.RuneError {
+
+			switch p.lookahead.size {
+			case 0:
+				p.lookahead.r = eof
+			case 1:
+				p.lookahead.r = utf8.RuneError
+				return utf8.RuneError, &InvalidUnicodeError{r: p.lookahead.r}
+			default:
+				panic("unhandled rune error case")
+			}
+		}
+	}
+	return p.lookahead.r, nil
+}
+
+func (p *parser) next() (rune, error) {
+	r, err := p.peek()
+	if err == nil {
+		p.end += p.lookahead.size
+		p.lookahead.r = 0
+		p.lookahead.size = 0
+	}
+	return r, err
+}
+
+func (p *parser) sureNext() {
+	_, err := p.next()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (p *parser) ignore() {
+	if p.empty() {
+		panic("cannot ignore empty token")
+	}
+	p.start = p.end
+}
+
+func (p *parser) accept() []byte {
+	if p.empty() {
+		panic("cannot accept empty token")
+	}
+	x := p.data[p.start:p.end]
+	p.start = p.end
+	return x
+}
+
+func (p *parser) expect(expected rune) error {
+	r, err := p.next()
+	if err != nil {
+		return err
+	}
+	if r != expected {
+		return &UnexpectedCharacter{
+			r:        r,
+			expected: expected,
+		}
+	}
+	return nil
+}
+
+func (p *parser) empty() bool {
+	return p.start == p.end
 }
 
 type InvalidCharacter struct {
@@ -94,34 +179,31 @@ func (e *UnexpectedCharacter) Error() string {
 	return fmt.Sprintf("expected character '%#U' but got '%#U'", e.expected, e.r)
 }
 
-func (p *parser) parse(b []byte) error {
-	next := b
-	var err error
+func (p *parser) parse() error {
 	for {
-		next, err = p.parseExpression(next)
+		err := p.parseExpression()
 		if err != nil {
 			return err
-		}
-		if len(next) == 0 {
-			return nil
 		}
 
 		// new lines between expressions
-		r, size, err := readRune(next)
+		r, err := p.next()
 		if err != nil {
 			return err
 		}
-		if r == '\n' {
-			next = next[size:]
+		switch r {
+		case eof:
+			return nil
+		case '\n':
+			p.ignore()
 			continue
-		}
-		if r == '\r' {
-			r, size2, err := readRune(next)
+		case '\r':
+			r, err = p.next()
 			if err != nil {
 				return err
 			}
 			if r == '\n' {
-				next = next[size+size2:]
+				p.ignore()
 				continue
 			}
 		}
@@ -129,22 +211,23 @@ func (p *parser) parse(b []byte) error {
 	}
 }
 
-func (p *parser) parseExpression(b []byte) ([]byte, error) {
-	next, err := p.parseWhitespace(b)
+func (p *parser) parseExpression() error {
+	err := p.parseWhitespace()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	r, _, err := readRune(next)
+
+	r, err := p.peek()
 	if err != nil {
-		return nil, err
+		return err
 	}
+
 	// Line with just whitespace and a comment. We can exit early.
 	if r == '#' {
-		return p.parseComment(next)
+		return p.parseComment()
 	}
 
 	// or line with something?
-
 	if r == '[' {
 		// parse table. could be either a standard table or an array table
 	}
@@ -152,45 +235,44 @@ func (p *parser) parseExpression(b []byte) ([]byte, error) {
 	// it has to be a keyval
 
 	if isUnquotedKeyRune(r) || r == '\'' || r == '"' {
-		next, err = p.parseKeyval(next)
+		err := p.parseKeyval()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	// parse trailing whitespace and comment
 
-	next, err = p.parseWhitespace(next)
+	err = p.parseWhitespace()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	r, _, err = readRune(next)
+	r, err = p.peek()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	if r == '#' {
-		return p.parseComment(next)
+		return p.parseComment()
 	}
 
-	return next, nil
+	return nil
 }
 
-func (p *parser) parseKeyval(b []byte) ([]byte, error) {
+func (p *parser) parseKeyval() error {
 	// key keyval-sep val
-	next, err := p.parseKey(b)
+	err := p.parseKey()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return next, nil
+	return nil
 }
 
-func (p *parser) parseKey(b []byte) ([]byte, error) {
+func (p *parser) parseKey() error {
 	// simple-key / dotted-key
 	// dotted-key = simple-key 1*( dot-sep simple-key )
 
-	return p.parseSimpleKey(b)
+	return p.parseSimpleKey()
 	// TODO: dotted key
 }
 
@@ -198,89 +280,67 @@ func isUnquotedKeyRune(r rune) bool {
 	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_'
 }
 
-func (p *parser) parseSimpleKey(b []byte) ([]byte, error) {
+func (p *parser) parseSimpleKey() error {
 	// simple-key = quoted-key / unquoted-key
 	// quoted-key = basic-string / literal-string
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// literal-string = apostrophe *literal-char apostrophe
 
-	r, _, err := readRune(b)
+	r, err := p.peek()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if r == '\'' {
-		return p.parseLiteralString(b)
+	switch r {
+	case '\'':
+		return p.parseLiteralString()
+	case '"':
+		return p.parseBasicString()
+	default:
+		return p.parseUnquotedKey()
 	}
-	if r == '"' {
-		return p.parseBasicString(b)
-	}
-
-	return p.parseUnquotedKey(b)
 }
 
-func (p *parser) parseUnquotedKey(b []byte) ([]byte, error) {
-	length := 0
-	r, size, err := readRune(b)
+func (p *parser) parseUnquotedKey() error {
+	r, err := p.next()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !isUnquotedKeyRune(r) {
-		return nil, &InvalidCharacter{r: r}
+		return &InvalidCharacter{r: r}
 	}
-	length += size
 
 	for {
-		r, size, err := readRune(b[length:])
+		r, err := p.peek()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if !isUnquotedKeyRune(r) {
 			break
 		}
-		length += size
+		p.sureNext()
 	}
-	p.builder.UnquotedKey(b[:length])
-	return b[length:], nil
+	p.builder.UnquotedKey(p.accept())
+	return nil
 }
 
-func expectRune(b []byte, expected rune) (int, error) {
-	r, size, err := readRune(b)
-	if err != nil {
-		return 0, err
+func (p *parser) parseComment() error {
+	if err := p.expect('#'); err != nil {
+		return err
 	}
-	if r != expected {
-		return 0, &UnexpectedCharacter{
-			r:        r,
-			expected: expected,
-		}
-	}
-	return size, nil
-}
-
-func (p *parser) parseComment(b []byte) ([]byte, error) {
-	length := 0
-
-	size, err := expectRune(b, '#')
-	if err != nil {
-		return b, err
-	}
-	length += size
 
 	for {
-		r, size, err := readRune(b[length:])
+		r, err := p.peek()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if r == eof || r == '\n' {
-			if length > 0 {
-				p.builder.Comment(b[:length])
-			}
-			return b[length:], nil
+			p.builder.Comment(p.accept())
+			return nil
 		}
-		length += size
+		p.sureNext()
 	}
 }
 
@@ -301,33 +361,19 @@ func (e *InvalidUnicodeError) Error() string {
 	return fmt.Sprintf("invalid unicode: %#U", e.r)
 }
 
-func readRune(b []byte) (rune, int, error) {
-	r, size := utf8.DecodeRune(b)
-	if r == utf8.RuneError {
-		if size == 0 { // eof
-			return eof, 0, nil
-		}
-		if size == 1 { // invalid rune
-			return utf8.RuneError, 1, &InvalidUnicodeError{r: r}
-		}
-	}
-	return r, size, nil
-}
-
-func (p *parser) parseWhitespace(b []byte) ([]byte, error) {
-	length := 0
+func (p *parser) parseWhitespace() error {
 	for {
-		r, size, err := readRune(b[length:])
+		r, err := p.peek()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if isWhitespace(r) {
-			length += size
+			p.sureNext()
 		} else {
-			if length > 0 {
-				p.builder.Whitespace(b[:length])
+			if !p.empty() {
+				p.builder.Whitespace(p.accept())
 			}
-			return b[length:], nil
+			return nil
 		}
 	}
 }
@@ -340,31 +386,32 @@ func isLiteralChar(r rune) bool {
 	return r == 0x09 || (r >= 0x20 && r <= 0x26) || (r >= 0x28 && r <= 0x7E) || isNonAsciiChar(r)
 }
 
-func (p *parser) parseLiteralString(b []byte) ([]byte, error) {
+func (p *parser) parseLiteralString() error {
 	// literal-string = apostrophe *literal-char apostrophe
 	// literal-char = %x09 / %x20-26 / %x28-7E / non-ascii
 	// non-ascii = %x80-D7FF / %xE000-10FFFF
 
-	length := 0
-
-	start, err := expectRune(b, '\'')
+	err := p.expect('\'')
 	if err != nil {
-		return nil, err
+		return err
 	}
+	p.ignore()
 
 	for {
-		r, size, err := readRune(b[start+length:])
+		r, err := p.peek()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if r == '\'' {
-			p.builder.LiteralString(b[start : start+length])
-			return b[start+length+size:], nil
+			p.builder.LiteralString(p.accept())
+			p.sureNext()
+			p.ignore()
+			return nil
 		}
 		if !isLiteralChar(r) {
-			return nil, &InvalidCharacter{r: r}
+			return &InvalidCharacter{r: r}
 		}
-		length += size
+		p.sureNext()
 	}
 }
 
@@ -380,7 +427,7 @@ func isHex(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'A' && r <= 'F')
 }
 
-func (p *parser) parseBasicString(b []byte) ([]byte, error) {
+func (p *parser) parseBasicString() error {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// basic-char = basic-unescaped / escaped
 	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
@@ -396,71 +443,70 @@ func (p *parser) parseBasicString(b []byte) ([]byte, error) {
 	//escape-seq-char =/ %x75 4HEXDIG ; uXXXX                U+XXXX
 	//escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
 	// HEXDIG = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
-	length := 0
 
-	start, err := expectRune(b, '"')
+	err := p.expect('"')
 	if err != nil {
-		return nil, err
+		return err
 	}
+	p.ignore()
 
 	for {
-		r, size, err := readRune(b[start+length:])
+		r, err := p.peek()
 		if err != nil {
-			return nil, err
+			return err
 		}
+
 		if r == '"' {
-			p.builder.BasicString(b[start : start+length])
-			return b[start+length+size:], nil
+			p.builder.BasicString(p.accept())
+			p.sureNext()
+			p.ignore()
+			return nil
 		}
 
 		if r == '\\' {
-			length += size
-			r, size, err := readRune(b[start+length:])
+			p.sureNext()
+			r, err := p.peek()
 			if err != nil {
-				return nil, err
+				return err
 			}
-
 			if isEscapeChar(r) {
-				length += size
+				p.sureNext()
 				continue
 			}
 
 			if r == 'u' {
-				length += size
+				p.sureNext()
 				for i := 0; i < 4; i++ {
-					r, size, err := readRune(b[start+length:])
+					r, err := p.next()
 					if err != nil {
-						return nil, err
+						return err
 					}
 					if !isHex(r) {
-						return nil, &InvalidCharacter{r: r}
+						return &InvalidCharacter{r: r}
 					}
-					length += size
 				}
 				continue
 			}
 
 			if r == 'U' {
-				length += size
+				p.sureNext()
 				for i := 0; i < 8; i++ {
-					r, size, err := readRune(b[start+length:])
+					r, err := p.next()
 					if err != nil {
-						return nil, err
+						return err
 					}
 					if !isHex(r) {
-						return nil, &InvalidCharacter{r: r}
+						return &InvalidCharacter{r: r}
 					}
-					length += size
 				}
 				continue
 			}
 
-			return nil, &InvalidCharacter{r: r}
-
+			return &InvalidCharacter{r: r}
 		}
 
 		if isBasicStringChar(r) {
-			length += size
+			p.sureNext()
 			continue
 		}
 	}
