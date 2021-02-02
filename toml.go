@@ -27,6 +27,9 @@ type builder interface {
 	Dot(b []byte)
 	Boolean(b []byte)
 	Equal(b []byte)
+	ArrayBegin()
+	ArrayEnd()
+	ArraySeparator()
 }
 
 type position struct {
@@ -36,6 +39,18 @@ type position struct {
 
 type documentBuilder struct {
 	document Document
+}
+
+func (d *documentBuilder) ArraySeparator() {
+	fmt.Println(", ARRAY SEPARATOR")
+}
+
+func (d *documentBuilder) ArrayBegin() {
+	fmt.Println("[ ARRAY BEGIN")
+}
+
+func (d *documentBuilder) ArrayEnd() {
+	fmt.Println("] ARRAY END")
 }
 
 func (d *documentBuilder) Equal(b []byte) {
@@ -243,6 +258,22 @@ func (p *parser) parse() error {
 	}
 }
 
+func (p *parser) parseRequiredNewline() error {
+	r := p.next()
+	switch r {
+	case '\n':
+		p.ignore()
+		return nil
+	case '\r':
+		r = p.next()
+		if r == '\n' {
+			p.ignore()
+			return nil
+		}
+	}
+	return &InvalidCharacter{r: r}
+}
+
 func (p *parser) parseExpression() error {
 	err := p.parseWhitespace()
 	if err != nil {
@@ -325,11 +356,104 @@ func (p *parser) parseVal() error {
 		return p.parseBool()
 	case '\'', '"':
 		return p.parseString()
+	case '[':
+		return p.parseArray()
 		// TODO
 	default:
 		return &InvalidCharacter{r: r}
 	}
 }
+
+func (p *parser) parseArray() error {
+	//array = array-open [ array-values ] ws-comment-newline array-close
+
+	err := p.expect('[')
+	if err != nil {
+		panic("arrays should start with [")
+	}
+
+	p.builder.ArrayBegin()
+
+	err = p.parseWhitespaceCommentNewline()
+	if err != nil {
+		return err
+	}
+
+	r := p.peek()
+
+	if r == ']' {
+		p.next()
+		p.ignore()
+		p.builder.ArrayEnd()
+		return nil
+	}
+
+	err = p.parseVal()
+	if err != nil {
+		return err
+	}
+
+	for {
+		err = p.parseWhitespaceCommentNewline()
+		if err != nil {
+			return err
+		}
+
+		r := p.peek()
+
+		if r == ']' {
+			p.next()
+			p.ignore()
+			p.builder.ArrayEnd()
+			return nil
+		}
+
+		err := p.expect(',')
+		if err != nil {
+			return err
+		}
+		p.builder.ArraySeparator()
+		p.ignore()
+
+		err = p.parseWhitespaceCommentNewline()
+		if err != nil {
+			return err
+		}
+
+		err = p.parseVal()
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func (p *parser) parseWhitespaceCommentNewline() error {
+	// ws-comment-newline = *( wschar / ([ comment ] newline) )
+
+	for {
+		if isWhitespace(p.peek()) {
+			err := p.parseWhitespace()
+			if err != nil {
+				return err
+			}
+		}
+		if p.peek() == '#' {
+			err := p.parseComment()
+			if err != nil {
+				return err
+			}
+		}
+		r := p.peek()
+		if r != '\n' && r != '\r' {
+			return nil
+		}
+		err := p.parseRequiredNewline()
+		if err != nil {
+			return err
+		}
+	}
+}
+
 func (p *parser) parseString() error {
 	r := p.peek()
 

@@ -24,6 +24,11 @@ var inputs = []string{
 	`a."b".c = true`,
 	`a = "foo"`,
 	`b = 'sample thingy'`,
+	`a = []`,
+	`b = ["foo"]`,
+	`c = [[[]]]`,
+	`d = ["foo","bar"]`,
+	`d = ["foo",    "test"]`,
 }
 
 func TestParse(t *testing.T) {
@@ -40,29 +45,17 @@ func TestParse(t *testing.T) {
 type noopBuilder struct {
 }
 
-func (n noopBuilder) Whitespace(b []byte) {
-}
-
-func (n noopBuilder) Comment(b []byte) {
-}
-
-func (n noopBuilder) UnquotedKey(b []byte) {
-}
-
-func (n noopBuilder) LiteralString(b []byte) {
-}
-
-func (n noopBuilder) BasicString(b []byte) {
-}
-
-func (n noopBuilder) Dot(b []byte) {
-}
-
-func (n noopBuilder) Boolean(b []byte) {
-}
-
-func (n noopBuilder) Equal(b []byte) {
-}
+func (n noopBuilder) ArraySeparator()        {}
+func (n noopBuilder) ArrayBegin()            {}
+func (n noopBuilder) ArrayEnd()              {}
+func (n noopBuilder) Whitespace(b []byte)    {}
+func (n noopBuilder) Comment(b []byte)       {}
+func (n noopBuilder) UnquotedKey(b []byte)   {}
+func (n noopBuilder) LiteralString(b []byte) {}
+func (n noopBuilder) BasicString(b []byte)   {}
+func (n noopBuilder) Dot(b []byte)           {}
+func (n noopBuilder) Boolean(b []byte)       {}
+func (n noopBuilder) Equal(b []byte)         {}
 
 func BenchmarkParseAll(b *testing.B) {
 	b.ReportAllocs()
