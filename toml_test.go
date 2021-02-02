@@ -29,6 +29,8 @@ var inputs = []string{
 	`c = [[[]]]`,
 	`d = ["foo","bar"]`,
 	`d = ["foo",    "test"]`,
+	`d = {}`,
+	`e = {f = "bar"}`,
 }
 
 func TestParse(t *testing.T) {
@@ -45,6 +47,9 @@ func TestParse(t *testing.T) {
 type noopBuilder struct {
 }
 
+func (n noopBuilder) InlineTableSeparator()  {}
+func (n noopBuilder) InlineTableBegin()      {}
+func (n noopBuilder) InlineTableEnd()        {}
 func (n noopBuilder) ArraySeparator()        {}
 func (n noopBuilder) ArrayBegin()            {}
 func (n noopBuilder) ArrayEnd()              {}

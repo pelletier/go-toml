@@ -30,6 +30,9 @@ type builder interface {
 	ArrayBegin()
 	ArrayEnd()
 	ArraySeparator()
+	InlineTableBegin()
+	InlineTableEnd()
+	InlineTableSeparator()
 }
 
 type position struct {
@@ -39,6 +42,18 @@ type position struct {
 
 type documentBuilder struct {
 	document Document
+}
+
+func (d *documentBuilder) InlineTableSeparator() {
+	fmt.Println(", InlineTable SEPARATOR")
+}
+
+func (d *documentBuilder) InlineTableBegin() {
+	fmt.Println("{ InlineTable BEGIN")
+}
+
+func (d *documentBuilder) InlineTableEnd() {
+	fmt.Println("} InlineTable END")
 }
 
 func (d *documentBuilder) ArraySeparator() {
@@ -358,9 +373,78 @@ func (p *parser) parseVal() error {
 		return p.parseString()
 	case '[':
 		return p.parseArray()
+	case '{':
+		return p.parseInlineTable()
 		// TODO
 	default:
 		return &InvalidCharacter{r: r}
+	}
+}
+
+func (p *parser) parseInlineTable() error {
+	//inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
+	//
+	//inline-table-open  = %x7B ws     ; {
+	//	inline-table-close = ws %x7D     ; }
+	//inline-table-sep   = ws %x2C ws  ; , Comma
+	//
+	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
+
+	err := p.expect('{')
+	if err != nil {
+		panic("inline tables should start with {")
+	}
+	p.ignore()
+	p.builder.InlineTableBegin()
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+
+	r := p.peek()
+	if r == '}' {
+		p.next()
+		p.ignore()
+		p.builder.InlineTableEnd()
+		return nil
+	}
+
+	err = p.parseKeyval()
+	if err != nil {
+		return err
+	}
+
+	for {
+		err = p.parseWhitespace()
+		if err != nil {
+			return err
+		}
+
+		r := p.peek()
+		if r == '}' {
+			p.next()
+			p.ignore()
+			p.builder.InlineTableEnd()
+			return nil
+		}
+
+		err := p.expect(',')
+		if err != nil {
+			return err
+		}
+		p.builder.InlineTableSeparator()
+		p.ignore()
+
+		err = p.parseWhitespace()
+		if err != nil {
+			return err
+		}
+
+		err = p.parseKeyval()
+		if err != nil {
+			return err
+		}
 	}
 }
 
@@ -371,6 +455,7 @@ func (p *parser) parseArray() error {
 	if err != nil {
 		panic("arrays should start with [")
 	}
+	p.ignore()
 
 	p.builder.ArrayBegin()
 
