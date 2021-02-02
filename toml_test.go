@@ -31,6 +31,11 @@ var inputs = []string{
 	`d = ["foo",    "test"]`,
 	`d = {}`,
 	`e = {f = "bar"}`,
+	`[foo]`,
+	`[   test   ]`,
+	`[  "hello".world ]`,
+	`[test]
+a = false`,
 }
 
 func TestParse(t *testing.T) {
@@ -47,6 +52,8 @@ func TestParse(t *testing.T) {
 type noopBuilder struct {
 }
 
+func (n noopBuilder) StandardTableBegin()    {}
+func (n noopBuilder) StandardTableEnd()      {}
 func (n noopBuilder) InlineTableSeparator()  {}
 func (n noopBuilder) InlineTableBegin()      {}
 func (n noopBuilder) InlineTableEnd()        {}

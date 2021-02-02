@@ -33,6 +33,8 @@ type builder interface {
 	InlineTableBegin()
 	InlineTableEnd()
 	InlineTableSeparator()
+	StandardTableBegin()
+	StandardTableEnd()
 }
 
 type position struct {
@@ -42,6 +44,14 @@ type position struct {
 
 type documentBuilder struct {
 	document Document
+}
+
+func (d *documentBuilder) StandardTableBegin() {
+	fmt.Println("STD-TABLE[")
+}
+
+func (d *documentBuilder) StandardTableEnd() {
+	fmt.Println("STD-TABLE]")
 }
 
 func (d *documentBuilder) InlineTableSeparator() {
@@ -290,6 +300,10 @@ func (p *parser) parseRequiredNewline() error {
 }
 
 func (p *parser) parseExpression() error {
+	//expression =  ws [ comment ]
+	//expression =/ ws keyval ws [ comment ]
+	//expression =/ ws table ws [ comment ]
+
 	err := p.parseWhitespace()
 	if err != nil {
 		return err
@@ -305,12 +319,11 @@ func (p *parser) parseExpression() error {
 	// or line with something?
 	if r == '[' {
 		// parse table. could be either a standard table or an array table
-		// TODO
-	}
-
-	// it has to be a keyval
-
-	if isUnquotedKeyRune(r) || r == '\'' || r == '"' {
+		err := p.parseTable()
+		if err != nil {
+			return err
+		}
+	} else if isUnquotedKeyRune(r) || r == '\'' || r == '"' {
 		err := p.parseKeyval()
 		if err != nil {
 			return err
@@ -843,4 +856,68 @@ func (p *parser) parseBasicString() error {
 			continue
 		}
 	}
+}
+
+func (p *parser) parseTable() error {
+	//;; Table
+	//
+	//table = std-table / array-table
+	//
+	//;; Standard Table
+	//
+	//std-table = std-table-open key std-table-close
+	//
+	//std-table-open  = %x5B ws     ; [ Left square bracket
+	//std-table-close = ws %x5D     ; ] Right square bracket
+	//
+	//;; Array Table
+	//
+	//array-table = array-table-open key array-table-close
+	//
+	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
+	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
+
+	if p.follows("[[") {
+		panic("TODO") // TODO: array-table
+	}
+
+	return p.parseStandardTable()
+}
+
+func (p *parser) parseStandardTable() error {
+	//;; Standard Table
+	//
+	//std-table = std-table-open key std-table-close
+	//
+	//std-table-open  = %x5B ws     ; [ Left square bracket
+	//std-table-close = ws %x5D     ; ] Right square bracket
+
+	err := p.expect('[')
+	if err != nil {
+		panic("std-table should start with [")
+	}
+	p.ignore()
+	p.builder.StandardTableBegin()
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+
+	err = p.parseKey()
+	if err != nil {
+		return err
+	}
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+	err = p.expect(']')
+	if err != nil {
+		return err
+	}
+	p.ignore()
+	p.builder.StandardTableEnd()
+	return nil
 }
