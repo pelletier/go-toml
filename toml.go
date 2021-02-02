@@ -110,11 +110,24 @@ type parser struct {
 	lookahead lookahead
 }
 
-func (p *parser) peek() rune {
-	if p.end >= len(p.data) {
+func (p *parser) at(i int) rune {
+	if p.end+i >= len(p.data) {
 		return eof
 	}
-	return rune(p.data[p.end])
+	return rune(p.data[p.end+i])
+}
+
+func (p *parser) follows(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if rune(s[i]) != p.at(i) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p *parser) peek() rune {
+	return p.at(0)
 }
 
 func (p *parser) next() rune {
@@ -310,9 +323,32 @@ func (p *parser) parseVal() error {
 	switch r {
 	case 't', 'f':
 		return p.parseBool()
+	case '\'', '"':
+		return p.parseString()
 		// TODO
 	default:
 		return &InvalidCharacter{r: r}
+	}
+}
+func (p *parser) parseString() error {
+	r := p.peek()
+
+	if r == '\'' {
+		if p.follows("'''") {
+			// TODO ml-literal-string
+			panic("TODO")
+		} else {
+			return p.parseLiteralString()
+		}
+	} else if r == '"' {
+		if p.follows("\"\"\"") {
+			// TODO ml-basic-string
+			panic("TODO")
+		} else {
+			return p.parseBasicString()
+		}
+	} else {
+		panic("string should start with ' or \"")
 	}
 }
 

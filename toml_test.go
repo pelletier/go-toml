@@ -22,6 +22,8 @@ var inputs = []string{
 	`"hello \u1234 foo" = false`,
 	`a.b.c = false`,
 	`a."b".c = true`,
+	`a = "foo"`,
+	`b = 'sample thingy'`,
 }
 
 func TestParse(t *testing.T) {
