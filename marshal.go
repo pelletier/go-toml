@@ -57,12 +57,12 @@ var annotationDefault = annotation{
 	defaultValue: tagDefault,
 }
 
-type marshalOrder int
+type MarshalOrder int
 
 // Orders the Encoder can write the fields to the output stream.
 const (
 	// Sort fields alphabetically.
-	OrderAlphabetical marshalOrder = iota + 1
+	OrderAlphabetical MarshalOrder = iota + 1
 	// Preserve the order the fields are encountered. For example, the order of fields in
 	// a struct.
 	OrderPreserve
@@ -256,7 +256,7 @@ type Encoder struct {
 	annotation
 	line        int
 	col         int
-	order       marshalOrder
+	order       MarshalOrder
 	promoteAnon bool
 	indentation string
 }
@@ -317,7 +317,7 @@ func (e *Encoder) ArraysWithOneElementPerLine(v bool) *Encoder {
 }
 
 // Order allows to change in which order fields will be written to the output stream.
-func (e *Encoder) Order(ord marshalOrder) *Encoder {
+func (e *Encoder) Order(ord MarshalOrder) *Encoder {
 	e.order = ord
 	return e
 }
