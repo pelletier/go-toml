@@ -136,40 +136,24 @@ func (p *parser) expect(expected rune) error {
 	return nil
 }
 
-func (p *parser) peekRune() (rune, error) {
+func (p *parser) peekRune() rune {
 	if p.lookahead.empty() {
 		p.lookahead.r, p.lookahead.size = utf8.DecodeRune(p.data[p.end:])
-		if p.lookahead.r == utf8.RuneError {
-
-			switch p.lookahead.size {
-			case 0:
-				p.lookahead.r = eof
-			case 1:
-				p.lookahead.r = utf8.RuneError
-				return utf8.RuneError, &InvalidUnicodeError{r: p.lookahead.r}
-			default:
-				panic("unhandled rune error case")
-			}
+		if p.lookahead.r == utf8.RuneError && p.lookahead.size == 0 {
+			p.lookahead.r = eof
 		}
 	}
-	return p.lookahead.r, nil
+	return p.lookahead.r
 }
 
-func (p *parser) nextRune() (rune, error) {
-	r, err := p.peekRune()
-	if err == nil {
+func (p *parser) nextRune() rune {
+	r := p.peekRune()
+	if r != eof {
 		p.end += p.lookahead.size
 		p.lookahead.r = 0
 		p.lookahead.size = 0
 	}
-	return r, err
-}
-
-func (p *parser) sureNextRune() {
-	_, err := p.nextRune()
-	if err != nil {
-		panic(err)
-	}
+	return r
 }
 
 func (p *parser) ignore() {
@@ -189,10 +173,7 @@ func (p *parser) accept() []byte {
 }
 
 func (p *parser) expectRune(expected rune) error {
-	r, err := p.nextRune()
-	if err != nil {
-		return err
-	}
+	r := p.nextRune()
 	if r != expected {
 		return &UnexpectedCharacter{
 			r:        r,
@@ -520,20 +501,17 @@ func (p *parser) parseLiteralString() error {
 	p.ignore()
 
 	for {
-		r, err := p.peekRune()
-		if err != nil {
-			return err
-		}
+		r := p.peekRune()
 		if r == '\'' {
 			p.builder.LiteralString(p.accept())
-			p.sureNextRune()
+			p.nextRune()
 			p.ignore()
 			return nil
 		}
 		if !isLiteralChar(r) {
 			return &InvalidCharacter{r: r}
 		}
-		p.sureNextRune()
+		p.nextRune()
 	}
 }
 
@@ -573,36 +551,27 @@ func (p *parser) parseBasicString() error {
 	p.ignore()
 
 	for {
-		r, err := p.peekRune()
-		if err != nil {
-			return err
-		}
+		r := p.peekRune()
 
 		if r == '"' {
 			p.builder.BasicString(p.accept())
-			p.sureNextRune()
+			p.nextRune()
 			p.ignore()
 			return nil
 		}
 
 		if r == '\\' {
-			p.sureNextRune()
-			r, err := p.peekRune()
-			if err != nil {
-				return err
-			}
+			p.nextRune()
+			r := p.peekRune()
 			if isEscapeChar(r) {
-				p.sureNextRune()
+				p.nextRune()
 				continue
 			}
 
 			if r == 'u' {
-				p.sureNextRune()
+				p.nextRune()
 				for i := 0; i < 4; i++ {
-					r, err := p.nextRune()
-					if err != nil {
-						return err
-					}
+					r := p.nextRune()
 					if !isHex(r) {
 						return &InvalidCharacter{r: r}
 					}
@@ -611,12 +580,9 @@ func (p *parser) parseBasicString() error {
 			}
 
 			if r == 'U' {
-				p.sureNextRune()
+				p.nextRune()
 				for i := 0; i < 8; i++ {
-					r, err := p.nextRune()
-					if err != nil {
-						return err
-					}
+					r := p.nextRune()
 					if !isHex(r) {
 						return &InvalidCharacter{r: r}
 					}
@@ -628,7 +594,7 @@ func (p *parser) parseBasicString() error {
 		}
 
 		if isBasicStringChar(r) {
-			p.sureNextRune()
+			p.nextRune()
 			continue
 		}
 	}
