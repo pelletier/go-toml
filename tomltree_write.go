@@ -103,7 +103,7 @@ func encodeTomlString(value string) string {
 	return b.String()
 }
 
-func tomlTreeStringRepresentation(t *Tree, ord marshalOrder) (string, error) {
+func tomlTreeStringRepresentation(t *Tree, ord MarshalOrder) (string, error) {
 	var orderedVals []sortNode
 	switch ord {
 	case OrderPreserve:
@@ -126,7 +126,7 @@ func tomlTreeStringRepresentation(t *Tree, ord marshalOrder) (string, error) {
 	return "{ " + strings.Join(values, ", ") + " }", nil
 }
 
-func tomlValueStringRepresentation(v interface{}, commented string, indent string, ord marshalOrder, arraysOneElementPerLine bool) (string, error) {
+func tomlValueStringRepresentation(v interface{}, commented string, indent string, ord MarshalOrder, arraysOneElementPerLine bool) (string, error) {
 	// this interface check is added to dereference the change made in the writeTo function.
 	// That change was made to allow this function to see formatting options.
 	tv, ok := v.(*tomlValue)
@@ -310,7 +310,7 @@ func (t *Tree) writeTo(w io.Writer, indent, keyspace string, bytesCount int64, a
 	return t.writeToOrdered(w, indent, keyspace, bytesCount, arraysOneElementPerLine, OrderAlphabetical, "  ", false)
 }
 
-func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount int64, arraysOneElementPerLine bool, ord marshalOrder, indentString string, parentCommented bool) (int64, error) {
+func (t *Tree) writeToOrdered(w io.Writer, indent, keyspace string, bytesCount int64, arraysOneElementPerLine bool, ord MarshalOrder, indentString string, parentCommented bool) (int64, error) {
 	var orderedVals []sortNode
 
 	switch ord {
