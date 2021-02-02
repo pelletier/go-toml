@@ -24,6 +24,7 @@ type builder interface {
 	UnquotedKey(b []byte)
 	LiteralString(b []byte)
 	BasicString(b []byte)
+	Dot(b []byte)
 }
 
 type position struct {
@@ -33,6 +34,11 @@ type position struct {
 
 type documentBuilder struct {
 	document Document
+}
+
+func (d *documentBuilder) Dot(b []byte) {
+	s := string(b)
+	fmt.Printf("DOT: '%s'\n", s)
 }
 
 func (d *documentBuilder) BasicString(b []byte) {
@@ -230,6 +236,7 @@ func (p *parser) parseExpression() error {
 	// or line with something?
 	if r == '[' {
 		// parse table. could be either a standard table or an array table
+		// TODO
 	}
 
 	// it has to be a keyval
@@ -271,9 +278,43 @@ func (p *parser) parseKeyval() error {
 func (p *parser) parseKey() error {
 	// simple-key / dotted-key
 	// dotted-key = simple-key 1*( dot-sep simple-key )
+	// dot-sep   = ws %x2E ws
 
-	return p.parseSimpleKey()
-	// TODO: dotted key
+	for {
+		err := p.parseSimpleKey()
+		if err != nil {
+			return err
+		}
+
+		err = p.parseWhitespace()
+		if err != nil {
+			return err
+		}
+
+		r, err := p.peek()
+		if err != nil {
+			return err
+		}
+
+		if r != '.' {
+			break
+		}
+
+		p.sureNext()
+		p.builder.Dot(p.accept())
+
+		err = p.parseWhitespace()
+		if err != nil {
+			return err
+		}
+	}
+
+	err := p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func isUnquotedKeyRune(r rune) bool {

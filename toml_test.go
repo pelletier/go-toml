@@ -22,6 +22,8 @@ func TestParse(t *testing.T) {
 		`"foo bar"`,
 		`"hello\tworld"`,
 		`"hello \u1234 foo"`,
+		`a.b.c`,
+		`a."b".c`,
 	}
 
 	for i, data := range inputs {
