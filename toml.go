@@ -25,6 +25,8 @@ type builder interface {
 	LiteralString(b []byte)
 	BasicString(b []byte)
 	Dot(b []byte)
+	Boolean(b []byte)
+	Equal(b []byte)
 }
 
 type position struct {
@@ -34,6 +36,16 @@ type position struct {
 
 type documentBuilder struct {
 	document Document
+}
+
+func (d *documentBuilder) Equal(b []byte) {
+	s := string(b)
+	fmt.Printf("EQUAL: '%s'\n", s)
+}
+
+func (d *documentBuilder) Boolean(b []byte) {
+	s := string(b)
+	fmt.Printf("Boolean: '%s'\n", s)
 }
 
 func (d *documentBuilder) Dot(b []byte) {
@@ -268,10 +280,93 @@ func (p *parser) parseExpression() error {
 
 func (p *parser) parseKeyval() error {
 	// key keyval-sep val
+	//keyval-sep = ws %x3D ws ; =
+
 	err := p.parseKey()
 	if err != nil {
 		return err
 	}
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+
+	err = p.expect('=')
+	if err != nil {
+		return err
+	}
+	p.builder.Equal(p.accept())
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+
+	return p.parseVal()
+}
+
+func (p *parser) parseVal() error {
+	//val = string / boolean / array / inline-table / date-time / float / integer
+	// string = ml-basic-string / basic-string / ml-literal-string / literal-string
+
+	r, err := p.peek()
+	if err != nil {
+		return err
+	}
+
+	switch r {
+	case 't', 'f':
+		return p.parseBool()
+		// TODO
+	default:
+		return &InvalidCharacter{r: r}
+	}
+}
+
+func (p *parser) parseBool() error {
+	r, err := p.peek()
+	if err != nil {
+		return err
+	}
+
+	if r == 't' {
+		p.sureNext()
+		err = p.expect('r')
+		if err != nil {
+			return err
+		}
+		err = p.expect('u')
+		if err != nil {
+			return err
+		}
+		err = p.expect('e')
+		if err != nil {
+			return err
+		}
+	} else if r == 'f' {
+		p.sureNext()
+		err = p.expect('a')
+		if err != nil {
+			return err
+		}
+		err = p.expect('l')
+		if err != nil {
+			return err
+		}
+		err = p.expect('s')
+		if err != nil {
+			return err
+		}
+		err = p.expect('e')
+		if err != nil {
+			return err
+		}
+	} else {
+		return &InvalidCharacter{r: r}
+	}
+
+	p.builder.Boolean(p.accept())
 	return nil
 }
 
