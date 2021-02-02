@@ -110,7 +110,33 @@ type parser struct {
 	lookahead lookahead
 }
 
-func (p *parser) peek() (rune, error) {
+func (p *parser) peek() rune {
+	if p.end >= len(p.data) {
+		return eof
+	}
+	return rune(p.data[p.end])
+}
+
+func (p *parser) next() rune {
+	x := p.peek()
+	if x != eof {
+		p.end++
+	}
+	return x
+}
+
+func (p *parser) expect(expected rune) error {
+	r := p.next()
+	if r != expected {
+		return &UnexpectedCharacter{
+			r:        r,
+			expected: expected,
+		}
+	}
+	return nil
+}
+
+func (p *parser) peekRune() (rune, error) {
 	if p.lookahead.empty() {
 		p.lookahead.r, p.lookahead.size = utf8.DecodeRune(p.data[p.end:])
 		if p.lookahead.r == utf8.RuneError {
@@ -129,8 +155,8 @@ func (p *parser) peek() (rune, error) {
 	return p.lookahead.r, nil
 }
 
-func (p *parser) next() (rune, error) {
-	r, err := p.peek()
+func (p *parser) nextRune() (rune, error) {
+	r, err := p.peekRune()
 	if err == nil {
 		p.end += p.lookahead.size
 		p.lookahead.r = 0
@@ -139,8 +165,8 @@ func (p *parser) next() (rune, error) {
 	return r, err
 }
 
-func (p *parser) sureNext() {
-	_, err := p.next()
+func (p *parser) sureNextRune() {
+	_, err := p.nextRune()
 	if err != nil {
 		panic(err)
 	}
@@ -162,8 +188,8 @@ func (p *parser) accept() []byte {
 	return x
 }
 
-func (p *parser) expect(expected rune) error {
-	r, err := p.next()
+func (p *parser) expectRune(expected rune) error {
+	r, err := p.nextRune()
 	if err != nil {
 		return err
 	}
@@ -205,10 +231,7 @@ func (p *parser) parse() error {
 		}
 
 		// new lines between expressions
-		r, err := p.next()
-		if err != nil {
-			return err
-		}
+		r := p.next()
 		switch r {
 		case eof:
 			return nil
@@ -216,10 +239,7 @@ func (p *parser) parse() error {
 			p.ignore()
 			continue
 		case '\r':
-			r, err = p.next()
-			if err != nil {
-				return err
-			}
+			r = p.next()
 			if r == '\n' {
 				p.ignore()
 				continue
@@ -235,10 +255,7 @@ func (p *parser) parseExpression() error {
 		return err
 	}
 
-	r, err := p.peek()
-	if err != nil {
-		return err
-	}
+	r := p.peek()
 
 	// Line with just whitespace and a comment. We can exit early.
 	if r == '#' {
@@ -267,10 +284,7 @@ func (p *parser) parseExpression() error {
 		return err
 	}
 
-	r, err = p.peek()
-	if err != nil {
-		return err
-	}
+	r = p.peek()
 	if r == '#' {
 		return p.parseComment()
 	}
@@ -310,10 +324,7 @@ func (p *parser) parseVal() error {
 	//val = string / boolean / array / inline-table / date-time / float / integer
 	// string = ml-basic-string / basic-string / ml-literal-string / literal-string
 
-	r, err := p.peek()
-	if err != nil {
-		return err
-	}
+	r := p.peek()
 
 	switch r {
 	case 't', 'f':
@@ -325,14 +336,11 @@ func (p *parser) parseVal() error {
 }
 
 func (p *parser) parseBool() error {
-	r, err := p.peek()
-	if err != nil {
-		return err
-	}
+	r := p.peek()
 
 	if r == 't' {
-		p.sureNext()
-		err = p.expect('r')
+		p.next()
+		err := p.expect('r')
 		if err != nil {
 			return err
 		}
@@ -345,8 +353,8 @@ func (p *parser) parseBool() error {
 			return err
 		}
 	} else if r == 'f' {
-		p.sureNext()
-		err = p.expect('a')
+		p.next()
+		err := p.expect('a')
 		if err != nil {
 			return err
 		}
@@ -386,16 +394,12 @@ func (p *parser) parseKey() error {
 			return err
 		}
 
-		r, err := p.peek()
-		if err != nil {
-			return err
-		}
-
+		r := p.peek()
 		if r != '.' {
 			break
 		}
 
-		p.sureNext()
+		p.next()
 		p.builder.Dot(p.accept())
 
 		err = p.parseWhitespace()
@@ -423,10 +427,7 @@ func (p *parser) parseSimpleKey() error {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// literal-string = apostrophe *literal-char apostrophe
 
-	r, err := p.peek()
-	if err != nil {
-		return err
-	}
+	r := p.peek()
 
 	switch r {
 	case '\'':
@@ -439,24 +440,20 @@ func (p *parser) parseSimpleKey() error {
 }
 
 func (p *parser) parseUnquotedKey() error {
-	r, err := p.next()
-	if err != nil {
-		return err
-	}
+	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
+
+	r := p.next()
 
 	if !isUnquotedKeyRune(r) {
 		return &InvalidCharacter{r: r}
 	}
 
 	for {
-		r, err := p.peek()
-		if err != nil {
-			return err
-		}
+		r := p.peek()
 		if !isUnquotedKeyRune(r) {
 			break
 		}
-		p.sureNext()
+		p.next()
 	}
 	p.builder.UnquotedKey(p.accept())
 	return nil
@@ -468,25 +465,17 @@ func (p *parser) parseComment() error {
 	}
 
 	for {
-		r, err := p.peek()
-		if err != nil {
-			return err
-		}
+		r := p.peek()
 		if r == eof || r == '\n' {
 			p.builder.Comment(p.accept())
 			return nil
 		}
-		p.sureNext()
+		p.next()
 	}
 }
 
 func isWhitespace(r rune) bool {
-	switch r {
-	case 0x20, 0x09:
-		return true
-	default:
-		return false
-	}
+	return r == 0x20 || r == 0x09
 }
 
 type InvalidUnicodeError struct {
@@ -499,12 +488,9 @@ func (e *InvalidUnicodeError) Error() string {
 
 func (p *parser) parseWhitespace() error {
 	for {
-		r, err := p.peek()
-		if err != nil {
-			return err
-		}
+		r := p.peek()
 		if isWhitespace(r) {
-			p.sureNext()
+			p.next()
 		} else {
 			if !p.empty() {
 				p.builder.Whitespace(p.accept())
@@ -534,20 +520,20 @@ func (p *parser) parseLiteralString() error {
 	p.ignore()
 
 	for {
-		r, err := p.peek()
+		r, err := p.peekRune()
 		if err != nil {
 			return err
 		}
 		if r == '\'' {
 			p.builder.LiteralString(p.accept())
-			p.sureNext()
+			p.sureNextRune()
 			p.ignore()
 			return nil
 		}
 		if !isLiteralChar(r) {
 			return &InvalidCharacter{r: r}
 		}
-		p.sureNext()
+		p.sureNextRune()
 	}
 }
 
@@ -587,33 +573,33 @@ func (p *parser) parseBasicString() error {
 	p.ignore()
 
 	for {
-		r, err := p.peek()
+		r, err := p.peekRune()
 		if err != nil {
 			return err
 		}
 
 		if r == '"' {
 			p.builder.BasicString(p.accept())
-			p.sureNext()
+			p.sureNextRune()
 			p.ignore()
 			return nil
 		}
 
 		if r == '\\' {
-			p.sureNext()
-			r, err := p.peek()
+			p.sureNextRune()
+			r, err := p.peekRune()
 			if err != nil {
 				return err
 			}
 			if isEscapeChar(r) {
-				p.sureNext()
+				p.sureNextRune()
 				continue
 			}
 
 			if r == 'u' {
-				p.sureNext()
+				p.sureNextRune()
 				for i := 0; i < 4; i++ {
-					r, err := p.next()
+					r, err := p.nextRune()
 					if err != nil {
 						return err
 					}
@@ -625,9 +611,9 @@ func (p *parser) parseBasicString() error {
 			}
 
 			if r == 'U' {
-				p.sureNext()
+				p.sureNextRune()
 				for i := 0; i < 8; i++ {
-					r, err := p.next()
+					r, err := p.nextRune()
 					if err != nil {
 						return err
 					}
@@ -642,7 +628,7 @@ func (p *parser) parseBasicString() error {
 		}
 
 		if isBasicStringChar(r) {
-			p.sureNext()
+			p.sureNextRune()
 			continue
 		}
 	}
