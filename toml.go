@@ -35,6 +35,8 @@ type builder interface {
 	InlineTableSeparator()
 	StandardTableBegin()
 	StandardTableEnd()
+	ArrayTableBegin()
+	ArrayTableEnd()
 }
 
 type position struct {
@@ -44,6 +46,14 @@ type position struct {
 
 type documentBuilder struct {
 	document Document
+}
+
+func (d *documentBuilder) ArrayTableBegin() {
+	fmt.Println("ARRAY-TABLE[[")
+}
+
+func (d *documentBuilder) ArrayTableEnd() {
+	fmt.Println("ARRAY-TABLE]]")
 }
 
 func (d *documentBuilder) StandardTableBegin() {
@@ -878,10 +888,55 @@ func (p *parser) parseTable() error {
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
 
 	if p.follows("[[") {
-		panic("TODO") // TODO: array-table
+		return p.parseArrayTable()
 	}
 
 	return p.parseStandardTable()
+}
+
+func (p *parser) parseArrayTable() error {
+	//;; Array Table
+	//
+	//array-table = array-table-open key array-table-close
+	//
+	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
+	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
+	err := p.expect('[')
+	if err != nil {
+		return err
+	}
+	err = p.expect('[')
+	if err != nil {
+		return err
+	}
+	p.ignore()
+	p.builder.ArrayTableBegin()
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+
+	err = p.parseKey()
+	if err != nil {
+		return err
+	}
+
+	err = p.parseWhitespace()
+	if err != nil {
+		return err
+	}
+	err = p.expect(']')
+	if err != nil {
+		return err
+	}
+	err = p.expect(']')
+	if err != nil {
+		return err
+	}
+	p.ignore()
+	p.builder.ArrayTableEnd()
+	return nil
 }
 
 func (p *parser) parseStandardTable() error {
