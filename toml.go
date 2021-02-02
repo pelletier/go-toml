@@ -5,137 +5,9 @@ import (
 	"unicode/utf8"
 )
 
-func Unmarshal(data []byte, v interface{}) error {
-	// TODO
-	return nil
-}
-
-func Marshal(v interface{}) ([]byte, error) {
-	// TODO
-	return nil, nil
-}
-
-type Document struct {
-}
-
-type builder interface {
-	Whitespace(b []byte)
-	Comment(b []byte)
-	UnquotedKey(b []byte)
-	LiteralString(b []byte)
-	BasicString(b []byte)
-	Dot(b []byte)
-	Boolean(b []byte)
-	Equal(b []byte)
-	ArrayBegin()
-	ArrayEnd()
-	ArraySeparator()
-	InlineTableBegin()
-	InlineTableEnd()
-	InlineTableSeparator()
-	StandardTableBegin()
-	StandardTableEnd()
-	ArrayTableBegin()
-	ArrayTableEnd()
-}
-
 type position struct {
 	line   int
 	column int
-}
-
-type documentBuilder struct {
-	document Document
-}
-
-func (d *documentBuilder) ArrayTableBegin() {
-	fmt.Println("ARRAY-TABLE[[")
-}
-
-func (d *documentBuilder) ArrayTableEnd() {
-	fmt.Println("ARRAY-TABLE]]")
-}
-
-func (d *documentBuilder) StandardTableBegin() {
-	fmt.Println("STD-TABLE[")
-}
-
-func (d *documentBuilder) StandardTableEnd() {
-	fmt.Println("STD-TABLE]")
-}
-
-func (d *documentBuilder) InlineTableSeparator() {
-	fmt.Println(", InlineTable SEPARATOR")
-}
-
-func (d *documentBuilder) InlineTableBegin() {
-	fmt.Println("{ InlineTable BEGIN")
-}
-
-func (d *documentBuilder) InlineTableEnd() {
-	fmt.Println("} InlineTable END")
-}
-
-func (d *documentBuilder) ArraySeparator() {
-	fmt.Println(", ARRAY SEPARATOR")
-}
-
-func (d *documentBuilder) ArrayBegin() {
-	fmt.Println("[ ARRAY BEGIN")
-}
-
-func (d *documentBuilder) ArrayEnd() {
-	fmt.Println("] ARRAY END")
-}
-
-func (d *documentBuilder) Equal(b []byte) {
-	s := string(b)
-	fmt.Printf("EQUAL: '%s'\n", s)
-}
-
-func (d *documentBuilder) Boolean(b []byte) {
-	s := string(b)
-	fmt.Printf("Boolean: '%s'\n", s)
-}
-
-func (d *documentBuilder) Dot(b []byte) {
-	s := string(b)
-	fmt.Printf("DOT: '%s'\n", s)
-}
-
-func (d *documentBuilder) BasicString(b []byte) {
-	s := string(b)
-	fmt.Printf("BasicString: '%s'\n", s)
-}
-
-func (d *documentBuilder) LiteralString(b []byte) {
-	s := string(b)
-	fmt.Printf("LiteralString: '%s'\n", s)
-}
-
-func (d *documentBuilder) UnquotedKey(b []byte) {
-	s := string(b)
-	fmt.Printf("UnquotedKey: '%s'\n", s)
-}
-
-func (d *documentBuilder) Comment(b []byte) {
-	s := string(b)
-	fmt.Printf("Comment: '%s'\n", s)
-}
-
-func (d *documentBuilder) Whitespace(b []byte) {
-	s := string(b)
-	fmt.Printf("Whitespace: '%s'\n", s)
-}
-
-func Parse(b []byte) (Document, error) {
-	builder := documentBuilder{}
-	p := parser{builder: &builder, data: b}
-	err := p.parse()
-	if err != nil {
-		return Document{}, err
-	}
-	return builder.document, nil
 }
 
 // eof is a rune value indicating end-of-file.
@@ -150,8 +22,8 @@ func (l lookahead) empty() bool {
 	return l.r == 0
 }
 
-type parser struct {
-	builder builder
+type lexer struct {
+	parser parser
 
 	data  []byte
 	start int
@@ -160,36 +32,36 @@ type parser struct {
 	lookahead lookahead
 }
 
-func (p *parser) at(i int) rune {
-	if p.end+i >= len(p.data) {
+func (l *lexer) at(i int) rune {
+	if l.end+i >= len(l.data) {
 		return eof
 	}
-	return rune(p.data[p.end+i])
+	return rune(l.data[l.end+i])
 }
 
-func (p *parser) follows(s string) bool {
+func (l *lexer) follows(s string) bool {
 	for i := 0; i < len(s); i++ {
-		if rune(s[i]) != p.at(i) {
+		if rune(s[i]) != l.at(i) {
 			return false
 		}
 	}
 	return true
 }
 
-func (p *parser) peek() rune {
-	return p.at(0)
+func (l *lexer) peek() rune {
+	return l.at(0)
 }
 
-func (p *parser) next() rune {
-	x := p.peek()
+func (l *lexer) next() rune {
+	x := l.peek()
 	if x != eof {
-		p.end++
+		l.end++
 	}
 	return x
 }
 
-func (p *parser) expect(expected rune) error {
-	r := p.next()
+func (l *lexer) expect(expected rune) error {
+	r := l.next()
 	if r != expected {
 		return &UnexpectedCharacter{
 			r:        r,
@@ -199,44 +71,44 @@ func (p *parser) expect(expected rune) error {
 	return nil
 }
 
-func (p *parser) peekRune() rune {
-	if p.lookahead.empty() {
-		p.lookahead.r, p.lookahead.size = utf8.DecodeRune(p.data[p.end:])
-		if p.lookahead.r == utf8.RuneError && p.lookahead.size == 0 {
-			p.lookahead.r = eof
+func (l *lexer) peekRune() rune {
+	if l.lookahead.empty() {
+		l.lookahead.r, l.lookahead.size = utf8.DecodeRune(l.data[l.end:])
+		if l.lookahead.r == utf8.RuneError && l.lookahead.size == 0 {
+			l.lookahead.r = eof
 		}
 	}
-	return p.lookahead.r
+	return l.lookahead.r
 }
 
-func (p *parser) nextRune() rune {
-	r := p.peekRune()
+func (l *lexer) nextRune() rune {
+	r := l.peekRune()
 	if r != eof {
-		p.end += p.lookahead.size
-		p.lookahead.r = 0
-		p.lookahead.size = 0
+		l.end += l.lookahead.size
+		l.lookahead.r = 0
+		l.lookahead.size = 0
 	}
 	return r
 }
 
-func (p *parser) ignore() {
-	if p.empty() {
+func (l *lexer) ignore() {
+	if l.empty() {
 		panic("cannot ignore empty token")
 	}
-	p.start = p.end
+	l.start = l.end
 }
 
-func (p *parser) accept() []byte {
-	if p.empty() {
+func (l *lexer) accept() []byte {
+	if l.empty() {
 		panic("cannot accept empty token")
 	}
-	x := p.data[p.start:p.end]
-	p.start = p.end
+	x := l.data[l.start:l.end]
+	l.start = l.end
 	return x
 }
 
-func (p *parser) expectRune(expected rune) error {
-	r := p.nextRune()
+func (l *lexer) expectRune(expected rune) error {
+	r := l.nextRune()
 	if r != expected {
 		return &UnexpectedCharacter{
 			r:        r,
@@ -246,8 +118,8 @@ func (p *parser) expectRune(expected rune) error {
 	return nil
 }
 
-func (p *parser) empty() bool {
-	return p.start == p.end
+func (l *lexer) empty() bool {
+	return l.start == l.end
 }
 
 type InvalidCharacter struct {
@@ -267,25 +139,25 @@ func (e *UnexpectedCharacter) Error() string {
 	return fmt.Sprintf("expected character '%#U' but got '%#U'", e.expected, e.r)
 }
 
-func (p *parser) parse() error {
+func (l *lexer) run() error {
 	for {
-		err := p.parseExpression()
+		err := l.lexExpression()
 		if err != nil {
 			return err
 		}
 
 		// new lines between expressions
-		r := p.next()
+		r := l.next()
 		switch r {
 		case eof:
 			return nil
 		case '\n':
-			p.ignore()
+			l.ignore()
 			continue
 		case '\r':
-			r = p.next()
+			r = l.next()
 			if r == '\n' {
-				p.ignore()
+				l.ignore()
 				continue
 			}
 		}
@@ -293,48 +165,48 @@ func (p *parser) parse() error {
 	}
 }
 
-func (p *parser) parseRequiredNewline() error {
-	r := p.next()
+func (l *lexer) lexRequiredNewline() error {
+	r := l.next()
 	switch r {
 	case '\n':
-		p.ignore()
+		l.ignore()
 		return nil
 	case '\r':
-		r = p.next()
+		r = l.next()
 		if r == '\n' {
-			p.ignore()
+			l.ignore()
 			return nil
 		}
 	}
 	return &InvalidCharacter{r: r}
 }
 
-func (p *parser) parseExpression() error {
+func (l *lexer) lexExpression() error {
 	//expression =  ws [ comment ]
 	//expression =/ ws keyval ws [ comment ]
 	//expression =/ ws table ws [ comment ]
 
-	err := p.parseWhitespace()
+	err := l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	r := p.peek()
+	r := l.peek()
 
 	// Line with just whitespace and a comment. We can exit early.
 	if r == '#' {
-		return p.parseComment()
+		return l.lexComment()
 	}
 
 	// or line with something?
 	if r == '[' {
 		// parse table. could be either a standard table or an array table
-		err := p.parseTable()
+		err := l.lexTable()
 		if err != nil {
 			return err
 		}
 	} else if isUnquotedKeyRune(r) || r == '\'' || r == '"' {
-		err := p.parseKeyval()
+		err := l.lexKeyval()
 		if err != nil {
 			return err
 		}
@@ -342,69 +214,69 @@ func (p *parser) parseExpression() error {
 
 	// parse trailing whitespace and comment
 
-	err = p.parseWhitespace()
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	r = p.peek()
+	r = l.peek()
 	if r == '#' {
-		return p.parseComment()
+		return l.lexComment()
 	}
 
 	return nil
 }
 
-func (p *parser) parseKeyval() error {
+func (l *lexer) lexKeyval() error {
 	// key keyval-sep val
 	//keyval-sep = ws %x3D ws ; =
 
-	err := p.parseKey()
+	err := l.lexKey()
 	if err != nil {
 		return err
 	}
 
-	err = p.parseWhitespace()
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	err = p.expect('=')
+	err = l.expect('=')
 	if err != nil {
 		return err
 	}
-	p.builder.Equal(p.accept())
+	l.parser.Equal(l.accept())
 
-	err = p.parseWhitespace()
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	return p.parseVal()
+	return l.lexVal()
 }
 
-func (p *parser) parseVal() error {
+func (l *lexer) lexVal() error {
 	//val = string / boolean / array / inline-table / date-time / float / integer
 	// string = ml-basic-string / basic-string / ml-literal-string / literal-string
 
-	r := p.peek()
+	r := l.peek()
 
 	switch r {
 	case 't', 'f':
-		return p.parseBool()
+		return l.lexBool()
 	case '\'', '"':
-		return p.parseString()
+		return l.lexString()
 	case '[':
-		return p.parseArray()
+		return l.lexArray()
 	case '{':
-		return p.parseInlineTable()
+		return l.lexInlineTable()
 		// TODO
 	default:
 		return &InvalidCharacter{r: r}
 	}
 }
 
-func (p *parser) parseInlineTable() error {
+func (l *lexer) lexInlineTable() error {
 	//inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	//
 	//inline-table-open  = %x7B ws     ; {
@@ -413,209 +285,209 @@ func (p *parser) parseInlineTable() error {
 	//
 	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 
-	err := p.expect('{')
+	err := l.expect('{')
 	if err != nil {
 		panic("inline tables should start with {")
 	}
-	p.ignore()
-	p.builder.InlineTableBegin()
+	l.ignore()
+	l.parser.InlineTableBegin()
 
-	err = p.parseWhitespace()
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	r := p.peek()
+	r := l.peek()
 	if r == '}' {
-		p.next()
-		p.ignore()
-		p.builder.InlineTableEnd()
+		l.next()
+		l.ignore()
+		l.parser.InlineTableEnd()
 		return nil
 	}
 
-	err = p.parseKeyval()
+	err = l.lexKeyval()
 	if err != nil {
 		return err
 	}
 
 	for {
-		err = p.parseWhitespace()
+		err = l.lexWhitespace()
 		if err != nil {
 			return err
 		}
 
-		r := p.peek()
+		r := l.peek()
 		if r == '}' {
-			p.next()
-			p.ignore()
-			p.builder.InlineTableEnd()
+			l.next()
+			l.ignore()
+			l.parser.InlineTableEnd()
 			return nil
 		}
 
-		err := p.expect(',')
+		err := l.expect(',')
 		if err != nil {
 			return err
 		}
-		p.builder.InlineTableSeparator()
-		p.ignore()
+		l.parser.InlineTableSeparator()
+		l.ignore()
 
-		err = p.parseWhitespace()
+		err = l.lexWhitespace()
 		if err != nil {
 			return err
 		}
 
-		err = p.parseKeyval()
+		err = l.lexKeyval()
 		if err != nil {
 			return err
 		}
 	}
 }
 
-func (p *parser) parseArray() error {
+func (l *lexer) lexArray() error {
 	//array = array-open [ array-values ] ws-comment-newline array-close
 
-	err := p.expect('[')
+	err := l.expect('[')
 	if err != nil {
 		panic("arrays should start with [")
 	}
-	p.ignore()
+	l.ignore()
 
-	p.builder.ArrayBegin()
+	l.parser.ArrayBegin()
 
-	err = p.parseWhitespaceCommentNewline()
+	err = l.lexWhitespaceCommentNewline()
 	if err != nil {
 		return err
 	}
 
-	r := p.peek()
+	r := l.peek()
 
 	if r == ']' {
-		p.next()
-		p.ignore()
-		p.builder.ArrayEnd()
+		l.next()
+		l.ignore()
+		l.parser.ArrayEnd()
 		return nil
 	}
 
-	err = p.parseVal()
+	err = l.lexVal()
 	if err != nil {
 		return err
 	}
 
 	for {
-		err = p.parseWhitespaceCommentNewline()
+		err = l.lexWhitespaceCommentNewline()
 		if err != nil {
 			return err
 		}
 
-		r := p.peek()
+		r := l.peek()
 
 		if r == ']' {
-			p.next()
-			p.ignore()
-			p.builder.ArrayEnd()
+			l.next()
+			l.ignore()
+			l.parser.ArrayEnd()
 			return nil
 		}
 
-		err := p.expect(',')
+		err := l.expect(',')
 		if err != nil {
 			return err
 		}
-		p.builder.ArraySeparator()
-		p.ignore()
+		l.parser.ArraySeparator()
+		l.ignore()
 
-		err = p.parseWhitespaceCommentNewline()
+		err = l.lexWhitespaceCommentNewline()
 		if err != nil {
 			return err
 		}
 
-		err = p.parseVal()
+		err = l.lexVal()
 		if err != nil {
 			return err
 		}
 	}
 }
 
-func (p *parser) parseWhitespaceCommentNewline() error {
+func (l *lexer) lexWhitespaceCommentNewline() error {
 	// ws-comment-newline = *( wschar / ([ comment ] newline) )
 
 	for {
-		if isWhitespace(p.peek()) {
-			err := p.parseWhitespace()
+		if isWhitespace(l.peek()) {
+			err := l.lexWhitespace()
 			if err != nil {
 				return err
 			}
 		}
-		if p.peek() == '#' {
-			err := p.parseComment()
+		if l.peek() == '#' {
+			err := l.lexComment()
 			if err != nil {
 				return err
 			}
 		}
-		r := p.peek()
+		r := l.peek()
 		if r != '\n' && r != '\r' {
 			return nil
 		}
-		err := p.parseRequiredNewline()
+		err := l.lexRequiredNewline()
 		if err != nil {
 			return err
 		}
 	}
 }
 
-func (p *parser) parseString() error {
-	r := p.peek()
+func (l *lexer) lexString() error {
+	r := l.peek()
 
 	if r == '\'' {
-		if p.follows("'''") {
+		if l.follows("'''") {
 			// TODO ml-literal-string
 			panic("TODO")
 		} else {
-			return p.parseLiteralString()
+			return l.lexLiteralString()
 		}
 	} else if r == '"' {
-		if p.follows("\"\"\"") {
+		if l.follows("\"\"\"") {
 			// TODO ml-basic-string
 			panic("TODO")
 		} else {
-			return p.parseBasicString()
+			return l.lexBasicString()
 		}
 	} else {
 		panic("string should start with ' or \"")
 	}
 }
 
-func (p *parser) parseBool() error {
-	r := p.peek()
+func (l *lexer) lexBool() error {
+	r := l.peek()
 
 	if r == 't' {
-		p.next()
-		err := p.expect('r')
+		l.next()
+		err := l.expect('r')
 		if err != nil {
 			return err
 		}
-		err = p.expect('u')
+		err = l.expect('u')
 		if err != nil {
 			return err
 		}
-		err = p.expect('e')
+		err = l.expect('e')
 		if err != nil {
 			return err
 		}
 	} else if r == 'f' {
-		p.next()
-		err := p.expect('a')
+		l.next()
+		err := l.expect('a')
 		if err != nil {
 			return err
 		}
-		err = p.expect('l')
+		err = l.expect('l')
 		if err != nil {
 			return err
 		}
-		err = p.expect('s')
+		err = l.expect('s')
 		if err != nil {
 			return err
 		}
-		err = p.expect('e')
+		err = l.expect('e')
 		if err != nil {
 			return err
 		}
@@ -623,41 +495,41 @@ func (p *parser) parseBool() error {
 		return &InvalidCharacter{r: r}
 	}
 
-	p.builder.Boolean(p.accept())
+	l.parser.Boolean(l.accept())
 	return nil
 }
 
-func (p *parser) parseKey() error {
+func (l *lexer) lexKey() error {
 	// simple-key / dotted-key
 	// dotted-key = simple-key 1*( dot-sep simple-key )
 	// dot-sep   = ws %x2E ws
 
 	for {
-		err := p.parseSimpleKey()
+		err := l.lexSimpleKey()
 		if err != nil {
 			return err
 		}
 
-		err = p.parseWhitespace()
+		err = l.lexWhitespace()
 		if err != nil {
 			return err
 		}
 
-		r := p.peek()
+		r := l.peek()
 		if r != '.' {
 			break
 		}
 
-		p.next()
-		p.builder.Dot(p.accept())
+		l.next()
+		l.parser.Dot(l.accept())
 
-		err = p.parseWhitespace()
+		err = l.lexWhitespace()
 		if err != nil {
 			return err
 		}
 	}
 
-	err := p.parseWhitespace()
+	err := l.lexWhitespace()
 	if err != nil {
 		return err
 	}
@@ -669,57 +541,57 @@ func isUnquotedKeyRune(r rune) bool {
 	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_'
 }
 
-func (p *parser) parseSimpleKey() error {
+func (l *lexer) lexSimpleKey() error {
 	// simple-key = quoted-key / unquoted-key
 	// quoted-key = basic-string / literal-string
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// literal-string = apostrophe *literal-char apostrophe
 
-	r := p.peek()
+	r := l.peek()
 
 	switch r {
 	case '\'':
-		return p.parseLiteralString()
+		return l.lexLiteralString()
 	case '"':
-		return p.parseBasicString()
+		return l.lexBasicString()
 	default:
-		return p.parseUnquotedKey()
+		return l.lexUnquotedKey()
 	}
 }
 
-func (p *parser) parseUnquotedKey() error {
+func (l *lexer) lexUnquotedKey() error {
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 
-	r := p.next()
+	r := l.next()
 
 	if !isUnquotedKeyRune(r) {
 		return &InvalidCharacter{r: r}
 	}
 
 	for {
-		r := p.peek()
+		r := l.peek()
 		if !isUnquotedKeyRune(r) {
 			break
 		}
-		p.next()
+		l.next()
 	}
-	p.builder.UnquotedKey(p.accept())
+	l.parser.UnquotedKey(l.accept())
 	return nil
 }
 
-func (p *parser) parseComment() error {
-	if err := p.expect('#'); err != nil {
+func (l *lexer) lexComment() error {
+	if err := l.expect('#'); err != nil {
 		return err
 	}
 
 	for {
-		r := p.peek()
+		r := l.peek()
 		if r == eof || r == '\n' {
-			p.builder.Comment(p.accept())
+			l.parser.Comment(l.accept())
 			return nil
 		}
-		p.next()
+		l.next()
 	}
 }
 
@@ -735,14 +607,14 @@ func (e *InvalidUnicodeError) Error() string {
 	return fmt.Sprintf("invalid unicode: %#U", e.r)
 }
 
-func (p *parser) parseWhitespace() error {
+func (l *lexer) lexWhitespace() error {
 	for {
-		r := p.peek()
+		r := l.peek()
 		if isWhitespace(r) {
-			p.next()
+			l.next()
 		} else {
-			if !p.empty() {
-				p.builder.Whitespace(p.accept())
+			if !l.empty() {
+				l.parser.Whitespace(l.accept())
 			}
 			return nil
 		}
@@ -757,29 +629,29 @@ func isLiteralChar(r rune) bool {
 	return r == 0x09 || (r >= 0x20 && r <= 0x26) || (r >= 0x28 && r <= 0x7E) || isNonAsciiChar(r)
 }
 
-func (p *parser) parseLiteralString() error {
+func (l *lexer) lexLiteralString() error {
 	// literal-string = apostrophe *literal-char apostrophe
 	// literal-char = %x09 / %x20-26 / %x28-7E / non-ascii
 	// non-ascii = %x80-D7FF / %xE000-10FFFF
 
-	err := p.expect('\'')
+	err := l.expect('\'')
 	if err != nil {
 		return err
 	}
-	p.ignore()
+	l.ignore()
 
 	for {
-		r := p.peekRune()
+		r := l.peekRune()
 		if r == '\'' {
-			p.builder.LiteralString(p.accept())
-			p.nextRune()
-			p.ignore()
+			l.parser.LiteralString(l.accept())
+			l.nextRune()
+			l.ignore()
 			return nil
 		}
 		if !isLiteralChar(r) {
 			return &InvalidCharacter{r: r}
 		}
-		p.nextRune()
+		l.nextRune()
 	}
 }
 
@@ -795,7 +667,7 @@ func isHex(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'A' && r <= 'F')
 }
 
-func (p *parser) parseBasicString() error {
+func (l *lexer) lexBasicString() error {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// basic-char = basic-unescaped / escaped
 	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
@@ -812,34 +684,34 @@ func (p *parser) parseBasicString() error {
 	//escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
 	// HEXDIG = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 
-	err := p.expect('"')
+	err := l.expect('"')
 	if err != nil {
 		return err
 	}
-	p.ignore()
+	l.ignore()
 
 	for {
-		r := p.peekRune()
+		r := l.peekRune()
 
 		if r == '"' {
-			p.builder.BasicString(p.accept())
-			p.nextRune()
-			p.ignore()
+			l.parser.BasicString(l.accept())
+			l.nextRune()
+			l.ignore()
 			return nil
 		}
 
 		if r == '\\' {
-			p.nextRune()
-			r := p.peekRune()
+			l.nextRune()
+			r := l.peekRune()
 			if isEscapeChar(r) {
-				p.nextRune()
+				l.nextRune()
 				continue
 			}
 
 			if r == 'u' {
-				p.nextRune()
+				l.nextRune()
 				for i := 0; i < 4; i++ {
-					r := p.nextRune()
+					r := l.nextRune()
 					if !isHex(r) {
 						return &InvalidCharacter{r: r}
 					}
@@ -848,9 +720,9 @@ func (p *parser) parseBasicString() error {
 			}
 
 			if r == 'U' {
-				p.nextRune()
+				l.nextRune()
 				for i := 0; i < 8; i++ {
-					r := p.nextRune()
+					r := l.nextRune()
 					if !isHex(r) {
 						return &InvalidCharacter{r: r}
 					}
@@ -862,13 +734,13 @@ func (p *parser) parseBasicString() error {
 		}
 
 		if isBasicStringChar(r) {
-			p.nextRune()
+			l.nextRune()
 			continue
 		}
 	}
 }
 
-func (p *parser) parseTable() error {
+func (l *lexer) lexTable() error {
 	//;; Table
 	//
 	//table = std-table / array-table
@@ -887,59 +759,59 @@ func (p *parser) parseTable() error {
 	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
 
-	if p.follows("[[") {
-		return p.parseArrayTable()
+	if l.follows("[[") {
+		return l.lexArrayTable()
 	}
 
-	return p.parseStandardTable()
+	return l.lexStandardTable()
 }
 
-func (p *parser) parseArrayTable() error {
+func (l *lexer) lexArrayTable() error {
 	//;; Array Table
 	//
 	//array-table = array-table-open key array-table-close
 	//
 	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
-	err := p.expect('[')
+	err := l.expect('[')
 	if err != nil {
 		return err
 	}
-	err = p.expect('[')
+	err = l.expect('[')
 	if err != nil {
 		return err
 	}
-	p.ignore()
-	p.builder.ArrayTableBegin()
+	l.ignore()
+	l.parser.ArrayTableBegin()
 
-	err = p.parseWhitespace()
-	if err != nil {
-		return err
-	}
-
-	err = p.parseKey()
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	err = p.parseWhitespace()
+	err = l.lexKey()
 	if err != nil {
 		return err
 	}
-	err = p.expect(']')
+
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
-	err = p.expect(']')
+	err = l.expect(']')
 	if err != nil {
 		return err
 	}
-	p.ignore()
-	p.builder.ArrayTableEnd()
+	err = l.expect(']')
+	if err != nil {
+		return err
+	}
+	l.ignore()
+	l.parser.ArrayTableEnd()
 	return nil
 }
 
-func (p *parser) parseStandardTable() error {
+func (l *lexer) lexStandardTable() error {
 	//;; Standard Table
 	//
 	//std-table = std-table-open key std-table-close
@@ -947,32 +819,32 @@ func (p *parser) parseStandardTable() error {
 	//std-table-open  = %x5B ws     ; [ Left square bracket
 	//std-table-close = ws %x5D     ; ] Right square bracket
 
-	err := p.expect('[')
+	err := l.expect('[')
 	if err != nil {
 		panic("std-table should start with [")
 	}
-	p.ignore()
-	p.builder.StandardTableBegin()
+	l.ignore()
+	l.parser.StandardTableBegin()
 
-	err = p.parseWhitespace()
-	if err != nil {
-		return err
-	}
-
-	err = p.parseKey()
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
 
-	err = p.parseWhitespace()
+	err = l.lexKey()
 	if err != nil {
 		return err
 	}
-	err = p.expect(']')
+
+	err = l.lexWhitespace()
 	if err != nil {
 		return err
 	}
-	p.ignore()
-	p.builder.StandardTableEnd()
+	err = l.expect(']')
+	if err != nil {
+		return err
+	}
+	l.ignore()
+	l.parser.StandardTableEnd()
 	return nil
 }

@@ -50,36 +50,36 @@ func TestParse(t *testing.T) {
 	}
 }
 
-type noopBuilder struct {
+type noopParser struct {
 }
 
-func (n noopBuilder) ArrayTableBegin()       {}
-func (n noopBuilder) ArrayTableEnd()         {}
-func (n noopBuilder) StandardTableBegin()    {}
-func (n noopBuilder) StandardTableEnd()      {}
-func (n noopBuilder) InlineTableSeparator()  {}
-func (n noopBuilder) InlineTableBegin()      {}
-func (n noopBuilder) InlineTableEnd()        {}
-func (n noopBuilder) ArraySeparator()        {}
-func (n noopBuilder) ArrayBegin()            {}
-func (n noopBuilder) ArrayEnd()              {}
-func (n noopBuilder) Whitespace(b []byte)    {}
-func (n noopBuilder) Comment(b []byte)       {}
-func (n noopBuilder) UnquotedKey(b []byte)   {}
-func (n noopBuilder) LiteralString(b []byte) {}
-func (n noopBuilder) BasicString(b []byte)   {}
-func (n noopBuilder) Dot(b []byte)           {}
-func (n noopBuilder) Boolean(b []byte)       {}
-func (n noopBuilder) Equal(b []byte)         {}
+func (n noopParser) ArrayTableBegin()       {}
+func (n noopParser) ArrayTableEnd()         {}
+func (n noopParser) StandardTableBegin()    {}
+func (n noopParser) StandardTableEnd()      {}
+func (n noopParser) InlineTableSeparator()  {}
+func (n noopParser) InlineTableBegin()      {}
+func (n noopParser) InlineTableEnd()        {}
+func (n noopParser) ArraySeparator()        {}
+func (n noopParser) ArrayBegin()            {}
+func (n noopParser) ArrayEnd()              {}
+func (n noopParser) Whitespace(b []byte)    {}
+func (n noopParser) Comment(b []byte)       {}
+func (n noopParser) UnquotedKey(b []byte)   {}
+func (n noopParser) LiteralString(b []byte) {}
+func (n noopParser) BasicString(b []byte)   {}
+func (n noopParser) Dot(b []byte)           {}
+func (n noopParser) Boolean(b []byte)       {}
+func (n noopParser) Equal(b []byte)         {}
 
 func BenchmarkParseAll(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
 		for _, data := range inputs {
-			builder := noopBuilder{}
-			p := parser{builder: &builder, data: []byte(data)}
-			err := p.parse()
+			p := noopParser{}
+			l := lexer{parser: &p, data: []byte(data)}
+			err := l.run()
 			if err != nil {
 				b.Fatalf("error: %s", err)
 			}
