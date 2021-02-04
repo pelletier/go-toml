@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var inputs = []string{
@@ -43,9 +43,14 @@ func TestParse(t *testing.T) {
 	for i, data := range inputs {
 		t.Run(fmt.Sprintf("example %d", i), func(t *testing.T) {
 			fmt.Printf("input:\n\t`%s`\n", data)
-			doc, err := Parse([]byte(data))
-			assert.NoError(t, err)
-			fmt.Println(doc)
+			b := []byte(data)
+			var token []byte
+			var err error
+			for len(b) > 0 {
+				token, b, err = scan(b)
+				require.NoError(t, err)
+				fmt.Printf("token => '%s'\n", string(token))
+			}
 		})
 	}
 }
@@ -72,17 +77,18 @@ func (n noopParser) Dot(b []byte)           {}
 func (n noopParser) Boolean(b []byte)       {}
 func (n noopParser) Equal(b []byte)         {}
 
-func BenchmarkParseAll(b *testing.B) {
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		for _, data := range inputs {
-			p := noopParser{}
-			l := lexer{parser: &p, data: []byte(data)}
-			err := l.run()
-			if err != nil {
-				b.Fatalf("error: %s", err)
-			}
-		}
-	}
-}
+//
+//func BenchmarkParseAll(b *testing.B) {
+//	b.ReportAllocs()
+//
+//	for i := 0; i < b.N; i++ {
+//		for _, data := range inputs {
+//			p := noopParser{}
+//			l := lexer{parser: &p, data: []byte(data)}
+//			err := l.run()
+//			if err != nil {
+//				b.Fatalf("error: %s", err)
+//			}
+//		}
+//	}
+//}
