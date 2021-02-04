@@ -1,0 +1,9 @@
+[service]
+golangci-lint-version =  "1.36.0"
+
+[linters]
+enable-all = true
+fast = true
+
+[issues]
+exclude-use-default = false
