@@ -151,16 +151,16 @@ func scanWindowsNewline(b []byte) ([]byte, []byte, error) {
 	return b[:2], b[2:], nil
 }
 
-func scanWhitespace(b []byte) ([]byte, []byte, error) {
+func scanWhitespace(b []byte) ([]byte, []byte) {
 	for i := 1; i < len(b); i++ {
 		switch b[i] {
 		case ' ', '\t':
 			continue
 		default:
-			return b[:i], b[i:], nil
+			return b[:i], b[i:]
 		}
 	}
-	return b, nil, nil
+	return b, nil
 }
 
 func scanComment(b []byte) ([]byte, []byte, error) {
