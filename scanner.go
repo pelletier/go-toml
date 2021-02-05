@@ -58,7 +58,8 @@ func scan(b []byte) ([]byte, []byte, error) {
 	case comment:
 		return scanComment(b)
 	case ' ', '\t':
-		return scanWhitespace(b)
+		data, rest := scanWhitespace(b)
+		return data, rest, nil
 	case '\r':
 		return scanWindowsNewline(b)
 	case '\n':
