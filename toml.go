@@ -58,8 +58,7 @@ func parseExpression(b []byte) ([]byte, error) {
 
 	var err error
 	if b[0] == '[' {
-		// TODO: parse 'table'
-		panic("todo")
+		b, err = parseTable(b)
 	} else {
 		b, err = parseKeyval(b)
 	}
@@ -75,6 +74,48 @@ func parseExpression(b []byte) ([]byte, error) {
 	}
 
 	return b, nil
+}
+
+func parseTable(b []byte) ([]byte, error) {
+	//table = std-table / array-table
+	if len(b) > 1 && b[1] == '[' {
+		return parseArrayTable(b)
+	}
+	return parseStdTable(b)
+}
+
+func parseArrayTable(b []byte) ([]byte, error) {
+	//array-table = array-table-open key array-table-close
+	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
+	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
+
+	b = b[2:]
+	b = parseWhitespace(b)
+	b, err := parseKey(b)
+	if err != nil {
+		return nil, err
+	}
+	b = parseWhitespace(b)
+	b, err = expect(']', b)
+	if err != nil {
+		return nil, err
+	}
+	return expect(']', b)
+}
+
+func parseStdTable(b []byte) ([]byte, error) {
+	//std-table = std-table-open key std-table-close
+	//std-table-open  = %x5B ws     ; [ Left square bracket
+	//std-table-close = ws %x5D     ; ] Right square bracket
+
+	b = b[1:]
+	b = parseWhitespace(b)
+	b, err := parseKey(b)
+	if err != nil {
+		return nil, err
+	}
+	b = parseWhitespace(b)
+	return expect(']', b)
 }
 
 func parseKeyval(b []byte) ([]byte, error) {
