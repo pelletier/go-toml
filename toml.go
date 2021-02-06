@@ -92,25 +92,24 @@ func parseKeyval(b []byte) ([]byte, error) {
 func parseVal(b []byte) ([]byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 
+	var err error
 	c := b[0]
 
 	switch c {
 	// strings
 	case '"':
-		var rest []byte
-		var err error
 		if scanFollowsMultilineBasicStringDelimiter(b) {
-			_, rest, err = parseMultilineBasicString(b)
+			_, b, err = parseMultilineBasicString(b)
 		} else {
-			_, rest, err = parseBasicString(b)
+			_, b, err = parseBasicString(b)
 		}
-		return rest, err
+		return b, err
 	case '\'':
 		if scanFollowsMultilineLiteralStringDelimiter(b) {
-			return parseMultilineLiteralString(b)
+			_, b, err = parseMultilineLiteralString(b)
 		}
-		_, rest, err := scanLiteralString(b)
-		return rest, err
+		_, b, err = scanLiteralString(b)
+		return b, err
 	// TODO boolean
 
 	// TODO array
@@ -125,6 +124,24 @@ func parseVal(b []byte) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected char")
 	}
+}
+
+func parseMultilineLiteralString(b []byte) (string, []byte, error) {
+	token, rest, err := scanMultilineLiteralString(b)
+	if err != nil {
+		return "", nil, err
+	}
+
+	i := 3
+
+	// skip the immediate new line
+	if token[i] == '\n' {
+		i++
+	} else if token[i] == '\r' && token[i+1] == '\n' {
+		i += 2
+	}
+
+	return string(token[i : len(b)-3]), rest, err
 }
 
 func parseMultilineBasicString(b []byte) (string, []byte, error) {

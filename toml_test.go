@@ -39,7 +39,7 @@ a = false`,
 	`[[foo]]`,
 }
 
-func TestParse(t *testing.T) {
+func TestScan(t *testing.T) {
 	for i, data := range inputs {
 		t.Run(fmt.Sprintf("example %d", i), func(t *testing.T) {
 			fmt.Printf("input:\n\t`%s`\n", data)
@@ -51,6 +51,17 @@ func TestParse(t *testing.T) {
 				require.NoError(t, err)
 				fmt.Printf("token => '%s'\n", string(token))
 			}
+		})
+	}
+}
+
+func TestParse(t *testing.T) {
+	for i, data := range inputs {
+		t.Run(fmt.Sprintf("example %d", i), func(t *testing.T) {
+			fmt.Printf("input:\n\t`%s`\n", data)
+			b := []byte(data)
+			err := parse(b)
+			require.NoError(t, err)
 		})
 	}
 }
