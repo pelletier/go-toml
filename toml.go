@@ -175,8 +175,8 @@ func parseVal(b []byte) ([]byte, error) {
 		return b[5:], nil
 	case '[':
 		return parseValArray(b)
-
-	// TODO inline-table
+	case '{':
+		return parseInlineTable(b)
 
 	// TODO date-time
 
@@ -186,6 +186,37 @@ func parseVal(b []byte) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected char")
 	}
+}
+
+func parseInlineTable(b []byte) ([]byte, error) {
+	//inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
+	//inline-table-open  = %x7B ws     ; {
+	//inline-table-close = ws %x7D     ; }
+	//inline-table-sep   = ws %x2C ws  ; , Comma
+	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
+
+	b = b[1:]
+
+	first := true
+	var err error
+	for len(b) > 0 {
+		b = parseWhitespace(b)
+		if b[0] == '}' {
+			break
+		}
+
+		if !first {
+			b, err = expect(',', b)
+			if err != nil {
+				return nil, err
+			}
+			b = parseWhitespace(b)
+		}
+		b, err = parseKeyval(b)
+
+		first = false
+	}
+	return expect('}', b)
 }
 
 func parseValArray(b []byte) ([]byte, error) {
