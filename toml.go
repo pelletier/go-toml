@@ -140,6 +140,9 @@ func parseKeyval(b []byte) ([]byte, error) {
 
 func parseVal(b []byte) ([]byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
+	if len(b) == 0 {
+		return nil, fmt.Errorf("expected value, not eof")
+	}
 
 	var err error
 	c := b[0]
@@ -170,7 +173,8 @@ func parseVal(b []byte) ([]byte, error) {
 			return nil, fmt.Errorf("expected 'false'")
 		}
 		return b[5:], nil
-	// TODO array
+	case '[':
+		return parseValArray(b)
 
 	// TODO inline-table
 
@@ -182,6 +186,75 @@ func parseVal(b []byte) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected char")
 	}
+}
+
+func parseValArray(b []byte) ([]byte, error) {
+	//array = array-open [ array-values ] ws-comment-newline array-close
+	//array-open =  %x5B ; [
+	//array-close = %x5D ; ]
+	//array-values =  ws-comment-newline val ws-comment-newline array-sep array-values
+	//array-values =/ ws-comment-newline val ws-comment-newline [ array-sep ]
+	//array-sep = %x2C  ; , Comma
+	//ws-comment-newline = *( wschar / [ comment ] newline )
+
+	b = b[1:]
+
+	first := true
+	var err error
+	for len(b) > 0 {
+		b, err = parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(b) == 0 {
+			return nil, unexpectedCharacter{b: b}
+		}
+
+		if b[0] == ']' {
+			break
+		}
+		if b[0] == ',' {
+			if first {
+				return nil, fmt.Errorf("array cannot start with comma")
+			}
+			b = b[1:]
+			b, err = parseOptionalWhitespaceCommentNewline(b)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		b, err = parseVal(b)
+		if err != nil {
+			return nil, err
+		}
+		b, err = parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return nil, err
+		}
+		first = false
+	}
+
+	return expect(']', b)
+}
+
+func parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error) {
+	var err error
+	b = parseWhitespace(b)
+	if len(b) > 0 && b[0] == '#' {
+		_, b, err = scanComment(b)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(b) > 0 && (b[0] == '\n' || b[0] == '\r') {
+		b, err = parseNewline(b)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return b, nil
 }
 
 func parseMultilineLiteralString(b []byte) (string, []byte, error) {
