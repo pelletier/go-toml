@@ -35,7 +35,7 @@ var inputs = []string{
 	`[   test   ]`,
 	`[  "hello".world ]`,
 	`[test]
-a = false`,
+	a = false`,
 	`[[foo]]`,
 }
 
@@ -66,27 +66,27 @@ func TestParse(t *testing.T) {
 	}
 }
 
-type noopParser struct {
-}
-
-func (n noopParser) ArrayTableBegin()       {}
-func (n noopParser) ArrayTableEnd()         {}
-func (n noopParser) StandardTableBegin()    {}
-func (n noopParser) StandardTableEnd()      {}
-func (n noopParser) InlineTableSeparator()  {}
-func (n noopParser) InlineTableBegin()      {}
-func (n noopParser) InlineTableEnd()        {}
-func (n noopParser) ArraySeparator()        {}
-func (n noopParser) ArrayBegin()            {}
-func (n noopParser) ArrayEnd()              {}
-func (n noopParser) Whitespace(b []byte)    {}
-func (n noopParser) Comment(b []byte)       {}
-func (n noopParser) UnquotedKey(b []byte)   {}
-func (n noopParser) LiteralString(b []byte) {}
-func (n noopParser) BasicString(b []byte)   {}
-func (n noopParser) Dot(b []byte)           {}
-func (n noopParser) Boolean(b []byte)       {}
-func (n noopParser) Equal(b []byte)         {}
+//type noopParser struct {
+//}
+//
+//func (n noopParser) ArrayTableBegin()       {}
+//func (n noopParser) ArrayTableEnd()         {}
+//func (n noopParser) StandardTableBegin()    {}
+//func (n noopParser) StandardTableEnd()      {}
+//func (n noopParser) InlineTableSeparator()  {}
+//func (n noopParser) InlineTableBegin()      {}
+//func (n noopParser) InlineTableEnd()        {}
+//func (n noopParser) ArraySeparator()        {}
+//func (n noopParser) ArrayBegin()            {}
+//func (n noopParser) ArrayEnd()              {}
+//func (n noopParser) Whitespace(b []byte)    {}
+//func (n noopParser) Comment(b []byte)       {}
+//func (n noopParser) UnquotedKey(b []byte)   {}
+//func (n noopParser) LiteralString(b []byte) {}
+//func (n noopParser) BasicString(b []byte)   {}
+//func (n noopParser) Dot(b []byte)           {}
+//func (n noopParser) Boolean(b []byte)       {}
+//func (n noopParser) Equal(b []byte)         {}
 
 //
 //func BenchmarkParseAll(b *testing.B) {

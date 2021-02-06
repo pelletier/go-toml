@@ -51,12 +51,20 @@ func parseExpression(b []byte) ([]byte, error) {
 		_, rest, err := scanComment(b)
 		return rest, err
 	}
+	if b[0] == '\n' || b[0] == '\r' {
+		_, rest, err := scanNewline(b)
+		return rest, err
+	}
 
+	var err error
 	if b[0] == '[' {
 		// TODO: parse 'table'
+		panic("todo")
 	} else {
-		rest, err := parseKeyval(b)
-		return rest, err
+		b, err = parseKeyval(b)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	b = parseWhitespace(b)
@@ -107,11 +115,20 @@ func parseVal(b []byte) ([]byte, error) {
 	case '\'':
 		if scanFollowsMultilineLiteralStringDelimiter(b) {
 			_, b, err = parseMultilineLiteralString(b)
+		} else {
+			_, b, err = scanLiteralString(b)
 		}
-		_, b, err = scanLiteralString(b)
 		return b, err
-	// TODO boolean
-
+	case 't':
+		if !scanFollowsTrue(b) {
+			return nil, fmt.Errorf("expected 'true'")
+		}
+		return b[4:], nil
+	case 'f':
+		if !scanFollowsFalse(b) {
+			return nil, fmt.Errorf("expected 'false'")
+		}
+		return b[5:], nil
 	// TODO array
 
 	// TODO inline-table
@@ -247,8 +264,8 @@ func parseKey(b []byte) ([]byte, error) {
 	}
 
 	for {
-		if len(b) > 0 && (b[0] == '.' || isWhitespace(b[0])) {
-			b = parseWhitespace(b)
+		b = parseWhitespace(b)
+		if len(b) > 0 && b[0] == '.' {
 			b, err = expect('.', b)
 			if err != nil {
 				return nil, err
@@ -264,10 +281,6 @@ func parseKey(b []byte) ([]byte, error) {
 	}
 
 	return b, nil
-}
-
-func isWhitespace(b byte) bool {
-	return b == ' ' || b == '\t'
 }
 
 func parseSimpleKey(b []byte) ([]byte, error) {
