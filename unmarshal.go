@@ -104,14 +104,14 @@ func (u *unmarshaler) StandardTableBegin() {
 
 	// tables are only top-level
 	u.stack = u.stack[:1]
+
+	u.push(u.top())
 }
 
 func (u *unmarshaler) StandardTableEnd() {
 	if u.err != nil {
 		return
 	}
-
-	panic("implement me")
 }
 
 type builder interface {
@@ -176,8 +176,7 @@ func (p parser) parseExpression(b []byte) ([]byte, error) {
 		return rest, err
 	}
 	if b[0] == '\n' || b[0] == '\r' {
-		_, rest, err := scanNewline(b)
-		return rest, err
+		return b, nil
 	}
 
 	var err error
@@ -292,10 +291,14 @@ func (p parser) parseVal(b []byte) ([]byte, error) {
 		}
 		return b, err
 	case '\'':
+		var v []byte
 		if scanFollowsMultilineLiteralStringDelimiter(b) {
-			_, b, err = p.parseMultilineLiteralString(b)
+			v, b, err = p.parseMultilineLiteralString(b)
 		} else {
-			_, b, err = scanLiteralString(b)
+			v, b, err = p.parseLiteralString(b)
+		}
+		if err == nil {
+			p.builder.StringValue(v)
 		}
 		return b, err
 	case 't':
@@ -321,6 +324,14 @@ func (p parser) parseVal(b []byte) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected char")
 	}
+}
+
+func (p parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
+	v, rest, err := scanLiteralString(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	return v[1 : len(v)-1], rest, nil
 }
 
 func (p parser) parseInlineTable(b []byte) ([]byte, error) {
@@ -426,10 +437,10 @@ func (p parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error) 
 	return b, nil
 }
 
-func (p parser) parseMultilineLiteralString(b []byte) (string, []byte, error) {
+func (p parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	token, rest, err := scanMultilineLiteralString(b)
 	if err != nil {
-		return "", nil, err
+		return nil, nil, err
 	}
 
 	i := 3
@@ -441,7 +452,7 @@ func (p parser) parseMultilineLiteralString(b []byte) (string, []byte, error) {
 		i += 2
 	}
 
-	return string(token[i : len(b)-3]), rest, err
+	return token[i : len(b)-3], rest, err
 }
 
 func (p parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
