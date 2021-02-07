@@ -20,8 +20,6 @@ var scanFollowsMultilineBasicStringDelimiter = scanFollows([]byte{'"', '"', '"'}
 var scanFollowsMultilineLiteralStringDelimiter = scanFollows([]byte{'\'', '\'', '\''})
 var scanFollowsTrue = scanFollows([]byte{'t', 'r', 'u', 'e'})
 var scanFollowsFalse = scanFollows([]byte{'f', 'a', 'l', 's', 'e'})
-var scanFollowsArrayTableBegin = scanFollows([]byte{arrayOrTableBegin, arrayOrTableBegin})
-var scanFollowsArrayTableEnd = scanFollows([]byte{arrayOrTableEnd, arrayOrTableEnd})
 
 func scanNewline(b []byte) ([]byte, []byte, error) {
 	if len(b) == 0 {
@@ -40,75 +38,6 @@ func scanNewline(b []byte) ([]byte, []byte, error) {
 		return nil, nil, unexpectedCharacter{r: '\n', b: b[2:]}
 	}
 	return nil, nil, unexpectedCharacter{b: b}
-}
-
-const (
-	dot               = '.'
-	equal             = '='
-	comma             = ','
-	inlineTableBegin  = '{'
-	inlineTableEnd    = '}'
-	comment           = '#'
-	arrayOrTableBegin = '['
-	arrayOrTableEnd   = ']'
-)
-
-// scan returns a []byte containing the next lexical token, bytes left, and an error.
-//
-// eof is signaled by an empty token and nil error.
-func scan(b []byte) ([]byte, []byte, error) {
-	if len(b) == 0 {
-		return b, b, nil
-	}
-
-	switch b[0] {
-	case dot, equal, inlineTableBegin, inlineTableEnd, comma:
-		return b[:1], b[1:], nil
-	case '"':
-		if scanFollowsMultilineBasicStringDelimiter(b) {
-			return scanMultilineBasicString(b)
-		}
-		return scanBasicString(b)
-	case '\'':
-		if scanFollowsMultilineLiteralStringDelimiter(b) {
-			return scanMultilineLiteralString(b)
-		}
-		return scanLiteralString(b)
-	case comment:
-		return scanComment(b)
-	case ' ', '\t':
-		data, rest := scanWhitespace(b)
-		return data, rest, nil
-	case '\r':
-		return scanWindowsNewline(b)
-	case '\n':
-		return b[:1], b[1:], nil
-	case 't':
-		if scanFollowsTrue(b) {
-			return b[:4], b[4:], nil
-		}
-	case 'f':
-		if scanFollowsFalse(b) {
-			return b[:5], b[5:], nil
-		}
-	case arrayOrTableBegin:
-		if scanFollowsArrayTableBegin(b) {
-			return b[:2], b[2:], nil
-		}
-		return b[:1], b[1:], nil
-	case arrayOrTableEnd:
-		if scanFollowsArrayTableEnd(b) {
-			return b[:2], b[2:], nil
-		}
-		return b[:1], b[1:], nil
-	}
-
-	if isUnquotedKeyChar(b[0]) {
-		return scanUnquotedKey(b)
-	}
-
-	// TODO: numbers, date-time
-	panic("unhandled scan")
 }
 
 func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
