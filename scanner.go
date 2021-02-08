@@ -21,25 +21,6 @@ var scanFollowsMultilineLiteralStringDelimiter = scanFollows([]byte{'\'', '\'', 
 var scanFollowsTrue = scanFollows([]byte{'t', 'r', 'u', 'e'})
 var scanFollowsFalse = scanFollows([]byte{'f', 'a', 'l', 's', 'e'})
 
-func scanNewline(b []byte) ([]byte, []byte, error) {
-	if len(b) == 0 {
-		return nil, nil, fmt.Errorf("not enough bytes for new line")
-	}
-	if b[0] == '\n' {
-		return b[:1], b[1:], nil
-	}
-	if b[0] == '\r' {
-		if len(b) < 2 {
-			return nil, nil, fmt.Errorf("not enough bytes for windows newline")
-		}
-		if b[1] == '\n' {
-			return b[:2], b[2:], nil
-		}
-		return nil, nil, unexpectedCharacter{r: '\n', b: b[2:]}
-	}
-	return nil, nil, unexpectedCharacter{b: b}
-}
-
 func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
 	//unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	for i := 0; i < len(b); i++ {

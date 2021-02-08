@@ -34,9 +34,63 @@ type unmarshaler struct {
 	// When set all callbacks are no-ops.
 	err error
 
-	// State that indicates the parser is processing a [table] name. If false
-	// keys are interpreted as part of a key-value.
-	parsingTable bool
+	// State that indicates the parser is processing a [[table-array]] name.
+	// If false keys are interpreted as part of a key-value or [table].
+	parsingTableArray bool
+
+	// Table Arrays need a buffer of keys because we need to know which one is
+	// the last one, as it may result in creating a new element in the array.
+	arrayTableKey [][]byte
+}
+
+func (u *unmarshaler) ArrayTableBegin() {
+	if u.err != nil {
+		return
+	}
+
+	u.parsingTableArray = true
+}
+
+func (u *unmarshaler) ArrayTableEnd() {
+	if u.err != nil {
+		return
+	}
+
+	u.parsingTableArray = false
+
+	u.stack = u.stack[:1]
+
+	parent := u.top()
+	for _, k := range u.arrayTableKey {
+		switch parent.Type().Kind() {
+		case reflect.Slice:
+			l := parent.Len()
+			parent = parent.Index(l - 1)
+		case reflect.Struct:
+		default:
+			u.err = fmt.Errorf("value of type '%s' cannot have children", parent)
+			return
+		}
+
+		f := parent.FieldByName(string(k))
+		if !f.IsValid() {
+			// TODO: implement alternative names
+			u.err = fmt.Errorf("field '%s' not found", string(k))
+			return
+		}
+		parent = f
+	}
+
+	if parent.Type().Kind() != reflect.Slice {
+		u.err = fmt.Errorf("array table key is not a slice")
+		return
+	}
+
+	n := reflect.New(parent.Type().Elem())
+	parent.Set(reflect.Append(parent, n.Elem()))
+	last := parent.Index(parent.Len() - 1)
+	u.push(last)
+	u.arrayTableKey = u.arrayTableKey[:0]
 }
 
 func (u *unmarshaler) KeyValBegin() {
@@ -47,10 +101,17 @@ func (u *unmarshaler) KeyValEnd() {
 	u.pop()
 }
 
-func getOrCreateChild(parent reflect.Value, key string) (reflect.Value, error) {
-	if parent.Type().Kind() != reflect.Struct {
+func (u *unmarshaler) getOrCreateChild(key string) (reflect.Value, error) {
+	parent := u.top()
+	switch parent.Type().Kind() {
+	case reflect.Slice:
+		l := parent.Len()
+		parent = parent.Index(l - 1)
+	case reflect.Struct:
+	default:
 		return reflect.Value{}, fmt.Errorf("value of type '%s' cannot have children", parent)
 	}
+
 	f := parent.FieldByName(key)
 	if !f.IsValid() {
 		// TODO: implement alternative names
@@ -88,13 +149,16 @@ func (u *unmarshaler) SimpleKey(v []byte) {
 		return
 	}
 
-	target, err := getOrCreateChild(u.top(), string(v))
-	if err != nil {
-		u.err = err
-		return
+	if u.parsingTableArray {
+		u.arrayTableKey = append(u.arrayTableKey, v)
+	} else {
+		target, err := u.getOrCreateChild(string(v))
+		if err != nil {
+			u.err = err
+			return
+		}
+		u.replace(target)
 	}
-
-	u.replace(target)
 }
 
 func (u *unmarshaler) StandardTableBegin() {
@@ -119,7 +183,8 @@ type builder interface {
 
 	StandardTableBegin()
 	StandardTableEnd()
-
+	ArrayTableBegin()
+	ArrayTableEnd()
 	KeyValBegin()
 	KeyValEnd()
 
@@ -211,6 +276,9 @@ func (p parser) parseArrayTable(b []byte) ([]byte, error) {
 	//array-table = array-table-open key array-table-close
 	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
+
+	p.builder.ArrayTableBegin()
+	defer p.builder.ArrayTableEnd()
 
 	b = b[2:]
 	b = p.parseWhitespace(b)

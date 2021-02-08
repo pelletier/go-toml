@@ -65,3 +65,126 @@ D = "D"
 	assert.Equal(t, "D", x.Bar.D)
 	assert.Equal(t, "E", x.E)
 }
+
+func TestUnmarshalDoesNotEraseBaseStruct(t *testing.T) {
+	x := struct {
+		A string
+		B string
+	}{
+		A: "preset",
+	}
+	err := Unmarshal([]byte(`B = "data"`), &x)
+
+	require.NoError(t, err)
+	assert.Equal(t, "preset", x.A)
+	assert.Equal(t, "data", x.B)
+}
+
+func TestArrayTableSimple(t *testing.T) {
+	doc := `
+[[Products]]
+Name = "Hammer"
+
+[[Products]]
+Name = "Nail"
+`
+
+	type Product struct {
+		Name string
+	}
+
+	type Data struct {
+		Products []Product
+	}
+
+	x := Data{}
+	err := Unmarshal([]byte(doc), &x)
+
+	require.NoError(t, err)
+
+	expected := Data{
+		Products: []Product{
+			{
+				Name: "Hammer",
+			},
+			{
+				Name: "Nail",
+			},
+		},
+	}
+
+	assert.Equal(t, expected, x)
+}
+
+//func TestUnmarshalArrayTablesMultiple(t *testing.T) {
+//	doc := `
+//[[Products]]
+//Name = "Hammer"
+//Sku = "738594937"
+//
+//[[Products]]  # empty table within the array
+//
+//[[Products]]
+//Name = "Nail"
+//Sku = "284758393"
+//
+//Color = "gray"
+//`
+//
+//	type Product struct {
+//		Name  string
+//		Sku   string
+//		Color string
+//	}
+//
+//	type Data struct {
+//		Products []Product
+//	}
+//
+//	x := Data{}
+//	err := Unmarshal([]byte(doc), &x)
+//
+//	require.NoError(t, err)
+//
+//	expected := Data{
+//		Products: []Product{
+//			{
+//				Name: "Hammer",
+//				Sku:  "738594937",
+//			},
+//			{},
+//			{
+//				Name:  "Nail",
+//				Sku:   "284758393",
+//				Color: "gray",
+//			},
+//		},
+//	}
+//
+//	assert.Equal(t, expected, x)
+//}
+
+//func TestUnmarshalArrayTablesNested(t *testing.T) {
+//	doc := `
+//[[Fruits]]
+//Name = "apple"
+//
+//[Fruits.Physical]  # subtable
+//Color = "red"
+//Shape = "round"
+//
+//[[Fruits.Varieties]]  # nested array of tables
+//Name = "red delicious"
+//
+//[[fruits.varieties]]
+//Name = "granny smith"
+//
+//
+//[[fruits]]
+//Name = "banana"
+//
+//[[fruits.varieties]]
+//Name = "plantain"
+//`
+//
+//}
