@@ -1,22 +1,23 @@
-package toml
+package toml_test
 
 import (
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestUnmarshalSimple(t *testing.T) {
 	x := struct{ Foo string }{}
-	err := Unmarshal([]byte(`Foo = "hello"`), &x)
+	err := toml.Unmarshal([]byte(`Foo = "hello"`), &x)
 	require.NoError(t, err)
 	assert.Equal(t, "hello", x.Foo)
 }
 
 func TestUnmarshalNestedStructs(t *testing.T) {
 	x := struct{ Foo struct{ Bar string } }{}
-	err := Unmarshal([]byte(`Foo.Bar = "hello"`), &x)
+	err := toml.Unmarshal([]byte(`Foo.Bar = "hello"`), &x)
 	require.NoError(t, err)
 	assert.Equal(t, "hello", x.Foo.Bar)
 }
@@ -26,7 +27,7 @@ func TestUnmarshalNestedStructsMultipleExpressions(t *testing.T) {
 		A struct{ B string }
 		C string
 	}{}
-	err := Unmarshal([]byte(`A.B = "hello"
+	err := toml.Unmarshal([]byte(`A.B = "hello"
 C = "test"`), &x)
 	require.NoError(t, err)
 	assert.Equal(t, "hello", x.A.B)
@@ -45,7 +46,7 @@ func TestUnmarshalTable(t *testing.T) {
 		}
 		E string
 	}{}
-	err := Unmarshal([]byte(`
+	err := toml.Unmarshal([]byte(`
 
 E = "E"
 Foo.C = "C"
@@ -73,7 +74,7 @@ func TestUnmarshalDoesNotEraseBaseStruct(t *testing.T) {
 	}{
 		A: "preset",
 	}
-	err := Unmarshal([]byte(`B = "data"`), &x)
+	err := toml.Unmarshal([]byte(`B = "data"`), &x)
 
 	require.NoError(t, err)
 	assert.Equal(t, "preset", x.A)
@@ -98,7 +99,7 @@ Name = "Nail"
 	}
 
 	x := Data{}
-	err := Unmarshal([]byte(doc), &x)
+	err := toml.Unmarshal([]byte(doc), &x)
 
 	require.NoError(t, err)
 
@@ -142,7 +143,7 @@ Color = "gray"
 	}
 
 	x := Data{}
-	err := Unmarshal([]byte(doc), &x)
+	err := toml.Unmarshal([]byte(doc), &x)
 
 	require.NoError(t, err)
 
@@ -206,7 +207,7 @@ Name = "plantain"
 	}
 
 	x := Doc{}
-	err := Unmarshal([]byte(doc), &x)
+	err := toml.Unmarshal([]byte(doc), &x)
 	require.NoError(t, err)
 
 	expected := Doc{
