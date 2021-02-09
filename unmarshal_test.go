@@ -234,3 +234,13 @@ Name = "plantain"
 
 	assert.Equal(t, expected, x)
 }
+
+func TestArraySimple(t *testing.T) {
+	x := struct {
+		Foo []string
+	}{}
+	doc := `Foo = ["hello", "world"]`
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"hello", "world"}, x.Foo)
+}

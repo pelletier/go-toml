@@ -141,7 +141,15 @@ func (u *unmarshaler) StringValue(v []byte) {
 	if u.err != nil {
 		return
 	}
-	u.top().SetString(string(v))
+
+	t := u.top()
+	if t.Type().Kind() == reflect.Slice {
+		s := reflect.ValueOf(string(v))
+		n := reflect.Append(t, s)
+		t.Set(n)
+	} else {
+		u.top().SetString(string(v))
+	}
 }
 
 func (u *unmarshaler) SimpleKey(v []byte) {
