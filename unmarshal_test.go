@@ -244,3 +244,24 @@ func TestArraySimple(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"hello", "world"}, x.Foo)
 }
+
+func TestBool(t *testing.T) {
+	x := struct {
+		Truthy bool
+		Falsey bool
+	}{Falsey: true}
+	doc := `Truthy = true
+Falsey = false`
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+	assert.Equal(t, true, x.Truthy)
+	assert.Equal(t, false, x.Falsey)
+}
+
+func TestBoolArray(t *testing.T) {
+	x := struct{ Bits []bool }{}
+	doc := `Bits = [true, false, true, true]`
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+	assert.Equal(t, []bool{true, false, true, true}, x.Bits)
+}

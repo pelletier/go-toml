@@ -152,6 +152,21 @@ func (u *unmarshaler) StringValue(v []byte) {
 	}
 }
 
+func (u *unmarshaler) BoolValue(b bool) {
+	if u.err != nil {
+		return
+	}
+
+	t := u.top()
+	if t.Type().Kind() == reflect.Slice {
+		s := reflect.ValueOf(b)
+		n := reflect.Append(t, s)
+		t.Set(n)
+	} else {
+		u.top().SetBool(b)
+	}
+}
+
 func (u *unmarshaler) SimpleKey(v []byte) {
 	if u.err != nil {
 		return
@@ -197,6 +212,7 @@ type builder interface {
 	KeyValEnd()
 
 	StringValue(v []byte)
+	BoolValue(b bool)
 }
 
 type parser struct {
@@ -381,11 +397,13 @@ func (p parser) parseVal(b []byte) ([]byte, error) {
 		if !scanFollowsTrue(b) {
 			return nil, fmt.Errorf("expected 'true'")
 		}
+		p.builder.BoolValue(true)
 		return b[4:], nil
 	case 'f':
 		if !scanFollowsFalse(b) {
 			return nil, fmt.Errorf("expected 'false'")
 		}
+		p.builder.BoolValue(false)
 		return b[5:], nil
 	case '[':
 		return p.parseValArray(b)
