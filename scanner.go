@@ -20,6 +20,8 @@ var scanFollowsMultilineBasicStringDelimiter = scanFollows([]byte{'"', '"', '"'}
 var scanFollowsMultilineLiteralStringDelimiter = scanFollows([]byte{'\'', '\'', '\''})
 var scanFollowsTrue = scanFollows([]byte{'t', 'r', 'u', 'e'})
 var scanFollowsFalse = scanFollows([]byte{'f', 'a', 'l', 's', 'e'})
+var scanFollowsInf = scanFollows([]byte{'i', 'n', 'f'})
+var scanFollowsNan = scanFollows([]byte{'n', 'a', 'n'})
 
 func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
 	//unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _

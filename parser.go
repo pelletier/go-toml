@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 )
 
 type builder interface {
@@ -21,6 +22,7 @@ type builder interface {
 
 	StringValue(v []byte)
 	BoolValue(b bool)
+	FloatValue(n float64)
 }
 
 type parser struct {
@@ -218,14 +220,8 @@ func (p parser) parseVal(b []byte) ([]byte, error) {
 		return p.parseValArray(b)
 	case '{':
 		return p.parseInlineTable(b)
-
-	// TODO date-time
-
-	// TODO float
-
-	// TODO integer
 	default:
-		return nil, fmt.Errorf("unexpected char")
+		return p.parseIntOrFloatOrDateTime(b)
 	}
 }
 
@@ -592,6 +588,172 @@ func (p parser) parseWhitespace(b []byte) []byte {
 
 	_, rest := scanWhitespace(b)
 	return rest
+}
+
+func (p parser) parseIntOrFloatOrDateTime(b []byte) ([]byte, error) {
+	switch b[0] {
+	case 'i':
+		if !scanFollowsInf(b) {
+			return nil, fmt.Errorf("expected 'inf'")
+		}
+		p.builder.FloatValue(math.Inf(1))
+		return b[3:], nil
+	case 'n':
+		if !scanFollowsNan(b) {
+			return nil, fmt.Errorf("expected 'nan'")
+		}
+		p.builder.FloatValue(math.NaN())
+		return b[3:], nil
+	case '+', '-':
+		return parseIntOrFloat(b)
+	}
+
+	if len(b) < 3 {
+		return parseIntOrFloat(b)
+	}
+	for idx, c := range b[:5] {
+		if c >= '0' && c <= '9' {
+			continue
+		}
+		if idx == 2 && c == ':' {
+			return parseDateTime(b)
+		}
+		if idx == 4 && c == '-' {
+			return parseDateTime(b)
+		}
+	}
+	return parseIntOrFloat(b)
+}
+
+func parseDateTime(b []byte) ([]byte, error) {
+
+}
+
+func (p parser) parseIntOrFloat(b []byte) ([]byte, error) {
+	r := b[0]
+	if r == '0' {
+		if len(b) >= 2 {
+			var isValidRune validRuneFn
+			switch b[1] {
+			case 'x':
+				isValidRune = isValidHexRune
+			case 'o':
+				isValidRune = isValidOctalRune
+			case 'b':
+				isValidRune = isValidBinaryRune
+			default:
+				if b[1] >= 'a' && b[1] <= 'z' || b[1] >= 'A' && b[1] <= 'Z' {
+					return nil, fmt.Errorf("unknown number base: %s. possible options are x (hex) o (octal) b (binary)", string(b[1]))
+				}
+			}
+
+			if isValidRune != nil {
+				b = b[2:]
+				digitSeen := false
+				for {
+					if !isValidRune(b[0]) {
+						break
+					}
+					digitSeen = true
+					b = b[1:]
+				}
+
+				if !digitSeen {
+					return nil, fmt.Errorf("number needs at least one digit")
+				}
+
+				p.builder.IntValue()
+				return b, nil
+			}
+		}
+	}
+
+	if r == '+' || r == '-' {
+		b = b[1:]
+		if scanFollowsInf(b) {
+			if r == '+' {
+				p.builder.FloatValue(plusInf)
+			} else {
+				p.builder.FloatValue(minusInf)
+			}
+			return b, nil
+		}
+		if scanFollowsNan(b) {
+			p.builder.FloatValue(nan)
+			return b, nil
+		}
+	}
+
+	pointSeen := false
+	expSeen := false
+	digitSeen := false
+	for len(b) > 0 {
+		next := b[0]
+		if next == '.' {
+			if pointSeen {
+				return nil, fmt.Errorf("cannot have two dots in one float")
+			}
+			b = b[1:]
+			if len(b) > 0 && !isDigit(b[0]) {
+				return nil, fmt.Errorf("float cannot end with a dot")
+			}
+			pointSeen = true
+		} else if next == 'e' || next == 'E' {
+			expSeen = true
+			b = b[1:]
+			if len(b) == 0 {
+				break
+			}
+			if b[0] == '+' || b[0] == '-' {
+				b = b[1:]
+			}
+		} else if isDigit(next) {
+			digitSeen = true
+			b = b[1:]
+		} else if next == '_' {
+			b = b[1:]
+		} else {
+			break
+		}
+		if pointSeen && !digitSeen {
+			return nil, fmt.Errorf("cannot start float with a dot")
+		}
+	}
+
+	if !digitSeen {
+		return nil, fmt.Errorf("no digit in that number")
+	}
+	if pointSeen || expSeen {
+		p.builder.FloatValue()
+	} else {
+		p.builder.IntValue()
+	}
+	return b, nil
+}
+
+func isDigit(r byte) bool {
+	return r >= '0' && r <= '9'
+}
+
+var plusInf = math.Inf(1)
+var minusInf = math.Inf(-1)
+var nan = math.NaN()
+
+type validRuneFn func(r byte) bool
+
+func isValidHexRune(r byte) bool {
+	return r >= 'a' && r <= 'f' ||
+		r >= 'A' && r <= 'F' ||
+		r >= '0' && r <= '9' ||
+		r == '_'
+}
+
+func isValidOctalRune(r byte) bool {
+	return r >= '0' && r <= '7' || r == '_'
+}
+
+func isValidBinaryRune(r byte) bool {
+	return r == '0' || r == '1' || r == '_'
 }
 
 func expect(x byte, b []byte) ([]byte, error) {
