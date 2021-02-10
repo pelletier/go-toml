@@ -7,7 +7,6 @@ package imported_tests
 // marked as skipped until we figure out if that's something we want in v2.
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -295,14 +294,16 @@ func TestDocUnmarshal(t *testing.T) {
 	result := testDoc{}
 	err := toml.Unmarshal(marshalTestToml, &result)
 	expected := docData
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(result, expected) {
-		resStr, _ := json.MarshalIndent(result, "", "  ")
-		expStr, _ := json.MarshalIndent(expected, "", "  ")
-		t.Errorf("Bad unmarshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, expected, result)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//if !reflect.DeepEqual(result, expected) {
+	//	resStr, _ := json.MarshalIndent(result, "", "  ")
+	//	expStr, _ := json.MarshalIndent(expected, "", "  ")
+	//	t.Errorf("Bad unmarshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
+	//}
 }
 
 type tomlTypeCheckTest struct {
