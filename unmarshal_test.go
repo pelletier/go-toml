@@ -245,6 +245,42 @@ func TestArraySimple(t *testing.T) {
 	assert.Equal(t, []string{"hello", "world"}, x.Foo)
 }
 
+func TestArrayNestedInTable(t *testing.T) {
+	x := struct {
+		Wrapper struct {
+			Foo []string
+		}
+	}{}
+	doc := `[Wrapper]
+Foo = ["hello", "world"]`
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"hello", "world"}, x.Wrapper.Foo)
+}
+
+func TestArrayMixed(t *testing.T) {
+	x := struct {
+		Wrapper struct {
+			Foo []interface{}
+		}
+	}{}
+	doc := `[Wrapper]
+Foo = ["hello", true]`
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{"hello", true}, x.Wrapper.Foo)
+}
+
+func TestArrayNested(t *testing.T) {
+	x := struct {
+		Foo [][]string
+	}{}
+	doc := `Foo = [["hello", "world"], ["a"], []]`
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+	assert.Equal(t, [][]string{{"hello", "world"}, {"a"}, nil}, x.Foo)
+}
+
 func TestBool(t *testing.T) {
 	x := struct {
 		Truthy bool

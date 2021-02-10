@@ -5,30 +5,24 @@ import (
 	"encoding/hex"
 	"fmt"
 	"reflect"
+
+	"github.com/pelletier/go-toml/v2/internal/reflectbuild"
 )
 
 func Unmarshal(data []byte, v interface{}) error {
-	if v == nil {
-		return fmt.Errorf("cannot unmarshal to nil target")
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("can only marshal to pointer, not %s", rv.Kind())
-	}
-
-	u := &unmarshaler{stack: []reflect.Value{rv.Elem()}}
-	parseErr := parser{builder: u}.parse(data)
-	if parseErr != nil {
-		return parseErr
+	u := &unmarshaler{}
+	u.builder, u.err = reflectbuild.NewBuilder(v)
+	if u.err == nil {
+		parseErr := parser{builder: u}.parse(data)
+		if parseErr != nil {
+			return parseErr
+		}
 	}
 	return u.err
 }
 
 type unmarshaler struct {
-	// Each stack frame is a pointer to the root object that should be
-	// considered when settings values.
-	// It at least contains the root object passed to Unmarshal.
-	stack []reflect.Value
+	builder reflectbuild.Builder
 
 	// First error that appeared during the construction of the object.
 	// When set all callbacks are no-ops.
@@ -41,6 +35,35 @@ type unmarshaler struct {
 	// Table Arrays need a buffer of keys because we need to know which one is
 	// the last one, as it may result in creating a new element in the array.
 	arrayTableKey [][]byte
+
+	// Flag to indicate that the next value is an an assignment.
+	// Assignments are when the builder already points to the value, and should
+	// be directly assigned. This is used to distinguish between assigning or
+	// appending to arrays.
+	assign bool
+}
+
+func (u *unmarshaler) Assignation() {
+	u.assign = true
+}
+
+func (u *unmarshaler) ArrayBegin() {
+	if u.err != nil {
+		return
+	}
+	u.builder.Save()
+	if u.assign {
+		u.assign = false
+	} else {
+		u.builder.SliceNewElem()
+	}
+}
+
+func (u *unmarshaler) ArrayEnd() {
+	if u.err != nil {
+		return
+	}
+	u.builder.Load()
 }
 
 func (u *unmarshaler) ArrayTableBegin() {
@@ -56,99 +79,48 @@ func (u *unmarshaler) ArrayTableEnd() {
 		return
 	}
 
-	u.parsingTableArray = false
+	u.builder.Reset()
 
-	u.stack = u.stack[:1]
-
-	parent := u.top()
-	for _, k := range u.arrayTableKey {
-		switch parent.Type().Kind() {
-		case reflect.Slice:
-			l := parent.Len()
-			parent = parent.Index(l - 1)
-		case reflect.Struct:
-		default:
-			u.err = fmt.Errorf("value of type '%s' cannot have children", parent)
+	for _, v := range u.arrayTableKey[:len(u.arrayTableKey)-1] {
+		u.err = u.builder.DigField(string(v))
+		if u.err != nil {
 			return
 		}
-
-		f := parent.FieldByName(string(k))
-		if !f.IsValid() {
-			// TODO: implement alternative names
-			u.err = fmt.Errorf("field '%s' not found", string(k))
-			return
-		}
-		parent = f
+		u.err = u.builder.SliceLastOrCreate()
 	}
 
-	if parent.Type().Kind() != reflect.Slice {
-		u.err = fmt.Errorf("array table key is not a slice")
+	v := u.arrayTableKey[len(u.arrayTableKey)-1]
+	u.err = u.builder.DigField(string(v))
+	if u.err != nil {
 		return
 	}
+	u.err = u.builder.SliceNewElem()
 
-	n := reflect.New(parent.Type().Elem())
-	parent.Set(reflect.Append(parent, n.Elem()))
-	last := parent.Index(parent.Len() - 1)
-	u.push(last)
+	u.parsingTableArray = false
 	u.arrayTableKey = u.arrayTableKey[:0]
 }
 
 func (u *unmarshaler) KeyValBegin() {
-	u.push(u.top())
+	u.builder.Save()
 }
 
 func (u *unmarshaler) KeyValEnd() {
-	u.pop()
-}
-
-func (u *unmarshaler) getOrCreateChild(key string) (reflect.Value, error) {
-	parent := u.top()
-	switch parent.Type().Kind() {
-	case reflect.Slice:
-		l := parent.Len()
-		parent = parent.Index(l - 1)
-	case reflect.Struct:
-	default:
-		return reflect.Value{}, fmt.Errorf("value of type '%s' cannot have children", parent)
-	}
-
-	f := parent.FieldByName(key)
-	if !f.IsValid() {
-		// TODO: implement alternative names
-		return reflect.Value{}, fmt.Errorf("field '%s' not found", key)
-	}
-	// TODO create things
-	return f, nil
-}
-
-func (u *unmarshaler) top() reflect.Value {
-	return u.stack[len(u.stack)-1]
-}
-
-func (u *unmarshaler) push(v reflect.Value) {
-	u.stack = append(u.stack, v)
-}
-
-func (u *unmarshaler) pop() {
-	u.stack = u.stack[:len(u.stack)-1]
-}
-
-func (u *unmarshaler) replace(v reflect.Value) {
-	u.stack[len(u.stack)-1] = v
+	u.builder.Load()
 }
 
 func (u *unmarshaler) StringValue(v []byte) {
 	if u.err != nil {
 		return
 	}
-
-	t := u.top()
-	if t.Type().Kind() == reflect.Slice {
-		s := reflect.ValueOf(string(v))
-		n := reflect.Append(t, s)
-		t.Set(n)
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(string(v)))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
 	} else {
-		u.top().SetString(string(v))
+		u.err = u.builder.SetString(string(v))
 	}
 }
 
@@ -156,14 +128,15 @@ func (u *unmarshaler) BoolValue(b bool) {
 	if u.err != nil {
 		return
 	}
-
-	t := u.top()
-	if t.Type().Kind() == reflect.Slice {
-		s := reflect.ValueOf(b)
-		n := reflect.Append(t, s)
-		t.Set(n)
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(b))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
 	} else {
-		u.top().SetBool(b)
+		u.err = u.builder.SetBool(b)
 	}
 }
 
@@ -175,12 +148,13 @@ func (u *unmarshaler) SimpleKey(v []byte) {
 	if u.parsingTableArray {
 		u.arrayTableKey = append(u.arrayTableKey, v)
 	} else {
-		target, err := u.getOrCreateChild(string(v))
-		if err != nil {
-			u.err = err
-			return
+		if u.builder.Cursor().Kind() == reflect.Slice {
+			u.err = u.builder.SliceLastOrCreate()
+			if u.err != nil {
+				return
+			}
 		}
-		u.replace(target)
+		u.err = u.builder.DigField(string(v))
 	}
 }
 
@@ -190,9 +164,7 @@ func (u *unmarshaler) StandardTableBegin() {
 	}
 
 	// tables are only top-level
-	u.stack = u.stack[:1]
-
-	u.push(u.top())
+	u.builder.Reset()
 }
 
 func (u *unmarshaler) StandardTableEnd() {
@@ -210,6 +182,9 @@ type builder interface {
 	ArrayTableEnd()
 	KeyValBegin()
 	KeyValEnd()
+	ArrayBegin()
+	ArrayEnd()
+	Assignation()
 
 	StringValue(v []byte)
 	BoolValue(b bool)
@@ -355,6 +330,7 @@ func (p parser) parseKeyval(b []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	p.builder.Assignation()
 	b = p.parseWhitespace(b)
 
 	return p.parseVal(b)
@@ -470,6 +446,9 @@ func (p parser) parseValArray(b []byte) ([]byte, error) {
 	//array-values =/ ws-comment-newline val ws-comment-newline [ array-sep ]
 	//array-sep = %x2C  ; , Comma
 	//ws-comment-newline = *( wschar / [ comment ] newline )
+
+	p.builder.ArrayBegin()
+	defer p.builder.ArrayEnd()
 
 	b = b[1:]
 
