@@ -235,7 +235,7 @@ Name = "plantain"
 	assert.Equal(t, expected, x)
 }
 
-func TestArraySimple(t *testing.T) {
+func TestUnmarshalArraySimple(t *testing.T) {
 	x := struct {
 		Foo []string
 	}{}
@@ -245,7 +245,7 @@ func TestArraySimple(t *testing.T) {
 	assert.Equal(t, []string{"hello", "world"}, x.Foo)
 }
 
-func TestArrayNestedInTable(t *testing.T) {
+func TestUnmarshalArrayNestedInTable(t *testing.T) {
 	x := struct {
 		Wrapper struct {
 			Foo []string
@@ -258,7 +258,7 @@ Foo = ["hello", "world"]`
 	assert.Equal(t, []string{"hello", "world"}, x.Wrapper.Foo)
 }
 
-func TestArrayMixed(t *testing.T) {
+func TestUnmarshalArrayMixed(t *testing.T) {
 	x := struct {
 		Wrapper struct {
 			Foo []interface{}
@@ -271,7 +271,7 @@ Foo = ["hello", true]`
 	assert.Equal(t, []interface{}{"hello", true}, x.Wrapper.Foo)
 }
 
-func TestArrayNested(t *testing.T) {
+func TestUnmarshalArrayNested(t *testing.T) {
 	x := struct {
 		Foo [][]string
 	}{}
@@ -281,7 +281,7 @@ func TestArrayNested(t *testing.T) {
 	assert.Equal(t, [][]string{{"hello", "world"}, {"a"}, nil}, x.Foo)
 }
 
-func TestBool(t *testing.T) {
+func TestUnmarshalBool(t *testing.T) {
 	x := struct {
 		Truthy bool
 		Falsey bool
@@ -294,10 +294,61 @@ Falsey = false`
 	assert.Equal(t, false, x.Falsey)
 }
 
-func TestBoolArray(t *testing.T) {
+func TestUnmarshalBoolArray(t *testing.T) {
 	x := struct{ Bits []bool }{}
 	doc := `Bits = [true, false, true, true]`
 	err := toml.Unmarshal([]byte(doc), &x)
 	require.NoError(t, err)
 	assert.Equal(t, []bool{true, false, true, true}, x.Bits)
+}
+
+func TestUnmarshalInlineTable(t *testing.T) {
+	doc := `
+	Name = { First = "Tom", Last = "Preston-Werner" }
+	Point = { X = "1", Y = "2" }
+	Animal = { Type.Name = "pug" }`
+
+	type Name struct {
+		First string
+		Last  string
+	}
+
+	type Point struct {
+		X string
+		Y string
+	}
+
+	type Type struct {
+		Name string
+	}
+
+	type Animal struct {
+		Type Type
+	}
+
+	type Doc struct {
+		Name   Name
+		Point  Point
+		Animal Animal
+	}
+	x := Doc{}
+	err := toml.Unmarshal([]byte(doc), &x)
+	require.NoError(t, err)
+
+	expected := Doc{
+		Name: Name{
+			First: "Tom",
+			Last:  "Preston-Werner",
+		},
+		Point: Point{
+			X: "1",
+			Y: "2",
+		},
+		Animal: Animal{
+			Type: Type{
+				Name: "pug",
+			},
+		},
+	}
+	assert.Equal(t, expected, x)
 }
