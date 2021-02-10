@@ -55,7 +55,7 @@ func (u *unmarshaler) ArrayBegin() {
 	if u.assign {
 		u.assign = false
 	} else {
-		u.builder.SliceNewElem()
+		u.err = u.builder.SliceNewElem()
 	}
 }
 
