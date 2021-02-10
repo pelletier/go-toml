@@ -615,7 +615,11 @@ func (p parser) parseIntOrFloatOrDateTime(b []byte) ([]byte, error) {
 	if len(b) < 3 {
 		return p.parseIntOrFloat(b)
 	}
-	for idx, c := range b[:5] {
+	s := 5
+	if len(b) < s {
+		s = len(b)
+	}
+	for idx, c := range b[:s] {
 		if c >= '0' && c <= '9' {
 			continue
 		}

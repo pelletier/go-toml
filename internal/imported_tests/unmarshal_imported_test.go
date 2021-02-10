@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type basicMarshalTestStruct struct {
@@ -55,34 +57,6 @@ Zstring = "Hello"
 
 [Xsubdoc]
   String2 = "Two"
-`)
-
-var basicTestTomlCustomIndentation = []byte(`String3 = "One"
-Ystrlist = ["Howdy", "Hey There"]
-Zstring = "Hello"
-
-[[Wsublist]]
-	String2 = "Three"
-
-[[Wsublist]]
-	String2 = "Four"
-
-[Xsubdoc]
-	String2 = "Two"
-`)
-
-var basicTestTomlOrdered = []byte(`Zstring = "Hello"
-Ystrlist = ["Howdy", "Hey There"]
-String3 = "One"
-
-[Xsubdoc]
-  String2 = "Two"
-
-[[Wsublist]]
-  String2 = "Three"
-
-[[Wsublist]]
-  String2 = "Four"
 `)
 
 var marshalTestToml = []byte(`title = "TOML Marshal Testing"
@@ -126,66 +100,6 @@ var marshalTestToml = []byte(`title = "TOML Marshal Testing"
   name = "Second"
 `)
 
-var marshalOrderPreserveToml = []byte(`title = "TOML Marshal Testing"
-
-[basic_lists]
-  floats = [12.3, 45.6, 78.9]
-  bools = [true, false, true]
-  dates = [1979-05-27T07:32:00Z, 1980-05-27T07:32:00Z]
-  ints = [8001, 8001, 8002]
-  uints = [5002, 5003]
-  strings = ["One", "Two", "Three"]
-
-[[subdocptrs]]
-  name = "Second"
-
-[basic_map]
-  one = "one"
-  two = "two"
-
-[subdoc]
-
-  [subdoc.second]
-    name = "Second"
-
-  [subdoc.first]
-    name = "First"
-
-[basic]
-  uint = 5001
-  bool = true
-  float = 123.4
-  float64 = 123.456782132399
-  int = 5000
-  string = "Bite me"
-  date = 1979-05-27T07:32:00Z
-
-[[subdoclist]]
-  name = "List.First"
-
-[[subdoclist]]
-  name = "List.Second"
-`)
-
-var mashalOrderPreserveMapToml = []byte(`title = "TOML Marshal Testing"
-
-[basic_map]
-  one = "one"
-  two = "two"
-
-[long_map]
-  a7 = "1"
-  b3 = "2"
-  c8 = "3"
-  d4 = "4"
-  e6 = "5"
-  f5 = "6"
-  g10 = "7"
-  h1 = "8"
-  i2 = "9"
-  j9 = "10"
-`)
-
 type Conf struct {
 	Name  string
 	Age   int
@@ -210,6 +124,7 @@ func TestInterface(t *testing.T) {
 	var config Conf
 	config.Inter = &NestedStruct{}
 	err := toml.Unmarshal(doc, &config)
+	require.NoError(t, err)
 	expected := Conf{
 		Name: "rui",
 		Age:  18,
@@ -219,9 +134,7 @@ func TestInterface(t *testing.T) {
 			Age:       100,
 		},
 	}
-	if err != nil || !reflect.DeepEqual(config, expected) {
-		t.Errorf("Bad unmarshal: expected %v, got %v", expected, config)
-	}
+	assert.Equal(t, expected, config)
 }
 
 func TestBasicUnmarshal(t *testing.T) {

@@ -43,6 +43,9 @@ func (b *Builder) top() reflect.Value {
 
 func (b *Builder) push(v reflect.Value) {
 	b.stack = append(b.stack, v)
+	// TODO: remove me. just here to make sure the method is included in the
+	// binary for debug
+	b.Dump()
 }
 
 func (b *Builder) pop() {
@@ -73,9 +76,14 @@ func (b *Builder) replace(v reflect.Value) {
 }
 
 // DigField pushes the cursor into a field of the current struct.
+// Dereferences all pointers found along the way.
 // Errors if the current value is not a struct, or the field does not exist.
 func (b *Builder) DigField(s string) error {
 	t := b.top()
+
+	for t.Kind() == reflect.Interface || t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
 
 	err := checkKind(t.Type(), reflect.Struct)
 	if err != nil {
