@@ -8,7 +8,7 @@ import (
 
 func Unmarshal(data []byte, v interface{}) error {
 	u := &unmarshaler{}
-	u.builder, u.err = reflectbuild.NewBuilder(v)
+	u.builder, u.err = reflectbuild.NewBuilder("toml", v)
 	if u.err == nil {
 		parseErr := parser{builder: u}.parse(data)
 		if parseErr != nil {

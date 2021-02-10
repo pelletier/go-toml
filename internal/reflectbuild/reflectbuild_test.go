@@ -11,17 +11,17 @@ import (
 
 func TestNewBuilderSuccess(t *testing.T) {
 	x := struct{}{}
-	_, err := reflectbuild.NewBuilder(&x)
+	_, err := reflectbuild.NewBuilder("", &x)
 	assert.NoError(t, err)
 }
 
 func TestNewBuilderNil(t *testing.T) {
-	_, err := reflectbuild.NewBuilder(nil)
+	_, err := reflectbuild.NewBuilder("", nil)
 	assert.Error(t, err)
 }
 
 func TestNewBuilderNonPtr(t *testing.T) {
-	_, err := reflectbuild.NewBuilder(struct{}{})
+	_, err := reflectbuild.NewBuilder("", struct{}{})
 	assert.Error(t, err)
 }
 
@@ -29,7 +29,7 @@ func TestDigField(t *testing.T) {
 	x := struct {
 		Field string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	assert.Error(t, b.DigField("oops"))
 	assert.NoError(t, b.DigField("Field"))
@@ -41,7 +41,7 @@ func TestBack(t *testing.T) {
 		A string
 		B string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	b.Save()
 	assert.NoError(t, b.DigField("A"))
@@ -63,7 +63,7 @@ func TestReset(t *testing.T) {
 		A []string
 		B string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	require.NoError(t, b.DigField("A"))
 	require.NoError(t, b.SliceNewElem())
@@ -80,7 +80,7 @@ func TestSetString(t *testing.T) {
 	x := struct {
 		Field string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	assert.Error(t, b.SetString("oops"))
 	require.NoError(t, b.DigField("Field"))
@@ -92,7 +92,7 @@ func TestSliceNewElem(t *testing.T) {
 	x := struct {
 		Field []string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	require.NoError(t, b.DigField("Field"))
 	b.Save()
@@ -112,7 +112,7 @@ func TestSliceNewElemNested(t *testing.T) {
 	x := struct {
 		Field [][]string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	require.NoError(t, b.DigField("Field"))
 
@@ -159,7 +159,7 @@ func TestCursor(t *testing.T) {
 	x := struct {
 		Field string
 	}{}
-	b, err := reflectbuild.NewBuilder(&x)
+	b, err := reflectbuild.NewBuilder("", &x)
 	require.NoError(t, err)
 	assert.Equal(t, b.Cursor().Kind(), reflect.Struct)
 	require.NoError(t, b.DigField("Field"))
