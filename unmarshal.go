@@ -137,6 +137,38 @@ func (u *unmarshaler) BoolValue(b bool) {
 	}
 }
 
+func (u *unmarshaler) FloatValue(n float64) {
+	if u.err != nil {
+		return
+	}
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(n))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
+	} else {
+		u.err = u.builder.SetFloat(n)
+	}
+}
+
+func (u *unmarshaler) IntValue(n int64) {
+	if u.err != nil {
+		return
+	}
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(n))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
+	} else {
+		u.err = u.builder.SetInt(n)
+	}
+}
+
 func (u *unmarshaler) SimpleKey(v []byte) {
 	if u.err != nil {
 		return

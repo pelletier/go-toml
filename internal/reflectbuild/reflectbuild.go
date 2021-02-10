@@ -210,6 +210,54 @@ func (b *Builder) SetBool(v bool) error {
 	return nil
 }
 
+func (b *Builder) SetFloat(n float64) error {
+	t := b.top()
+
+	err := checkKindFloat(t.Type())
+	if err != nil {
+		return err
+	}
+
+	t.SetFloat(n)
+	return nil
+}
+
+func (b *Builder) SetInt(n int64) error {
+	t := b.top()
+
+	err := checkKindInt(t.Type())
+	if err != nil {
+		return err
+	}
+
+	t.SetInt(n)
+	return nil
+}
+
+func checkKindInt(rt reflect.Type) error {
+	switch rt.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return nil
+	}
+
+	return IncorrectKindError{
+		Actual:   rt.Kind(),
+		Expected: reflect.Int,
+	}
+}
+
+func checkKindFloat(rt reflect.Type) error {
+	switch rt.Kind() {
+	case reflect.Float32, reflect.Float64:
+		return nil
+	}
+
+	return IncorrectKindError{
+		Actual:   rt.Kind(),
+		Expected: reflect.Float64,
+	}
+}
+
 func checkKind(rt reflect.Type, expected reflect.Kind) error {
 	if rt.Kind() != expected {
 		return IncorrectKindError{

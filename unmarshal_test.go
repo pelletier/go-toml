@@ -15,6 +15,13 @@ func TestUnmarshalSimple(t *testing.T) {
 	assert.Equal(t, "hello", x.Foo)
 }
 
+func TestUnmarshalInt(t *testing.T) {
+	x := struct{ Foo int }{}
+	err := toml.Unmarshal([]byte(`Foo = 42`), &x)
+	require.NoError(t, err)
+	assert.Equal(t, 42, x.Foo)
+}
+
 func TestUnmarshalNestedStructs(t *testing.T) {
 	x := struct{ Foo struct{ Bar string } }{}
 	err := toml.Unmarshal([]byte(`Foo.Bar = "hello"`), &x)
