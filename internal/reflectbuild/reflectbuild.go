@@ -178,7 +178,7 @@ func (b *Builder) DigField(s string) error {
 
 	g, err := b.fieldGetter(t.Type(), s)
 	if err != nil {
-		return err
+		return FieldNotFoundError{FieldName: s, Struct: t}
 	}
 
 	f := g(t)
@@ -330,6 +330,12 @@ func (b *Builder) SetInt(n int64) error {
 	}
 
 	t.SetInt(n)
+	return nil
+}
+
+func (b *Builder) Set(v reflect.Value) error {
+	t := b.top()
+	t.Set(v)
 	return nil
 }
 

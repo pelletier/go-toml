@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type builder interface {
@@ -27,6 +28,10 @@ type builder interface {
 	BoolValue(b bool)
 	FloatValue(n float64)
 	IntValue(n int64)
+	LocalDateValue(date LocalDate)
+	LocalDateTimeValue(dt LocalDateTime)
+	DateTimeValue(dt time.Time)
+	LocalTimeValue(localTime LocalTime)
 }
 
 type parser struct {
@@ -624,17 +629,270 @@ func (p parser) parseIntOrFloatOrDateTime(b []byte) ([]byte, error) {
 			continue
 		}
 		if idx == 2 && c == ':' {
-			return parseDateTime(b)
+			return p.parseDateTime(b)
 		}
 		if idx == 4 && c == '-' {
-			return parseDateTime(b)
+			return p.parseDateTime(b)
 		}
 	}
 	return p.parseIntOrFloat(b)
 }
 
-func parseDateTime(b []byte) ([]byte, error) {
-	panic("implement me")
+func digitsToInt(b []byte) int {
+	x := 0
+	for _, d := range b {
+		x *= 10
+		x += int(d - '0')
+	}
+	return x
+}
+
+func (p parser) parseDateTime(b []byte) ([]byte, error) {
+	// we know the first 2 ar digits.
+	if b[2] == ':' {
+		return p.parseTime(b)
+	}
+	// This state accepts an offset date-time, a local date-time, or a local date.
+	//
+	//   v--- cursor
+	// 1979-05-27T07:32:00Z
+	// 1979-05-27T00:32:00-07:00
+	// 1979-05-27T00:32:00.999999-07:00
+	// 1979-05-27 07:32:00Z
+	// 1979-05-27 00:32:00-07:00
+	// 1979-05-27 00:32:00.999999-07:00
+	// 1979-05-27T07:32:00
+	// 1979-05-27T00:32:00.999999
+	// 1979-05-27 07:32:00
+	// 1979-05-27 00:32:00.999999
+	// 1979-05-27
+
+	// date
+
+	idx := 4
+
+	localDate := LocalDate{
+		Year: digitsToInt(b[:idx]),
+	}
+
+	for i := 0; i < 2; i++ {
+		// month
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid month digit in date: %c", b[idx])
+		}
+		localDate.Month *= 10
+		localDate.Month += time.Month(b[idx] - '0')
+	}
+
+	idx++
+	if b[idx] != '-' {
+		return nil, fmt.Errorf("expected - to separate month of a date, not %c", b[idx])
+	}
+
+	for i := 0; i < 2; i++ {
+		// day
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid day digit in date: %c", b[idx])
+		}
+		localDate.Day *= 10
+		localDate.Day += int(b[idx] - '0')
+	}
+
+	idx++
+
+	if idx >= len(b) {
+		p.builder.LocalDateValue(localDate)
+		return nil, nil
+	} else if b[idx] != ' ' && b[idx] != 'T' {
+		p.builder.LocalDateValue(localDate)
+		return b[idx:], nil
+	}
+
+	// check if there is a chance there is anything useful after
+	if b[idx] == ' ' && (((idx + 2) >= len(b)) || !isDigit(b[idx+1]) || !isDigit(b[idx+2])) {
+		p.builder.LocalDateValue(localDate)
+		return b[idx:], nil
+	}
+
+	//idx++ // skip the T or ' '
+
+	// time
+	localTime := LocalTime{}
+
+	for i := 0; i < 2; i++ {
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid hour digit in time: %c", b[idx])
+		}
+		localTime.Hour *= 10
+		localTime.Hour += int(b[idx] - '0')
+	}
+
+	idx++
+	if b[idx] != ':' {
+		return nil, fmt.Errorf("time hour/minute separator should be :, not %c", b[idx])
+	}
+
+	for i := 0; i < 2; i++ {
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid minute digit in time: %c", b[idx])
+		}
+		localTime.Minute *= 10
+		localTime.Minute += int(b[idx] - '0')
+	}
+
+	idx++
+	if b[idx] != ':' {
+		return nil, fmt.Errorf("time minute/second separator should be :, not %c", b[idx])
+	}
+
+	for i := 0; i < 2; i++ {
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid second digit in time: %c", b[idx])
+		}
+		localTime.Second *= 10
+		localTime.Second += int(b[idx] - '0')
+	}
+
+	idx++
+	if idx < len(b) && b[idx] == '.' {
+		idx++
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("expected at least one digit in time's fraction, not %c", b[idx])
+		}
+
+		for {
+			localTime.Nanosecond *= 10
+			localTime.Nanosecond += int(b[idx] - '0')
+			idx++
+			if !isDigit(b[idx]) {
+				break
+			}
+		}
+	}
+
+	if idx >= len(b) || (b[idx] != 'Z' && b[idx] != '+' && b[idx] != '-') {
+		dt := LocalDateTime{
+			Date: localDate,
+			Time: localTime,
+		}
+		p.builder.LocalDateTimeValue(dt)
+		return b[idx:], nil
+	}
+
+	loc := time.UTC
+
+	if b[idx] == 'Z' {
+		idx++
+	} else {
+		start := idx
+		sign := 1
+		if b[idx] == '-' {
+			sign = -1
+		}
+
+		hours := 0
+		for i := 0; i < 2; i++ {
+			idx++
+			if !isDigit(b[idx]) {
+				return nil, fmt.Errorf("invalid hour digit in time offset: %c", b[idx])
+			}
+			hours *= 10
+			hours += int(b[idx] - '0')
+		}
+		offset := hours * 60 * 60
+
+		idx++
+		if b[idx] != ':' {
+			return nil, fmt.Errorf("time offset hour/minute separator should be :, not %c", b[idx])
+		}
+
+		minutes := 0
+		for i := 0; i < 2; i++ {
+			idx++
+			if !isDigit(b[idx]) {
+				return nil, fmt.Errorf("invalid minute digit in time offset: %c", b[idx])
+			}
+			minutes *= 10
+			minutes += int(b[idx] - '0')
+		}
+		offset += minutes * 60
+		offset *= sign
+		idx++
+		loc = time.FixedZone(string(b[start:idx]), offset)
+	}
+	dt := time.Date(localDate.Year, localDate.Month, localDate.Day, localTime.Hour, localTime.Minute, localTime.Second, localTime.Nanosecond, loc)
+	p.builder.DateTimeValue(dt)
+	return b[idx:], nil
+}
+
+func (p parser) parseTime(b []byte) ([]byte, error) {
+	localTime := LocalTime{}
+
+	idx := 0
+
+	for i := 0; i < 2; i++ {
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid hour digit in time: %c", b[idx])
+		}
+		localTime.Hour *= 10
+		localTime.Hour += int(b[idx] - '0')
+	}
+
+	idx++
+	if b[idx] != ':' {
+		return nil, fmt.Errorf("time hour/minute separator should be :, not %c", b[idx])
+	}
+
+	for i := 0; i < 2; i++ {
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid minute digit in time: %c", b[idx])
+		}
+		localTime.Minute *= 10
+		localTime.Minute += int(b[idx] - '0')
+	}
+
+	idx++
+	if b[idx] != ':' {
+		return nil, fmt.Errorf("time minute/second separator should be :, not %c", b[idx])
+	}
+
+	for i := 0; i < 2; i++ {
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("invalid second digit in time: %c", b[idx])
+		}
+		localTime.Second *= 10
+		localTime.Second += int(b[idx] - '0')
+	}
+
+	idx++
+	if idx < len(b) && b[idx] == '.' {
+		idx++
+		idx++
+		if !isDigit(b[idx]) {
+			return nil, fmt.Errorf("expected at least one digit in time's fraction, not %c", b[idx])
+		}
+
+		for {
+			localTime.Nanosecond *= 10
+			localTime.Nanosecond += int(b[idx] - '0')
+			idx++
+			if !isDigit(b[idx]) {
+				break
+			}
+		}
+	}
+
+	p.builder.LocalTimeValue(localTime)
+	return b[idx:], nil
 }
 
 func (p parser) parseIntOrFloat(b []byte) ([]byte, error) {

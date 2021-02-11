@@ -2,6 +2,7 @@ package toml
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/reflectbuild"
 )
@@ -169,6 +170,70 @@ func (u *unmarshaler) IntValue(n int64) {
 	}
 }
 
+func (u *unmarshaler) LocalDateValue(date LocalDate) {
+	if u.err != nil {
+		return
+	}
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(date))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
+	} else {
+		u.err = u.builder.Set(reflect.ValueOf(date))
+	}
+}
+
+func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
+	if u.err != nil {
+		return
+	}
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(dt))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
+	} else {
+		u.err = u.builder.Set(reflect.ValueOf(dt))
+	}
+}
+
+func (u *unmarshaler) DateTimeValue(dt time.Time) {
+	if u.err != nil {
+		return
+	}
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(dt))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
+	} else {
+		u.err = u.builder.Set(reflect.ValueOf(dt))
+	}
+}
+
+func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
+	if u.err != nil {
+		return
+	}
+	if u.builder.IsSlice() {
+		u.builder.Save()
+		u.err = u.builder.SliceAppend(reflect.ValueOf(localTime))
+		if u.err != nil {
+			return
+		}
+		u.builder.Load()
+	} else {
+		u.err = u.builder.Set(reflect.ValueOf(localTime))
+	}
+}
+
 func (u *unmarshaler) SimpleKey(v []byte) {
 	if u.err != nil {
 		return
@@ -184,6 +249,10 @@ func (u *unmarshaler) SimpleKey(v []byte) {
 			}
 		}
 		u.err = u.builder.DigField(string(v))
+		if u.err == nil {
+			return
+		}
+		// TODO: figure out what to do with unexported fields
 	}
 }
 
