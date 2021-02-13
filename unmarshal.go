@@ -39,14 +39,29 @@ type unmarshaler struct {
 	// be directly assigned. This is used to distinguish between assigning or
 	// appending to arrays.
 	assign bool
+
+	// State that indicates the parser is processing a [table] name.
+	// Used to know whether the whole table should be skipped or just the
+	// keyval if a field is missing.
+	parsingTable bool
+
+	skipKeyValCount uint
+	skipTable       bool
+}
+
+func (u *unmarshaler) skipping() bool {
+	return u.skipTable || u.skipKeyValCount > 0
 }
 
 func (u *unmarshaler) Assignation() {
+	if u.skipping() || u.err != nil {
+		return
+	}
 	u.assign = true
 }
 
 func (u *unmarshaler) ArrayBegin() {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	u.builder.Save()
@@ -58,14 +73,14 @@ func (u *unmarshaler) ArrayBegin() {
 }
 
 func (u *unmarshaler) ArrayEnd() {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	u.builder.Load()
 }
 
 func (u *unmarshaler) ArrayTableBegin() {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 
@@ -73,7 +88,7 @@ func (u *unmarshaler) ArrayTableBegin() {
 }
 
 func (u *unmarshaler) ArrayTableEnd() {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 
@@ -99,15 +114,29 @@ func (u *unmarshaler) ArrayTableEnd() {
 }
 
 func (u *unmarshaler) KeyValBegin() {
+	if u.skipKeyValCount > 0 {
+		u.skipKeyValCount++
+		return
+	}
+	if u.skipping() || u.err != nil {
+		return
+	}
 	u.builder.Save()
 }
 
 func (u *unmarshaler) KeyValEnd() {
+	if u.skipKeyValCount > 0 {
+		u.skipKeyValCount--
+		return
+	}
+	if u.skipping() || u.err != nil {
+		return
+	}
 	u.builder.Load()
 }
 
 func (u *unmarshaler) StringValue(v []byte) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -123,7 +152,7 @@ func (u *unmarshaler) StringValue(v []byte) {
 }
 
 func (u *unmarshaler) BoolValue(b bool) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -139,7 +168,7 @@ func (u *unmarshaler) BoolValue(b bool) {
 }
 
 func (u *unmarshaler) FloatValue(n float64) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -155,7 +184,7 @@ func (u *unmarshaler) FloatValue(n float64) {
 }
 
 func (u *unmarshaler) IntValue(n int64) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -171,7 +200,7 @@ func (u *unmarshaler) IntValue(n int64) {
 }
 
 func (u *unmarshaler) LocalDateValue(date LocalDate) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -187,7 +216,7 @@ func (u *unmarshaler) LocalDateValue(date LocalDate) {
 }
 
 func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -203,7 +232,7 @@ func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
 }
 
 func (u *unmarshaler) DateTimeValue(dt time.Time) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -219,7 +248,7 @@ func (u *unmarshaler) DateTimeValue(dt time.Time) {
 }
 
 func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 	if u.builder.IsSlice() {
@@ -235,7 +264,7 @@ func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
 }
 
 func (u *unmarshaler) SimpleKey(v []byte) {
-	if u.err != nil {
+	if u.skipping() || u.err != nil {
 		return
 	}
 
@@ -252,21 +281,31 @@ func (u *unmarshaler) SimpleKey(v []byte) {
 		if u.err == nil {
 			return
 		}
+		if _, ok := u.err.(reflectbuild.FieldNotFoundError); ok {
+			u.err = nil
+			if u.parsingTable {
+				u.skipTable = true
+			} else {
+				u.skipKeyValCount = 1
+			}
+		}
 		// TODO: figure out what to do with unexported fields
 	}
 }
 
 func (u *unmarshaler) StandardTableBegin() {
-	if u.err != nil {
+	u.skipTable = false
+	u.parsingTable = true
+	if u.skipping() || u.err != nil {
 		return
 	}
-
 	// tables are only top-level
 	u.builder.Reset()
 }
 
 func (u *unmarshaler) StandardTableEnd() {
-	if u.err != nil {
+	u.parsingTable = false
+	if u.skipping() || u.err != nil {
 		return
 	}
 }
