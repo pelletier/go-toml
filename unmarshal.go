@@ -139,9 +139,10 @@ func (u *unmarshaler) StringValue(v []byte) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(string(v)))
+		s := string(v)
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&s))
 		if u.err != nil {
 			return
 		}
@@ -157,7 +158,7 @@ func (u *unmarshaler) BoolValue(b bool) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(b))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&b))
 		if u.err != nil {
 			return
 		}
@@ -173,7 +174,7 @@ func (u *unmarshaler) FloatValue(n float64) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(n))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&n))
 		if u.err != nil {
 			return
 		}
@@ -189,7 +190,7 @@ func (u *unmarshaler) IntValue(n int64) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(n))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&n))
 		if u.err != nil {
 			return
 		}
@@ -205,7 +206,7 @@ func (u *unmarshaler) LocalDateValue(date LocalDate) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(date))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&date))
 		if u.err != nil {
 			return
 		}
@@ -221,7 +222,7 @@ func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(dt))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&dt))
 		if u.err != nil {
 			return
 		}
@@ -237,7 +238,7 @@ func (u *unmarshaler) DateTimeValue(dt time.Time) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(dt))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&dt))
 		if u.err != nil {
 			return
 		}
@@ -253,7 +254,7 @@ func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
 	}
 	if u.builder.IsSlice() {
 		u.builder.Save()
-		u.err = u.builder.SliceAppend(reflect.ValueOf(localTime))
+		u.err = u.builder.SliceAppend(reflect.ValueOf(&localTime))
 		if u.err != nil {
 			return
 		}

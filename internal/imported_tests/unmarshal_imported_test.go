@@ -296,14 +296,6 @@ func TestDocUnmarshal(t *testing.T) {
 	expected := docData
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//if !reflect.DeepEqual(result, expected) {
-	//	resStr, _ := json.MarshalIndent(result, "", "  ")
-	//	expStr, _ := json.MarshalIndent(expected, "", "  ")
-	//	t.Errorf("Bad unmarshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expStr, resStr)
-	//}
 }
 
 type tomlTypeCheckTest struct {

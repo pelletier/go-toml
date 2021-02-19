@@ -44,7 +44,6 @@ func (b *Builder) getOrGenerateFieldGettersRecursive(m structFieldGetters, idx [
 			// only consider exported fields
 			continue
 		}
-		// TODO: handle embedded structs
 		if f.Anonymous {
 			b.getOrGenerateFieldGettersRecursive(m, copyAndAppend(idx, i), f.Type)
 		} else {
@@ -223,6 +222,10 @@ func (b *Builder) IsSlice() bool {
 	return b.top().Kind() == reflect.Slice
 }
 
+func (b *Builder) IsSliceOrPtr() bool {
+	return b.top().Kind() == reflect.Slice || (b.top().Kind() == reflect.Ptr && b.top().Type().Elem().Kind() == reflect.Slice)
+}
+
 // Last moves the cursor to the last value of the current value.
 // For a slice or an array, it is the last element they contain, if any.
 // For anything else, it's a no-op.
@@ -269,12 +272,40 @@ func (b *Builder) SliceNewElem() error {
 	return nil
 }
 
+func assertPtr(v reflect.Value) {
+	if v.Kind() != reflect.Ptr {
+		panic(fmt.Sprintf("value '%s' should be a ptr, not '%s'", v, v.Kind()))
+	}
+}
+
 func (b *Builder) SliceAppend(v reflect.Value) error {
+	assertPtr(v)
+
 	t := b.top()
+
+	// pointer to a slice
+	if t.Kind() == reflect.Ptr {
+		// if the pointer is nil we need to allocate the slice
+		if t.IsNil() {
+			x := reflect.New(t.Type().Elem())
+			t.Set(x)
+		}
+		// target the slice itself
+		t = t.Elem()
+	}
+
 	err := checkKind(t.Type(), reflect.Slice)
 	if err != nil {
 		return err
 	}
+
+	if t.Type().Elem().Kind() == reflect.Ptr {
+		// if it is a slice of pointers, we can just append
+	} else {
+		// otherwise we need to reference the value
+		v = v.Elem()
+	}
+
 	newSlice := reflect.Append(t, v)
 	t.Set(newSlice)
 	b.replace(t.Index(t.Len() - 1))
@@ -286,12 +317,16 @@ func (b *Builder) SliceAppend(v reflect.Value) error {
 func (b *Builder) SetString(s string) error {
 	t := b.top()
 
-	err := checkKind(t.Type(), reflect.String)
-	if err != nil {
-		return err
-	}
+	if t.Kind() == reflect.Ptr {
+		t.Set(reflect.ValueOf(&s))
+	} else {
+		err := checkKind(t.Type(), reflect.String)
+		if err != nil {
+			return err
+		}
 
-	t.SetString(s)
+		t.SetString(s)
+	}
 	return nil
 }
 

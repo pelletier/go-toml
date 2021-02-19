@@ -165,3 +165,41 @@ func TestCursor(t *testing.T) {
 	require.NoError(t, b.DigField("Field"))
 	assert.Equal(t, b.Cursor().Kind(), reflect.String)
 }
+
+func TestStringPtr(t *testing.T) {
+	x := struct {
+		Field *string
+	}{}
+	b, err := reflectbuild.NewBuilder("", &x)
+	require.NoError(t, err)
+	assert.Equal(t, b.Cursor().Kind(), reflect.Struct)
+	require.NoError(t, b.DigField("Field"))
+	assert.NoError(t, b.SetString("A"))
+	assert.Equal(t, "A", *x.Field)
+}
+
+func TestAppendSlicePtr(t *testing.T) {
+	x := struct {
+		Field *[]string
+	}{}
+	b, err := reflectbuild.NewBuilder("", &x)
+	require.NoError(t, err)
+	assert.Equal(t, b.Cursor().Kind(), reflect.Struct)
+	require.NoError(t, b.DigField("Field"))
+	v := "A"
+	assert.NoError(t, b.SliceAppend(reflect.ValueOf(&v)))
+	assert.Equal(t, []string{"A"}, *x.Field)
+}
+
+func TestAppendPtrSlicePtr(t *testing.T) {
+	x := struct {
+		Field *[]*string
+	}{}
+	b, err := reflectbuild.NewBuilder("", &x)
+	require.NoError(t, err)
+	assert.Equal(t, b.Cursor().Kind(), reflect.Struct)
+	require.NoError(t, b.DigField("Field"))
+	v := "A"
+	assert.NoError(t, b.SliceAppend(reflect.ValueOf(&v)))
+	assert.Equal(t, "A", *(*x.Field)[0])
+}
