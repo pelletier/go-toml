@@ -65,6 +65,10 @@ func (u *unmarshaler) ArrayBegin() {
 		return
 	}
 	u.builder.Save()
+	u.err = u.builder.EnsureSlice()
+	if u.err != nil {
+		return
+	}
 	if u.assign {
 		u.assign = false
 	} else {

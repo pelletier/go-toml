@@ -490,6 +490,21 @@ func (b *Builder) Set(v reflect.Value) error {
 	return t.set(v)
 }
 
+// EnsureSlice makes sure that the cursor points to a non-nil slice.
+func (b *Builder) EnsureSlice() error {
+	t := b.top()
+	v := t.get()
+	if v.Kind() != reflect.Slice {
+		return IncorrectKindError{Actual: v.Kind(), Expected: reflect.Slice}
+	}
+
+	if v.IsNil() {
+		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+	}
+
+	return nil
+}
+
 func checkKindInt(rt reflect.Type) error {
 	switch rt.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
