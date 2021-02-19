@@ -17,9 +17,16 @@ type structFieldGetters map[string]fieldGetter
 
 type target interface {
 	get() reflect.Value
-	set(value reflect.Value)
+	set(value reflect.Value) error
 
 	fmt.Stringer
+}
+
+func isAssignable(t reflect.Type, v reflect.Value) error {
+	if v.Type().AssignableTo(t) {
+		return nil
+	}
+	return fmt.Errorf("cannot assign '%s' ('%s') to a '%s'", v, v.Type(), t)
 }
 
 type valueTarget reflect.Value
@@ -28,8 +35,14 @@ func (v valueTarget) get() reflect.Value {
 	return reflect.Value(v)
 }
 
-func (v valueTarget) set(value reflect.Value) {
+func (v valueTarget) set(value reflect.Value) error {
+	rv := reflect.Value(v)
+	err := isAssignable(rv.Type(), value)
+	if err != nil {
+		return err
+	}
 	reflect.Value(v).Set(value)
+	return nil
 }
 
 func (v valueTarget) String() string {
@@ -45,8 +58,13 @@ func (v mapTarget) get() reflect.Value {
 	return v.m.MapIndex(v.index)
 }
 
-func (v mapTarget) set(value reflect.Value) {
+func (v mapTarget) set(value reflect.Value) error {
+	err := isAssignable(v.m.Type().Elem(), value)
+	if err != nil {
+		return err
+	}
 	v.m.SetMapIndex(v.index, value)
+	return nil
 }
 
 func (v mapTarget) String() string {
@@ -413,23 +431,11 @@ func (b *Builder) SetString(s string) error {
 	t := b.top()
 	v := t.get()
 
-	if !v.IsValid() {
-		fmt.Println("============ INVALID ===========")
-		fmt.Println(b.Dump())
-		fmt.Println("==================== ===========")
-	}
-
 	if v.Kind() == reflect.Ptr {
 		v.Set(reflect.ValueOf(&s))
-	} else {
-		err := checkKind(v.Type(), reflect.String)
-		if err != nil {
-			return err
-		}
-
-		v.SetString(s)
+		return nil
 	}
-	return nil
+	return t.set(reflect.ValueOf(s))
 }
 
 // Set the value at the cursor to the given boolean.
@@ -481,8 +487,7 @@ func (b *Builder) SetInt(n int64) error {
 
 func (b *Builder) Set(v reflect.Value) error {
 	t := b.top()
-	t.set(v)
-	return nil
+	return t.set(v)
 }
 
 func checkKindInt(rt reflect.Type) error {

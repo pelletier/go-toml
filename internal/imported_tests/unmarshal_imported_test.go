@@ -421,26 +421,6 @@ func TestErrUnmarshal(t *testing.T) {
 	}
 }
 
-type emptyMarshalTestStruct struct {
-	Title      string                  `toml:"title"`
-	Bool       bool                    `toml:"bool"`
-	Int        int                     `toml:"int"`
-	String     string                  `toml:"string"`
-	StringList []string                `toml:"stringlist"`
-	Ptr        *basicMarshalTestStruct `toml:"ptr"`
-	Map        map[string]string       `toml:"map"`
-}
-
-var emptyTestData = emptyMarshalTestStruct{
-	Title:      "Placeholder",
-	Bool:       false,
-	Int:        0,
-	String:     "",
-	StringList: []string{},
-	Ptr:        nil,
-	Map:        map[string]string{},
-}
-
 var emptyTestToml = []byte(`bool = false
 int = 0
 string = ""
@@ -474,15 +454,30 @@ var emptyTestToml2 = []byte(`title = "Placeholder"
 `)
 
 func TestEmptytomlUnmarshal(t *testing.T) {
+	type emptyMarshalTestStruct struct {
+		Title      string                  `toml:"title"`
+		Bool       bool                    `toml:"bool"`
+		Int        int                     `toml:"int"`
+		String     string                  `toml:"string"`
+		StringList []string                `toml:"stringlist"`
+		Ptr        *basicMarshalTestStruct `toml:"ptr"`
+		Map        map[string]string       `toml:"map"`
+	}
+
+	emptyTestData := emptyMarshalTestStruct{
+		Title:      "Placeholder",
+		Bool:       false,
+		Int:        0,
+		String:     "",
+		StringList: []string{},
+		Ptr:        nil,
+		Map:        map[string]string{},
+	}
+
 	result := emptyMarshalTestStruct{}
 	err := toml.Unmarshal(emptyTestToml, &result)
-	expected := emptyTestData
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad empty unmarshal: expected %v, got %v", expected, result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, emptyTestData, result)
 }
 
 func TestEmptyUnmarshalOmit(t *testing.T) {
