@@ -45,6 +45,10 @@ type unmarshaler struct {
 	// keyval if a field is missing.
 	parsingTable bool
 
+	// Counters that indicate that we are skipping TOML expressions. It happens
+	// when the document contains values that are not in the target struct.
+	// TODO: signal the parser that it can just scan to avoid processing the
+	// unused data.
 	skipKeyValCount uint
 	skipTable       bool
 }
@@ -152,7 +156,8 @@ func (u *unmarshaler) StringValue(v []byte) {
 		}
 		u.builder.Load()
 	} else {
-		u.err = u.builder.SetString(string(v))
+		s := string(v)
+		u.err = u.builder.Set(reflect.ValueOf(&s))
 	}
 }
 
@@ -216,7 +221,7 @@ func (u *unmarshaler) LocalDateValue(date LocalDate) {
 		}
 		u.builder.Load()
 	} else {
-		u.err = u.builder.Set(reflect.ValueOf(date))
+		u.err = u.builder.Set(reflect.ValueOf(&date))
 	}
 }
 
@@ -232,7 +237,7 @@ func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
 		}
 		u.builder.Load()
 	} else {
-		u.err = u.builder.Set(reflect.ValueOf(dt))
+		u.err = u.builder.Set(reflect.ValueOf(&dt))
 	}
 }
 
@@ -248,7 +253,7 @@ func (u *unmarshaler) DateTimeValue(dt time.Time) {
 		}
 		u.builder.Load()
 	} else {
-		u.err = u.builder.Set(reflect.ValueOf(dt))
+		u.err = u.builder.Set(reflect.ValueOf(&dt))
 	}
 }
 
@@ -264,7 +269,7 @@ func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
 		}
 		u.builder.Load()
 	} else {
-		u.err = u.builder.Set(reflect.ValueOf(localTime))
+		u.err = u.builder.Set(reflect.ValueOf(&localTime))
 	}
 }
 
@@ -313,4 +318,6 @@ func (u *unmarshaler) StandardTableEnd() {
 	if u.skipping() || u.err != nil {
 		return
 	}
+
+	u.builder.EnsureStructOrMap()
 }

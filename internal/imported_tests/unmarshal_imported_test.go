@@ -430,29 +430,6 @@ title = "Placeholder"
 [map]
 `)
 
-type emptyMarshalTestStruct2 struct {
-	Title      string                  `toml:"title"`
-	Bool       bool                    `toml:"bool,omitempty"`
-	Int        int                     `toml:"int, omitempty"`
-	String     string                  `toml:"string,omitempty "`
-	StringList []string                `toml:"stringlist,omitempty"`
-	Ptr        *basicMarshalTestStruct `toml:"ptr,omitempty"`
-	Map        map[string]string       `toml:"map,omitempty"`
-}
-
-var emptyTestData2 = emptyMarshalTestStruct2{
-	Title:      "Placeholder",
-	Bool:       false,
-	Int:        0,
-	String:     "",
-	StringList: []string{},
-	Ptr:        nil,
-	Map:        map[string]string{},
-}
-
-var emptyTestToml2 = []byte(`title = "Placeholder"
-`)
-
 func TestEmptytomlUnmarshal(t *testing.T) {
 	type emptyMarshalTestStruct struct {
 		Title      string                  `toml:"title"`
@@ -481,15 +458,32 @@ func TestEmptytomlUnmarshal(t *testing.T) {
 }
 
 func TestEmptyUnmarshalOmit(t *testing.T) {
+	t.Skipf("Have not figured yet if omitempty is a good idea")
+
+	type emptyMarshalTestStruct2 struct {
+		Title      string                  `toml:"title"`
+		Bool       bool                    `toml:"bool,omitempty"`
+		Int        int                     `toml:"int, omitempty"`
+		String     string                  `toml:"string,omitempty "`
+		StringList []string                `toml:"stringlist,omitempty"`
+		Ptr        *basicMarshalTestStruct `toml:"ptr,omitempty"`
+		Map        map[string]string       `toml:"map,omitempty"`
+	}
+
+	var emptyTestData2 = emptyMarshalTestStruct2{
+		Title:      "Placeholder",
+		Bool:       false,
+		Int:        0,
+		String:     "",
+		StringList: []string{},
+		Ptr:        nil,
+		Map:        map[string]string{},
+	}
+
 	result := emptyMarshalTestStruct2{}
 	err := toml.Unmarshal(emptyTestToml, &result)
-	expected := emptyTestData2
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad empty omit unmarshal: expected %v, got %v", expected, result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, emptyTestData2, result)
 }
 
 type pointerMarshalTestStruct struct {
@@ -532,15 +526,11 @@ Str = "Hello"
 `)
 
 func TestPointerUnmarshal(t *testing.T) {
+	t.Log("TOML data:", string(pointerTestToml))
 	result := pointerMarshalTestStruct{}
 	err := toml.Unmarshal(pointerTestToml, &result)
-	expected := pointerTestData
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad pointer unmarshal: expected %v, got %v", expected, result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, pointerTestData, result)
 }
 
 func TestUnmarshalTypeMismatch(t *testing.T) {

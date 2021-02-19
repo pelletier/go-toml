@@ -140,7 +140,7 @@ func TestSliceNewElemNested(t *testing.T) {
 func TestIncorrectKindError(t *testing.T) {
 	err := reflectbuild.IncorrectKindError{
 		Actual:   reflect.String,
-		Expected: reflect.Struct,
+		Expected: []reflect.Kind{reflect.Struct},
 	}
 	assert.NotEmpty(t, err.Error())
 }

@@ -37,6 +37,14 @@ func (v valueTarget) get() reflect.Value {
 
 func (v valueTarget) set(value reflect.Value) error {
 	rv := reflect.Value(v)
+
+	// value is guaranteed to be a pointer
+
+	if rv.Kind() != reflect.Ptr {
+		// TODO: check value is nil?
+		value = value.Elem()
+	}
+
 	err := isAssignable(rv.Type(), value)
 	if err != nil {
 		return err
@@ -59,6 +67,13 @@ func (v mapTarget) get() reflect.Value {
 }
 
 func (v mapTarget) set(value reflect.Value) error {
+	// value is guaranteed to be a pointer
+
+	if v.m.Type().Elem().Kind() != reflect.Ptr {
+		// TODO: check value is nil?
+		value = value.Elem()
+	}
+
 	err := isAssignable(v.m.Type().Elem(), value)
 	if err != nil {
 		return err
@@ -486,6 +501,7 @@ func (b *Builder) SetInt(n int64) error {
 }
 
 func (b *Builder) Set(v reflect.Value) error {
+	assertPtr(v)
 	t := b.top()
 	return t.set(v)
 }
@@ -494,14 +510,43 @@ func (b *Builder) Set(v reflect.Value) error {
 func (b *Builder) EnsureSlice() error {
 	t := b.top()
 	v := t.get()
+
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		v = v.Elem()
+	}
+
 	if v.Kind() != reflect.Slice {
-		return IncorrectKindError{Actual: v.Kind(), Expected: reflect.Slice}
+		return IncorrectKindError{Actual: v.Kind(), Expected: []reflect.Kind{reflect.Slice}}
 	}
 
 	if v.IsNil() {
 		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
 	}
 
+	return nil
+}
+
+// EnsureStructOrMap makes sure that the cursor points to an initialized
+// struct or map.
+func (b *Builder) EnsureStructOrMap() error {
+	t := b.top()
+	v := t.get()
+
+	switch v.Kind() {
+	case reflect.Struct:
+	case reflect.Map:
+		if v.IsNil() {
+			return t.set(reflect.MakeMap(v.Type()))
+		}
+	default:
+		return IncorrectKindError{
+			Actual:   v.Kind(),
+			Expected: []reflect.Kind{reflect.Struct, reflect.Map},
+		}
+	}
 	return nil
 }
 
@@ -513,7 +558,7 @@ func checkKindInt(rt reflect.Type) error {
 
 	return IncorrectKindError{
 		Actual:   rt.Kind(),
-		Expected: reflect.Int,
+		Expected: []reflect.Kind{reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64},
 	}
 }
 
@@ -525,7 +570,7 @@ func checkKindFloat(rt reflect.Type) error {
 
 	return IncorrectKindError{
 		Actual:   rt.Kind(),
-		Expected: reflect.Float64,
+		Expected: []reflect.Kind{reflect.Float64},
 	}
 }
 
@@ -533,7 +578,7 @@ func checkKind(rt reflect.Type, expected reflect.Kind) error {
 	if rt.Kind() != expected {
 		return IncorrectKindError{
 			Actual:   rt.Kind(),
-			Expected: expected,
+			Expected: []reflect.Kind{expected},
 		}
 	}
 	return nil
@@ -541,11 +586,14 @@ func checkKind(rt reflect.Type, expected reflect.Kind) error {
 
 type IncorrectKindError struct {
 	Actual   reflect.Kind
-	Expected reflect.Kind
+	Expected []reflect.Kind
 }
 
 func (e IncorrectKindError) Error() string {
-	return fmt.Sprintf("incorrect kind: expected '%s', got '%s'", e.Expected, e.Actual)
+	if len(e.Expected) < 2 {
+		return fmt.Sprintf("incorrect kind: expected '%s', got '%s'", e.Expected[0], e.Actual)
+	}
+	return fmt.Sprintf("incorrect kind: expected any of '%s', got '%s'", e.Expected, e.Actual)
 }
 
 type FieldNotFoundError struct {
