@@ -298,12 +298,6 @@ func TestDocUnmarshal(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-type tomlTypeCheckTest struct {
-	name string
-	item interface{}
-	typ  int //0=primitive, 1=otherslice, 2=treeslice, 3=tree
-}
-
 type unexportedMarshalTestStruct struct {
 	String      string                      `toml:"string"`
 	StringList  []string                    `toml:"strlist"`

@@ -18,6 +18,8 @@ type structFieldGetters map[string]fieldGetter
 type target interface {
 	get() reflect.Value
 	set(value reflect.Value)
+
+	fmt.Stringer
 }
 
 type valueTarget reflect.Value
@@ -28,6 +30,10 @@ func (v valueTarget) get() reflect.Value {
 
 func (v valueTarget) set(value reflect.Value) {
 	reflect.Value(v).Set(value)
+}
+
+func (v valueTarget) String() string {
+	return fmt.Sprintf("valueTarget: '%s' (%s)", reflect.Value(v), reflect.Value(v).Type())
 }
 
 type mapTarget struct {
@@ -41,6 +47,10 @@ func (v mapTarget) get() reflect.Value {
 
 func (v mapTarget) set(value reflect.Value) {
 	v.m.SetMapIndex(v.index, value)
+}
+
+func (v mapTarget) String() string {
+	return fmt.Sprintf("mapTarget: '%s'[%s]", v.m, v.index)
 }
 
 // Builder wraps a value and provides method to modify its structure.
@@ -151,7 +161,9 @@ func NewBuilder(tag string, v interface{}) (Builder, error) {
 }
 
 func (b *Builder) top() target {
-	return b.stack[len(b.stack)-1]
+	t := b.stack[len(b.stack)-1]
+	fmt.Println("TOP:", t)
+	return t
 }
 
 func (b *Builder) duplicate() {
@@ -163,6 +175,7 @@ func (b *Builder) duplicate() {
 
 func (b *Builder) pop() {
 	b.stack = b.stack[:len(b.stack)-1]
+	fmt.Println("POP: top:", b.stack[len(b.stack)-1])
 }
 
 func (b *Builder) len() int {
@@ -185,6 +198,7 @@ func (b *Builder) Dump() string {
 }
 
 func (b *Builder) replace(v target) {
+	fmt.Println("REPLACING:", v)
 	b.stack[len(b.stack)-1] = v
 }
 
@@ -357,10 +371,40 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 		value = value.Elem()
 	}
 
+	if v.Type().Elem() != value.Type() {
+		nv, err := tryConvert(v.Type().Elem(), value)
+		if err != nil {
+			return fmt.Errorf("cannot assign '%s' to '%s'", value.Type(), v.Type().Elem())
+		}
+		value = nv
+	}
+
 	newSlice := reflect.Append(v, value)
 	v.Set(newSlice)
 	b.replace(valueTarget(v.Index(v.Len() - 1))) // TODO: "sliceTarget" ?
 	return nil
+}
+
+func tryConvert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
+	result := value
+	if value.Kind() == reflect.Ptr {
+		if t.Kind() != reflect.Ptr {
+			return reflect.Value{}, fmt.Errorf("cannot convert pointer to non-pointer")
+		}
+
+		if value.Type().Elem().ConvertibleTo(t.Elem()) {
+			result = reflect.New(t.Elem())
+			result.Elem().Set(value.Elem().Convert(t.Elem()))
+			return result, nil
+		}
+	} else {
+		if value.Type().ConvertibleTo(t) {
+			result = reflect.New(t)
+			result.Elem().Set(value.Convert(t))
+			return result.Elem(), nil
+		}
+	}
+	return result, fmt.Errorf("no conversion found")
 }
 
 // Set the value at the cursor to the given string.
@@ -368,6 +412,12 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 func (b *Builder) SetString(s string) error {
 	t := b.top()
 	v := t.get()
+
+	if !v.IsValid() {
+		fmt.Println("============ INVALID ===========")
+		fmt.Println(b.Dump())
+		fmt.Println("==================== ===========")
+	}
 
 	if v.Kind() == reflect.Ptr {
 		v.Set(reflect.ValueOf(&s))
@@ -416,7 +466,13 @@ func (b *Builder) SetInt(n int64) error {
 
 	err := checkKindInt(v.Type())
 	if err != nil {
-		return err
+		rn := reflect.ValueOf(n)
+		if rn.Type().ConvertibleTo(v.Type()) {
+			v.Set(rn.Convert(v.Type()))
+			return nil
+		} else {
+			return err
+		}
 	}
 
 	v.SetInt(n)
