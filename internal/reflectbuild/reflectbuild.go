@@ -15,6 +15,34 @@ type fieldGetter func(s reflect.Value) reflect.Value
 // collection of fieldGetters for a given struct type
 type structFieldGetters map[string]fieldGetter
 
+type target interface {
+	get() reflect.Value
+	set(value reflect.Value)
+}
+
+type valueTarget reflect.Value
+
+func (v valueTarget) get() reflect.Value {
+	return reflect.Value(v)
+}
+
+func (v valueTarget) set(value reflect.Value) {
+	reflect.Value(v).Set(value)
+}
+
+type mapTarget struct {
+	index reflect.Value
+	m     reflect.Value
+}
+
+func (v mapTarget) get() reflect.Value {
+	return v.m.MapIndex(v.index)
+}
+
+func (v mapTarget) set(value reflect.Value) {
+	v.m.SetMapIndex(v.index, value)
+}
+
 // Builder wraps a value and provides method to modify its structure.
 // It is a stateful object that keeps a cursor of what part of the object is
 // being modified.
@@ -23,7 +51,7 @@ type Builder struct {
 	root reflect.Value
 	// Root is always a pointer to a non-nil value.
 	// Cursor is the top of the stack.
-	stack []reflect.Value
+	stack []target
 	// Struct field tag to use to retrieve name.
 	nameTag string
 	// Cache of functions to access specific fields.
@@ -117,17 +145,17 @@ func NewBuilder(tag string, v interface{}) (Builder, error) {
 
 	return Builder{
 		root:    rv.Elem(),
-		stack:   []reflect.Value{rv.Elem()},
+		stack:   []target{valueTarget(rv.Elem())},
 		nameTag: tag,
 	}, nil
 }
 
-func (b *Builder) top() reflect.Value {
+func (b *Builder) top() target {
 	return b.stack[len(b.stack)-1]
 }
 
-func (b *Builder) push(v reflect.Value) {
-	b.stack = append(b.stack, v)
+func (b *Builder) duplicate() {
+	b.stack = append(b.stack, b.stack[len(b.stack)-1])
 	// TODO: remove me. just here to make sure the method is included in the
 	// binary for debug
 	b.Dump()
@@ -149,14 +177,14 @@ func (b *Builder) Dump() string {
 		if i > 0 {
 			str.WriteString(" | ")
 		}
-		fmt.Fprintf(&str, "%s (%s)", x.Type(), x)
+		fmt.Fprintf(&str, "%s", x)
 	}
 
 	str.WriteByte(']')
 	return str.String()
 }
 
-func (b *Builder) replace(v reflect.Value) {
+func (b *Builder) replace(v target) {
 	b.stack[len(b.stack)-1] = v
 }
 
@@ -165,27 +193,47 @@ func (b *Builder) replace(v reflect.Value) {
 // Errors if the current value is not a struct, or the field does not exist.
 func (b *Builder) DigField(s string) error {
 	t := b.top()
+	v := t.get()
 
-	for t.Kind() == reflect.Interface || t.Kind() == reflect.Ptr {
-		t = t.Elem()
+	for v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			thing := reflect.New(v.Type().Elem())
+			v.Set(thing)
+		}
+		v = v.Elem()
 	}
 
-	err := checkKind(t.Type(), reflect.Struct)
-	if err != nil {
-		return err
-	}
+	if v.Kind() == reflect.Map {
+		// if map is nil, allocate it
+		if v.IsNil() {
+			v.Set(reflect.MakeMap(v.Type()))
+		}
 
-	g, err := b.fieldGetter(t.Type(), s)
-	if err != nil {
-		return FieldNotFoundError{FieldName: s, Struct: t}
-	}
+		// TODO: handle error when map is not indexed by strings
+		key := reflect.ValueOf(s)
 
-	f := g(t)
-	if !f.IsValid() {
-		return FieldNotFoundError{FieldName: s, Struct: t}
-	}
+		b.replace(mapTarget{
+			index: key,
+			m:     v,
+		})
+	} else {
+		err := checkKind(v.Type(), reflect.Struct)
+		if err != nil {
+			return err
+		}
 
-	b.replace(f)
+		g, err := b.fieldGetter(v.Type(), s)
+		if err != nil {
+			return FieldNotFoundError{FieldName: s, Struct: v}
+		}
+
+		f := g(v)
+		if !f.IsValid() {
+			return FieldNotFoundError{FieldName: s, Struct: v}
+		}
+
+		b.replace(valueTarget(f))
+	}
 
 	return nil
 }
@@ -194,13 +242,13 @@ func (b *Builder) DigField(s string) error {
 // It can be restored using Back().
 // Save points are stored as a stack.
 func (b *Builder) Save() {
-	b.push(b.top())
+	b.duplicate()
 }
 
 // Reset brings the cursor back to the root object.
 func (b *Builder) Reset() {
 	b.stack = b.stack[:1]
-	b.stack[0] = b.root
+	b.stack[0] = valueTarget(b.root)
 }
 
 // Load is the opposite of Save. It discards the current cursor and loads the
@@ -215,15 +263,15 @@ func (b *Builder) Load() {
 
 // Cursor returns the value pointed at by the cursor.
 func (b *Builder) Cursor() reflect.Value {
-	return b.top()
+	return b.top().get()
 }
 
 func (b *Builder) IsSlice() bool {
-	return b.top().Kind() == reflect.Slice
+	return b.top().get().Kind() == reflect.Slice
 }
 
 func (b *Builder) IsSliceOrPtr() bool {
-	return b.top().Kind() == reflect.Slice || (b.top().Kind() == reflect.Ptr && b.top().Type().Elem().Kind() == reflect.Slice)
+	return b.top().get().Kind() == reflect.Slice || (b.top().get().Kind() == reflect.Ptr && b.top().get().Type().Elem().Kind() == reflect.Slice)
 }
 
 // Last moves the cursor to the last value of the current value.
@@ -235,7 +283,7 @@ func (b *Builder) Last() {
 		length := b.Cursor().Len()
 		if length > 0 {
 			x := b.Cursor().Index(length - 1)
-			b.replace(x)
+			b.replace(valueTarget(x)) // TODO: create a "sliceTarget" ?
 		}
 	}
 }
@@ -244,12 +292,13 @@ func (b *Builder) Last() {
 // Otherwise creates a new element in that slice and moves to it.
 func (b *Builder) SliceLastOrCreate() error {
 	t := b.top()
-	err := checkKind(t.Type(), reflect.Slice)
+	v := t.get()
+	err := checkKind(v.Type(), reflect.Slice)
 	if err != nil {
 		return err
 	}
 
-	if t.Len() == 0 {
+	if v.Len() == 0 {
 		return b.SliceNewElem()
 	}
 	b.Last()
@@ -261,14 +310,15 @@ func (b *Builder) SliceLastOrCreate() error {
 // object.
 func (b *Builder) SliceNewElem() error {
 	t := b.top()
-	err := checkKind(t.Type(), reflect.Slice)
+	v := t.get()
+	err := checkKind(v.Type(), reflect.Slice)
 	if err != nil {
 		return err
 	}
-	elem := reflect.New(t.Type().Elem())
-	newSlice := reflect.Append(t, elem.Elem())
-	t.Set(newSlice)
-	b.replace(t.Index(t.Len() - 1))
+	elem := reflect.New(v.Type().Elem())
+	newSlice := reflect.Append(v, elem.Elem())
+	v.Set(newSlice)
+	b.replace(valueTarget(v.Index(v.Len() - 1))) // TODO: "sliceTarget"?
 	return nil
 }
 
@@ -278,37 +328,38 @@ func assertPtr(v reflect.Value) {
 	}
 }
 
-func (b *Builder) SliceAppend(v reflect.Value) error {
-	assertPtr(v)
+func (b *Builder) SliceAppend(value reflect.Value) error {
+	assertPtr(value)
 
 	t := b.top()
+	v := t.get()
 
 	// pointer to a slice
-	if t.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Ptr {
 		// if the pointer is nil we need to allocate the slice
-		if t.IsNil() {
-			x := reflect.New(t.Type().Elem())
-			t.Set(x)
+		if v.IsNil() {
+			x := reflect.New(v.Type().Elem())
+			v.Set(x)
 		}
 		// target the slice itself
-		t = t.Elem()
+		v = v.Elem()
 	}
 
-	err := checkKind(t.Type(), reflect.Slice)
+	err := checkKind(v.Type(), reflect.Slice)
 	if err != nil {
 		return err
 	}
 
-	if t.Type().Elem().Kind() == reflect.Ptr {
+	if v.Type().Elem().Kind() == reflect.Ptr {
 		// if it is a slice of pointers, we can just append
 	} else {
 		// otherwise we need to reference the value
-		v = v.Elem()
+		value = value.Elem()
 	}
 
-	newSlice := reflect.Append(t, v)
-	t.Set(newSlice)
-	b.replace(t.Index(t.Len() - 1))
+	newSlice := reflect.Append(v, value)
+	v.Set(newSlice)
+	b.replace(valueTarget(v.Index(v.Len() - 1))) // TODO: "sliceTarget" ?
 	return nil
 }
 
@@ -316,61 +367,65 @@ func (b *Builder) SliceAppend(v reflect.Value) error {
 // Errors if a string cannot be assigned to the current value.
 func (b *Builder) SetString(s string) error {
 	t := b.top()
+	v := t.get()
 
-	if t.Kind() == reflect.Ptr {
-		t.Set(reflect.ValueOf(&s))
+	if v.Kind() == reflect.Ptr {
+		v.Set(reflect.ValueOf(&s))
 	} else {
-		err := checkKind(t.Type(), reflect.String)
+		err := checkKind(v.Type(), reflect.String)
 		if err != nil {
 			return err
 		}
 
-		t.SetString(s)
+		v.SetString(s)
 	}
 	return nil
 }
 
 // Set the value at the cursor to the given boolean.
 // Errors if a boolean cannot be assigned to the current value.
-func (b *Builder) SetBool(v bool) error {
+func (b *Builder) SetBool(value bool) error {
 	t := b.top()
+	v := t.get()
 
-	err := checkKind(t.Type(), reflect.Bool)
+	err := checkKind(v.Type(), reflect.Bool)
 	if err != nil {
 		return err
 	}
 
-	t.SetBool(v)
+	v.SetBool(value)
 	return nil
 }
 
 func (b *Builder) SetFloat(n float64) error {
 	t := b.top()
+	v := t.get()
 
-	err := checkKindFloat(t.Type())
+	err := checkKindFloat(v.Type())
 	if err != nil {
 		return err
 	}
 
-	t.SetFloat(n)
+	v.SetFloat(n)
 	return nil
 }
 
 func (b *Builder) SetInt(n int64) error {
 	t := b.top()
+	v := t.get()
 
-	err := checkKindInt(t.Type())
+	err := checkKindInt(v.Type())
 	if err != nil {
 		return err
 	}
 
-	t.SetInt(n)
+	v.SetInt(n)
 	return nil
 }
 
 func (b *Builder) Set(v reflect.Value) error {
 	t := b.top()
-	t.Set(v)
+	t.set(v)
 	return nil
 }
 
