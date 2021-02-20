@@ -47,7 +47,10 @@ func (v valueTarget) set(value reflect.Value) error {
 
 	err := isAssignable(rv.Type(), value)
 	if err != nil {
-		return err
+		if !value.Type().ConvertibleTo(rv.Type()) {
+			return err
+		}
+		value = value.Convert(rv.Type())
 	}
 	reflect.Value(v).Set(value)
 	return nil
@@ -74,12 +77,25 @@ func (v mapTarget) set(value reflect.Value) error {
 		value = value.Elem()
 	}
 
-	err := isAssignable(v.m.Type().Elem(), value)
+	targetType := v.m.Type().Elem()
+	value, err := convertAsNeeded(targetType, value)
 	if err != nil {
 		return err
 	}
+
 	v.m.SetMapIndex(v.index, value)
 	return nil
+}
+
+func convertAsNeeded(t reflect.Type, v reflect.Value) (reflect.Value, error) {
+	err := isAssignable(t, v)
+	if err != nil {
+		if !v.Type().ConvertibleTo(t) {
+			return reflect.Value{}, err
+		}
+		v = v.Convert(t)
+	}
+	return v, nil
 }
 
 func (v mapTarget) String() string {
@@ -259,6 +275,11 @@ func (b *Builder) DigField(s string) error {
 		// TODO: handle error when map is not indexed by strings
 		key := reflect.ValueOf(s)
 
+		key, err := convertAsNeeded(v.Type().Key(), key)
+		if err != nil {
+			return err
+		}
+
 		b.replace(mapTarget{
 			index: key,
 			m:     v,
@@ -358,6 +379,11 @@ func (b *Builder) SliceLastOrCreate() error {
 func (b *Builder) SliceNewElem() error {
 	t := b.top()
 	v := t.get()
+
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
 	err := checkKind(v.Type(), reflect.Slice)
 	if err != nil {
 		return err
@@ -519,7 +545,11 @@ func (b *Builder) EnsureSlice() error {
 	}
 
 	if v.Kind() != reflect.Slice {
-		return IncorrectKindError{Actual: v.Kind(), Expected: []reflect.Kind{reflect.Slice}}
+		return IncorrectKindError{
+			Reason:   "EnsureSlice",
+			Actual:   v.Kind(),
+			Expected: []reflect.Kind{reflect.Slice},
+		}
 	}
 
 	if v.IsNil() {
@@ -539,10 +569,13 @@ func (b *Builder) EnsureStructOrMap() error {
 	case reflect.Struct:
 	case reflect.Map:
 		if v.IsNil() {
-			return t.set(reflect.MakeMap(v.Type()))
+			x := reflect.New(v.Type())
+			x.Elem().Set(reflect.MakeMap(v.Type()))
+			return t.set(x)
 		}
 	default:
 		return IncorrectKindError{
+			Reason:   "EnsureStructOrMap",
 			Actual:   v.Kind(),
 			Expected: []reflect.Kind{reflect.Struct, reflect.Map},
 		}
@@ -557,6 +590,7 @@ func checkKindInt(rt reflect.Type) error {
 	}
 
 	return IncorrectKindError{
+		Reason:   "CheckKindInt",
 		Actual:   rt.Kind(),
 		Expected: []reflect.Kind{reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64},
 	}
@@ -569,6 +603,7 @@ func checkKindFloat(rt reflect.Type) error {
 	}
 
 	return IncorrectKindError{
+		Reason:   "CheckKindFloat",
 		Actual:   rt.Kind(),
 		Expected: []reflect.Kind{reflect.Float64},
 	}
@@ -577,6 +612,7 @@ func checkKindFloat(rt reflect.Type) error {
 func checkKind(rt reflect.Type, expected reflect.Kind) error {
 	if rt.Kind() != expected {
 		return IncorrectKindError{
+			Reason:   "CheckKind",
 			Actual:   rt.Kind(),
 			Expected: []reflect.Kind{expected},
 		}
@@ -585,15 +621,27 @@ func checkKind(rt reflect.Type, expected reflect.Kind) error {
 }
 
 type IncorrectKindError struct {
+	Reason   string
 	Actual   reflect.Kind
 	Expected []reflect.Kind
 }
 
 func (e IncorrectKindError) Error() string {
+	b := strings.Builder{}
+	b.WriteString("incorrect kind: ")
+
 	if len(e.Expected) < 2 {
-		return fmt.Sprintf("incorrect kind: expected '%s', got '%s'", e.Expected[0], e.Actual)
+		b.WriteString(fmt.Sprintf("expected '%s', got '%s'", e.Expected[0], e.Actual))
+	} else {
+		b.WriteString(fmt.Sprintf("expected any of '%s', got '%s'", e.Expected, e.Actual))
 	}
-	return fmt.Sprintf("incorrect kind: expected any of '%s', got '%s'", e.Expected, e.Actual)
+
+	if e.Reason != "" {
+		b.WriteString(": ")
+		b.WriteString(e.Reason)
+	}
+
+	return b.String()
 }
 
 type FieldNotFoundError struct {
