@@ -770,6 +770,11 @@ func (p parser) parseDateTime(b []byte) ([]byte, error) {
 			localTime.Nanosecond *= 10
 			localTime.Nanosecond += int(b[idx] - '0')
 			idx++
+
+			if idx < len(b) {
+				break
+			}
+
 			if !isDigit(b[idx]) {
 				break
 			}

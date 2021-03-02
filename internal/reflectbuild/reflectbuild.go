@@ -202,6 +202,10 @@ func NewBuilder(tag string, v interface{}) (Builder, error) {
 		return Builder{}, fmt.Errorf("cannot build a %s: need a pointer", rv.Type().Kind())
 	}
 
+	if rv.IsNil() {
+		return Builder{}, fmt.Errorf("cannot build a nil value")
+	}
+
 	return Builder{
 		root:    rv.Elem(),
 		stack:   []target{valueTarget(rv.Elem())},
@@ -251,6 +255,8 @@ func (b *Builder) replace(v target) {
 	b.stack[len(b.stack)-1] = v
 }
 
+var mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
+
 // DigField pushes the cursor into a field of the current struct.
 // Dereferences all pointers found along the way.
 // Errors if the current value is not a struct, or the field does not exist.
@@ -259,9 +265,17 @@ func (b *Builder) DigField(s string) error {
 	v := t.get()
 
 	for v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+		if v.Kind() == reflect.Interface {
+			fmt.Println("STOP")
+		}
+
 		if v.IsNil() {
-			thing := reflect.New(v.Type().Elem())
-			v.Set(thing)
+			if v.Kind() == reflect.Ptr {
+				thing := reflect.New(v.Type().Elem())
+				v.Set(thing)
+			} else {
+				v.Set(reflect.MakeMap(mapStringInterfaceType))
+			}
 		}
 		v = v.Elem()
 	}

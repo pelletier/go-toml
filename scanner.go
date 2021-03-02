@@ -154,7 +154,7 @@ func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
 		switch b[i] {
 		case '"':
 			if scanFollowsMultilineBasicStringDelimiter(b[i:]) {
-				return b[:i+3], b[:i+3], nil
+				return b[:i+3], b[i+3:], nil
 			}
 		case '\\':
 			if len(b) < i+2 {
