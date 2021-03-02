@@ -207,7 +207,6 @@ func (u *unmarshaler) IntValue(n int64) {
 		u.builder.Load()
 	} else {
 		u.err = u.builder.Set(reflect.ValueOf(&n))
-		//u.err = u.builder.SetInt(n)
 	}
 }
 

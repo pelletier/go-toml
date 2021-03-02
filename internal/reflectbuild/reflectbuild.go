@@ -45,13 +45,12 @@ func (v valueTarget) set(value reflect.Value) error {
 		value = value.Elem()
 	}
 
-	err := isAssignable(rv.Type(), value)
+	targetType := rv.Type()
+	value, err := tryConvert(targetType, value)
 	if err != nil {
-		if !value.Type().ConvertibleTo(rv.Type()) {
-			return err
-		}
-		value = value.Convert(rv.Type())
+		return err
 	}
+
 	reflect.Value(v).Set(value)
 	return nil
 }
@@ -78,24 +77,13 @@ func (v mapTarget) set(value reflect.Value) error {
 	}
 
 	targetType := v.m.Type().Elem()
-	value, err := convertAsNeeded(targetType, value)
+	value, err := tryConvert(targetType, value)
 	if err != nil {
 		return err
 	}
 
 	v.m.SetMapIndex(v.index, value)
 	return nil
-}
-
-func convertAsNeeded(t reflect.Type, v reflect.Value) (reflect.Value, error) {
-	err := isAssignable(t, v)
-	if err != nil {
-		if !v.Type().ConvertibleTo(t) {
-			return reflect.Value{}, err
-		}
-		v = v.Convert(t)
-	}
-	return v, nil
 }
 
 func (v mapTarget) String() string {
@@ -289,7 +277,7 @@ func (b *Builder) DigField(s string) error {
 		// TODO: handle error when map is not indexed by strings
 		key := reflect.ValueOf(s)
 
-		key, err := convertAsNeeded(v.Type().Key(), key)
+		key, err := tryConvert(v.Type().Key(), key)
 		if err != nil {
 			return err
 		}
@@ -445,11 +433,11 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 	}
 
 	if v.Type().Elem() != value.Type() {
-		nv, err := tryConvert(v.Type().Elem(), value)
-		if err != nil {
-			return fmt.Errorf("cannot assign '%s' to '%s'", value.Type(), v.Type().Elem())
-		}
-		value = nv
+		//nv, err := tryConvert(v.Type().Elem(), value)
+		//if err != nil {
+		return fmt.Errorf("cannot assign '%s' to '%s'", value.Type(), v.Type().Elem())
+		//}
+		//value = nv
 	}
 
 	newSlice := reflect.Append(v, value)
@@ -460,24 +448,32 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 
 func tryConvert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	result := value
+
+	if value.Type().AssignableTo(t) {
+		return result, nil
+	}
+
 	if value.Kind() == reflect.Ptr {
 		if t.Kind() != reflect.Ptr {
 			return reflect.Value{}, fmt.Errorf("cannot convert pointer to non-pointer")
 		}
 
-		if value.Type().Elem().ConvertibleTo(t.Elem()) {
-			result = reflect.New(t.Elem())
-			result.Elem().Set(value.Elem().Convert(t.Elem()))
-			return result, nil
-		}
-	} else {
-		if value.Type().ConvertibleTo(t) {
-			result = reflect.New(t)
-			result.Elem().Set(value.Convert(t))
-			return result.Elem(), nil
-		}
+		value = value.Elem()
+		t = t.Elem()
 	}
-	return result, fmt.Errorf("no conversion found")
+
+	if !value.Type().ConvertibleTo(t) {
+		return result, fmt.Errorf("cannot convert '%s' to '%s'", value.Type(), t)
+	}
+
+	switch t.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		value.Convert(reflect.TypeOf(int64(0)))
+	}
+
+	result = reflect.New(t)
+	result.Elem().Set(value.Convert(t))
+	return result.Elem(), nil
 }
 
 // Set the value at the cursor to the given string.
@@ -518,25 +514,6 @@ func (b *Builder) SetFloat(n float64) error {
 	}
 
 	v.SetFloat(n)
-	return nil
-}
-
-func (b *Builder) SetInt(n int64) error {
-	t := b.top()
-	v := t.get()
-
-	err := checkKindInt(v.Type())
-	if err != nil {
-		rn := reflect.ValueOf(n)
-		if rn.Type().ConvertibleTo(v.Type()) {
-			v.Set(rn.Convert(v.Type()))
-			return nil
-		} else {
-			return err
-		}
-	}
-
-	v.SetInt(n)
 	return nil
 }
 
