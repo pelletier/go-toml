@@ -12,9 +12,9 @@ stages:
       vmImage: ubuntu-latest
     steps:
     - task: GoTool@0
-      displayName: "Install Go 1.15"
+      displayName: "Install Go 1.16"
       inputs:
-        version: "1.15"
+        version: "1.16"
     - task: Go@0
       displayName: "go fmt ./..."
       inputs:
@@ -27,9 +27,9 @@ stages:
       vmImage: ubuntu-latest
     steps:
     - task: GoTool@0
-      displayName: "Install Go 1.15"
+      displayName: "Install Go 1.16"
       inputs:
-        version: "1.15"
+        version: "1.16"
     - task: Go@0
       displayName: "Generate coverage"
       inputs:
@@ -47,9 +47,9 @@ stages:
       vmImage: ubuntu-latest
     steps:
     - task: GoTool@0
-      displayName: "Install Go 1.15"
+      displayName: "Install Go 1.16"
       inputs:
-        version: "1.15"
+        version: "1.16"
     - script: echo "##vso[task.setvariable variable=PATH]${PATH}:/home/vsts/go/bin/"
     - task: Bash@3
       inputs:
@@ -60,6 +60,15 @@ stages:
     displayName: "unit tests"
     strategy:
       matrix:
+        linux 1.16:
+          goVersion: '1.16'
+          imageName: 'ubuntu-latest'
+        mac 1.16:
+          goVersion: '1.16'
+          imageName: 'macOS-latest'
+        windows 1.16:
+          goVersion: '1.16'
+          imageName: 'windows-latest'
         linux 1.15:
           goVersion: '1.15'
           imageName: 'ubuntu-latest'
@@ -68,15 +77,6 @@ stages:
           imageName: 'macOS-latest'
         windows 1.15:
           goVersion: '1.15'
-          imageName: 'windows-latest'
-        linux 1.14:
-          goVersion: '1.14'
-          imageName: 'ubuntu-latest'
-        mac 1.14:
-          goVersion: '1.14'
-          imageName: 'macOS-latest'
-        windows 1.14:
-          goVersion: '1.14'
           imageName: 'windows-latest'
     pool:
       vmImage: $(imageName)
@@ -113,7 +113,7 @@ stages:
     - task: GoTool@0
       displayName: "Install Go"
       inputs:
-        version: 1.15
+        version: 1.16
     - task: Bash@3
       inputs:
         targetType: inline
