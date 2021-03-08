@@ -22,13 +22,6 @@ type target interface {
 	fmt.Stringer
 }
 
-func isAssignable(t reflect.Type, v reflect.Value) error {
-	if v.Type().AssignableTo(t) {
-		return nil
-	}
-	return fmt.Errorf("cannot assign '%s' ('%s') to a '%s'", v, v.Type(), t)
-}
-
 type valueTarget reflect.Value
 
 func (v valueTarget) get() reflect.Value {
@@ -39,6 +32,9 @@ func (v valueTarget) set(value reflect.Value) error {
 	rv := reflect.Value(v)
 
 	// value is guaranteed to be a pointer
+	if value.Kind() != reflect.Ptr {
+		panic(fmt.Sprintf("set() should receive a pointer, not a '%s'", value.Kind()))
+	}
 
 	if rv.Kind() != reflect.Ptr {
 		// TODO: check value is nil?
@@ -46,12 +42,12 @@ func (v valueTarget) set(value reflect.Value) error {
 	}
 
 	targetType := rv.Type()
-	value, err := tryConvert(targetType, value)
+	value, err := convert(targetType, value)
 	if err != nil {
 		return err
 	}
 
-	reflect.Value(v).Set(value)
+	rv.Set(value)
 	return nil
 }
 
@@ -77,7 +73,7 @@ func (v mapTarget) set(value reflect.Value) error {
 	}
 
 	targetType := v.m.Type().Elem()
-	value, err := tryConvert(targetType, value)
+	value, err := convert(targetType, value)
 	if err != nil {
 		return err
 	}
@@ -277,7 +273,7 @@ func (b *Builder) DigField(s string) error {
 		// TODO: handle error when map is not indexed by strings
 		key := reflect.ValueOf(s)
 
-		key, err := tryConvert(v.Type().Key(), key)
+		key, err := convert(v.Type().Key(), key)
 		if err != nil {
 			return err
 		}
@@ -433,7 +429,7 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 	}
 
 	if v.Type().Elem() != value.Type() {
-		//nv, err := tryConvert(v.Type().Elem(), value)
+		//nv, err := convert(v.Type().Elem(), value)
 		//if err != nil {
 		return fmt.Errorf("cannot assign '%s' to '%s'", value.Type(), v.Type().Elem())
 		//}
@@ -446,7 +442,19 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 	return nil
 }
 
-func tryConvert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
+// convert value so that it can be assigned to t.
+//
+// Conversion rules:
+//
+// * Pointers are de-referenced as needed.
+// * Integer types are converted between each other as long as they don't
+//   overflow.
+// * Float types are converted between each other as long as they don't
+//   overflow.
+//
+// TODO: this function acts as a switchboard. Runtime has enough information to
+// generate per-type functions avoiding the double type switches.
+func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	result := value
 
 	if value.Type().AssignableTo(t) {
@@ -462,18 +470,58 @@ func tryConvert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 		t = t.Elem()
 	}
 
-	if !value.Type().ConvertibleTo(t) {
-		return result, fmt.Errorf("cannot convert '%s' to '%s'", value.Type(), t)
-	}
-
+	var err error
 	switch t.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		value.Convert(reflect.TypeOf(int64(0)))
+		value, err = convertInt(t, value)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		value, err = convertUint(t, value)
+	case reflect.Float32, reflect.Float64:
+		value, err = convertFloat(t, value)
+	default:
+		err = fmt.Errorf("not converting a %s into a %s", value.Kind(), t.Kind())
+	}
+
+	if err != nil {
+		return value, err
 	}
 
 	result = reflect.New(t)
 	result.Elem().Set(value.Convert(t))
 	return result.Elem(), nil
+}
+
+func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return value.Convert(t), nil // reflect.TypeOf(int64(0))
+	default:
+		return value, fmt.Errorf("cannot convert %s to integer (%s)", value.Kind(), t.Kind())
+	}
+}
+
+func convertUint(t reflect.Type, value reflect.Value) (reflect.Value, error) {
+	switch value.Kind() {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return value.Convert(t), nil // reflect.TypeOf(int64(0))
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		x := value.Int()
+		if x < 0 {
+			return value, fmt.Errorf("cannot store negative integer '%d' into %s", x, t.Kind())
+		}
+		return value.Convert(t), nil
+	default:
+		return value, fmt.Errorf("cannot convert %s to unsigned integer (%s)", value.Kind(), t.Kind())
+	}
+}
+
+func convertFloat(t reflect.Type, value reflect.Value) (reflect.Value, error) {
+	switch value.Kind() {
+	case reflect.Float32, reflect.Float64:
+		return value.Convert(t), nil
+	default:
+		return value, fmt.Errorf("cannot convert %s to integer (%s)", value.Kind(), t.Kind())
+	}
 }
 
 // Set the value at the cursor to the given string.
