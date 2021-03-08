@@ -428,12 +428,9 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 		value = value.Elem()
 	}
 
-	if v.Type().Elem() != value.Type() {
-		//nv, err := convert(v.Type().Elem(), value)
-		//if err != nil {
-		return fmt.Errorf("cannot assign '%s' to '%s'", value.Type(), v.Type().Elem())
-		//}
-		//value = nv
+	value, err = convert(v.Type().Elem(), value)
+	if err != nil {
+		return err
 	}
 
 	newSlice := reflect.Append(v, value)
@@ -455,12 +452,11 @@ func (b *Builder) SliceAppend(value reflect.Value) error {
 // TODO: this function acts as a switchboard. Runtime has enough information to
 // generate per-type functions avoiding the double type switches.
 func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
-	result := value
-
 	if value.Type().AssignableTo(t) {
-		return result, nil
+		return value, nil
 	}
 
+	returnPtr := false
 	if value.Kind() == reflect.Ptr {
 		if t.Kind() != reflect.Ptr {
 			return reflect.Value{}, fmt.Errorf("cannot convert pointer to non-pointer")
@@ -468,6 +464,7 @@ func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 
 		value = value.Elem()
 		t = t.Elem()
+		returnPtr = true
 	}
 
 	var err error
@@ -486,8 +483,11 @@ func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 		return value, err
 	}
 
-	result = reflect.New(t)
+	result := reflect.New(t) // TODO: remove alloc
 	result.Elem().Set(value.Convert(t))
+	if returnPtr {
+		return result, nil
+	}
 	return result.Elem(), nil
 }
 
