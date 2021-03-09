@@ -23,6 +23,8 @@ type builder interface {
 	ArrayBegin()
 	ArrayEnd()
 	Assignation()
+	InlineTableBegin()
+	InlineTableEnd()
 
 	StringValue(v []byte)
 	BoolValue(b bool)
@@ -249,6 +251,9 @@ func (p parser) parseInlineTable(b []byte) ([]byte, error) {
 	//inline-table-sep   = ws %x2C ws  ; , Comma
 	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 
+	p.builder.InlineTableBegin()
+	defer p.builder.InlineTableEnd()
+
 	b = b[1:]
 
 	first := true
@@ -273,6 +278,7 @@ func (p parser) parseInlineTable(b []byte) ([]byte, error) {
 
 		first = false
 	}
+
 	return expect('}', b)
 }
 

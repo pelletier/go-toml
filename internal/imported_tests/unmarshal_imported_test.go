@@ -1887,11 +1887,9 @@ func TestUnmarshalMixedTypeArray(t *testing.T) {
 func TestUnmarshalArray(t *testing.T) {
 	var err error
 
-	var actual1 arrayStruct
-	err = toml.Unmarshal(sliceTomlDemo, &actual1)
-	if err != nil {
-		t.Error("shound not err", err)
-	}
+	var actual arrayStruct
+	err = toml.Unmarshal(sliceTomlDemo, &actual)
+	require.NoError(t, err)
 
 	expected := arrayStruct{
 		Slice:          [4]string{"Howdy", "Hey There"},
@@ -1901,17 +1899,13 @@ func TestUnmarshalArray(t *testing.T) {
 		StructSlice:    [4]basicMarshalTestSubStruct{{"1"}, {"2"}},
 		StructSlicePtr: &[4]basicMarshalTestSubStruct{{"1"}, {"2"}},
 	}
-	if !reflect.DeepEqual(actual1, expected) {
-		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual1)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestUnmarshalArrayFail(t *testing.T) {
 	var actual arrayTooSmallStruct
 	err := toml.Unmarshal([]byte(`str_slice = ["Howdy", "Hey There"]`), &actual)
-	if err.Error() != "(0, 0): unmarshal: TOML array length (2) exceeds destination array length (1)" {
-		t.Error("expect err:(0, 0): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
-	}
+	assert.Error(t, err)
 }
 
 func TestUnmarshalArrayFail2(t *testing.T) {
@@ -1919,9 +1913,7 @@ func TestUnmarshalArrayFail2(t *testing.T) {
 
 	var actual arrayTooSmallStruct
 	err := toml.Unmarshal([]byte(doc), &actual)
-	if err.Error() != "(1, 1): unmarshal: TOML array length (2) exceeds destination array length (1)" {
-		t.Error("expect err:(1, 1): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
-	}
+	assert.Error(t, err)
 }
 
 func TestUnmarshalArrayFail3(t *testing.T) {
@@ -1932,9 +1924,7 @@ String2="2"`
 
 	var actual arrayTooSmallStruct
 	err := toml.Unmarshal([]byte(doc), &actual)
-	if err.Error() != "(3, 1): unmarshal: TOML array length (2) exceeds destination array length (1)" {
-		t.Error("expect err:(3, 1): unmarshal: TOML array length (2) exceeds destination array length (1) but got ", err)
-	}
+	assert.Error(t, err)
 }
 
 func TestDecoderStrict(t *testing.T) {

@@ -121,6 +121,23 @@ func (u *unmarshaler) ArrayTableEnd() {
 	u.arrayTableKey = u.arrayTableKey[:0]
 }
 
+func (u *unmarshaler) InlineTableBegin() {
+	if u.skipping() || u.err != nil {
+		return
+	}
+
+	// TODO
+
+}
+
+func (u *unmarshaler) InlineTableEnd() {
+	if u.skipping() || u.err != nil {
+		return
+	}
+
+	// TODO
+}
+
 func (u *unmarshaler) KeyValBegin() {
 	if u.skipKeyValCount > 0 {
 		u.skipKeyValCount++
