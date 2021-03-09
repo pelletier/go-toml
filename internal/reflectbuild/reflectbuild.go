@@ -467,6 +467,10 @@ func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 		returnPtr = true
 	}
 
+	if t.Kind() == value.Kind() {
+		return value.Convert(t), nil
+	}
+
 	var err error
 	switch t.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
