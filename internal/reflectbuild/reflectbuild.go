@@ -4,6 +4,7 @@ package reflectbuild
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 )
@@ -495,33 +496,172 @@ func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	return result.Elem(), nil
 }
 
+type IntegerOverflowErr struct {
+	value int64
+	min   int64
+	max   int64
+	kind  reflect.Kind
+}
+
+func (e IntegerOverflowErr) Error() string {
+	return fmt.Sprintf("integer overflow: cannot store %d in %s [%d, %d]", e.value, e.kind, e.min, e.max)
+}
+
+const maxInt = int64(^uint(0) >> 1)
+const minInt = -maxInt - 1
+
 func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	switch value.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return value.Convert(t), nil // reflect.TypeOf(int64(0))
+		x := value.Int()
+
+		switch t.Kind() {
+		case reflect.Int:
+			if x > maxInt || x < minInt {
+				return value, IntegerOverflowErr{
+					value: x,
+					min:   minInt,
+					max:   maxInt,
+					kind:  t.Kind(),
+				}
+			}
+		case reflect.Int8:
+			if x > math.MaxInt8 || x < math.MinInt8 {
+				return value, IntegerOverflowErr{
+					value: x,
+					min:   math.MinInt8,
+					max:   math.MaxInt8,
+					kind:  t.Kind(),
+				}
+			}
+		case reflect.Int16:
+			if x > math.MaxInt16 || x < math.MinInt16 {
+				return value, IntegerOverflowErr{
+					value: x,
+					min:   math.MinInt16,
+					max:   math.MaxInt16,
+					kind:  t.Kind(),
+				}
+			}
+		case reflect.Int32:
+			if x > math.MaxInt32 || x < math.MinInt32 {
+				return value, IntegerOverflowErr{
+					value: x,
+					min:   math.MinInt32,
+					max:   math.MaxInt32,
+					kind:  t.Kind(),
+				}
+			}
+		case reflect.Int64:
+			if x > math.MaxInt64 || x < math.MinInt64 {
+				return value, IntegerOverflowErr{
+					value: x,
+					min:   math.MinInt64,
+					max:   math.MaxInt64,
+					kind:  t.Kind(),
+				}
+			}
+		}
+
+		return value.Convert(t), nil
 	default:
 		return value, fmt.Errorf("cannot convert %s to integer (%s)", value.Kind(), t.Kind())
 	}
 }
 
+type UnsignedIntegerOverflowErr struct {
+	value uint64
+	max   uint64
+	kind  reflect.Kind
+}
+
+func (e UnsignedIntegerOverflowErr) Error() string {
+	return fmt.Sprintf("unsigned integer overflow: cannot store %d in %s [max %d]", e.value, e.kind, e.max)
+}
+
 func convertUint(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	switch value.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		err := convertUintOverflowCheck(t.Kind(), value.Uint())
+		if err != nil {
+			return value, err
+		}
 		return value.Convert(t), nil // reflect.TypeOf(int64(0))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		x := value.Int()
-		if x < 0 {
-			return value, fmt.Errorf("cannot store negative integer '%d' into %s", x, t.Kind())
+		signed := value.Int()
+		if signed < 0 {
+			return value, fmt.Errorf("cannot store negative integer '%d' into %s", signed, t.Kind())
 		}
+
+		x := uint64(signed)
+		err := convertUintOverflowCheck(t.Kind(), x)
+		if err != nil {
+			return value, err
+		}
+
 		return value.Convert(t), nil
 	default:
 		return value, fmt.Errorf("cannot convert %s to unsigned integer (%s)", value.Kind(), t.Kind())
 	}
 }
 
+const maxUint = uint64(^uint(0))
+
+func convertUintOverflowCheck(t reflect.Kind, x uint64) error {
+	switch t {
+	case reflect.Uint:
+		if x > maxUint {
+			return UnsignedIntegerOverflowErr{
+				value: x,
+				max:   maxUint,
+				kind:  t,
+			}
+		}
+	case reflect.Uint8:
+		if x > math.MaxUint8 {
+			return UnsignedIntegerOverflowErr{
+				value: x,
+				max:   math.MaxUint8,
+				kind:  t,
+			}
+		}
+	case reflect.Uint16:
+		if x > math.MaxUint16 {
+			return UnsignedIntegerOverflowErr{
+				value: x,
+				max:   math.MaxUint16,
+				kind:  t,
+			}
+		}
+	case reflect.Uint32:
+		if x > math.MaxUint32 {
+			return UnsignedIntegerOverflowErr{
+				value: x,
+				max:   math.MaxUint32,
+				kind:  t,
+			}
+		}
+	case reflect.Uint64:
+		if x > math.MaxUint64 {
+			return UnsignedIntegerOverflowErr{
+				value: x,
+				max:   math.MaxUint64,
+				kind:  t,
+			}
+		}
+	}
+	return nil
+}
+
 func convertFloat(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	switch value.Kind() {
 	case reflect.Float32, reflect.Float64:
+		if t.Kind() == reflect.Float32 {
+			f := value.Float()
+			if f > math.MaxFloat32 {
+				return value, fmt.Errorf("float overflow: %f does not fit in %s [max %f]")
+			}
+		}
 		return value.Convert(t), nil
 	default:
 		return value, fmt.Errorf("cannot convert %s to integer (%s)", value.Kind(), t.Kind())

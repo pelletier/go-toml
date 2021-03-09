@@ -1047,15 +1047,15 @@ func TestUnmarshalOverflow(t *testing.T) {
 	testCases := []TestCase{
 		{
 			desc:  "byte",
-			input: `u8 = 300`,
+			input: `U8 = 300`,
 		},
 		{
 			desc:  "int8",
-			input: `i8 = 300`,
+			input: `I8 = 300`,
 		},
 		{
 			desc:  "float32",
-			input: `f32 = 1e300`,
+			input: `F32 = 1e300`,
 		},
 	}
 
