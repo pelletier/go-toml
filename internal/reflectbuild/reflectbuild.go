@@ -380,6 +380,12 @@ func (b *Builder) SliceNewElem() error {
 	v := t.get()
 
 	if v.Kind() == reflect.Ptr {
+		// if the pointer is nil we need to allocate the slice
+		if v.IsNil() {
+			x := reflect.New(v.Type().Elem())
+			v.Set(x)
+		}
+		// target the slice itself
 		v = v.Elem()
 	}
 

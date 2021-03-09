@@ -165,7 +165,7 @@ func (u *unmarshaler) BoolValue(b bool) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&b))
 		if u.err != nil {
@@ -181,7 +181,7 @@ func (u *unmarshaler) FloatValue(n float64) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&n))
 		if u.err != nil {
@@ -198,7 +198,7 @@ func (u *unmarshaler) IntValue(n int64) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&n))
 		if u.err != nil {
@@ -214,7 +214,7 @@ func (u *unmarshaler) LocalDateValue(date LocalDate) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&date))
 		if u.err != nil {
@@ -230,7 +230,7 @@ func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&dt))
 		if u.err != nil {
@@ -246,7 +246,7 @@ func (u *unmarshaler) DateTimeValue(dt time.Time) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&dt))
 		if u.err != nil {
@@ -262,7 +262,7 @@ func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
 	if u.skipping() || u.err != nil {
 		return
 	}
-	if u.builder.IsSlice() {
+	if u.builder.IsSliceOrPtr() {
 		u.builder.Save()
 		u.err = u.builder.SliceAppend(reflect.ValueOf(&localTime))
 		if u.err != nil {

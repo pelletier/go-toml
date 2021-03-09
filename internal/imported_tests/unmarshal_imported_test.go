@@ -1827,9 +1827,7 @@ type arrayTooSmallStruct struct {
 func TestUnmarshalSlice(t *testing.T) {
 	var actual sliceStruct
 	err := toml.Unmarshal(sliceTomlDemo, &actual)
-	if err != nil {
-		t.Error("shound not err", err)
-	}
+	require.NoError(t, err)
 	expected := sliceStruct{
 		Slice:          []string{"Howdy", "Hey There"},
 		SlicePtr:       &[]string{"Howdy", "Hey There"},
@@ -1838,10 +1836,7 @@ func TestUnmarshalSlice(t *testing.T) {
 		StructSlice:    []basicMarshalTestSubStruct{{"1"}, {"2"}},
 		StructSlicePtr: &[]basicMarshalTestSubStruct{{"1"}, {"2"}},
 	}
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
-	}
-
+	assert.Equal(t, expected, actual)
 }
 
 func TestUnmarshalSliceFail(t *testing.T) {
