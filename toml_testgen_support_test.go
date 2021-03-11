@@ -8,8 +8,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func testgenInvalid(t *testing.T, input string) {
@@ -56,7 +54,7 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	}
 
 	if !reflect.DeepEqual(jsonExpected, jsonTest) {
-		t.Logf("Diff:\n%s", spew.Sdump(jsonExpected, jsonTest))
+		t.Logf("Diff:\n%#+v\n%#+v", jsonExpected, jsonTest)
 		t.Fatal("parsed TOML tree is different than expected structure")
 	}
 }
