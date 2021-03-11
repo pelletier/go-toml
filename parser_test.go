@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func assertSubTree(t *testing.T, path []string, tree *Tree, err error, ref map[string]interface{}) {
@@ -39,7 +37,7 @@ func assertSubTree(t *testing.T, path []string, tree *Tree, err error, ref map[s
 }
 
 func assertTree(t *testing.T, tree *Tree, err error, ref map[string]interface{}) {
-	t.Log("Asserting tree:\n", spew.Sdump(tree))
+	t.Logf("Asserting tree:\n (%T)(%p)(%+v)", tree, tree, tree)
 	assertSubTree(t, []string{}, tree, err, ref)
 	t.Log("Finished tree assertion.")
 }
