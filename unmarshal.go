@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -62,6 +63,7 @@ func (u *unmarshaler) Assignation() {
 		return
 	}
 	u.assign = true
+	fmt.Println("ASSIGN: TRUE!")
 }
 
 func (u *unmarshaler) ArrayBegin() {
@@ -73,11 +75,12 @@ func (u *unmarshaler) ArrayBegin() {
 	if u.err != nil {
 		return
 	}
-	if u.assign {
-		u.assign = false
-	} else {
-		u.err = u.builder.SliceNewElem()
+	fmt.Println("ARRAY BEGIN ASSIGN =", u.assign)
+	if !u.assign {
+		//u.err = u.builder.SliceNewSlice()
+		// TODO
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) ArrayEnd() {
@@ -126,8 +129,15 @@ func (u *unmarshaler) InlineTableBegin() {
 		return
 	}
 
-	// TODO
+	u.builder.Save()
 
+	if u.builder.IsSliceOrPtr() {
+		u.err = u.builder.SliceNewElem()
+	} else {
+		u.err = u.builder.EnsureStructOrMap()
+	}
+
+	u.assign = false
 }
 
 func (u *unmarshaler) InlineTableEnd() {
@@ -135,7 +145,7 @@ func (u *unmarshaler) InlineTableEnd() {
 		return
 	}
 
-	// TODO
+	u.builder.Load()
 }
 
 func (u *unmarshaler) KeyValBegin() {
@@ -176,6 +186,7 @@ func (u *unmarshaler) StringValue(v []byte) {
 		s := string(v)
 		u.err = u.builder.Set(reflect.ValueOf(&s))
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) BoolValue(b bool) {
@@ -192,6 +203,7 @@ func (u *unmarshaler) BoolValue(b bool) {
 	} else {
 		u.err = u.builder.SetBool(b)
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) FloatValue(n float64) {
@@ -209,6 +221,7 @@ func (u *unmarshaler) FloatValue(n float64) {
 		u.err = u.builder.Set(reflect.ValueOf(&n))
 		//u.err = u.builder.SetFloat(n)
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) IntValue(n int64) {
@@ -225,6 +238,7 @@ func (u *unmarshaler) IntValue(n int64) {
 	} else {
 		u.err = u.builder.Set(reflect.ValueOf(&n))
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) LocalDateValue(date LocalDate) {
@@ -241,6 +255,7 @@ func (u *unmarshaler) LocalDateValue(date LocalDate) {
 	} else {
 		u.err = u.builder.Set(reflect.ValueOf(&date))
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
@@ -257,6 +272,7 @@ func (u *unmarshaler) LocalDateTimeValue(dt LocalDateTime) {
 	} else {
 		u.err = u.builder.Set(reflect.ValueOf(&dt))
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) DateTimeValue(dt time.Time) {
@@ -273,6 +289,7 @@ func (u *unmarshaler) DateTimeValue(dt time.Time) {
 	} else {
 		u.err = u.builder.Set(reflect.ValueOf(&dt))
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
@@ -289,6 +306,7 @@ func (u *unmarshaler) LocalTimeValue(localTime LocalTime) {
 	} else {
 		u.err = u.builder.Set(reflect.ValueOf(&localTime))
 	}
+	u.assign = false
 }
 
 func (u *unmarshaler) SimpleKey(v []byte) {
@@ -337,5 +355,5 @@ func (u *unmarshaler) StandardTableEnd() {
 		return
 	}
 
-	u.builder.EnsureStructOrMap()
+	u.builder.EnsureStructOrMap() // TODO: handle error
 }

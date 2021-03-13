@@ -199,9 +199,7 @@ func NewBuilder(tag string, v interface{}) (Builder, error) {
 }
 
 func (b *Builder) top() target {
-	t := b.stack[len(b.stack)-1]
-	fmt.Println("TOP:", t)
-	return t
+	return b.stack[len(b.stack)-1]
 }
 
 func (b *Builder) duplicate() {
@@ -213,7 +211,6 @@ func (b *Builder) duplicate() {
 
 func (b *Builder) pop() {
 	b.stack = b.stack[:len(b.stack)-1]
-	fmt.Println("POP: top:", b.stack[len(b.stack)-1])
 }
 
 func (b *Builder) len() int {
@@ -236,7 +233,6 @@ func (b *Builder) Dump() string {
 }
 
 func (b *Builder) replace(v target) {
-	fmt.Println("REPLACING:", v)
 	b.stack[len(b.stack)-1] = v
 }
 
@@ -250,10 +246,6 @@ func (b *Builder) DigField(s string) error {
 	v := t.get()
 
 	for v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
-		if v.Kind() == reflect.Interface {
-			fmt.Println("STOP")
-		}
-
 		if v.IsNil() {
 			if v.Kind() == reflect.Ptr {
 				thing := reflect.New(v.Type().Elem())
@@ -338,7 +330,20 @@ func (b *Builder) IsSlice() bool {
 }
 
 func (b *Builder) IsSliceOrPtr() bool {
-	return b.top().get().Kind() == reflect.Slice || (b.top().get().Kind() == reflect.Ptr && b.top().get().Type().Elem().Kind() == reflect.Slice)
+	t := b.top().get()
+	if t.Kind() == reflect.Slice {
+		return true
+	}
+
+	if t.Kind() == reflect.Ptr && t.Type().Elem().Kind() == reflect.Slice {
+		return true
+	}
+
+	if t.Kind() == reflect.Interface && !t.IsNil() && t.Elem().Type().Kind() == reflect.Slice {
+		return true
+	}
+
+	return false
 }
 
 // Last moves the cursor to the last value of the current value.
@@ -502,14 +507,14 @@ func convert(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	return result.Elem(), nil
 }
 
-type IntegerOverflowErr struct {
+type IntegerOverflowError struct {
 	value int64
 	min   int64
 	max   int64
 	kind  reflect.Kind
 }
 
-func (e IntegerOverflowErr) Error() string {
+func (e IntegerOverflowError) Error() string {
 	return fmt.Sprintf("integer overflow: cannot store %d in %s [%d, %d]", e.value, e.kind, e.min, e.max)
 }
 
@@ -524,7 +529,7 @@ func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 		switch t.Kind() {
 		case reflect.Int:
 			if x > maxInt || x < minInt {
-				return value, IntegerOverflowErr{
+				return value, IntegerOverflowError{
 					value: x,
 					min:   minInt,
 					max:   maxInt,
@@ -533,7 +538,7 @@ func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 			}
 		case reflect.Int8:
 			if x > math.MaxInt8 || x < math.MinInt8 {
-				return value, IntegerOverflowErr{
+				return value, IntegerOverflowError{
 					value: x,
 					min:   math.MinInt8,
 					max:   math.MaxInt8,
@@ -542,7 +547,7 @@ func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 			}
 		case reflect.Int16:
 			if x > math.MaxInt16 || x < math.MinInt16 {
-				return value, IntegerOverflowErr{
+				return value, IntegerOverflowError{
 					value: x,
 					min:   math.MinInt16,
 					max:   math.MaxInt16,
@@ -551,7 +556,7 @@ func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 			}
 		case reflect.Int32:
 			if x > math.MaxInt32 || x < math.MinInt32 {
-				return value, IntegerOverflowErr{
+				return value, IntegerOverflowError{
 					value: x,
 					min:   math.MinInt32,
 					max:   math.MaxInt32,
@@ -560,7 +565,7 @@ func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 			}
 		case reflect.Int64:
 			if x > math.MaxInt64 || x < math.MinInt64 {
-				return value, IntegerOverflowErr{
+				return value, IntegerOverflowError{
 					value: x,
 					min:   math.MinInt64,
 					max:   math.MaxInt64,
@@ -575,13 +580,13 @@ func convertInt(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 	}
 }
 
-type UnsignedIntegerOverflowErr struct {
+type UnsignedIntegerOverflowError struct {
 	value uint64
 	max   uint64
 	kind  reflect.Kind
 }
 
-func (e UnsignedIntegerOverflowErr) Error() string {
+func (e UnsignedIntegerOverflowError) Error() string {
 	return fmt.Sprintf("unsigned integer overflow: cannot store %d in %s [max %d]", e.value, e.kind, e.max)
 }
 
@@ -617,7 +622,7 @@ func convertUintOverflowCheck(t reflect.Kind, x uint64) error {
 	switch t {
 	case reflect.Uint:
 		if x > maxUint {
-			return UnsignedIntegerOverflowErr{
+			return UnsignedIntegerOverflowError{
 				value: x,
 				max:   maxUint,
 				kind:  t,
@@ -625,7 +630,7 @@ func convertUintOverflowCheck(t reflect.Kind, x uint64) error {
 		}
 	case reflect.Uint8:
 		if x > math.MaxUint8 {
-			return UnsignedIntegerOverflowErr{
+			return UnsignedIntegerOverflowError{
 				value: x,
 				max:   math.MaxUint8,
 				kind:  t,
@@ -633,7 +638,7 @@ func convertUintOverflowCheck(t reflect.Kind, x uint64) error {
 		}
 	case reflect.Uint16:
 		if x > math.MaxUint16 {
-			return UnsignedIntegerOverflowErr{
+			return UnsignedIntegerOverflowError{
 				value: x,
 				max:   math.MaxUint16,
 				kind:  t,
@@ -641,7 +646,7 @@ func convertUintOverflowCheck(t reflect.Kind, x uint64) error {
 		}
 	case reflect.Uint32:
 		if x > math.MaxUint32 {
-			return UnsignedIntegerOverflowErr{
+			return UnsignedIntegerOverflowError{
 				value: x,
 				max:   math.MaxUint32,
 				kind:  t,
@@ -649,7 +654,7 @@ func convertUintOverflowCheck(t reflect.Kind, x uint64) error {
 		}
 	case reflect.Uint64:
 		if x > math.MaxUint64 {
-			return UnsignedIntegerOverflowErr{
+			return UnsignedIntegerOverflowError{
 				value: x,
 				max:   math.MaxUint64,
 				kind:  t,
@@ -665,7 +670,7 @@ func convertFloat(t reflect.Type, value reflect.Value) (reflect.Value, error) {
 		if t.Kind() == reflect.Float32 {
 			f := value.Float()
 			if f > math.MaxFloat32 {
-				return value, fmt.Errorf("float overflow: %f does not fit in %s [max %f]")
+				return value, fmt.Errorf("float overflow: %f does not fit in %s [max %f]", f, t, math.MaxFloat32)
 			}
 		}
 		return value.Convert(t), nil
@@ -684,7 +689,7 @@ func (b *Builder) SetString(s string) error {
 		v.Set(reflect.ValueOf(&s))
 		return nil
 	}
-	return t.set(reflect.ValueOf(s))
+	return t.set(reflect.ValueOf(&s))
 }
 
 // Set the value at the cursor to the given boolean.
@@ -762,6 +767,8 @@ func (b *Builder) EnsureStructOrMap() error {
 			x.Elem().Set(reflect.MakeMap(v.Type()))
 			return t.set(x)
 		}
+	case reflect.Interface:
+		// TODO: ?
 	default:
 		return IncorrectKindError{
 			Reason:   "EnsureStructOrMap",
@@ -770,19 +777,6 @@ func (b *Builder) EnsureStructOrMap() error {
 		}
 	}
 	return nil
-}
-
-func checkKindInt(rt reflect.Type) error {
-	switch rt.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return nil
-	}
-
-	return IncorrectKindError{
-		Reason:   "CheckKindInt",
-		Actual:   rt.Kind(),
-		Expected: []reflect.Kind{reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64},
-	}
 }
 
 func checkKindFloat(rt reflect.Type) error {
