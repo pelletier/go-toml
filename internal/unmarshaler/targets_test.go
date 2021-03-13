@@ -129,6 +129,28 @@ func TestPushValue_Struct(t *testing.T) {
 	}
 }
 
+func TestPushNew(t *testing.T) {
+	t.Run("slice of strings", func(t *testing.T) {
+		type Doc struct {
+			A []string
+		}
+		d := Doc{}
+
+		x, err := scope(reflect.ValueOf(&d).Elem(), "A")
+		require.NoError(t, err)
+
+		n, err := x.pushNew()
+		require.NoError(t, err)
+		require.NoError(t, n.setString("hello"))
+		require.Equal(t, []string{"hello"}, d.A)
+
+		n, err = x.pushNew()
+		require.NoError(t, err)
+		require.NoError(t, n.setString("world"))
+		require.Equal(t, []string{"hello", "world"}, d.A)
+	})
+}
+
 func TestScope_Struct(t *testing.T) {
 	examples := []struct {
 		desc  string
@@ -157,7 +179,7 @@ func TestScope_Struct(t *testing.T) {
 			if e.err {
 				require.Error(t, err)
 			} else {
-				x2, ok := x.(structTarget)
+				x2, ok := x.(valueTarget)
 				require.True(t, ok)
 				x2.get()
 			}

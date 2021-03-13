@@ -15,18 +15,23 @@ type target interface {
 	// Appends an arbitrary value to the container.
 	pushValue(v reflect.Value) error
 
+	// Creates a new value of the container's element type, and returns a
+	// target to it.
+	pushNew() (target, error)
+
 	// Dereferences the target.
 	get() reflect.Value
 }
 
-// struct target just contain the reflect.Value of the target field.
-type structTarget reflect.Value
+// valueTarget just contains a reflect.Value that can be set.
+// It is used for struct fields.
+type valueTarget reflect.Value
 
-func (t structTarget) get() reflect.Value {
+func (t valueTarget) get() reflect.Value {
 	return reflect.Value(t)
 }
 
-func (t structTarget) ensure() {
+func (t valueTarget) ensure() {
 	f := t.get()
 	if !f.IsNil() {
 		return
@@ -40,7 +45,7 @@ func (t structTarget) ensure() {
 	}
 }
 
-func (t structTarget) setString(v string) error {
+func (t valueTarget) setString(v string) error {
 	f := t.get()
 	if f.Kind() != reflect.String {
 		return fmt.Errorf("cannot assign string to a %s", f.String())
@@ -49,7 +54,7 @@ func (t structTarget) setString(v string) error {
 	return nil
 }
 
-func (t structTarget) pushValue(v reflect.Value) error {
+func (t valueTarget) pushValue(v reflect.Value) error {
 	f := t.get()
 
 	switch f.Kind() {
@@ -61,6 +66,26 @@ func (t structTarget) pushValue(v reflect.Value) error {
 	}
 
 	return nil
+}
+
+func (t valueTarget) pushNew() (target, error) {
+	f := t.get()
+
+	switch f.Kind() {
+	case reflect.Slice:
+		t.ensure()
+		f = t.get()
+		idx := f.Len()
+		f.Set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
+		return valueTarget(f.Index(idx)), nil
+	default:
+		return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
+	}
+}
+
+func scopeTarget(t target, name string) (target, error) {
+	x := t.get()
+	return scope(x, name)
 }
 
 func scope(v reflect.Value, name string) (target, error) {
@@ -86,7 +111,7 @@ func scopeStruct(v reflect.Value, name string) (target, error) {
 		} else {
 			// TODO: handle names variations
 			if f.Name == name {
-				return structTarget(v.Field(i)), nil
+				return valueTarget(v.Field(i)), nil
 			}
 		}
 	}
