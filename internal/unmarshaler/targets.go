@@ -15,6 +15,12 @@ type target interface {
 	// Store a boolean at the target
 	setBool(v bool) error
 
+	// Store an int64 at the target
+	setInt64(v int64) error
+
+	// Store a float64 at the target
+	setFloat64(v float64) error
+
 	// Creates a new value of the container's element type, and returns a
 	// target to it.
 	pushNew() (target, error)
@@ -78,6 +84,38 @@ func (t valueTarget) setBool(v bool) error {
 		f.Set(reflect.ValueOf(v))
 	default:
 		return fmt.Errorf("cannot assign bool to a %s", f.String())
+	}
+
+	return nil
+}
+
+func (t valueTarget) setInt64(v int64) error {
+	f := t.get()
+
+	switch f.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		// TODO: overflow checks
+		f.SetInt(v)
+	case reflect.Interface:
+		f.Set(reflect.ValueOf(v))
+	default:
+		return fmt.Errorf("cannot assign int64 to a %s", f.String())
+	}
+
+	return nil
+}
+
+func (t valueTarget) setFloat64(v float64) error {
+	f := t.get()
+
+	switch f.Kind() {
+	case reflect.Float32, reflect.Float64:
+		// TODO: overflow checks
+		f.SetFloat(v)
+	case reflect.Interface:
+		f.Set(reflect.ValueOf(v))
+	default:
+		return fmt.Errorf("cannot assign float64 to a %s", f.String())
 	}
 
 	return nil

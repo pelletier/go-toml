@@ -80,6 +80,10 @@ func unmarshalValue(x target, node *ast.Node) error {
 		return unmarshalString(x, node)
 	case ast.Bool:
 		return unmarshalBool(x, node)
+	case ast.Integer:
+		return unmarshalInteger(x, node)
+	case ast.Float:
+		return unmarshalFloat(x, node)
 	case ast.Array:
 		return unmarshalArray(x, node)
 	case ast.InlineTable:
@@ -98,6 +102,24 @@ func unmarshalBool(x target, node *ast.Node) error {
 	assertNode(ast.Bool, node)
 	v := node.Data[0] == 't'
 	return x.setBool(v)
+}
+
+func unmarshalInteger(x target, node *ast.Node) error {
+	assertNode(ast.Integer, node)
+	v, err := node.DecodeInteger()
+	if err != nil {
+		return err
+	}
+	return x.setInt64(v)
+}
+
+func unmarshalFloat(x target, node *ast.Node) error {
+	assertNode(ast.Float, node)
+	v, err := node.DecodeFloat()
+	if err != nil {
+		return err
+	}
+	return x.setFloat64(v)
 }
 
 func unmarshalInlineTable(x target, node *ast.Node) error {

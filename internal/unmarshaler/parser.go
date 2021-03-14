@@ -3,15 +3,10 @@ package unmarshaler
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
-
 	"github.com/pelletier/go-toml/v2/internal/ast"
 )
 
@@ -234,8 +229,6 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 		b, err = p.parseIntOrFloatOrDateTime(&node, b)
 		return node, b, err
 	}
-	panic("parseVal not finished yet")
-	return ast.Node{}, nil, nil
 }
 
 func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
@@ -994,234 +987,9 @@ func (p *parser) scanIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
 	return b[i:], nil
 }
 
-//func (p *parser) parseIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
-//	i := 0
-//	r := b[0]
-//	if r == '0' {
-//		if len(b) >= 2 {
-//			var isValidRune validRuneFn
-//			var parseFn func([]byte) (int64, error)
-//			switch b[1] {
-//			case 'x':
-//				isValidRune = isValidHexRune
-//				parseFn = parseIntHex
-//			case 'o':
-//				isValidRune = isValidOctalRune
-//				parseFn = parseIntOct
-//			case 'b':
-//				isValidRune = isValidBinaryRune
-//				parseFn = parseIntBin
-//			default:
-//				if b[1] >= 'a' && b[1] <= 'z' || b[1] >= 'A' && b[1] <= 'Z' {
-//					return nil, fmt.Errorf("unknown number base: %s. possible options are x (hex) o (octal) b (binary)", string(b[1]))
-//				}
-//				parseFn = parseIntDec
-//			}
-//
-//			if isValidRune != nil {
-//				i = 2
-//				digitSeen := false
-//				for {
-//					if !isValidRune(b[i]) {
-//						break
-//					}
-//					digitSeen = true
-//					i++
-//				}
-//
-//				if !digitSeen {
-//					return nil, fmt.Errorf("number needs at least one digit")
-//				}
-//
-//				v, err := parseFn(b[:i])
-//				if err != nil {
-//					return nil, err
-//				}
-//				//p.builder.IntValue(v)
-//				// TODO
-//				v = v
-//				return b[i:], nil
-//			}
-//		}
-//	}
-//
-//	if r == '+' || r == '-' {
-//		b = b[1:]
-//		if scanFollowsInf(b) {
-//			if r == '+' {
-//				//p.builder.FloatValue(plusInf)
-//				// TODO
-//			} else {
-//				//p.builder.FloatValue(minusInf)
-//				// TODO
-//			}
-//			return b, nil
-//		}
-//		if scanFollowsNan(b) {
-//			//p.builder.FloatValue(nan)
-//			// TODO
-//			return b, nil
-//		}
-//	}
-//
-//	pointSeen := false
-//	expSeen := false
-//	digitSeen := false
-//	for i < len(b) {
-//		next := b[i]
-//		if next == '.' {
-//			if pointSeen {
-//				return nil, fmt.Errorf("cannot have two dots in one float")
-//			}
-//			i++
-//			if i < len(b) && !isDigit(b[i]) {
-//				return nil, fmt.Errorf("float cannot end with a dot")
-//			}
-//			pointSeen = true
-//		} else if next == 'e' || next == 'E' {
-//			expSeen = true
-//			i++
-//			if i >= len(b) {
-//				break
-//			}
-//			if b[i] == '+' || b[i] == '-' {
-//				i++
-//			}
-//		} else if isDigit(next) {
-//			digitSeen = true
-//			i++
-//		} else if next == '_' {
-//			i++
-//		} else {
-//			break
-//		}
-//		if pointSeen && !digitSeen {
-//			return nil, fmt.Errorf("cannot start float with a dot")
-//		}
-//	}
-//
-//	if !digitSeen {
-//		return nil, fmt.Errorf("no digit in that number")
-//	}
-//	if pointSeen || expSeen {
-//		f, err := parseFloat(b[:i])
-//		if err != nil {
-//			return nil, err
-//		}
-//		//p.builder.FloatValue(f)
-//		// TODO
-//		f = f
-//	} else {
-//		v, err := parseIntDec(b[:i])
-//		if err != nil {
-//			return nil, err
-//		}
-//		//p.builder.IntValue(v)
-//		// TODO
-//		v = v
-//	}
-//	return b[i:], nil
-//}
-
-func parseFloat(b []byte) (float64, error) {
-	// TODO: inefficient
-	tok := string(b)
-	err := numberContainsInvalidUnderscore(tok)
-	if err != nil {
-		return 0, err
-	}
-	cleanedVal := cleanupNumberToken(tok)
-	return strconv.ParseFloat(cleanedVal, 64)
-}
-
-func parseIntHex(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-	err := hexNumberContainsInvalidUnderscore(cleanedVal)
-	if err != nil {
-		return 0, nil
-	}
-	return strconv.ParseInt(cleanedVal[2:], 16, 64)
-}
-
-func parseIntOct(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-	err := numberContainsInvalidUnderscore(cleanedVal)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseInt(cleanedVal[2:], 8, 64)
-}
-
-func parseIntBin(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-	err := numberContainsInvalidUnderscore(cleanedVal)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseInt(cleanedVal[2:], 2, 64)
-}
-
-func parseIntDec(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-	err := numberContainsInvalidUnderscore(cleanedVal)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseInt(cleanedVal, 10, 64)
-}
-
-func numberContainsInvalidUnderscore(value string) error {
-	// For large numbers, you may use underscores between digits to enhance
-	// readability. Each underscore must be surrounded by at least one digit on
-	// each side.
-
-	hasBefore := false
-	for idx, r := range value {
-		if r == '_' {
-			if !hasBefore || idx+1 >= len(value) {
-				// can't end with an underscore
-				return errInvalidUnderscore
-			}
-		}
-		hasBefore = isDigitRune(r)
-	}
-	return nil
-}
-
-func hexNumberContainsInvalidUnderscore(value string) error {
-	hasBefore := false
-	for idx, r := range value {
-		if r == '_' {
-			if !hasBefore || idx+1 >= len(value) {
-				// can't end with an underscore
-				return errInvalidUnderscoreHex
-			}
-		}
-		hasBefore = isHexDigit(r)
-	}
-	return nil
-}
-
-func cleanupNumberToken(value string) string {
-	cleanedVal := strings.Replace(value, "_", "", -1)
-	return cleanedVal
-}
-
 func isDigit(r byte) bool {
 	return r >= '0' && r <= '9'
 }
-
-func isDigitRune(r rune) bool {
-	return r >= '0' && r <= '9'
-}
-
-var plusInf = math.Inf(1)
-var minusInf = math.Inf(-1)
-var nan = math.NaN()
 
 type validRuneFn func(r byte) bool
 
@@ -1230,12 +998,6 @@ func isValidHexRune(r byte) bool {
 		r >= 'A' && r <= 'F' ||
 		r >= '0' && r <= '9' ||
 		r == '_'
-}
-
-func isHexDigit(r rune) bool {
-	return isDigitRune(r) ||
-		(r >= 'a' && r <= 'f') ||
-		(r >= 'A' && r <= 'F')
 }
 
 func isValidOctalRune(r byte) bool {
@@ -1265,6 +1027,3 @@ func (u unexpectedCharacter) Error() string {
 	}
 	return fmt.Sprintf("expected %#U, not %#U", u.r, u.b[0])
 }
-
-var errInvalidUnderscore = errors.New("invalid use of _ in number")
-var errInvalidUnderscoreHex = errors.New("invalid use of _ in hex number")

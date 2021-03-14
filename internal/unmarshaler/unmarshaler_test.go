@@ -1,6 +1,7 @@
 package unmarshaler
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +9,164 @@ import (
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 )
+
+func TestUnmarshal_Integers(t *testing.T) {
+	examples := []struct {
+		desc     string
+		input    string
+		expected int64
+		err      bool
+	}{
+		{
+			desc:     "integer just digits",
+			input:    `1234`,
+			expected: 1234,
+		},
+		{
+			desc:     "integer zero",
+			input:    `0`,
+			expected: 0,
+		},
+		{
+			desc:     "integer sign",
+			input:    `+99`,
+			expected: 99,
+		},
+		{
+			desc:     "integer hex uppercase",
+			input:    `0xDEADBEEF`,
+			expected: 0xDEADBEEF,
+		},
+		{
+			desc:     "integer hex lowercase",
+			input:    `0xdead_beef`,
+			expected: 0xDEADBEEF,
+		},
+		{
+			desc:     "integer octal",
+			input:    `0o01234567`,
+			expected: 0o01234567,
+		},
+		{
+			desc:     "integer binary",
+			input:    `0b11010110`,
+			expected: 0b11010110,
+		},
+	}
+
+	type doc struct {
+		A int64
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			doc := doc{}
+			err := Unmarshal([]byte(`A = `+e.input), &doc)
+			require.NoError(t, err)
+			assert.Equal(t, e.expected, doc.A)
+		})
+	}
+}
+
+func TestUnmarshal_Floats(t *testing.T) {
+	examples := []struct {
+		desc     string
+		input    string
+		expected float64
+		testFn   func(t *testing.T, v float64)
+		err      bool
+	}{
+
+		{
+			desc:     "float pi",
+			input:    `3.1415`,
+			expected: 3.1415,
+		},
+		{
+			desc:     "float negative",
+			input:    `-0.01`,
+			expected: -0.01,
+		},
+		{
+			desc:     "float signed exponent",
+			input:    `5e+22`,
+			expected: 5e+22,
+		},
+		{
+			desc:     "float exponent lowercase",
+			input:    `1e06`,
+			expected: 1e06,
+		},
+		{
+			desc:     "float exponent uppercase",
+			input:    `-2E-2`,
+			expected: -2e-2,
+		},
+		{
+			desc:     "float fractional with exponent",
+			input:    `6.626e-34`,
+			expected: 6.626e-34,
+		},
+		{
+			desc:     "float underscores",
+			input:    `224_617.445_991_228`,
+			expected: 224_617.445_991_228,
+		},
+		{
+			desc:     "inf",
+			input:    `inf`,
+			expected: math.Inf(+1),
+		},
+		{
+			desc:     "inf negative",
+			input:    `-inf`,
+			expected: math.Inf(-1),
+		},
+		{
+			desc:     "inf positive",
+			input:    `+inf`,
+			expected: math.Inf(+1),
+		},
+		{
+			desc:  "nan",
+			input: `nan`,
+			testFn: func(t *testing.T, v float64) {
+				assert.True(t, math.IsNaN(v))
+			},
+		},
+		{
+			desc:  "nan negative",
+			input: `-nan`,
+			testFn: func(t *testing.T, v float64) {
+				assert.True(t, math.IsNaN(v))
+			},
+		},
+		{
+			desc:  "nan positive",
+			input: `+nan`,
+			testFn: func(t *testing.T, v float64) {
+				assert.True(t, math.IsNaN(v))
+			},
+		},
+	}
+
+	type doc struct {
+		A float64
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			doc := doc{}
+			err := Unmarshal([]byte(`A = `+e.input), &doc)
+			require.NoError(t, err)
+			if e.testFn != nil {
+				e.testFn(t, doc.A)
+			} else {
+				assert.Equal(t, e.expected, doc.A)
+			}
+		})
+	}
+}
 
 func TestUnmarshal(t *testing.T) {
 	type test struct {

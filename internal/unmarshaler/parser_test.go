@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParser_Numbers(t *testing.T) {
+func TestParser_AST_Numbers(t *testing.T) {
 	examples := []struct {
 		desc  string
 		input string
