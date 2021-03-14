@@ -98,6 +98,40 @@ func TestParser_AST(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:  "inline table",
+			input: `name = { first = "Tom", last = "Preston-Werner" }`,
+			ast: ast.Root{
+				ast.Node{
+					Kind: ast.KeyValue,
+					Children: []ast.Node{
+						{
+							Kind: ast.Key,
+							Data: []byte(`name`),
+						},
+						{
+							Kind: ast.InlineTable,
+							Children: []ast.Node{
+								{
+									Kind: ast.KeyValue,
+									Children: []ast.Node{
+										{Kind: ast.Key, Data: []byte(`first`)},
+										{Kind: ast.String, Data: []byte(`Tom`)},
+									},
+								},
+								{
+									Kind: ast.KeyValue,
+									Children: []ast.Node{
+										{Kind: ast.Key, Data: []byte(`last`)},
+										{Kind: ast.String, Data: []byte(`Preston-Werner`)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, e := range examples {

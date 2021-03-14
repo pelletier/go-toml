@@ -80,6 +80,8 @@ func unmarshalValue(x target, node *ast.Node) error {
 		return unmarshalString(x, node)
 	case ast.Array:
 		return unmarshalArray(x, node)
+	case ast.InlineTable:
+		return unmarshalInlineTable(x, node)
 	default:
 		panic(fmt.Errorf("unhandled unmarshalValue kind %s", node.Kind))
 	}
@@ -87,8 +89,19 @@ func unmarshalValue(x target, node *ast.Node) error {
 
 func unmarshalString(x target, node *ast.Node) error {
 	assertNode(ast.String, node)
-
 	return x.setString(string(node.Data))
+}
+
+func unmarshalInlineTable(x target, node *ast.Node) error {
+	assertNode(ast.InlineTable, node)
+
+	for _, kv := range node.Children {
+		err := unmarshalKeyValue(x, &kv)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func unmarshalArray(x target, node *ast.Node) error {

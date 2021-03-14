@@ -222,8 +222,9 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 		b, err := p.parseValArray(&node, b)
 		return node, b, err
 	case '{':
-		// TODO
-		//return p.parseInlineTable(b)
+		node.Kind = ast.InlineTable
+		b, err := p.parseInlineTable(&node, b)
+		return node, b, err
 	default:
 		// TODO
 		//return p.parseIntOrFloatOrDateTime(b)
@@ -240,38 +241,39 @@ func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
 	return v[1 : len(v)-1], rest, nil
 }
 
-func (p *parser) parseInlineTable(b []byte) ([]byte, error) {
+func (p *parser) parseInlineTable(node *ast.Node, b []byte) ([]byte, error) {
 	//inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	//inline-table-open  = %x7B ws     ; {
 	//inline-table-close = ws %x7D     ; }
 	//inline-table-sep   = ws %x2C ws  ; , Comma
 	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 
-	// TODO
-	//b = b[1:]
-	//
-	//first := true
-	//var err error
-	//for len(b) > 0 {
-	//	b = p.parseWhitespace(b)
-	//	if b[0] == '}' {
-	//		break
-	//	}
-	//
-	//	if !first {
-	//		b, err = expect(',', b)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		b = p.parseWhitespace(b)
-	//	}
-	//	b, err = p.parseKeyval(b)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	first = false
-	//}
+	b = b[1:]
+
+	first := true
+	var err error
+	for len(b) > 0 {
+		b = p.parseWhitespace(b)
+		if b[0] == '}' {
+			break
+		}
+
+		if !first {
+			b, err = expect(',', b)
+			if err != nil {
+				return nil, err
+			}
+			b = p.parseWhitespace(b)
+		}
+		var kv ast.Node
+		kv, b, err = p.parseKeyval(b)
+		if err != nil {
+			return nil, err
+		}
+		node.Children = append(node.Children, kv)
+
+		first = false
+	}
 
 	return expect('}', b)
 }

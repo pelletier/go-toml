@@ -137,6 +137,62 @@ func TestFromAst_Table(t *testing.T) {
 	})
 }
 
+func TestFromAst_InlineTable(t *testing.T) {
+	t.Run("one level of strings", func(t *testing.T) {
+		//		name = { first = "Tom", last = "Preston-Werner" }
+
+		root := ast.Root{
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`Name`)},
+					{
+						Kind: ast.InlineTable,
+						Children: []ast.Node{
+							{
+								Kind: ast.KeyValue,
+								Children: []ast.Node{
+									{Kind: ast.Key, Data: []byte(`First`)},
+									{Kind: ast.String, Data: []byte(`Tom`)},
+								},
+							},
+							{
+								Kind: ast.KeyValue,
+								Children: []ast.Node{
+									{Kind: ast.Key, Data: []byte(`Last`)},
+									{Kind: ast.String, Data: []byte(`Preston-Werner`)},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		type Name struct {
+			First string
+			Last  string
+		}
+
+		type Doc struct {
+			Name Name
+		}
+
+		x := Doc{}
+		err := fromAst(root, &x)
+		require.NoError(t, err)
+		assert.Equal(t, Doc{
+			Name: Name{
+				First: "Tom",
+				Last:  "Preston-Werner",
+			},
+		}, x)
+
+	})
+}
+
 func TestFromAst_Slice(t *testing.T) {
 	t.Run("slice of string", func(t *testing.T) {
 		root := ast.Root{
