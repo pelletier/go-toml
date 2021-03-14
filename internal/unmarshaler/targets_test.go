@@ -13,13 +13,14 @@ func TestStructTarget_Ensure(t *testing.T) {
 		desc  string
 		input reflect.Value
 		name  string
-		test  func(v reflect.Value)
+		test  func(v reflect.Value, err error)
 	}{
 		{
 			desc:  "handle a nil slice of string",
 			input: reflect.ValueOf(&struct{ A []string }{}).Elem(),
 			name:  "A",
-			test: func(v reflect.Value) {
+			test: func(v reflect.Value, err error) {
+				assert.NoError(t, err)
 				assert.False(t, v.IsNil())
 			},
 		},
@@ -27,7 +28,8 @@ func TestStructTarget_Ensure(t *testing.T) {
 			desc:  "handle an existing slice of string",
 			input: reflect.ValueOf(&struct{ A []string }{A: []string{"foo"}}).Elem(),
 			name:  "A",
-			test: func(v reflect.Value) {
+			test: func(v reflect.Value, err error) {
+				assert.NoError(t, err)
 				require.False(t, v.IsNil())
 				s := v.Interface().([]string)
 				assert.Equal(t, []string{"foo"}, s)
@@ -39,9 +41,9 @@ func TestStructTarget_Ensure(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			target, err := scope(e.input, e.name)
 			require.NoError(t, err)
-			target.ensure()
+			err = target.ensureSlice()
 			v := target.get()
-			e.test(v)
+			e.test(v, err)
 		})
 	}
 }
@@ -93,42 +95,6 @@ func TestStructTarget_SetString(t *testing.T) {
 	}
 }
 
-func TestPushValue_Struct(t *testing.T) {
-	examples := []struct {
-		desc     string
-		input    reflect.Value
-		expected []string
-		error    bool
-	}{
-		{
-			desc:     "push to nil slice",
-			input:    reflect.ValueOf(&struct{ A []string }{}).Elem(),
-			expected: []string{"hello"},
-		},
-		{
-			desc:  "push to string",
-			input: reflect.ValueOf(&struct{ A string }{}).Elem(),
-			error: true,
-		},
-	}
-
-	for _, e := range examples {
-		t.Run(e.desc, func(t *testing.T) {
-			target, err := scope(e.input, "A")
-			require.NoError(t, err)
-			v := reflect.ValueOf("hello")
-			err = target.pushValue(v)
-			if e.error {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				x := target.get().Interface().([]string)
-				assert.Equal(t, e.expected, x)
-			}
-		})
-	}
-}
-
 func TestPushNew(t *testing.T) {
 	t.Run("slice of strings", func(t *testing.T) {
 		type Doc struct {
@@ -148,6 +114,26 @@ func TestPushNew(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, n.setString("world"))
 		require.Equal(t, []string{"hello", "world"}, d.A)
+	})
+
+	t.Run("slice of interfaces", func(t *testing.T) {
+		type Doc struct {
+			A []interface{}
+		}
+		d := Doc{}
+
+		x, err := scope(reflect.ValueOf(&d).Elem(), "A")
+		require.NoError(t, err)
+
+		n, err := x.pushNew()
+		require.NoError(t, err)
+		require.NoError(t, n.setString("hello"))
+		require.Equal(t, []interface{}{"hello"}, d.A)
+
+		n, err = x.pushNew()
+		require.NoError(t, err)
+		require.NoError(t, n.setString("world"))
+		require.Equal(t, []interface{}{"hello", "world"}, d.A)
 	})
 }
 

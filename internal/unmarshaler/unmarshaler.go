@@ -77,7 +77,10 @@ func unmarshalString(x target, node *ast.Node) error {
 func unmarshalArray(x target, node *ast.Node) error {
 	assertNode(ast.Array, node)
 
-	x.ensure()
+	err := x.ensureSlice()
+	if err != nil {
+		return err
+	}
 
 	for _, n := range node.Children {
 		v, err := x.pushNew()

@@ -38,37 +38,120 @@ func TestFromAst_KV(t *testing.T) {
 }
 
 func TestFromAst_Slice(t *testing.T) {
-	root := ast.Root{
-		ast.Node{
-			Kind: ast.KeyValue,
-			Children: []ast.Node{
-				{
-					Kind: ast.Key,
-					Data: []byte(`Foo`),
-				},
-				{
-					Kind: ast.Array,
-					Children: []ast.Node{
-						{
-							Kind: ast.String,
-							Data: []byte(`hello`),
-						},
-						{
-							Kind: ast.String,
-							Data: []byte(`world`),
+	t.Run("slice of string", func(t *testing.T) {
+		root := ast.Root{
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`Foo`),
+					},
+					{
+						Kind: ast.Array,
+						Children: []ast.Node{
+							{
+								Kind: ast.String,
+								Data: []byte(`hello`),
+							},
+							{
+								Kind: ast.String,
+								Data: []byte(`world`),
+							},
 						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	type Doc struct {
-		Foo []string
-	}
+		type Doc struct {
+			Foo []string
+		}
 
-	x := Doc{}
-	err := unmarshaler.FromAst(root, &x)
-	require.NoError(t, err)
-	assert.Equal(t, Doc{Foo: []string{"hello", "world"}}, x)
+		x := Doc{}
+		err := unmarshaler.FromAst(root, &x)
+		require.NoError(t, err)
+		assert.Equal(t, Doc{Foo: []string{"hello", "world"}}, x)
+	})
+
+	t.Run("slice of interfaces for strings", func(t *testing.T) {
+		root := ast.Root{
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`Foo`),
+					},
+					{
+						Kind: ast.Array,
+						Children: []ast.Node{
+							{
+								Kind: ast.String,
+								Data: []byte(`hello`),
+							},
+							{
+								Kind: ast.String,
+								Data: []byte(`world`),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		type Doc struct {
+			Foo []interface{}
+		}
+
+		x := Doc{}
+		err := unmarshaler.FromAst(root, &x)
+		require.NoError(t, err)
+		assert.Equal(t, Doc{Foo: []interface{}{"hello", "world"}}, x)
+	})
+
+	t.Run("slice of interfaces with slices", func(t *testing.T) {
+		root := ast.Root{
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`Foo`),
+					},
+					{
+						Kind: ast.Array,
+						Children: []ast.Node{
+							{
+								Kind: ast.String,
+								Data: []byte(`hello`),
+							},
+							{
+								Kind: ast.Array,
+								Children: []ast.Node{
+									{
+										Kind: ast.String,
+										Data: []byte(`inner1`),
+									},
+									{
+										Kind: ast.String,
+										Data: []byte(`inner2`),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		type Doc struct {
+			Foo []interface{}
+		}
+
+		x := Doc{}
+		err := unmarshaler.FromAst(root, &x)
+		require.NoError(t, err)
+		assert.Equal(t, Doc{Foo: []interface{}{"hello", []interface{}{"inner1", "inner2"}}}, x)
+	})
 }

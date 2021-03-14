@@ -218,8 +218,9 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 		// TODO
 		return node, b[5:], nil
 	case '[':
-		// TODO
-		//return p.parseValArray(b)
+		node.Kind = ast.Array
+		b, err := p.parseValArray(&node, b)
+		return node, b, err
 	case '{':
 		// TODO
 		//return p.parseInlineTable(b)
@@ -275,7 +276,7 @@ func (p *parser) parseInlineTable(b []byte) ([]byte, error) {
 	return expect('}', b)
 }
 
-func (p *parser) parseValArray(b []byte) ([]byte, error) {
+func (p *parser) parseValArray(node *ast.Node, b []byte) ([]byte, error) {
 	//array = array-open [ array-values ] ws-comment-newline array-close
 	//array-open =  %x5B ; [
 	//array-close = %x5D ; ]
@@ -284,45 +285,46 @@ func (p *parser) parseValArray(b []byte) ([]byte, error) {
 	//array-sep = %x2C  ; , Comma
 	//ws-comment-newline = *( wschar / [ comment ] newline )
 
-	// TODO
-	//b = b[1:]
-	//
-	//first := true
-	//var err error
-	//for len(b) > 0 {
-	//	b, err = p.parseOptionalWhitespaceCommentNewline(b)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	if len(b) == 0 {
-	//		return nil, unexpectedCharacter{b: b}
-	//	}
-	//
-	//	if b[0] == ']' {
-	//		break
-	//	}
-	//	if b[0] == ',' {
-	//		if first {
-	//			return nil, fmt.Errorf("array cannot start with comma")
-	//		}
-	//		b = b[1:]
-	//		b, err = p.parseOptionalWhitespaceCommentNewline(b)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//	}
-	//
-	//	b, err = p.parseVal(b)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	b, err = p.parseOptionalWhitespaceCommentNewline(b)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	first = false
-	//}
+	b = b[1:]
+
+	first := true
+	var err error
+	for len(b) > 0 {
+		b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(b) == 0 {
+			return nil, unexpectedCharacter{b: b}
+		}
+
+		if b[0] == ']' {
+			break
+		}
+		if b[0] == ',' {
+			if first {
+				return nil, fmt.Errorf("array cannot start with comma")
+			}
+			b = b[1:]
+			b, err = p.parseOptionalWhitespaceCommentNewline(b)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		var valueNode ast.Node
+		valueNode, b, err = p.parseVal(b)
+		if err != nil {
+			return nil, err
+		}
+		node.Children = append(node.Children, valueNode)
+		b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return nil, err
+		}
+		first = false
+	}
 
 	return expect(']', b)
 }

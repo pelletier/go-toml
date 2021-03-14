@@ -6,14 +6,11 @@ import (
 )
 
 type target interface {
-	// Ensure the target's reflect value is not nil.
-	ensure()
+	// Ensure the target's value is compatible with a slice and initialized.
+	ensureSlice() error
 
 	// Store a string at the target.
 	setString(v string) error
-
-	// Appends an arbitrary value to the container.
-	pushValue(v reflect.Value) error
 
 	// Creates a new value of the container's element type, and returns a
 	// target to it.
@@ -31,38 +28,38 @@ func (t valueTarget) get() reflect.Value {
 	return reflect.Value(t)
 }
 
-func (t valueTarget) ensure() {
+func (t valueTarget) ensureSlice() error {
 	f := t.get()
-	if !f.IsNil() {
-		return
-	}
 
-	switch f.Kind() {
+	switch f.Type().Kind() {
 	case reflect.Slice:
-		f.Set(reflect.MakeSlice(f.Type(), 0, 0))
+		if f.IsNil() {
+			f.Set(reflect.MakeSlice(f.Type(), 0, 0))
+		}
+	case reflect.Interface:
+		if f.IsNil() {
+			f.Set(reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0))
+		} else {
+			if f.Type().Elem().Kind() != reflect.Slice {
+				return fmt.Errorf("interface is pointing to a %s, not a slice", f.Kind())
+			}
+		}
 	default:
-		panic(fmt.Errorf("don't know how to ensure %s", f.Kind()))
+		return fmt.Errorf("cannot initialize a slice in %s", f.Kind())
 	}
+	return nil
 }
 
 func (t valueTarget) setString(v string) error {
 	f := t.get()
-	if f.Kind() != reflect.String {
-		return fmt.Errorf("cannot assign string to a %s", f.String())
-	}
-	f.SetString(v)
-	return nil
-}
-
-func (t valueTarget) pushValue(v reflect.Value) error {
-	f := t.get()
 
 	switch f.Kind() {
-	case reflect.Slice:
-		t.ensure()
-		f.Set(reflect.Append(f, v))
+	case reflect.String:
+		f.SetString(v)
+	case reflect.Interface:
+		f.Set(reflect.ValueOf(v))
 	default:
-		return fmt.Errorf("cannot push %s on a %s", v.Kind(), f.Kind())
+		return fmt.Errorf("cannot assign string to a %s", f.String())
 	}
 
 	return nil
@@ -73,11 +70,22 @@ func (t valueTarget) pushNew() (target, error) {
 
 	switch f.Kind() {
 	case reflect.Slice:
-		t.ensure()
-		f = t.get()
 		idx := f.Len()
 		f.Set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
 		return valueTarget(f.Index(idx)), nil
+	case reflect.Interface:
+		if f.IsNil() {
+			panic("interface should have been initialized")
+		}
+		ifaceElem := f.Elem()
+		if ifaceElem.Kind() != reflect.Slice {
+			return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
+		}
+		idx := ifaceElem.Len()
+		newElem := reflect.New(ifaceElem.Type().Elem()).Elem()
+		newSlice := reflect.Append(ifaceElem, newElem)
+		f.Set(newSlice)
+		return valueTarget(f.Elem().Index(idx)), nil
 	default:
 		return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
 	}

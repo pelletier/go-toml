@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParser_Simple(t *testing.T) {
+func TestParser_AST(t *testing.T) {
 	examples := []struct {
 		desc  string
 		input string
@@ -28,6 +28,71 @@ func TestParser_Simple(t *testing.T) {
 						{
 							Kind: ast.String,
 							Data: []byte(`hello`),
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:  "array of strings",
+			input: `A = ["hello", ["world", "again"]]`,
+			ast: ast.Root{
+				ast.Node{
+					Kind: ast.KeyValue,
+					Children: []ast.Node{
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
+						},
+						{
+							Kind: ast.Array,
+							Children: []ast.Node{
+								{
+									Kind: ast.String,
+									Data: []byte(`hello`),
+								},
+								{
+									Kind: ast.Array,
+									Children: []ast.Node{
+										{
+											Kind: ast.String,
+											Data: []byte(`world`),
+										},
+										{
+											Kind: ast.String,
+											Data: []byte(`again`),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:  "array of arrays of strings",
+			input: `A = ["hello", "world"]`,
+			ast: ast.Root{
+				ast.Node{
+					Kind: ast.KeyValue,
+					Children: []ast.Node{
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
+						},
+						{
+							Kind: ast.Array,
+							Children: []ast.Node{
+								{
+									Kind: ast.String,
+									Data: []byte(`hello`),
+								},
+								{
+									Kind: ast.String,
+									Data: []byte(`world`),
+								},
+							},
 						},
 					},
 				},
