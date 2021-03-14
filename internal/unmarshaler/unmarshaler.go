@@ -7,19 +7,28 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/ast"
 )
 
-func FromAst(tree ast.Root, target interface{}) error {
-	v := reflect.ValueOf(target)
-	if v.Kind() != reflect.Ptr {
-		return fmt.Errorf("need to target a pointer, not %s", v.Kind())
+func Unmarshal(data []byte, v interface{}) error {
+	p := parser{}
+	err := p.parse(data)
+	if err != nil {
+		return err
 	}
-	if v.IsNil() {
+	return fromAst(p.tree, v)
+}
+
+func fromAst(tree ast.Root, v interface{}) error {
+	r := reflect.ValueOf(v)
+	if r.Kind() != reflect.Ptr {
+		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
+	}
+	if r.IsNil() {
 		return fmt.Errorf("target pointer must be non-nil")
 	}
 
-	x := valueTarget(v.Elem())
-
+	var x target = valueTarget(r.Elem())
+	var err error
 	for _, node := range tree {
-		err := unmarshalTopLevelNode(x, &node)
+		x, err = unmarshalTopLevelNode(x, &node)
 		if err != nil {
 			return err
 		}
@@ -28,30 +37,38 @@ func FromAst(tree ast.Root, target interface{}) error {
 	return nil
 }
 
-func unmarshalTopLevelNode(x target, node *ast.Node) error {
+// The target return value is the target for the next top-level node. Mostly
+// unchanged, except by table and array table.
+func unmarshalTopLevelNode(x target, node *ast.Node) (target, error) {
 	switch node.Kind {
 	case ast.Table:
-		panic("TODO")
+		return scopeWithKey(x, node.Key())
 	case ast.ArrayTable:
 		panic("TODO")
 	case ast.KeyValue:
-		return unmarshalKeyValue(x, node)
+		return x, unmarshalKeyValue(x, node)
 	default:
 		panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
 	}
 }
 
-func unmarshalKeyValue(x target, node *ast.Node) error {
-	assertNode(ast.KeyValue, node)
-
-	key := node.Key()
-
+func scopeWithKey(x target, key []ast.Node) (target, error) {
 	var err error
 	for _, n := range key {
 		x, err = scopeTarget(x, string(n.Data))
 		if err != nil {
-			return err
+			return nil, err
 		}
+	}
+	return x, nil
+}
+
+func unmarshalKeyValue(x target, node *ast.Node) error {
+	assertNode(ast.KeyValue, node)
+
+	x, err := scopeWithKey(x, node.Key())
+	if err != nil {
+		return err
 	}
 
 	return unmarshalValue(x, node.Value())

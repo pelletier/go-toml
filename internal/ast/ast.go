@@ -129,23 +129,29 @@ type Node struct {
 	// InlineTables have one child per key-value pair in the table.
 	// KeyValues have at least two children. The last one is the value. The
 	// rest make a potentially dotted key.
+	// Table and Array table have one child per element of the key they
+	// represent (same as KeyValue, but without the last node being the value).
 	Children []Node
 }
 
 var NoNode = Node{}
 
-// Key returns the nodes making the Key of a KeyValue.
+// Key returns the child nodes making the Key on a supported node. Panics
+// otherwise.
 // They are guaranteed to be all be of the Kind Key. A simple key would return
 // just one element.
-// Panics if not called on a KeyValue node, or if the Children are malformed.
 func (n *Node) Key() []Node {
-	if n.Kind != KeyValue {
-		panic(fmt.Errorf("Key() should only be called on on a KeyValue, not %s", n.Kind))
+	switch n.Kind {
+	case KeyValue:
+		if len(n.Children) < 2 {
+			panic(fmt.Errorf("KeyValue should have at least two children, not %d", len(n.Children)))
+		}
+		return n.Children[:len(n.Children)-1]
+	case Table:
+		return n.Children
+	default:
+		panic(fmt.Errorf("Key() is not supported on a %s", n.Kind))
 	}
-	if len(n.Children) < 2 {
-		panic(fmt.Errorf("KeyValue should have at least two children, not %d", len(n.Children)))
-	}
-	return n.Children[:len(n.Children)-1]
 }
 
 // Value returns a pointer to the value node of a KeyValue.

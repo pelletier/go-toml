@@ -1,4 +1,4 @@
-package unmarshaler_test
+package unmarshaler
 
 import (
 	"testing"
@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
-	"github.com/pelletier/go-toml/v2/internal/unmarshaler"
 )
 
 func TestFromAst_KV(t *testing.T) {
@@ -32,9 +31,110 @@ func TestFromAst_KV(t *testing.T) {
 	}
 
 	x := Doc{}
-	err := unmarshaler.FromAst(root, &x)
+	err := fromAst(root, &x)
 	require.NoError(t, err)
 	assert.Equal(t, Doc{Foo: "hello"}, x)
+}
+
+func TestFromAst_Table(t *testing.T) {
+	t.Run("one level table on struct", func(t *testing.T) {
+		root := ast.Root{
+			ast.Node{
+				Kind: ast.Table,
+				Children: []ast.Node{
+					{Kind: ast.Key, Data: []byte(`Level1`)},
+				},
+			},
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`A`),
+					},
+					{
+						Kind: ast.String,
+						Data: []byte(`hello`),
+					},
+				},
+			},
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`B`),
+					},
+					{
+						Kind: ast.String,
+						Data: []byte(`world`),
+					},
+				},
+			},
+		}
+
+		type Level1 struct {
+			A string
+			B string
+		}
+
+		type Doc struct {
+			Level1 Level1
+		}
+
+		x := Doc{}
+		err := fromAst(root, &x)
+		require.NoError(t, err)
+		assert.Equal(t, Doc{
+			Level1: Level1{
+				A: "hello",
+				B: "world",
+			},
+		}, x)
+	})
+	t.Run("one level table on struct", func(t *testing.T) {
+		root := ast.Root{
+			ast.Node{
+				Kind: ast.Table,
+				Children: []ast.Node{
+					{Kind: ast.Key, Data: []byte(`A`)},
+					{Kind: ast.Key, Data: []byte(`B`)},
+				},
+			},
+			ast.Node{
+				Kind: ast.KeyValue,
+				Children: []ast.Node{
+					{
+						Kind: ast.Key,
+						Data: []byte(`C`),
+					},
+					{
+						Kind: ast.String,
+						Data: []byte(`value`),
+					},
+				},
+			},
+		}
+
+		type B struct {
+			C string
+		}
+
+		type A struct {
+			B B
+		}
+
+		type Doc struct {
+			A A
+		}
+
+		x := Doc{}
+		err := fromAst(root, &x)
+		require.NoError(t, err)
+		assert.Equal(t, Doc{
+			A: A{B: B{C: "value"}},
+		}, x)
+	})
 }
 
 func TestFromAst_Slice(t *testing.T) {
@@ -69,7 +169,7 @@ func TestFromAst_Slice(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := unmarshaler.FromAst(root, &x)
+		err := fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []string{"hello", "world"}}, x)
 	})
@@ -105,7 +205,7 @@ func TestFromAst_Slice(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := unmarshaler.FromAst(root, &x)
+		err := fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []interface{}{"hello", "world"}}, x)
 	})
@@ -150,7 +250,7 @@ func TestFromAst_Slice(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := unmarshaler.FromAst(root, &x)
+		err := fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []interface{}{"hello", []interface{}{"inner1", "inner2"}}}, x)
 	})
