@@ -71,7 +71,7 @@ func (p *parser) parseExpression(b []byte) ([]byte, error) {
 	var err error
 	var node ast.Node
 	if b[0] == '[' {
-		b, err = p.parseTable(b)
+		node, b, err = p.parseTable(b)
 	} else {
 		node, b, err = p.parseKeyval(b)
 	}
@@ -91,7 +91,7 @@ func (p *parser) parseExpression(b []byte) ([]byte, error) {
 	return b, nil
 }
 
-func (p *parser) parseTable(b []byte) ([]byte, error) {
+func (p *parser) parseTable(b []byte) (ast.Node, []byte, error) {
 	//table = std-table / array-table
 	if len(b) > 1 && b[1] == '[' {
 		return p.parseArrayTable(b)
@@ -99,7 +99,7 @@ func (p *parser) parseTable(b []byte) ([]byte, error) {
 	return p.parseStdTable(b)
 }
 
-func (p *parser) parseArrayTable(b []byte) ([]byte, error) {
+func (p *parser) parseArrayTable(b []byte) (ast.Node, []byte, error) {
 	//array-table = array-table-open key array-table-close
 	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
@@ -118,26 +118,30 @@ func (p *parser) parseArrayTable(b []byte) ([]byte, error) {
 	//}
 	//return expect(']', b)
 
-	return nil, nil
+	return ast.NoNode, nil, nil
 }
 
-func (p *parser) parseStdTable(b []byte) ([]byte, error) {
+func (p *parser) parseStdTable(b []byte) (ast.Node, []byte, error) {
 	//std-table = std-table-open key std-table-close
 	//std-table-open  = %x5B ws     ; [ Left square bracket
 	//std-table-close = ws %x5D     ; ] Right square bracket
 
-	// TODO
-	//b = b[1:]
-	//b = p.parseWhitespace(b)
-	//b, err := p.parseKey(b)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//b = p.parseWhitespace(b)
-	//
-	//return expect(']', b)
+	node := ast.Node{
+		Kind: ast.Table,
+	}
 
-	return nil, nil
+	b = b[1:]
+	b = p.parseWhitespace(b)
+	key, b, err := p.parseKey(b)
+	if err != nil {
+		return ast.NoNode, nil, err
+	}
+	node.Children = key
+	b = p.parseWhitespace(b)
+
+	b, err = expect(']', b)
+
+	return node, b, err
 }
 
 func (p *parser) parseKeyval(b []byte) (ast.Node, []byte, error) {

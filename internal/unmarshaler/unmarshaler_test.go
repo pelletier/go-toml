@@ -72,6 +72,23 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc: "standard table",
+			input: `[A]
+B = "data"`,
+			gen: func() test {
+				type A struct {
+					B string
+				}
+				type doc struct {
+					A A
+				}
+				return test{
+					&doc{},
+					&doc{A: A{B: "data"}},
+				}
+			},
+		},
+		{
 			desc:  "inline table",
 			input: `Name = {First = "hello", Last = "world"}`,
 			gen: func() test {
