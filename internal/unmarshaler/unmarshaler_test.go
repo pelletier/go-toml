@@ -33,6 +33,32 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "kv bool true",
+			input: `A = true`,
+			gen: func() test {
+				type doc struct {
+					A bool
+				}
+				return test{
+					&doc{},
+					&doc{A: true},
+				}
+			},
+		},
+		{
+			desc:  "kv bool false",
+			input: `A = false`,
+			gen: func() test {
+				type doc struct {
+					A bool
+				}
+				return test{
+					&doc{A: true},
+					&doc{A: false},
+				}
+			},
+		},
+		{
 			desc:  "string array",
 			input: `A = ["foo", "bar"]`,
 			gen: func() test {

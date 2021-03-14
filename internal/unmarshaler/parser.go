@@ -209,13 +209,15 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 		if !scanFollowsTrue(b) {
 			return node, nil, fmt.Errorf("expected 'true'")
 		}
-		// TODO
+		node.Kind = ast.Bool
+		node.Data = b[:4]
 		return node, b[4:], nil
 	case 'f':
 		if !scanFollowsFalse(b) {
 			return node, nil, fmt.Errorf("expected 'false'")
 		}
-		// TODO
+		node.Kind = ast.Bool
+		node.Data = b[:5]
 		return node, b[5:], nil
 	case '[':
 		node.Kind = ast.Array

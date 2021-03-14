@@ -78,6 +78,8 @@ func unmarshalValue(x target, node *ast.Node) error {
 	switch node.Kind {
 	case ast.String:
 		return unmarshalString(x, node)
+	case ast.Bool:
+		return unmarshalBool(x, node)
 	case ast.Array:
 		return unmarshalArray(x, node)
 	case ast.InlineTable:
@@ -90,6 +92,12 @@ func unmarshalValue(x target, node *ast.Node) error {
 func unmarshalString(x target, node *ast.Node) error {
 	assertNode(ast.String, node)
 	return x.setString(string(node.Data))
+}
+
+func unmarshalBool(x target, node *ast.Node) error {
+	assertNode(ast.Bool, node)
+	v := node.Data[0] == 't'
+	return x.setBool(v)
 }
 
 func unmarshalInlineTable(x target, node *ast.Node) error {

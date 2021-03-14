@@ -12,6 +12,9 @@ type target interface {
 	// Store a string at the target.
 	setString(v string) error
 
+	// Store a boolean at the target
+	setBool(v bool) error
+
 	// Creates a new value of the container's element type, and returns a
 	// target to it.
 	pushNew() (target, error)
@@ -60,6 +63,21 @@ func (t valueTarget) setString(v string) error {
 		f.Set(reflect.ValueOf(v))
 	default:
 		return fmt.Errorf("cannot assign string to a %s", f.String())
+	}
+
+	return nil
+}
+
+func (t valueTarget) setBool(v bool) error {
+	f := t.get()
+
+	switch f.Kind() {
+	case reflect.Bool:
+		f.SetBool(v)
+	case reflect.Interface:
+		f.Set(reflect.ValueOf(v))
+	default:
+		return fmt.Errorf("cannot assign bool to a %s", f.String())
 	}
 
 	return nil

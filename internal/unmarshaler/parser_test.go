@@ -34,6 +34,25 @@ func TestParser_AST(t *testing.T) {
 			},
 		},
 		{
+			desc:  "simple bool assignment",
+			input: `A = true`,
+			ast: ast.Root{
+				ast.Node{
+					Kind: ast.KeyValue,
+					Children: []ast.Node{
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
+						},
+						{
+							Kind: ast.Bool,
+							Data: []byte(`true`),
+						},
+					},
+				},
+			},
+		},
+		{
 			desc:  "array of strings",
 			input: `A = ["hello", ["world", "again"]]`,
 			ast: ast.Root{
