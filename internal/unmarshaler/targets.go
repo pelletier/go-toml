@@ -100,6 +100,12 @@ func scope(v reflect.Value, name string) (target, error) {
 	switch v.Kind() {
 	case reflect.Struct:
 		return scopeStruct(v, name)
+	case reflect.Interface:
+		if v.IsNil() {
+			panic("not implemented") // TODO
+		} else {
+			return scope(v.Elem(), name)
+		}
 	default:
 		panic(fmt.Errorf("can't scope on a %s", v.Kind()))
 	}

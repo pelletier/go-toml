@@ -9,6 +9,102 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/ast"
 )
 
+func TestUnmarshal(t *testing.T) {
+	type test struct {
+		target   interface{}
+		expected interface{}
+	}
+	examples := []struct {
+		desc  string
+		input string
+		gen   func() test
+	}{
+		{
+			desc:  "kv string",
+			input: `A = "foo"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+				return test{
+					&doc{},
+					&doc{A: "foo"},
+				}
+			},
+		},
+		{
+			desc:  "string array",
+			input: `A = ["foo", "bar"]`,
+			gen: func() test {
+				type doc struct {
+					A []string
+				}
+				return test{
+					&doc{},
+					&doc{A: []string{"foo", "bar"}},
+				}
+			},
+		},
+		{
+			desc:  "inline table",
+			input: `Name = {First = "hello", Last = "world"}`,
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+				return test{
+					&doc{},
+					&doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "inline table inside array",
+			input: `Names = [{First = "hello", Last = "world"}, {First = "ab", Last = "cd"}]`,
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Names []name
+				}
+				return test{
+					&doc{},
+					&doc{
+						Names: []name{
+							{
+								First: "hello",
+								Last:  "world",
+							},
+							{
+								First: "ab",
+								Last:  "cd",
+							},
+						},
+					},
+				}
+			},
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			test := e.gen()
+			err := Unmarshal([]byte(e.input), test.target)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, test.target)
+		})
+	}
+}
+
 func TestFromAst_KV(t *testing.T) {
 	root := ast.Root{
 		ast.Node{
