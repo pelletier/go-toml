@@ -231,8 +231,8 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 		b, err := p.parseInlineTable(&node, b)
 		return node, b, err
 	default:
-		// TODO
-		//return p.parseIntOrFloatOrDateTime(b)
+		b, err = p.parseIntOrFloatOrDateTime(&node, b)
+		return node, b, err
 	}
 	panic("parseVal not finished yet")
 	return ast.Node{}, nil, nil
@@ -614,28 +614,28 @@ func (p *parser) parseWhitespace(b []byte) []byte {
 	return rest
 }
 
-func (p *parser) parseIntOrFloatOrDateTime(b []byte) ([]byte, error) {
+func (p *parser) parseIntOrFloatOrDateTime(node *ast.Node, b []byte) ([]byte, error) {
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
 			return nil, fmt.Errorf("expected 'inf'")
 		}
-		//p.builder.FloatValue(math.Inf(1))
-		// TODO
+		node.Kind = ast.Float
+		node.Data = b[:3]
 		return b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
 			return nil, fmt.Errorf("expected 'nan'")
 		}
-		//p.builder.FloatValue(math.NaN())
-		// TODO
+		node.Kind = ast.Float
+		node.Data = b[:3]
 		return b[3:], nil
 	case '+', '-':
-		return p.parseIntOrFloat(b)
+		return p.scanIntOrFloat(node, b)
 	}
 
 	if len(b) < 3 {
-		return p.parseIntOrFloat(b)
+		return p.scanIntOrFloat(node, b)
 	}
 	s := 5
 	if len(b) < s {
@@ -652,7 +652,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) ([]byte, error) {
 			return p.parseDateTime(b)
 		}
 	}
-	return p.parseIntOrFloat(b)
+	return p.scanIntOrFloat(node, b)
 }
 
 func digitsToInt(b []byte) int {
@@ -925,134 +925,203 @@ func (p *parser) parseTime(b []byte) ([]byte, error) {
 	return b[idx:], nil
 }
 
-func (p *parser) parseIntOrFloat(b []byte) ([]byte, error) {
+func (p *parser) scanIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
 	i := 0
-	r := b[0]
-	if r == '0' {
-		if len(b) >= 2 {
-			var isValidRune validRuneFn
-			var parseFn func([]byte) (int64, error)
-			switch b[1] {
-			case 'x':
-				isValidRune = isValidHexRune
-				parseFn = parseIntHex
-			case 'o':
-				isValidRune = isValidOctalRune
-				parseFn = parseIntOct
-			case 'b':
-				isValidRune = isValidBinaryRune
-				parseFn = parseIntBin
-			default:
-				if b[1] >= 'a' && b[1] <= 'z' || b[1] >= 'A' && b[1] <= 'Z' {
-					return nil, fmt.Errorf("unknown number base: %s. possible options are x (hex) o (octal) b (binary)", string(b[1]))
-				}
-				parseFn = parseIntDec
-			}
 
-			if isValidRune != nil {
-				i = 2
-				digitSeen := false
-				for {
-					if !isValidRune(b[i]) {
-						break
-					}
-					digitSeen = true
-					i++
-				}
+	if len(b) > 2 && b[0] == '0' {
+		var isValidRune validRuneFn
+		switch b[1] {
+		case 'x':
+			isValidRune = isValidHexRune
+		case 'o':
+			isValidRune = isValidOctalRune
+		case 'b':
+			isValidRune = isValidBinaryRune
+		default:
+			return b, fmt.Errorf("unknown number base: %c. possible options are x (hex) o (octal) b (binary)", b[1])
+		}
 
-				if !digitSeen {
-					return nil, fmt.Errorf("number needs at least one digit")
-				}
-
-				v, err := parseFn(b[:i])
-				if err != nil {
-					return nil, err
-				}
-				//p.builder.IntValue(v)
-				// TODO
-				v = v
+		i += 2
+		for ; i < len(b); i++ {
+			if !isValidRune(b[i]) {
+				node.Kind = ast.Integer
+				node.Data = b[:i]
 				return b[i:], nil
 			}
 		}
 	}
 
-	if r == '+' || r == '-' {
-		b = b[1:]
-		if scanFollowsInf(b) {
-			if r == '+' {
-				//p.builder.FloatValue(plusInf)
-				// TODO
-			} else {
-				//p.builder.FloatValue(minusInf)
-				// TODO
+	isFloat := false
+
+	for ; i < len(b); i++ {
+		c := b[i]
+
+		if c >= '0' && c <= '9' || c == '+' || c == '-' || c == '_' {
+			continue
+		}
+
+		if c == '.' || c == 'e' || c == 'E' {
+			isFloat = true
+			continue
+		}
+
+		if c == 'i' {
+			if scanFollowsInf(b[i:]) {
+				node.Kind = ast.Float
+				node.Data = b[:i+3]
+				return b[i+3:], nil
 			}
-			return b, nil
+			return nil, fmt.Errorf("unexpected character i while scanning for a number")
 		}
-		if scanFollowsNan(b) {
-			//p.builder.FloatValue(nan)
-			// TODO
-			return b, nil
+		if c == 'n' {
+			if scanFollowsNan(b[i:]) {
+				node.Kind = ast.Float
+				node.Data = b[:i+3]
+				return b[i+3:], nil
+			}
+			return nil, fmt.Errorf("unexpected character n while scanning for a number")
 		}
+
+		break
 	}
 
-	pointSeen := false
-	expSeen := false
-	digitSeen := false
-	for i < len(b) {
-		next := b[i]
-		if next == '.' {
-			if pointSeen {
-				return nil, fmt.Errorf("cannot have two dots in one float")
-			}
-			i++
-			if i < len(b) && !isDigit(b[i]) {
-				return nil, fmt.Errorf("float cannot end with a dot")
-			}
-			pointSeen = true
-		} else if next == 'e' || next == 'E' {
-			expSeen = true
-			i++
-			if i >= len(b) {
-				break
-			}
-			if b[i] == '+' || b[i] == '-' {
-				i++
-			}
-		} else if isDigit(next) {
-			digitSeen = true
-			i++
-		} else if next == '_' {
-			i++
-		} else {
-			break
-		}
-		if pointSeen && !digitSeen {
-			return nil, fmt.Errorf("cannot start float with a dot")
-		}
-	}
-
-	if !digitSeen {
-		return nil, fmt.Errorf("no digit in that number")
-	}
-	if pointSeen || expSeen {
-		f, err := parseFloat(b[:i])
-		if err != nil {
-			return nil, err
-		}
-		//p.builder.FloatValue(f)
-		// TODO
-		f = f
+	if isFloat {
+		node.Kind = ast.Float
 	} else {
-		v, err := parseIntDec(b[:i])
-		if err != nil {
-			return nil, err
-		}
-		//p.builder.IntValue(v)
-		// TODO
-		v = v
+		node.Kind = ast.Integer
 	}
+	node.Data = b[:i]
 	return b[i:], nil
 }
+
+//func (p *parser) parseIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
+//	i := 0
+//	r := b[0]
+//	if r == '0' {
+//		if len(b) >= 2 {
+//			var isValidRune validRuneFn
+//			var parseFn func([]byte) (int64, error)
+//			switch b[1] {
+//			case 'x':
+//				isValidRune = isValidHexRune
+//				parseFn = parseIntHex
+//			case 'o':
+//				isValidRune = isValidOctalRune
+//				parseFn = parseIntOct
+//			case 'b':
+//				isValidRune = isValidBinaryRune
+//				parseFn = parseIntBin
+//			default:
+//				if b[1] >= 'a' && b[1] <= 'z' || b[1] >= 'A' && b[1] <= 'Z' {
+//					return nil, fmt.Errorf("unknown number base: %s. possible options are x (hex) o (octal) b (binary)", string(b[1]))
+//				}
+//				parseFn = parseIntDec
+//			}
+//
+//			if isValidRune != nil {
+//				i = 2
+//				digitSeen := false
+//				for {
+//					if !isValidRune(b[i]) {
+//						break
+//					}
+//					digitSeen = true
+//					i++
+//				}
+//
+//				if !digitSeen {
+//					return nil, fmt.Errorf("number needs at least one digit")
+//				}
+//
+//				v, err := parseFn(b[:i])
+//				if err != nil {
+//					return nil, err
+//				}
+//				//p.builder.IntValue(v)
+//				// TODO
+//				v = v
+//				return b[i:], nil
+//			}
+//		}
+//	}
+//
+//	if r == '+' || r == '-' {
+//		b = b[1:]
+//		if scanFollowsInf(b) {
+//			if r == '+' {
+//				//p.builder.FloatValue(plusInf)
+//				// TODO
+//			} else {
+//				//p.builder.FloatValue(minusInf)
+//				// TODO
+//			}
+//			return b, nil
+//		}
+//		if scanFollowsNan(b) {
+//			//p.builder.FloatValue(nan)
+//			// TODO
+//			return b, nil
+//		}
+//	}
+//
+//	pointSeen := false
+//	expSeen := false
+//	digitSeen := false
+//	for i < len(b) {
+//		next := b[i]
+//		if next == '.' {
+//			if pointSeen {
+//				return nil, fmt.Errorf("cannot have two dots in one float")
+//			}
+//			i++
+//			if i < len(b) && !isDigit(b[i]) {
+//				return nil, fmt.Errorf("float cannot end with a dot")
+//			}
+//			pointSeen = true
+//		} else if next == 'e' || next == 'E' {
+//			expSeen = true
+//			i++
+//			if i >= len(b) {
+//				break
+//			}
+//			if b[i] == '+' || b[i] == '-' {
+//				i++
+//			}
+//		} else if isDigit(next) {
+//			digitSeen = true
+//			i++
+//		} else if next == '_' {
+//			i++
+//		} else {
+//			break
+//		}
+//		if pointSeen && !digitSeen {
+//			return nil, fmt.Errorf("cannot start float with a dot")
+//		}
+//	}
+//
+//	if !digitSeen {
+//		return nil, fmt.Errorf("no digit in that number")
+//	}
+//	if pointSeen || expSeen {
+//		f, err := parseFloat(b[:i])
+//		if err != nil {
+//			return nil, err
+//		}
+//		//p.builder.FloatValue(f)
+//		// TODO
+//		f = f
+//	} else {
+//		v, err := parseIntDec(b[:i])
+//		if err != nil {
+//			return nil, err
+//		}
+//		//p.builder.IntValue(v)
+//		// TODO
+//		v = v
+//	}
+//	return b[i:], nil
+//}
 
 func parseFloat(b []byte) (float64, error) {
 	// TODO: inefficient
