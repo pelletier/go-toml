@@ -184,7 +184,6 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 	c := b[0]
 
 	switch c {
-	// strings
 	case '"':
 		var v []byte
 		if scanFollowsMultilineBasicStringDelimiter(b) {
@@ -205,8 +204,8 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 			v, b, err = p.parseLiteralString(b)
 		}
 		if err == nil {
-			// TODO
-			v = v
+			node.Kind = ast.String
+			node.Data = v
 		}
 		return node, b, err
 	case 't':
