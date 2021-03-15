@@ -13,6 +13,7 @@ Development branch. Probably does not work.
 - [ ] Support Date / times.
 - [ ] Support Unmarshaler interface.
 - [ ] Support struct tags annotations.
+- [ ] Original go-toml unmarshal tests pass.
 - [ ] Benchmark!
 
 ## Further work
