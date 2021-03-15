@@ -41,7 +41,7 @@ func TestStructTarget_Ensure(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			target, err := scope(e.input, e.name)
 			require.NoError(t, err)
-			err = target.ensureSlice()
+			err = ensureSlice(target)
 			v := target.get()
 			e.test(v, err)
 		})
@@ -88,7 +88,7 @@ func TestStructTarget_SetString(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			target, err := scope(e.input, e.name)
 			require.NoError(t, err)
-			err = target.setString(str)
+			err = setString(target, str)
 			v := target.get()
 			e.test(v, err)
 		})
@@ -105,12 +105,12 @@ func TestPushNew(t *testing.T) {
 		x, err := scope(reflect.ValueOf(&d).Elem(), "A")
 		require.NoError(t, err)
 
-		n, err := x.pushNew()
+		n, err := pushNew(x)
 		require.NoError(t, err)
 		require.NoError(t, n.setString("hello"))
 		require.Equal(t, []string{"hello"}, d.A)
 
-		n, err = x.pushNew()
+		n, err = pushNew(x)
 		require.NoError(t, err)
 		require.NoError(t, n.setString("world"))
 		require.Equal(t, []string{"hello", "world"}, d.A)
@@ -125,14 +125,14 @@ func TestPushNew(t *testing.T) {
 		x, err := scope(reflect.ValueOf(&d).Elem(), "A")
 		require.NoError(t, err)
 
-		n, err := x.pushNew()
+		n, err := pushNew(x)
 		require.NoError(t, err)
-		require.NoError(t, n.setString("hello"))
+		require.NoError(t, setString(n, "hello"))
 		require.Equal(t, []interface{}{"hello"}, d.A)
 
-		n, err = x.pushNew()
+		n, err = pushNew(x)
 		require.NoError(t, err)
-		require.NoError(t, n.setString("world"))
+		require.NoError(t, setString(n, "world"))
 		require.Equal(t, []interface{}{"hello", "world"}, d.A)
 	})
 }

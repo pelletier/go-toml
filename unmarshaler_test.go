@@ -172,6 +172,7 @@ func TestUnmarshal(t *testing.T) {
 	type test struct {
 		target   interface{}
 		expected interface{}
+		err      bool
 	}
 	examples := []struct {
 		desc  string
@@ -186,8 +187,8 @@ func TestUnmarshal(t *testing.T) {
 					A string
 				}
 				return test{
-					&doc{},
-					&doc{A: "foo"},
+					target:   &doc{},
+					expected: &doc{A: "foo"},
 				}
 			},
 		},
@@ -199,8 +200,8 @@ func TestUnmarshal(t *testing.T) {
 					A bool
 				}
 				return test{
-					&doc{},
-					&doc{A: true},
+					target:   &doc{},
+					expected: &doc{A: true},
 				}
 			},
 		},
@@ -212,8 +213,8 @@ func TestUnmarshal(t *testing.T) {
 					A bool
 				}
 				return test{
-					&doc{A: true},
-					&doc{A: false},
+					target:   &doc{A: true},
+					expected: &doc{A: false},
 				}
 			},
 		},
@@ -225,8 +226,8 @@ func TestUnmarshal(t *testing.T) {
 					A []string
 				}
 				return test{
-					&doc{},
-					&doc{A: []string{"foo", "bar"}},
+					target:   &doc{},
+					expected: &doc{A: []string{"foo", "bar"}},
 				}
 			},
 		},
@@ -242,8 +243,8 @@ B = "data"`,
 					A A
 				}
 				return test{
-					&doc{},
-					&doc{A: A{B: "data"}},
+					target:   &doc{},
+					expected: &doc{A: A{B: "data"}},
 				}
 			},
 		},
@@ -259,8 +260,8 @@ B = "data"`,
 					Name name
 				}
 				return test{
-					&doc{},
-					&doc{Name: name{
+					target: &doc{},
+					expected: &doc{Name: name{
 						First: "hello",
 						Last:  "world",
 					}},
@@ -279,8 +280,8 @@ B = "data"`,
 					Names []name
 				}
 				return test{
-					&doc{},
-					&doc{
+					target: &doc{},
+					expected: &doc{
 						Names: []name{
 							{
 								First: "hello",
@@ -295,14 +296,86 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "into map[string]interface{}",
+			input: `A = "foo"`,
+			gen: func() test {
+				doc := map[string]interface{}{}
+				return test{
+					target: &doc,
+					expected: &map[string]interface{}{
+						"A": "foo",
+					},
+				}
+			},
+		},
+		{
+			desc: "multi keys of different types into map[string]interface{}",
+			input: `A = "foo"
+B = 42`,
+			gen: func() test {
+				doc := map[string]interface{}{}
+				return test{
+					target: &doc,
+					expected: &map[string]interface{}{
+						"A": "foo",
+						"B": int64(42),
+					},
+				}
+			},
+		},
+		{
+			desc:  "slice in a map[string]interface{}",
+			input: `A = ["foo", "bar"]`,
+			gen: func() test {
+				doc := map[string]interface{}{}
+				return test{
+					target: &doc,
+					expected: &map[string]interface{}{
+						"A": []interface{}{"foo", "bar"},
+					},
+				}
+			},
+		},
+		{
+			desc:  "string into map[string]string",
+			input: `A = "foo"`,
+			gen: func() test {
+				doc := map[string]string{}
+				return test{
+					target: &doc,
+					expected: &map[string]string{
+						"A": "foo",
+					},
+				}
+			},
+		},
+		{
+			desc:  "float64 into map[string]string",
+			input: `A = 42.0`,
+			gen: func() test {
+				doc := map[string]string{}
+				return test{
+					target: &doc,
+					err:    true,
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			test := e.gen()
+			if test.err && test.expected != nil {
+				panic("invalid test: cannot expect both an error and a value")
+			}
 			err := Unmarshal([]byte(e.input), test.target)
-			require.NoError(t, err)
-			assert.Equal(t, test.expected, test.target)
+			if test.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expected, test.target)
+			}
 		})
 	}
 }
@@ -437,8 +510,6 @@ func TestFromAst_Table(t *testing.T) {
 
 func TestFromAst_InlineTable(t *testing.T) {
 	t.Run("one level of strings", func(t *testing.T) {
-		//		name = { first = "Tom", last = "Preston-Werner" }
-
 		root := ast.Root{
 			ast.Node{
 				Kind: ast.KeyValue,

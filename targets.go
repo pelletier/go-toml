@@ -6,8 +6,8 @@ import (
 )
 
 type target interface {
-	// Ensure the target's value is compatible with a slice and initialized.
-	ensureSlice() error
+	// Dereferences the target.
+	get() reflect.Value
 
 	// Store a string at the target.
 	setString(v string) error
@@ -21,12 +21,8 @@ type target interface {
 	// Store a float64 at the target
 	setFloat64(v float64) error
 
-	// Creates a new value of the container's element type, and returns a
-	// target to it.
-	pushNew() (target, error)
-
-	// Dereferences the target.
-	get() reflect.Value
+	// Stores any  value at the target
+	set(v reflect.Value) error
 }
 
 // valueTarget just contains a reflect.Value that can be set.
@@ -37,21 +33,76 @@ func (t valueTarget) get() reflect.Value {
 	return reflect.Value(t)
 }
 
-func (t valueTarget) ensureSlice() error {
+func (t valueTarget) set(v reflect.Value) error {
+	reflect.Value(t).Set(v)
+	return nil
+}
+
+func (t valueTarget) setString(v string) error {
+	t.get().SetString(v)
+	return nil
+}
+
+func (t valueTarget) setBool(v bool) error {
+	t.get().SetBool(v)
+	return nil
+}
+
+func (t valueTarget) setInt64(v int64) error {
+	t.get().SetInt(v)
+	return nil
+}
+
+func (t valueTarget) setFloat64(v float64) error {
+	t.get().SetFloat(v)
+	return nil
+}
+
+// mapTarget targets a specific key of a map.
+type mapTarget struct {
+	v reflect.Value
+	k reflect.Value
+}
+
+func (t mapTarget) get() reflect.Value {
+	return t.v.MapIndex(t.k)
+}
+
+func (t mapTarget) set(v reflect.Value) error {
+	t.v.SetMapIndex(t.k, v)
+	return nil
+}
+
+func (t mapTarget) setString(v string) error {
+	return t.set(reflect.ValueOf(v))
+}
+
+func (t mapTarget) setBool(v bool) error {
+	return t.set(reflect.ValueOf(v))
+}
+
+func (t mapTarget) setInt64(v int64) error {
+	return t.set(reflect.ValueOf(v))
+}
+
+func (t mapTarget) setFloat64(v float64) error {
+	return t.set(reflect.ValueOf(v))
+}
+
+func ensureSlice(t target) error {
 	f := t.get()
 
 	switch f.Type().Kind() {
 	case reflect.Slice:
 		if f.IsNil() {
-			f.Set(reflect.MakeSlice(f.Type(), 0, 0))
+			return t.set(reflect.MakeSlice(f.Type(), 0, 0))
 		}
 	case reflect.Interface:
 		if f.IsNil() {
-			f.Set(reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0))
-		} else {
-			if f.Type().Elem().Kind() != reflect.Slice {
-				return fmt.Errorf("interface is pointing to a %s, not a slice", f.Kind())
-			}
+			return t.set(reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0))
+		}
+		if f.Type().Elem().Kind() != reflect.Slice {
+			return fmt.Errorf("interface is pointing to a %s, not a slice", f.Kind())
 		}
 	default:
 		return fmt.Errorf("cannot initialize a slice in %s", f.Kind())
@@ -59,76 +110,71 @@ func (t valueTarget) ensureSlice() error {
 	return nil
 }
 
-func (t valueTarget) setString(v string) error {
+func setString(t target, v string) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.String:
-		f.SetString(v)
+		return t.setString(v)
 	case reflect.Interface:
-		f.Set(reflect.ValueOf(v))
+		return t.set(reflect.ValueOf(v))
 	default:
-		return fmt.Errorf("cannot assign string to a %s", f.String())
+		return fmt.Errorf("cannot assign string to a %s", f.Kind())
 	}
-
-	return nil
 }
 
-func (t valueTarget) setBool(v bool) error {
+func setBool(t target, v bool) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Bool:
-		f.SetBool(v)
+		return t.setBool(v)
 	case reflect.Interface:
-		f.Set(reflect.ValueOf(v))
+		return t.set(reflect.ValueOf(v))
 	default:
 		return fmt.Errorf("cannot assign bool to a %s", f.String())
 	}
-
-	return nil
 }
 
-func (t valueTarget) setInt64(v int64) error {
+func setInt64(t target, v int64) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		// TODO: overflow checks
-		f.SetInt(v)
+		return t.setInt64(v)
 	case reflect.Interface:
-		f.Set(reflect.ValueOf(v))
+		return t.set(reflect.ValueOf(v))
 	default:
 		return fmt.Errorf("cannot assign int64 to a %s", f.String())
 	}
-
-	return nil
 }
 
-func (t valueTarget) setFloat64(v float64) error {
+func setFloat64(t target, v float64) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Float32, reflect.Float64:
 		// TODO: overflow checks
-		f.SetFloat(v)
+		return t.setFloat64(v)
 	case reflect.Interface:
-		f.Set(reflect.ValueOf(v))
+		return t.set(reflect.ValueOf(v))
 	default:
 		return fmt.Errorf("cannot assign float64 to a %s", f.String())
 	}
-
-	return nil
 }
 
-func (t valueTarget) pushNew() (target, error) {
+func pushNew(t target) (target, error) {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Slice:
 		idx := f.Len()
-		f.Set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
-		return valueTarget(f.Index(idx)), nil
+		err := t.set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
+		if err != nil {
+			return nil, err
+		}
+		return valueTarget(t.get().Index(idx)), nil
 	case reflect.Interface:
 		if f.IsNil() {
 			panic("interface should have been initialized")
@@ -140,8 +186,11 @@ func (t valueTarget) pushNew() (target, error) {
 		idx := ifaceElem.Len()
 		newElem := reflect.New(ifaceElem.Type().Elem()).Elem()
 		newSlice := reflect.Append(ifaceElem, newElem)
-		f.Set(newSlice)
-		return valueTarget(f.Elem().Index(idx)), nil
+		err := t.set(newSlice)
+		if err != nil {
+			return nil, err
+		}
+		return valueTarget(t.get().Elem().Index(idx)), nil
 	default:
 		return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
 	}
@@ -162,9 +211,28 @@ func scope(v reflect.Value, name string) (target, error) {
 		} else {
 			return scope(v.Elem(), name)
 		}
+	case reflect.Map:
+		return scopeMap(v, name)
 	default:
 		panic(fmt.Errorf("can't scope on a %s", v.Kind()))
 	}
+}
+
+func scopeMap(v reflect.Value, name string) (target, error) {
+	if v.IsNil() {
+		v.Set(reflect.MakeMap(v.Type()))
+	}
+
+	k := reflect.ValueOf(name)
+	if !v.MapIndex(k).IsValid() {
+		newElem := reflect.New(v.Type().Elem())
+		v.SetMapIndex(k, newElem.Elem())
+	}
+
+	return mapTarget{
+		v: v,
+		k: k,
+	}, nil
 }
 
 func scopeStruct(v reflect.Value, name string) (target, error) {

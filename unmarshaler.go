@@ -95,13 +95,13 @@ func unmarshalValue(x target, node *ast.Node) error {
 
 func unmarshalString(x target, node *ast.Node) error {
 	assertNode(ast.String, node)
-	return x.setString(string(node.Data))
+	return setString(x, string(node.Data))
 }
 
 func unmarshalBool(x target, node *ast.Node) error {
 	assertNode(ast.Bool, node)
 	v := node.Data[0] == 't'
-	return x.setBool(v)
+	return setBool(x, v)
 }
 
 func unmarshalInteger(x target, node *ast.Node) error {
@@ -110,7 +110,7 @@ func unmarshalInteger(x target, node *ast.Node) error {
 	if err != nil {
 		return err
 	}
-	return x.setInt64(v)
+	return setInt64(x, v)
 }
 
 func unmarshalFloat(x target, node *ast.Node) error {
@@ -119,7 +119,7 @@ func unmarshalFloat(x target, node *ast.Node) error {
 	if err != nil {
 		return err
 	}
-	return x.setFloat64(v)
+	return setFloat64(x, v)
 }
 
 func unmarshalInlineTable(x target, node *ast.Node) error {
@@ -137,13 +137,13 @@ func unmarshalInlineTable(x target, node *ast.Node) error {
 func unmarshalArray(x target, node *ast.Node) error {
 	assertNode(ast.Array, node)
 
-	err := x.ensureSlice()
+	err := ensureSlice(x)
 	if err != nil {
 		return err
 	}
 
 	for _, n := range node.Children {
-		v, err := x.pushNew()
+		v, err := pushNew(x)
 		if err != nil {
 			return err
 		}

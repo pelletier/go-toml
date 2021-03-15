@@ -6,7 +6,7 @@ Development branch. Probably does not work.
 
 ## Must do
 
-- [ ] Unmarshal into maps.
+- [x] Unmarshal into maps.
 - [ ] Attach comments to AST (gated by parser flag).
 - [ ] Abstract AST.
 - [ ] Support Array Tables
