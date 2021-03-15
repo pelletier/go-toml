@@ -98,21 +98,24 @@ func (p *parser) parseArrayTable(b []byte) (ast.Node, []byte, error) {
 	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
 
-	// TODO
-	//b = b[2:]
-	//b = p.parseWhitespace(b)
-	//b, err := p.parseKey(b)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//b = p.parseWhitespace(b)
-	//b, err = expect(']', b)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return expect(']', b)
+	node := ast.Node{
+		Kind: ast.ArrayTable,
+	}
 
-	return ast.NoNode, nil, nil
+	b = b[2:]
+	b = p.parseWhitespace(b)
+	k, b, err := p.parseKey(b)
+	if err != nil {
+		return node, nil, err
+	}
+	node.Children = k
+	b = p.parseWhitespace(b)
+	b, err = expect(']', b)
+	if err != nil {
+		return node, nil, err
+	}
+	b, err = expect(']', b)
+	return node, b, err
 }
 
 func (p *parser) parseStdTable(b []byte) (ast.Node, []byte, error) {
