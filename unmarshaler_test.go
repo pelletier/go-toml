@@ -1,4 +1,4 @@
-package unmarshaler
+package toml
 
 import (
 	"math"

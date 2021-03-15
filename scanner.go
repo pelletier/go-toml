@@ -113,6 +113,7 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 	return b, nil, nil
 }
 
+// TODO perform validation on the string?
 func scanBasicString(b []byte) ([]byte, []byte, error) {
 	//basic-string = quotation-mark *basic-char quotation-mark
 	//quotation-mark = %x22            ; "
@@ -136,6 +137,7 @@ func scanBasicString(b []byte) ([]byte, []byte, error) {
 	return nil, nil, fmt.Errorf(`basic string not terminated by "`)
 }
 
+// TODO perform validation on the string?
 func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	//ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	//ml-basic-string-delim
