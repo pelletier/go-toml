@@ -25,10 +25,11 @@ func fromAst(tree ast.Root, v interface{}) error {
 		return fmt.Errorf("target pointer must be non-nil")
 	}
 
-	var x target = valueTarget(r.Elem())
 	var err error
+	var root target = valueTarget(r.Elem())
+	current := root
 	for _, node := range tree {
-		x, err = unmarshalTopLevelNode(x, &node)
+		current, err = unmarshalTopLevelNode(root, current, &node)
 		if err != nil {
 			return err
 		}
@@ -39,17 +40,41 @@ func fromAst(tree ast.Root, v interface{}) error {
 
 // The target return value is the target for the next top-level node. Mostly
 // unchanged, except by table and array table.
-func unmarshalTopLevelNode(x target, node *ast.Node) (target, error) {
+func unmarshalTopLevelNode(root target, x target, node *ast.Node) (target, error) {
 	switch node.Kind {
 	case ast.Table:
-		return scopeWithKey(x, node.Key())
+		return scopeWithTable(root, node.Key())
 	case ast.ArrayTable:
-		panic("TODO")
+		return scopeWithArrayTable(root, node.Key())
 	case ast.KeyValue:
 		return x, unmarshalKeyValue(x, node)
 	default:
 		panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
 	}
+}
+
+func scopeWithTable(x target, key []ast.Node) (target, error) {
+	var err error
+	for _, n := range key {
+		x, err = scopeTableTarget(false, x, string(n.Data))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return x, nil
+}
+
+func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
+	var err error
+	if len(key) > 1 {
+		for _, n := range key[:len(key)-1] {
+			x, err = scopeTableTarget(false, x, string(n.Data))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return scopeTableTarget(true, x, string(key[len(key)-1].Data))
 }
 
 func scopeWithKey(x target, key []ast.Node) (target, error) {

@@ -73,14 +73,14 @@ func (p *parser) parseExpression(b []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	p.tree = append(p.tree, node)
+
 	b = p.parseWhitespace(b)
 
 	if len(b) > 0 && b[0] == '#' {
 		_, rest, err := scanComment(b)
 		return rest, err
 	}
-
-	p.tree = append(p.tree, node)
 
 	return b, nil
 }

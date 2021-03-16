@@ -201,6 +201,19 @@ func scopeTarget(t target, name string) (target, error) {
 	return scope(x, name)
 }
 
+func scopeTableTarget(append bool, t target, name string) (target, error) {
+	x := t.get()
+	t, err := scope(x, name)
+	if err != nil {
+		return t, err
+	}
+	x = t.get()
+	if x.Kind() == reflect.Slice {
+		return scopeSlice(t, append)
+	}
+	return t, nil
+}
+
 func scope(v reflect.Value, name string) (target, error) {
 	switch v.Kind() {
 	case reflect.Struct:
@@ -216,6 +229,20 @@ func scope(v reflect.Value, name string) (target, error) {
 	default:
 		panic(fmt.Errorf("can't scope on a %s", v.Kind()))
 	}
+}
+
+func scopeSlice(t target, append bool) (target, error) {
+	v := t.get()
+	if append {
+		newElem := reflect.New(v.Type().Elem())
+		newSlice := reflect.Append(v, newElem.Elem())
+		err := t.set(newSlice)
+		if err != nil {
+			return t, err
+		}
+		v = t.get()
+	}
+	return valueTarget(v.Index(v.Len() - 1)), nil
 }
 
 func scopeMap(v reflect.Value, name string) (target, error) {

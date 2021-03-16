@@ -147,7 +147,7 @@ func (n *Node) Key() []Node {
 			panic(fmt.Errorf("KeyValue should have at least two children, not %d", len(n.Children)))
 		}
 		return n.Children[:len(n.Children)-1]
-	case Table:
+	case Table, ArrayTable:
 		return n.Children
 	default:
 		panic(fmt.Errorf("Key() is not supported on a %s", n.Kind))

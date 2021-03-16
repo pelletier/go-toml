@@ -175,6 +175,7 @@ func TestUnmarshal(t *testing.T) {
 		err      bool
 	}
 	examples := []struct {
+		skip  bool
 		desc  string
 		input string
 		gen   func() test
@@ -312,7 +313,7 @@ B = "data"`,
 		{
 			desc: "multi keys of different types into map[string]interface{}",
 			input: `A = "foo"
-B = 42`,
+					B = 42`,
 			gen: func() test {
 				doc := map[string]interface{}{}
 				return test{
@@ -361,10 +362,104 @@ B = 42`,
 				}
 			},
 		},
+		{
+			desc: "one-level one-element array table",
+			input: `[[First]]
+					Second = "hello"`,
+			gen: func() test {
+				type First struct {
+					Second string
+				}
+				type Doc struct {
+					First []First
+				}
+				return test{
+					target: &Doc{},
+					expected: &Doc{
+						First: []First{
+							{
+								Second: "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "one-level multi-element array table",
+			input: `[[Products]]
+					Name = "Hammer"
+					Sku = 738594937
+					
+					[[Products]]  # empty table within the array
+					
+					[[Products]]
+					Name = "Nail"
+					Sku = 284758393
+					
+					Color = "gray"`,
+			gen: func() test {
+				type Product struct {
+					Name  string
+					Sku   int64
+					Color string
+				}
+				type Doc struct {
+					Products []Product
+				}
+				return test{
+					target: &Doc{},
+					expected: &Doc{
+						Products: []Product{
+							{Name: "Hammer", Sku: 738594937},
+							{},
+							{Name: "Nail", Sku: 284758393, Color: "gray"},
+						},
+					},
+				}
+			},
+		},
+		{
+			skip: true, // TODO
+			desc: "one-level multi-element array table to map",
+			input: `[[Products]]
+					Name = "Hammer"
+					Sku = 738594937
+					
+					[[Products]]  # empty table within the array
+					
+					[[Products]]
+					Name = "Nail"
+					Sku = 284758393
+					
+					Color = "gray"`,
+			gen: func() test {
+				return test{
+					target: &map[string]interface{}{},
+					expected: &map[string]interface{}{
+						"Products": []interface{}{
+							map[string]interface{}{
+								"Name": "Hammer",
+								"Sku":  738594937,
+							},
+							nil,
+							map[string]interface{}{
+								"Name":  "Nail",
+								"Sku":   284758393,
+								"Color": "gray",
+							},
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
+			if e.skip {
+				t.Skip()
+			}
 			test := e.gen()
 			if test.err && test.expected != nil {
 				panic("invalid test: cannot expect both an error and a value")
