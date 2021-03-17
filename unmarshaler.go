@@ -42,18 +42,26 @@ func fromAst(tree ast.Root, v interface{}) error {
 // unchanged, except by table and array table.
 func unmarshalTopLevelNode(root target, x target, node *ast.Node) (target, error) {
 	switch node.Kind {
-	case ast.Table:
-		return scopeWithTable(root, node.Key())
-	case ast.ArrayTable:
-		return scopeWithArrayTable(root, node.Key())
 	case ast.KeyValue:
 		return x, unmarshalKeyValue(x, node)
+	case ast.Table:
+		return scopeWithKey(root, node.Key())
+	case ast.ArrayTable:
+		return scopeWithArrayTable(root, node.Key())
 	default:
 		panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
 	}
 }
 
-func scopeWithTable(x target, key []ast.Node) (target, error) {
+// scopeWithKey performs target scoping when unmarshaling an ast.KeyValue node.
+//
+// The goal is to hop from target to target recursively using the names in key.
+// Parts of the key should be used to resolve field names for structs, and as
+// keys when targeting maps.
+//
+// When encountering slices, it should always use its last element, and error
+// if the slice does not have any.
+func scopeWithKey(x target, key []ast.Node) (target, error) {
 	var err error
 	for _, n := range key {
 		x, err = scopeTableTarget(false, x, string(n.Data))
@@ -64,6 +72,11 @@ func scopeWithTable(x target, key []ast.Node) (target, error) {
 	return x, nil
 }
 
+// scopeWithArrayTable performs target scoping when unmarshaling an
+// ast.ArrayTable node.
+//
+// It is the same as scopeWithKey, but when scoping the last part of the key
+// it creates a new element in the array instead of using the last one.
 func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
 	var err error
 	if len(key) > 1 {
@@ -74,18 +87,26 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
 			}
 		}
 	}
-	return scopeTableTarget(true, x, string(key[len(key)-1].Data))
-}
-
-func scopeWithKey(x target, key []ast.Node) (target, error) {
-	var err error
-	for _, n := range key {
-		x, err = scopeTarget(x, string(n.Data))
-		if err != nil {
-			return nil, err
-		}
+	x, err = scopeTableTarget(true, x, string(key[len(key)-1].Data))
+	if err != nil {
+		return x, err
 	}
-	return x, nil
+
+	v := x.get()
+
+	if v.Kind() == reflect.Interface {
+		x, err = initInterface(true, x)
+		if err != nil {
+			return x, err
+		}
+		v = x.get()
+	}
+
+	if v.Kind() == reflect.Slice {
+		return scopeSlice(x, true)
+	}
+
+	return x, err
 }
 
 func unmarshalKeyValue(x target, node *ast.Node) error {

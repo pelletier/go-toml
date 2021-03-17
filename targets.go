@@ -196,21 +196,54 @@ func pushNew(t target) (target, error) {
 	}
 }
 
-func scopeTarget(t target, name string) (target, error) {
-	x := t.get()
-	return scope(x, name)
-}
-
 func scopeTableTarget(append bool, t target, name string) (target, error) {
 	x := t.get()
+
+	if x.Kind() == reflect.Interface {
+		t, err := initInterface(append, t)
+		if err != nil {
+			return t, err
+		}
+		x = t.get()
+	}
+
+	if x.Kind() == reflect.Slice {
+		return scopeSlice(t, append)
+	}
+
 	t, err := scope(x, name)
 	if err != nil {
 		return t, err
 	}
-	x = t.get()
-	if x.Kind() == reflect.Slice {
-		return scopeSlice(t, append)
+	return t, nil
+}
+
+// initInterface makes sure that the interface pointed at by the target is not
+// nil.
+// Returns the target to the initialized value of the target.
+func initInterface(append bool, t target) (target, error) {
+	x := t.get()
+
+	if x.Kind() != reflect.Interface {
+		panic("this should only be called on interfaces")
 	}
+
+	if x.IsNil() {
+		var newElement reflect.Value
+		if append {
+			newElement = reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0)
+		} else {
+			newElement = reflect.MakeMap(reflect.TypeOf(map[string]interface{}{}))
+		}
+		err := t.set(newElement)
+		if err != nil {
+			return t, err
+		}
+		x = t.get()
+	}
+
+	x = x.Elem()
+	t = valueTarget(x)
 	return t, nil
 }
 
@@ -218,12 +251,6 @@ func scope(v reflect.Value, name string) (target, error) {
 	switch v.Kind() {
 	case reflect.Struct:
 		return scopeStruct(v, name)
-	case reflect.Interface:
-		if v.IsNil() {
-			panic("not implemented") // TODO
-		} else {
-			return scope(v.Elem(), name)
-		}
 	case reflect.Map:
 		return scopeMap(v, name)
 	default:
@@ -233,6 +260,7 @@ func scope(v reflect.Value, name string) (target, error) {
 
 func scopeSlice(t target, append bool) (target, error) {
 	v := t.get()
+
 	if append {
 		newElem := reflect.New(v.Type().Elem())
 		newSlice := reflect.Append(v, newElem.Elem())

@@ -420,7 +420,6 @@ B = "data"`,
 			},
 		},
 		{
-			skip: true, // TODO
 			desc: "one-level multi-element array table to map",
 			input: `[[Products]]
 					Name = "Hammer"
