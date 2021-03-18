@@ -240,7 +240,12 @@ func scopeTableTarget(append bool, t target, name string) (target, error) {
 	case reflect.Map:
 		return scopeMap(x, name)
 	case reflect.Slice:
-		return scopeSlice(append, t)
+		t, err := scopeSlice(append, t)
+		if err != nil {
+			return t, err
+		}
+		append = false
+		return scopeTableTarget(append, t, name)
 	default:
 		panic(fmt.Errorf("can't scope on a %s", x.Kind()))
 	}

@@ -452,6 +452,76 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc: "sub-table in array table",
+			input: `[[Fruits]]
+					Name = "apple"
+
+					[Fruits.Physical]  # subtable
+					Color = "red"
+					Shape = "round"`,
+			gen: func() test {
+				return test{
+					target: &map[string]interface{}{},
+					expected: &map[string]interface{}{
+						"Fruits": []interface{}{
+							map[string]interface{}{
+								"Name": "apple",
+								"Physical": map[string]interface{}{
+									"Color": "red",
+									"Shape": "round",
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "multiple sub-table in array tables",
+			input: `[[Fruits]]
+					Name = "apple"
+
+					[[Fruits.Varieties]]  # nested array of tables
+					Name = "red delicious"
+
+					[[Fruits.Varieties]]
+					Name = "granny smith"
+
+					[[Fruits]]
+					Name = "banana"
+
+					[[Fruits.Varieties]]
+					Name = "plantain"`,
+			gen: func() test {
+				return test{
+					target: &map[string]interface{}{},
+					expected: &map[string]interface{}{
+						"Fruits": []interface{}{
+							map[string]interface{}{
+								"Name": "apple",
+								"Varieties": []interface{}{
+									map[string]interface{}{
+										"Name": "red delicious",
+									},
+									map[string]interface{}{
+										"Name": "granny smith",
+									},
+								},
+							},
+							map[string]interface{}{
+								"Name": "banana",
+								"Varieties": []interface{}{
+									map[string]interface{}{
+										"Name": "plantain",
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
