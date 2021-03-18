@@ -87,7 +87,7 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
 			}
 		}
 	}
-	x, err = scopeTableTarget(true, x, string(key[len(key)-1].Data))
+	x, err = scopeTableTarget(false, x, string(key[len(key)-1].Data))
 	if err != nil {
 		return x, err
 	}
