@@ -522,6 +522,56 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc: "multiple sub-table in array tables into structs",
+			input: `[[Fruits]]
+					Name = "apple"
+
+					[[Fruits.Varieties]]  # nested array of tables
+					Name = "red delicious"
+
+					[[Fruits.Varieties]]
+					Name = "granny smith"
+
+					[[Fruits]]
+					Name = "banana"
+
+					[[Fruits.Varieties]]
+					Name = "plantain"`,
+			gen: func() test {
+				type Variety struct {
+					Name string
+				}
+				type Fruit struct {
+					Name      string
+					Varieties []Variety
+				}
+				type doc struct {
+					Fruits []Fruit
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Fruits: []Fruit{
+							{
+								Name: "apple",
+								Varieties: []Variety{
+									{Name: "red delicious"},
+									{Name: "granny smith"},
+								},
+							},
+							{
+								Name: "banana",
+								Varieties: []Variety{
+									{Name: "plantain"},
+								},
+							},
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
