@@ -7,14 +7,17 @@ Development branch. Probably does not work.
 ## Must do
 
 - [x] Unmarshal into maps.
-- [ ] Attach comments to AST (gated by parser flag).
-- [ ] Abstract AST.
-- [ ] Support Array Tables
+- [x] Support Array Tables.
+- [ ] Unmarshal into pointers.
 - [ ] Support Date / times.
 - [ ] Support Unmarshaler interface.
 - [ ] Support struct tags annotations.
 - [ ] Original go-toml unmarshal tests pass.
 - [ ] Benchmark!
+- [ ] Abstract AST.
+- [ ] Attach comments to AST (gated by parser flag).
+- [ ] Track file position (line, column) for errors.
+- [ ] Benchmark again!
 
 ## Further work
 

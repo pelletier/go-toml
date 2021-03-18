@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	toml "github.com/pelletier/go-toml/v2/internal/unmarshaler"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
