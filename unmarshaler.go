@@ -95,7 +95,7 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
 	v := x.get()
 
 	if v.Kind() == reflect.Interface {
-		x, err = initInterface(true, x)
+		x, err = scopeInterface(true, x)
 		if err != nil {
 			return x, err
 		}
@@ -103,7 +103,7 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
 	}
 
 	if v.Kind() == reflect.Slice {
-		return scopeSlice(x, true)
+		return scopeSlice(true, x)
 	}
 
 	return x, err

@@ -439,12 +439,12 @@ B = "data"`,
 						"Products": []interface{}{
 							map[string]interface{}{
 								"Name": "Hammer",
-								"Sku":  738594937,
+								"Sku":  int64(738594937),
 							},
 							nil,
 							map[string]interface{}{
 								"Name":  "Nail",
-								"Sku":   284758393,
+								"Sku":   int64(284758393),
 								"Color": "gray",
 							},
 						},

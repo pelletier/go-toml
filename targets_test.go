@@ -39,7 +39,7 @@ func TestStructTarget_Ensure(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			target, err := scope(e.input, e.name)
+			target, err := scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
 			err = ensureSlice(target)
 			v := target.get()
@@ -86,7 +86,7 @@ func TestStructTarget_SetString(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			target, err := scope(e.input, e.name)
+			target, err := scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
 			err = setString(target, str)
 			v := target.get()
@@ -102,7 +102,7 @@ func TestPushNew(t *testing.T) {
 		}
 		d := Doc{}
 
-		x, err := scope(reflect.ValueOf(&d).Elem(), "A")
+		x, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
 		n, err := pushNew(x)
@@ -122,7 +122,7 @@ func TestPushNew(t *testing.T) {
 		}
 		d := Doc{}
 
-		x, err := scope(reflect.ValueOf(&d).Elem(), "A")
+		x, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
 		n, err := pushNew(x)
@@ -161,7 +161,7 @@ func TestScope_Struct(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			x, err := scope(e.input, e.name)
+			x, err := scopeTableTarget(false, valueTarget(e.input), e.name)
 			if e.err {
 				require.Error(t, err)
 			} else {

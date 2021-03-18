@@ -58,6 +58,35 @@ func (t valueTarget) setFloat64(v float64) error {
 	return nil
 }
 
+// interfaceTarget wraps an other target to dereference on get.
+type interfaceTarget struct {
+	x target
+}
+
+func (t interfaceTarget) get() reflect.Value {
+	return t.x.get().Elem()
+}
+
+func (t interfaceTarget) set(v reflect.Value) error {
+	return t.x.set(v)
+}
+
+func (t interfaceTarget) setString(v string) error {
+	return t.x.setString(v)
+}
+
+func (t interfaceTarget) setBool(v bool) error {
+	return t.x.setBool(v)
+}
+
+func (t interfaceTarget) setInt64(v int64) error {
+	return t.x.setInt64(v)
+}
+
+func (t interfaceTarget) setFloat64(v float64) error {
+	return t.x.setFloat64(v)
+}
+
 // mapTarget targets a specific key of a map.
 type mapTarget struct {
 	v reflect.Value
@@ -199,66 +228,62 @@ func pushNew(t target) (target, error) {
 func scopeTableTarget(append bool, t target, name string) (target, error) {
 	x := t.get()
 
-	if x.Kind() == reflect.Interface {
-		t, err := initInterface(append, t)
+	switch x.Kind() {
+	case reflect.Interface:
+		t, err := scopeInterface(append, t)
 		if err != nil {
 			return t, err
 		}
-		x = t.get()
+		return scopeTableTarget(append, t, name)
+	case reflect.Struct:
+		return scopeStruct(x, name)
+	case reflect.Map:
+		return scopeMap(x, name)
+	case reflect.Slice:
+		return scopeSlice(append, t)
+	default:
+		panic(fmt.Errorf("can't scope on a %s", x.Kind()))
 	}
+	return t, nil
+}
 
-	if x.Kind() == reflect.Slice {
-		return scopeSlice(t, append)
-	}
-
-	t, err := scope(x, name)
+func scopeInterface(append bool, t target) (target, error) {
+	err := initInterface(append, t)
 	if err != nil {
 		return t, err
 	}
-	return t, nil
+	return interfaceTarget{t}, nil
 }
 
 // initInterface makes sure that the interface pointed at by the target is not
 // nil.
 // Returns the target to the initialized value of the target.
-func initInterface(append bool, t target) (target, error) {
+func initInterface(append bool, t target) error {
 	x := t.get()
 
 	if x.Kind() != reflect.Interface {
 		panic("this should only be called on interfaces")
 	}
 
-	if x.IsNil() {
-		var newElement reflect.Value
-		if append {
-			newElement = reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0)
-		} else {
-			newElement = reflect.MakeMap(reflect.TypeOf(map[string]interface{}{}))
-		}
-		err := t.set(newElement)
-		if err != nil {
-			return t, err
-		}
-		x = t.get()
+	if !x.IsNil() {
+		return nil
 	}
 
-	x = x.Elem()
-	t = valueTarget(x)
-	return t, nil
-}
-
-func scope(v reflect.Value, name string) (target, error) {
-	switch v.Kind() {
-	case reflect.Struct:
-		return scopeStruct(v, name)
-	case reflect.Map:
-		return scopeMap(v, name)
-	default:
-		panic(fmt.Errorf("can't scope on a %s", v.Kind()))
+	var newElement reflect.Value
+	if append {
+		newElement = reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0)
+	} else {
+		newElement = reflect.MakeMap(reflect.TypeOf(map[string]interface{}{}))
 	}
+	err := t.set(newElement)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func scopeSlice(t target, append bool) (target, error) {
+func scopeSlice(append bool, t target) (target, error) {
 	v := t.get()
 
 	if append {
