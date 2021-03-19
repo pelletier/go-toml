@@ -328,13 +328,8 @@ shouldntBeHere = 2
 func TestUnexportedUnmarshal(t *testing.T) {
 	result := unexportedMarshalTestStruct{}
 	err := toml.Unmarshal(unexportedTestToml, &result)
-	expected := unexportedTestData
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad unexported unmarshal: expected %v, got %v", expected, result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, unexportedTestData, result)
 }
 
 type errStruct struct {

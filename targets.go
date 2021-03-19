@@ -225,7 +225,7 @@ func pushNew(t target) (target, error) {
 	}
 }
 
-func scopeTableTarget(append bool, t target, name string) (target, error) {
+func scopeTableTarget(append bool, t target, name string) (target, bool, error) {
 	x := t.get()
 
 	switch x.Kind() {
@@ -234,19 +234,19 @@ func scopeTableTarget(append bool, t target, name string) (target, error) {
 	case reflect.Interface:
 		t, err := scopeInterface(append, t)
 		if err != nil {
-			return t, err
+			return t, false, err
 		}
 		return scopeTableTarget(append, t, name)
 	case reflect.Ptr:
 		t, err := scopePtr(t)
 		if err != nil {
-			return t, err
+			return t, false, err
 		}
 		return scopeTableTarget(append, t, name)
 	case reflect.Slice:
 		t, err := scopeSlice(append, t)
 		if err != nil {
-			return t, err
+			return t, false, err
 		}
 		append = false
 		return scopeTableTarget(append, t, name)
@@ -260,7 +260,6 @@ func scopeTableTarget(append bool, t target, name string) (target, error) {
 	default:
 		panic(fmt.Errorf("can't scope on a %s", x.Kind()))
 	}
-	return t, nil
 }
 
 func scopeInterface(append bool, t target) (target, error) {
@@ -330,7 +329,7 @@ func scopeSlice(append bool, t target) (target, error) {
 	return valueTarget(v.Index(v.Len() - 1)), nil
 }
 
-func scopeMap(v reflect.Value, name string) (target, error) {
+func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	if v.IsNil() {
 		v.Set(reflect.MakeMap(v.Type()))
 	}
@@ -344,10 +343,10 @@ func scopeMap(v reflect.Value, name string) (target, error) {
 	return mapTarget{
 		v: v,
 		k: k,
-	}, nil
+	}, true, nil
 }
 
-func scopeStruct(v reflect.Value, name string) (target, error) {
+func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 	// TODO: cache this
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
@@ -361,9 +360,9 @@ func scopeStruct(v reflect.Value, name string) (target, error) {
 		} else {
 			// TODO: handle names variations
 			if f.Name == name {
-				return valueTarget(v.Field(i)), nil
+				return valueTarget(v.Field(i)), true, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("field '%s' not found on %s", name, v.Type())
+	return nil, false, nil
 }

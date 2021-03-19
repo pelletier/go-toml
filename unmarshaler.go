@@ -26,31 +26,36 @@ func fromAst(tree ast.Root, v interface{}) error {
 	}
 
 	var err error
+	var skipUntilTable bool
 	var root target = valueTarget(r.Elem())
 	current := root
 	for _, node := range tree {
-		current, err = unmarshalTopLevelNode(root, current, &node)
+		var found bool
+		switch node.Kind {
+		case ast.KeyValue:
+			if skipUntilTable {
+				continue
+			}
+			err = unmarshalKeyValue(current, &node)
+			found = true
+		case ast.Table:
+			current, found, err = scopeWithKey(root, node.Key())
+		case ast.ArrayTable:
+			current, found, err = scopeWithArrayTable(root, node.Key())
+		default:
+			panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
+		}
+
 		if err != nil {
 			return err
+		}
+
+		if !found {
+			skipUntilTable = true
 		}
 	}
 
 	return nil
-}
-
-// The target return value is the target for the next top-level node. Mostly
-// unchanged, except by table and array table.
-func unmarshalTopLevelNode(root target, x target, node *ast.Node) (target, error) {
-	switch node.Kind {
-	case ast.KeyValue:
-		return x, unmarshalKeyValue(x, node)
-	case ast.Table:
-		return scopeWithKey(root, node.Key())
-	case ast.ArrayTable:
-		return scopeWithArrayTable(root, node.Key())
-	default:
-		panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
-	}
 }
 
 // scopeWithKey performs target scoping when unmarshaling an ast.KeyValue node.
@@ -61,15 +66,16 @@ func unmarshalTopLevelNode(root target, x target, node *ast.Node) (target, error
 //
 // When encountering slices, it should always use its last element, and error
 // if the slice does not have any.
-func scopeWithKey(x target, key []ast.Node) (target, error) {
+func scopeWithKey(x target, key []ast.Node) (target, bool, error) {
 	var err error
+	found := true
 	for _, n := range key {
-		x, err = scopeTableTarget(false, x, string(n.Data))
-		if err != nil {
-			return nil, err
+		x, found, err = scopeTableTarget(false, x, string(n.Data))
+		if err != nil || !found {
+			return nil, found, err
 		}
 	}
-	return x, nil
+	return x, true, nil
 }
 
 // scopeWithArrayTable performs target scoping when unmarshaling an
@@ -77,19 +83,20 @@ func scopeWithKey(x target, key []ast.Node) (target, error) {
 //
 // It is the same as scopeWithKey, but when scoping the last part of the key
 // it creates a new element in the array instead of using the last one.
-func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
+func scopeWithArrayTable(x target, key []ast.Node) (target, bool, error) {
 	var err error
+	found := true
 	if len(key) > 1 {
 		for _, n := range key[:len(key)-1] {
-			x, err = scopeTableTarget(false, x, string(n.Data))
-			if err != nil {
-				return nil, err
+			x, found, err = scopeTableTarget(false, x, string(n.Data))
+			if err != nil || !found {
+				return nil, found, err
 			}
 		}
 	}
-	x, err = scopeTableTarget(false, x, string(key[len(key)-1].Data))
-	if err != nil {
-		return x, err
+	x, found, err = scopeTableTarget(false, x, string(key[len(key)-1].Data))
+	if err != nil || !found {
+		return x, found, err
 	}
 
 	v := x.get()
@@ -97,24 +104,29 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, error) {
 	if v.Kind() == reflect.Interface {
 		x, err = scopeInterface(true, x)
 		if err != nil {
-			return x, err
+			return x, found, err
 		}
 		v = x.get()
 	}
 
 	if v.Kind() == reflect.Slice {
-		return scopeSlice(true, x)
+		x, err = scopeSlice(true, x)
 	}
 
-	return x, err
+	return x, found, err
 }
 
 func unmarshalKeyValue(x target, node *ast.Node) error {
 	assertNode(ast.KeyValue, node)
 
-	x, err := scopeWithKey(x, node.Key())
+	x, found, err := scopeWithKey(x, node.Key())
 	if err != nil {
 		return err
+	}
+
+	// A struct in the path was not found. Skip this value.
+	if !found {
+		return nil
 	}
 
 	return unmarshalValue(x, node.Value())

@@ -39,7 +39,7 @@ func TestStructTarget_Ensure(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			target, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			target, _, err := scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
 			err = ensureSlice(target)
 			v := target.get()
@@ -86,7 +86,7 @@ func TestStructTarget_SetString(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			target, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			target, _, err := scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
 			err = setString(target, str)
 			v := target.get()
@@ -102,7 +102,7 @@ func TestPushNew(t *testing.T) {
 		}
 		d := Doc{}
 
-		x, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
+		x, _, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
 		n, err := pushNew(x)
@@ -122,7 +122,7 @@ func TestPushNew(t *testing.T) {
 		}
 		d := Doc{}
 
-		x, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
+		x, _, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
 		n, err := pushNew(x)
@@ -143,6 +143,7 @@ func TestScope_Struct(t *testing.T) {
 		input reflect.Value
 		name  string
 		err   bool
+		found bool
 		idx   []int
 	}{
 		{
@@ -150,21 +151,25 @@ func TestScope_Struct(t *testing.T) {
 			input: reflect.ValueOf(&struct{ A string }{}).Elem(),
 			name:  "A",
 			idx:   []int{0},
+			found: true,
 		},
 		{
 			desc:  "fails not-exported field",
 			input: reflect.ValueOf(&struct{ a string }{}).Elem(),
 			name:  "a",
-			err:   true,
+			err:   false,
+			found: false,
 		},
 	}
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			x, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			x, found, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			assert.Equal(t, e.found, found)
 			if e.err {
-				require.Error(t, err)
-			} else {
+				assert.Error(t, err)
+			}
+			if found {
 				x2, ok := x.(valueTarget)
 				require.True(t, ok)
 				x2.get()
