@@ -9,7 +9,8 @@ type Kind int
 
 const (
 	// meta
-	Comment Kind = iota
+	Invalid Kind = iota
+	Comment
 	Key
 
 	// top level structures
@@ -34,6 +35,8 @@ const (
 
 func (k Kind) String() string {
 	switch k {
+	case Invalid:
+		return "Invalid"
 	case Comment:
 		return "Comment"
 	case Key:

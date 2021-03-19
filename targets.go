@@ -3,6 +3,7 @@ package toml
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 type target interface {
@@ -358,8 +359,11 @@ func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 		if f.Anonymous {
 			// TODO: handle embedded structs
 		} else {
-			// TODO: handle names variations
-			if f.Name == name {
+			fieldName, ok := f.Tag.Lookup("toml")
+			if !ok {
+				fieldName = f.Name
+			}
+			if strings.EqualFold(fieldName, name) {
 				return valueTarget(v.Field(i)), true, nil
 			}
 		}
