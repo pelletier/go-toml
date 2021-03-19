@@ -348,25 +348,50 @@ func scopeMap(v reflect.Value, name string) (target, bool, error) {
 }
 
 func scopeStruct(v reflect.Value, name string) (target, bool, error) {
-	// TODO: cache this
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.PkgPath != "" {
-			// only consider exported fields
-			continue
-		}
-		if f.Anonymous {
-			// TODO: handle embedded structs
-		} else {
-			fieldName, ok := f.Tag.Lookup("toml")
-			if !ok {
-				fieldName = f.Name
+	// TODO: cache this, and reduce allocations
+
+	fieldPaths := map[string][]int{}
+
+	path := make([]int, 0, 16)
+	var walk func(reflect.Value)
+	walk = func(v reflect.Value) {
+		t := v.Type()
+		for i := 0; i < t.NumField(); i++ {
+			l := len(path)
+			path = append(path, i)
+			f := t.Field(i)
+			if f.PkgPath != "" {
+				// only consider exported fields
+				continue
 			}
-			if strings.EqualFold(fieldName, name) {
-				return valueTarget(v.Field(i)), true, nil
+			if f.Anonymous {
+				walk(v.Field(i))
+			} else {
+				fieldName, ok := f.Tag.Lookup("toml")
+				if !ok {
+					fieldName = f.Name
+				}
+
+				pathCopy := make([]int, len(path))
+				copy(pathCopy, path)
+
+				fieldPaths[fieldName] = pathCopy
+				// extra copy for the case-insensitive match
+				fieldPaths[strings.ToLower(fieldName)] = pathCopy
 			}
+			path = path[:l]
 		}
 	}
-	return nil, false, nil
+
+	walk(v)
+
+	path, ok := fieldPaths[name]
+	if !ok {
+		path, ok = fieldPaths[strings.ToLower(name)]
+	}
+	if !ok {
+		return nil, false, nil
+	}
+
+	return valueTarget(v.FieldByIndex(path)), true, nil
 }

@@ -11,7 +11,7 @@ Development branch. Probably does not work.
 - [x] Unmarshal into pointers.
 - [ ] Support Date / times.
 - [ ] Support Unmarshaler interface.
-- [ ] Support struct tags annotations.
+- [x] Support struct tags annotations.
 - [ ] Original go-toml unmarshal tests pass.
 - [ ] Benchmark!
 - [ ] Abstract AST.
