@@ -2,6 +2,7 @@ package toml
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
@@ -13,7 +14,26 @@ func Unmarshal(data []byte, v interface{}) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO: remove me; sanity check
+	allValidOrDump(p.tree, p.tree)
+
 	return fromAst(p.tree, v)
+}
+
+func allValidOrDump(tree ast.Root, nodes []ast.Node) bool {
+	for i, n := range nodes {
+		if n.Kind == ast.Invalid {
+			fmt.Printf("AST contains invalid node! idx=%d\n", i)
+			fmt.Fprintf(os.Stderr, "%s\n", tree.Sdot())
+			return false
+		}
+		ok := allValidOrDump(tree, n.Children)
+		if !ok {
+			return ok
+		}
+	}
+	return true
 }
 
 func fromAst(tree ast.Root, v interface{}) error {
