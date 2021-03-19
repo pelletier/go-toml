@@ -229,16 +229,20 @@ func scopeTableTarget(append bool, t target, name string) (target, error) {
 	x := t.get()
 
 	switch x.Kind() {
+	// Kinds that need to recurse
+
 	case reflect.Interface:
 		t, err := scopeInterface(append, t)
 		if err != nil {
 			return t, err
 		}
 		return scopeTableTarget(append, t, name)
-	case reflect.Struct:
-		return scopeStruct(x, name)
-	case reflect.Map:
-		return scopeMap(x, name)
+	case reflect.Ptr:
+		t, err := scopePtr(t)
+		if err != nil {
+			return t, err
+		}
+		return scopeTableTarget(append, t, name)
 	case reflect.Slice:
 		t, err := scopeSlice(append, t)
 		if err != nil {
@@ -246,6 +250,13 @@ func scopeTableTarget(append bool, t target, name string) (target, error) {
 		}
 		append = false
 		return scopeTableTarget(append, t, name)
+
+	// Terminal kinds
+
+	case reflect.Struct:
+		return scopeStruct(x, name)
+	case reflect.Map:
+		return scopeMap(x, name)
 	default:
 		panic(fmt.Errorf("can't scope on a %s", x.Kind()))
 	}
@@ -258,6 +269,22 @@ func scopeInterface(append bool, t target) (target, error) {
 		return t, err
 	}
 	return interfaceTarget{t}, nil
+}
+
+func scopePtr(t target) (target, error) {
+	err := initPtr(t)
+	if err != nil {
+		return t, err
+	}
+	return valueTarget(t.get().Elem()), nil
+}
+
+func initPtr(t target) error {
+	x := t.get()
+	if !x.IsNil() {
+		return nil
+	}
+	return t.set(reflect.New(x.Type().Elem()))
 }
 
 // initInterface makes sure that the interface pointed at by the target is not

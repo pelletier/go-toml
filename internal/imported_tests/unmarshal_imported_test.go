@@ -138,13 +138,8 @@ func TestInterface(t *testing.T) {
 func TestBasicUnmarshal(t *testing.T) {
 	result := basicMarshalTestStruct{}
 	err := toml.Unmarshal(basicTestToml, &result)
-	expected := basicTestData
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Bad unmarshal: expected %v, got %v", expected, result)
-	}
+	require.NoError(t, err)
+	require.Equal(t, basicTestData, result)
 }
 
 type quotedKeyMarshalTestStruct struct {
