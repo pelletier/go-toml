@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 )
@@ -166,9 +167,42 @@ func unmarshalValue(x target, node *ast.Node) error {
 		return unmarshalArray(x, node)
 	case ast.InlineTable:
 		return unmarshalInlineTable(x, node)
+	case ast.LocalDateTime:
+		return unmarshalLocalDateTime(x, node)
+	case ast.DateTime:
+		return unmarshalDateTime(x, node)
 	default:
 		panic(fmt.Errorf("unhandled unmarshalValue kind %s", node.Kind))
 	}
+}
+
+func unmarshalLocalDateTime(x target, node *ast.Node) error {
+	assertNode(ast.LocalDateTime, node)
+	v, rest, err := parseLocalDateTime(node.Data)
+	if err != nil {
+		return err
+	}
+	if len(rest) > 0 {
+		return fmt.Errorf("extra characters at the end of a local date time")
+	}
+	return setLocalDateTime(x, v)
+}
+
+func unmarshalDateTime(x target, node *ast.Node) error {
+	assertNode(ast.DateTime, node)
+	v, err := parseDateTime(node.Data)
+	if err != nil {
+		return err
+	}
+	return setDateTime(x, v)
+}
+
+func setLocalDateTime(x target, v LocalDateTime) error {
+	return x.set(reflect.ValueOf(v))
+}
+
+func setDateTime(x target, v time.Time) error {
+	return x.set(reflect.ValueOf(v))
 }
 
 func unmarshalString(x target, node *ast.Node) error {
@@ -184,7 +218,7 @@ func unmarshalBool(x target, node *ast.Node) error {
 
 func unmarshalInteger(x target, node *ast.Node) error {
 	assertNode(ast.Integer, node)
-	v, err := node.DecodeInteger()
+	v, err := parseInteger(node.Data)
 	if err != nil {
 		return err
 	}
@@ -193,7 +227,7 @@ func unmarshalInteger(x target, node *ast.Node) error {
 
 func unmarshalFloat(x target, node *ast.Node) error {
 	assertNode(ast.Float, node)
-	v, err := node.DecodeFloat()
+	v, err := parseFloat(node.Data)
 	if err != nil {
 		return err
 	}

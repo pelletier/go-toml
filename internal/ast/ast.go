@@ -211,34 +211,6 @@ func (n *Node) Value() *Node {
 	return &n.Children[len(n.Children)-1]
 }
 
-// DecodeInteger parse the data of an Integer node and returns the represented
-// int64, or an error.
-// Panics if not called on an Integer node.
-func (n *Node) DecodeInteger() (int64, error) {
-	assertKind(Integer, n)
-	if len(n.Data) > 2 && n.Data[0] == '0' {
-		switch n.Data[1] {
-		case 'x':
-			return parseIntHex(n.Data)
-		case 'b':
-			return parseIntBin(n.Data)
-		case 'o':
-			return parseIntOct(n.Data)
-		default:
-			return 0, fmt.Errorf("invalid base: '%c'", n.Data[1])
-		}
-	}
-	return parseIntDec(n.Data)
-}
-
-// DecodeFloat parse the data of a Float node and returns the represented
-// float64, or an error.
-// Panics if not called on an Float node.
-func (n *Node) DecodeFloat() (float64, error) {
-	assertKind(Float, n)
-	return parseFloat(n.Data)
-}
-
 func assertKind(k Kind, n *Node) {
 	if n.Kind != k {
 		panic(fmt.Errorf("method was expecting a %s, not a %s", k, n.Kind))

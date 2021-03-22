@@ -637,14 +637,11 @@ func (p *parser) parseIntOrFloatOrDateTime(node *ast.Node, b []byte) ([]byte, er
 		s = len(b)
 	}
 	for idx, c := range b[:s] {
-		if c >= '0' && c <= '9' {
+		if isDigit(c) {
 			continue
 		}
-		if idx == 2 && c == ':' {
-			return p.parseDateTime(b)
-		}
-		if idx == 4 && c == '-' {
-			return p.parseDateTime(b)
+		if idx == 2 && c == ':' || (idx == 4 && c == '-') {
+			return p.scanDateTime(node, b)
 		}
 	}
 	return p.scanIntOrFloat(node, b)
@@ -659,14 +656,61 @@ func digitsToInt(b []byte) int {
 	return x
 }
 
+func (p *parser) scanDateTime(node *ast.Node, b []byte) ([]byte, error) {
+	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
+	// followed by a digit.
+
+	hasTime := false
+	hasTz := false
+	seenSpace := false
+
+	i := 0
+	for ; i < len(b); i++ {
+		c := b[i]
+		if isDigit(c) || c == '-' {
+		} else if c == 'T' || c == ':' || c == '.' {
+			hasTime = true
+			continue
+		} else if c == '+' || c == '-' || c == 'Z' {
+			hasTz = true
+		} else if c == ' ' {
+			if !seenSpace && i+1 < len(b) && isDigit(b[i+1]) {
+				i += 2
+				seenSpace = true
+				hasTime = true
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+	}
+
+	if hasTime {
+		if hasTz {
+			node.Kind = ast.DateTime
+		} else {
+			node.Kind = ast.LocalDateTime
+		}
+	} else {
+		if hasTz {
+			return nil, fmt.Errorf("possible DateTime cannot have a timezone but no time component")
+		}
+		node.Kind = ast.LocalDate
+	}
+
+	node.Data = b[:i]
+
+	return b[i:], nil
+}
+
 func (p *parser) parseDateTime(b []byte) ([]byte, error) {
-	// we know the first 2 ar digits.
+	// we know the first 2 are digits.
 	if b[2] == ':' {
 		return p.parseTime(b)
 	}
 	// This state accepts an offset date-time, a local date-time, or a local date.
 	//
-	//   v--- cursor
 	// 1979-05-27T07:32:00Z
 	// 1979-05-27T00:32:00-07:00
 	// 1979-05-27T00:32:00.999999-07:00
