@@ -202,7 +202,8 @@ func setInt64(t target, v int64) error {
 	switch f.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		// TODO: overflow checks
-		return t.setInt64(v)
+		converted := reflect.ValueOf(v).Convert(f.Type())
+		return t.set(converted)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		// TODO: overflow checks
 		converted := reflect.ValueOf(v).Convert(f.Type())
@@ -390,6 +391,15 @@ func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	}
 
 	k := reflect.ValueOf(name)
+
+	keyType := v.Type().Key()
+	if !k.Type().AssignableTo(keyType) {
+		if !k.Type().ConvertibleTo(keyType) {
+			return nil, false, fmt.Errorf("cannot convert string into map key type %s", keyType)
+		}
+		k = k.Convert(keyType)
+	}
+
 	if !v.MapIndex(k).IsValid() {
 		newElem := reflect.New(v.Type().Elem())
 		v.SetMapIndex(k, newElem.Elem())
