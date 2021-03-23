@@ -156,8 +156,7 @@ func setString(t target, v string) error {
 			}
 			f = t.get()
 		}
-		f.Elem().Set(reflect.ValueOf(v))
-		return nil
+		return setString(valueTarget(f.Elem()), v)
 	default:
 		return fmt.Errorf("cannot assign string to a %s", f.Kind())
 	}
@@ -179,8 +178,7 @@ func setBool(t target, v bool) error {
 			}
 			f = t.get()
 		}
-		f.Elem().Set(reflect.ValueOf(v))
-		return nil
+		return setBool(valueTarget(f.Elem()), v)
 	default:
 		return fmt.Errorf("cannot assign bool to a %s", f.String())
 	}
@@ -193,6 +191,10 @@ func setInt64(t target, v int64) error {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		// TODO: overflow checks
 		return t.setInt64(v)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		// TODO: overflow checks
+		converted := reflect.ValueOf(v).Convert(f.Type())
+		return t.set(converted)
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
 	case reflect.Ptr:
@@ -203,8 +205,7 @@ func setInt64(t target, v int64) error {
 			}
 			f = t.get()
 		}
-		f.Elem().Set(reflect.ValueOf(v))
-		return nil
+		return setInt64(valueTarget(f.Elem()), v)
 	default:
 		return fmt.Errorf("cannot assign int64 to a %s", f.String())
 	}
@@ -227,8 +228,7 @@ func setFloat64(t target, v float64) error {
 			}
 			f = t.get()
 		}
-		f.Elem().Set(reflect.ValueOf(v))
-		return nil
+		return setFloat64(valueTarget(f.Elem()), v)
 	default:
 		return fmt.Errorf("cannot assign float64 to a %s", f.String())
 	}
