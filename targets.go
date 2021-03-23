@@ -148,6 +148,16 @@ func setString(t target, v string) error {
 		return t.setString(v)
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
+	case reflect.Ptr:
+		if !f.Elem().IsValid() {
+			err := t.set(reflect.New(f.Type().Elem()))
+			if err != nil {
+				return err
+			}
+			f = t.get()
+		}
+		f.Elem().Set(reflect.ValueOf(v))
+		return nil
 	default:
 		return fmt.Errorf("cannot assign string to a %s", f.Kind())
 	}
@@ -161,6 +171,16 @@ func setBool(t target, v bool) error {
 		return t.setBool(v)
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
+	case reflect.Ptr:
+		if !f.Elem().IsValid() {
+			err := t.set(reflect.New(f.Type().Elem()))
+			if err != nil {
+				return err
+			}
+			f = t.get()
+		}
+		f.Elem().Set(reflect.ValueOf(v))
+		return nil
 	default:
 		return fmt.Errorf("cannot assign bool to a %s", f.String())
 	}
@@ -175,6 +195,16 @@ func setInt64(t target, v int64) error {
 		return t.setInt64(v)
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
+	case reflect.Ptr:
+		if !f.Elem().IsValid() {
+			err := t.set(reflect.New(f.Type().Elem()))
+			if err != nil {
+				return err
+			}
+			f = t.get()
+		}
+		f.Elem().Set(reflect.ValueOf(v))
+		return nil
 	default:
 		return fmt.Errorf("cannot assign int64 to a %s", f.String())
 	}
@@ -189,6 +219,16 @@ func setFloat64(t target, v float64) error {
 		return t.setFloat64(v)
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
+	case reflect.Ptr:
+		if !f.Elem().IsValid() {
+			err := t.set(reflect.New(f.Type().Elem()))
+			if err != nil {
+				return err
+			}
+			f = t.get()
+		}
+		f.Elem().Set(reflect.ValueOf(v))
+		return nil
 	default:
 		return fmt.Errorf("cannot assign float64 to a %s", f.String())
 	}
