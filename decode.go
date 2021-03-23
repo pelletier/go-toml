@@ -75,7 +75,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 
 	dt, b, err := parseLocalDateTime(b)
 	if err != nil {
-		return time.Time{}, nil
+		return time.Time{}, err
 	}
 
 	var zone *time.Location
@@ -165,9 +165,15 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	if err != nil {
 		return t, nil, err
 	}
+	if b[2] != ':' {
+		return t, nil, fmt.Errorf("expecting colon between hours and minutes")
+	}
 	t.Minute, err = parseDecimalDigits(b[3:5])
 	if err != nil {
 		return t, nil, err
+	}
+	if b[5] != ':' {
+		return t, nil, fmt.Errorf("expecting colon between minutes and seconds")
 	}
 	t.Second, err = parseDecimalDigits(b[6:8])
 	if err != nil {
