@@ -129,16 +129,28 @@ func ensureSlice(t target) error {
 		}
 	case reflect.Interface:
 		if f.IsNil() {
-			return t.set(reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0))
+			return t.set(reflect.MakeSlice(sliceInterfaceType, 0, 0))
 		}
 		if f.Type().Elem().Kind() != reflect.Slice {
 			return fmt.Errorf("interface is pointing to a %s, not a slice", f.Kind())
 		}
+	case reflect.Ptr:
+		if f.IsNil() {
+			ptr := reflect.New(f.Type().Elem())
+			err := t.set(ptr)
+			if err != nil {
+				return err
+			}
+			f = t.get()
+		}
+		return ensureSlice(valueTarget(f.Elem()))
 	default:
 		return fmt.Errorf("cannot initialize a slice in %s", f.Kind())
 	}
 	return nil
 }
+
+var sliceInterfaceType = reflect.TypeOf([]interface{}{})
 
 func setString(t target, v string) error {
 	f := t.get()
@@ -261,6 +273,8 @@ func pushNew(t target) (target, error) {
 			return nil, err
 		}
 		return valueTarget(t.get().Elem().Index(idx)), nil
+	case reflect.Ptr:
+		return pushNew(valueTarget(f.Elem()))
 	default:
 		return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
 	}

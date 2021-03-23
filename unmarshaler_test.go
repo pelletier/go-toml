@@ -572,6 +572,22 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "slice pointer in slice pointer",
+			input: `A = ["Hello"]`,
+			gen: func() test {
+				type doc struct {
+					A *[]*string
+				}
+				hello := "Hello"
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: &[]*string{&hello},
+					},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {

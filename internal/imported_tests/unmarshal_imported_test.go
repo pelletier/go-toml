@@ -517,7 +517,6 @@ Str = "Hello"
 `)
 
 func TestPointerUnmarshal(t *testing.T) {
-	t.Log("TOML data:", string(pointerTestToml))
 	result := pointerMarshalTestStruct{}
 	err := toml.Unmarshal(pointerTestToml, &result)
 	require.NoError(t, err)
