@@ -977,17 +977,21 @@ func (p *parser) scanIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
 		case 'b':
 			isValidRune = isValidBinaryRune
 		default:
-			return b, fmt.Errorf("unknown number base: %c. possible options are x (hex) o (octal) b (binary)", b[1])
+			i++
 		}
 
-		i += 2
-		for ; i < len(b); i++ {
-			if !isValidRune(b[i]) {
-				node.Kind = ast.Integer
-				node.Data = b[:i]
-				return b[i:], nil
+		if isValidRune != nil {
+			i += 2
+			for ; i < len(b); i++ {
+				if !isValidRune(b[i]) {
+					break
+				}
 			}
 		}
+
+		node.Kind = ast.Integer
+		node.Data = b[:i]
+		return b[i:], nil
 	}
 
 	isFloat := false

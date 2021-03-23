@@ -8,7 +8,7 @@ Development branch. Probably does not work.
 
 - [x] Unmarshal into maps.
 - [x] Support Array Tables.
-- [x] Unmarshal into pointers.  
+- [x] Unmarshal into pointers.
 - [x] Support Date / times.
 - [ ] Support Unmarshaler interface.
 - [x] Support struct tags annotations.

@@ -439,7 +439,7 @@ func TestEmptytomlUnmarshal(t *testing.T) {
 		String:     "",
 		StringList: []string{},
 		Ptr:        nil,
-		Map:        map[string]string{},
+		Map:        nil,
 	}
 
 	result := emptyMarshalTestStruct{}
