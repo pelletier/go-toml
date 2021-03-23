@@ -2,6 +2,7 @@ package toml
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 )
@@ -196,18 +197,70 @@ func setBool(t target, v bool) error {
 	}
 }
 
+const maxInt = int64(^uint(0) >> 1)
+const minInt = -maxInt - 1
+
 func setInt64(t target, v int64) error {
 	f := t.get()
 
 	switch f.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		// TODO: overflow checks
-		converted := reflect.ValueOf(v).Convert(f.Type())
-		return t.set(converted)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		// TODO: overflow checks
-		converted := reflect.ValueOf(v).Convert(f.Type())
-		return t.set(converted)
+	case reflect.Int64:
+		return t.setInt64(v)
+	case reflect.Int32:
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return fmt.Errorf("integer %d does not fit in an int32", v)
+		}
+		return t.set(reflect.ValueOf(int32(v)))
+	case reflect.Int16:
+		if v < math.MinInt16 || v > math.MaxInt16 {
+			return fmt.Errorf("integer %d does not fit in an int16", v)
+		}
+		return t.set(reflect.ValueOf(int16(v)))
+	case reflect.Int8:
+		if v < math.MinInt8 || v > math.MaxInt8 {
+			return fmt.Errorf("integer %d does not fit in an int8", v)
+		}
+		return t.set(reflect.ValueOf(int8(v)))
+	case reflect.Int:
+		if v < minInt || v > maxInt {
+			return fmt.Errorf("integer %d does not fit in an int", v)
+		}
+		return t.set(reflect.ValueOf(int(v)))
+
+	case reflect.Uint64:
+		if v < 0 {
+			return fmt.Errorf("negative integer %d cannot be stored in an uint64", v)
+		}
+		return t.set(reflect.ValueOf(uint64(v)))
+	case reflect.Uint32:
+		if v < 0 {
+			return fmt.Errorf("negative integer %d cannot be stored in an uint32", v)
+		}
+		if v > math.MaxUint32 {
+			return fmt.Errorf("integer %d cannot be stored in an uint32", v)
+		}
+		return t.set(reflect.ValueOf(uint32(v)))
+	case reflect.Uint16:
+		if v < 0 {
+			return fmt.Errorf("negative integer %d cannot be stored in an uint16", v)
+		}
+		if v > math.MaxUint16 {
+			return fmt.Errorf("integer %d cannot be stored in an uint16", v)
+		}
+		return t.set(reflect.ValueOf(uint16(v)))
+	case reflect.Uint8:
+		if v < 0 {
+			return fmt.Errorf("negative integer %d cannot be stored in an uint8", v)
+		}
+		if v > math.MaxUint8 {
+			return fmt.Errorf("integer %d cannot be stored in an uint8", v)
+		}
+		return t.set(reflect.ValueOf(uint8(v)))
+	case reflect.Uint:
+		if v < 0 {
+			return fmt.Errorf("negative integer %d cannot be stored in an uint", v)
+		}
+		return t.set(reflect.ValueOf(uint(v)))
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
 	case reflect.Ptr:
@@ -228,9 +281,13 @@ func setFloat64(t target, v float64) error {
 	f := t.get()
 
 	switch f.Kind() {
-	case reflect.Float32, reflect.Float64:
-		// TODO: overflow checks
+	case reflect.Float64:
 		return t.setFloat64(v)
+	case reflect.Float32:
+		if v > math.MaxFloat32 {
+			return fmt.Errorf("float %f cannot be stored in a float32", v)
+		}
+		return t.set(reflect.ValueOf(float32(v)))
 	case reflect.Interface:
 		return t.set(reflect.ValueOf(v))
 	case reflect.Ptr:
