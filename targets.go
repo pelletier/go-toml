@@ -483,9 +483,7 @@ func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 			f := t.Field(i)
 			if f.PkgPath != "" {
 				// only consider exported fields
-				continue
-			}
-			if f.Anonymous {
+			} else if f.Anonymous {
 				walk(v.Field(i))
 			} else {
 				fieldName, ok := f.Tag.Lookup("toml")
