@@ -122,6 +122,14 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, bool, error) {
 
 	v := x.get()
 
+	if v.Kind() == reflect.Ptr {
+		x, err = scopePtr(x)
+		if err != nil {
+			return x, false, err
+		}
+		v = x.get()
+	}
+
 	if v.Kind() == reflect.Interface {
 		x, err = scopeInterface(true, x)
 		if err != nil {
