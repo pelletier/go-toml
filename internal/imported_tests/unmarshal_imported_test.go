@@ -1833,7 +1833,7 @@ func TestUnmarshalSliceFail2(t *testing.T) {
 	assert.Error(t, toml.Unmarshal([]byte(doc), &actual))
 }
 
-func TestUnmarshalMixedTypeArray(t *testing.T) {
+func TestUnmarshalMixedTypeSlice(t *testing.T) {
 	type TestStruct struct {
 		ArrayField []interface{}
 	}
@@ -1854,9 +1854,9 @@ func TestUnmarshalMixedTypeArray(t *testing.T) {
 			map[string]interface{}{
 				"Field": "inner1",
 			},
-			[]map[string]interface{}{
-				{"Field": "inner2"},
-				{"Field": "inner3"},
+			[]interface{}{
+				map[string]interface{}{"Field": "inner2"},
+				map[string]interface{}{"Field": "inner3"},
 			},
 		},
 	}

@@ -10,8 +10,9 @@ Development branch. Probably does not work.
 - [x] Support Array Tables.
 - [x] Unmarshal into pointers.
 - [x] Support Date / times.
-- [ ] Support Unmarshaler interface.
 - [x] Support struct tags annotations.
+- [ ] Support Arrays.
+- [ ] Support Unmarshaler interface.
 - [ ] Original go-toml unmarshal tests pass.
 - [ ] Benchmark!
 - [ ] Abstract AST.
