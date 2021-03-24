@@ -126,10 +126,10 @@ func TestInterface(t *testing.T) {
 	expected := Conf{
 		Name: "rui",
 		Age:  18,
-		Inter: &NestedStruct{
-			FirstName: "wang",
-			LastName:  "jl",
-			Age:       100,
+		Inter: map[string]interface{}{
+			"FirstName": "wang",
+			"LastName":  "jl",
+			"Age":       int64(100),
 		},
 	}
 	assert.Equal(t, expected, config)
@@ -1663,25 +1663,21 @@ Age = 23
 		},
 		NilField:              nil,
 		InterfacePointerField: &s,
-		StructArrayField: []map[string]interface{}{
-			{
+		StructArrayField: []interface{}{
+			map[string]interface{}{
 				"Name": "Allen",
 				"Age":  int64(20),
 			},
-			{
+			map[string]interface{}{
 				"Name": "Jack",
 				"Age":  int64(23),
 			},
 		},
 	}
 	actual := OuterStruct{}
-	if err := toml.Unmarshal(doc, &actual); err == nil {
-		if !reflect.DeepEqual(actual, expected) {
-			t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
-		}
-	} else {
-		t.Fatal(err)
-	}
+	err := toml.Unmarshal(doc, &actual)
+	require.NoError(t, err)
+	assert.Equal(t, expected, actual)
 }
 
 func TestUnmarshalToNonNilInterface(t *testing.T) {
@@ -1727,8 +1723,8 @@ InnerField = "After4"
 	var s interface{} = InnerStruct{"After"}
 	expected := OuterStruct{
 		PrimitiveField: "Allen",
-		ArrayField:     []int{1, 2, 3},
-		StructField:    InnerStruct{InnerField: "After1"},
+		ArrayField:     []interface{}{int64(1), int64(2), int64(3)},
+		StructField:    map[string]interface{}{"InnerField": "After1"},
 		MapField: map[string]interface{}{
 			"MapField1": []interface{}{int64(4), int64(5), int64(6)},
 			"MapField2": map[string]interface{}{
@@ -1736,12 +1732,12 @@ InnerField = "After4"
 			},
 			"MapField3": false,
 		},
-		PointerField:          &InnerStruct{InnerField: "After2"},
+		PointerField:          map[string]interface{}{"InnerField": "After2"},
 		NilField:              nil,
 		InterfacePointerField: &s,
-		StructArrayField: []InnerStruct{
-			{InnerField: "After3"},
-			{InnerField: "After4"},
+		StructArrayField: []interface{}{
+			map[string]interface{}{"InnerField": "After3"},
+			map[string]interface{}{"InnerField": "After4"},
 		},
 	}
 	actual := OuterStruct{
@@ -1763,13 +1759,10 @@ InnerField = "After4"
 			{InnerField: "Before4"},
 		},
 	}
-	if err := toml.Unmarshal(doc, &actual); err == nil {
-		if !reflect.DeepEqual(actual, expected) {
-			t.Errorf("Bad unmarshal: expected %v, got %v", expected, actual)
-		}
-	} else {
-		t.Fatal(err)
-	}
+
+	err := toml.Unmarshal(doc, &actual)
+	require.NoError(t, err)
+	assert.Equal(t, expected, actual)
 }
 
 func TestUnmarshalNil(t *testing.T) {

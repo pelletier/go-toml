@@ -129,10 +129,10 @@ func ensureSlice(t target) error {
 			return t.set(reflect.MakeSlice(f.Type(), 0, 0))
 		}
 	case reflect.Interface:
-		if f.IsNil() {
+		if f.IsNil() || f.Elem().Type() != sliceInterfaceType {
 			return t.set(reflect.MakeSlice(sliceInterfaceType, 0, 0))
 		}
-		if f.Type().Elem().Kind() != reflect.Slice {
+		if f.Elem().Type().Kind() != reflect.Slice {
 			return fmt.Errorf("interface is pointing to a %s, not a slice", f.Kind())
 		}
 	case reflect.Ptr:
@@ -152,6 +152,7 @@ func ensureSlice(t target) error {
 }
 
 var sliceInterfaceType = reflect.TypeOf([]interface{}{})
+var mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 
 func setString(t target, v string) error {
 	f := t.get()
@@ -409,15 +410,15 @@ func initInterface(append bool, t target) error {
 		panic("this should only be called on interfaces")
 	}
 
-	if !x.IsNil() {
+	if !x.IsNil() && (x.Elem().Type() == sliceInterfaceType || x.Elem().Type() == mapStringInterfaceType) {
 		return nil
 	}
 
 	var newElement reflect.Value
 	if append {
-		newElement = reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, 0)
+		newElement = reflect.MakeSlice(sliceInterfaceType, 0, 0)
 	} else {
-		newElement = reflect.MakeMap(reflect.TypeOf(map[string]interface{}{}))
+		newElement = reflect.MakeMap(mapStringInterfaceType)
 	}
 	err := t.set(newElement)
 	if err != nil {

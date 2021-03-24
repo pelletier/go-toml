@@ -588,6 +588,31 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc: "interface holding a struct",
+			input: `[A]
+					B = "After"`,
+			gen: func() test {
+				type inner struct {
+					B interface{}
+				}
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{
+						A: inner{
+							B: "Before",
+						},
+					},
+					expected: &doc{
+						A: map[string]interface{}{
+							"B": "After",
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
