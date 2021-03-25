@@ -1,8 +1,8 @@
 package toml
 
 import (
+	"encoding"
 	"fmt"
-	"os"
 	"reflect"
 	"time"
 
@@ -16,27 +16,8 @@ func Unmarshal(data []byte, v interface{}) error {
 		return err
 	}
 
-	// TODO: remove me; sanity check
-	allValidOrDump(p.tree, p.tree)
-
 	d := decoder{}
-
 	return d.fromAst(p.tree, v)
-}
-
-func allValidOrDump(tree ast.Root, nodes []ast.Node) bool {
-	for i, n := range nodes {
-		if n.Kind == ast.Invalid {
-			fmt.Printf("AST contains invalid node! idx=%d\n", i)
-			fmt.Fprintf(os.Stderr, "%s\n", tree.Sdot())
-			return false
-		}
-		ok := allValidOrDump(tree, n.Children)
-		if !ok {
-			return ok
-		}
-	}
-	return true
 }
 
 type decoder struct {
@@ -187,7 +168,40 @@ func (d *decoder) unmarshalKeyValue(x target, node *ast.Node) error {
 	return d.unmarshalValue(x, node.Value())
 }
 
+var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
+
+func tryTextUnmarshaler(x target, node *ast.Node) (bool, error) {
+	v := x.get()
+
+	if v.Kind() == reflect.Ptr {
+		if !v.Elem().IsValid() {
+			err := x.set(reflect.New(v.Type().Elem()))
+			if err != nil {
+				return false, nil
+			}
+			v = x.get()
+		}
+		return tryTextUnmarshaler(valueTarget(v.Elem()), node)
+	}
+
+	if v.Kind() != reflect.Struct {
+		return false, nil
+	}
+	if v.Type().Implements(textUnmarshalerType) {
+		return true, v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
+	}
+	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
+		return true, v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
+	}
+	return false, nil
+}
+
 func (d *decoder) unmarshalValue(x target, node *ast.Node) error {
+	ok, err := tryTextUnmarshaler(x, node)
+	if ok {
+		return err
+	}
+
 	switch node.Kind {
 	case ast.String:
 		return unmarshalString(x, node)

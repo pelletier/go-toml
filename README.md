@@ -12,8 +12,8 @@ Development branch. Probably does not work.
 - [x] Support Date / times.
 - [x] Support struct tags annotations.
 - [x] Support Arrays.
-- [ ] Support Unmarshaler interface.
-- [ ] Original go-toml unmarshal tests pass.
+- [x] Support Unmarshaler interface.
+- [x] Original go-toml unmarshal tests pass.
 - [ ] Benchmark!
 - [ ] Abstract AST.
 - [ ] Attach comments to AST (gated by parser flag).

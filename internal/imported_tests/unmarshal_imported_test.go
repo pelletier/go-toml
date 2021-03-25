@@ -1994,6 +1994,7 @@ type parent struct {
 }
 
 func TestCustomUnmarshal(t *testing.T) {
+	t.Skip("not sure if UnmarshalTOML is a good idea")
 	input := `
 [Doc]
     key = "ok1"
@@ -2002,18 +2003,15 @@ func TestCustomUnmarshal(t *testing.T) {
 `
 
 	var d parent
-	if err := toml.Unmarshal([]byte(input), &d); err != nil {
-		t.Fatalf("unexpected err: %s", err.Error())
-	}
-	if d.Doc.Decoded.Key != "ok1" {
-		t.Errorf("Bad unmarshal: expected ok, got %v", d.Doc.Decoded.Key)
-	}
-	if d.DocPointer.Decoded.Key != "ok2" {
-		t.Errorf("Bad unmarshal: expected ok, got %v", d.DocPointer.Decoded.Key)
-	}
+	err := toml.Unmarshal([]byte(input), &d)
+	require.NoError(t, err)
+	assert.Equal(t, "ok1", d.Doc.Decoded.Key)
+	assert.Equal(t, "ok2", d.DocPointer.Decoded.Key)
 }
 
 func TestCustomUnmarshalError(t *testing.T) {
+	t.Skip("not sure if UnmarshalTOML is a good idea")
+
 	input := `
 [Doc]
     key = 1
@@ -2071,25 +2069,13 @@ Bool = true
 Int = 21
 Float = 2.0
 `
-
-	if err := toml.Unmarshal([]byte(input), &doc); err != nil {
-		t.Fatalf("unexpected err: %s", err.Error())
-	}
-	if doc.UnixTime.Value != 12 {
-		t.Fatalf("expected UnixTime: 12 got: %d", doc.UnixTime.Value)
-	}
-	if doc.Version.Value != 42 {
-		t.Fatalf("expected Version: 42 got: %d", doc.Version.Value)
-	}
-	if doc.Bool.Value != 1 {
-		t.Fatalf("expected Bool: 1 got: %d", doc.Bool.Value)
-	}
-	if doc.Int.Value != 21 {
-		t.Fatalf("expected Int: 21 got: %d", doc.Int.Value)
-	}
-	if doc.Float.Value != 2 {
-		t.Fatalf("expected Float: 2 got: %d", doc.Float.Value)
-	}
+	err := toml.Unmarshal([]byte(input), &doc)
+	require.NoError(t, err)
+	assert.Equal(t, 12, doc.UnixTime.Value)
+	assert.Equal(t, 42, doc.Version.Value)
+	assert.Equal(t, 1, doc.Bool.Value)
+	assert.Equal(t, 21, doc.Int.Value)
+	assert.Equal(t, 2, doc.Float.Value)
 }
 
 func TestTextUnmarshalError(t *testing.T) {
