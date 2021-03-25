@@ -173,17 +173,6 @@ var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 func tryTextUnmarshaler(x target, node *ast.Node) (bool, error) {
 	v := x.get()
 
-	if v.Kind() == reflect.Ptr {
-		if !v.Elem().IsValid() {
-			err := x.set(reflect.New(v.Type().Elem()))
-			if err != nil {
-				return false, nil
-			}
-			v = x.get()
-		}
-		return tryTextUnmarshaler(valueTarget(v.Elem()), node)
-	}
-
 	if v.Kind() != reflect.Struct {
 		return false, nil
 	}
@@ -197,6 +186,18 @@ func tryTextUnmarshaler(x target, node *ast.Node) (bool, error) {
 }
 
 func (d *decoder) unmarshalValue(x target, node *ast.Node) error {
+	v := x.get()
+	if v.Kind() == reflect.Ptr {
+		if !v.Elem().IsValid() {
+			err := x.set(reflect.New(v.Type().Elem()))
+			if err != nil {
+				return err
+			}
+			v = x.get()
+		}
+		return d.unmarshalValue(valueTarget(v.Elem()), node)
+	}
+
 	ok, err := tryTextUnmarshaler(x, node)
 	if ok {
 		return err
