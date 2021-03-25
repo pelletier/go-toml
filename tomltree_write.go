@@ -158,7 +158,15 @@ func tomlValueStringRepresentation(v interface{}, commented string, indent strin
 		return strings.ToLower(strconv.FormatFloat(value, 'f', -1, bits)), nil
 	case string:
 		if tv.multiline {
-			return "\"\"\"\n" + encodeMultilineTomlString(value, commented) + "\"\"\"", nil
+			if tv.literal {
+				b := strings.Builder{}
+				b.WriteString("'''\n")
+				b.Write([]byte(value))
+				b.WriteString("\n'''")
+				return b.String(), nil
+			} else {
+				return "\"\"\"\n" + encodeMultilineTomlString(value, commented) + "\"\"\"", nil
+			}
 		}
 		return "\"" + encodeTomlString(value) + "\"", nil
 	case []byte:

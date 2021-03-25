@@ -18,6 +18,7 @@ const (
 	tagFieldComment = "comment"
 	tagCommented    = "commented"
 	tagMultiline    = "multiline"
+	tagLiteral      = "literal"
 	tagDefault      = "default"
 )
 
@@ -27,6 +28,7 @@ type tomlOpts struct {
 	comment      string
 	commented    bool
 	multiline    bool
+	literal      bool
 	include      bool
 	omitempty    bool
 	defaultValue string
@@ -46,6 +48,7 @@ type annotation struct {
 	comment      string
 	commented    string
 	multiline    string
+	literal      string
 	defaultValue string
 }
 
@@ -54,6 +57,7 @@ var annotationDefault = annotation{
 	comment:      tagFieldComment,
 	commented:    tagCommented,
 	multiline:    tagMultiline,
+	literal:      tagLiteral,
 	defaultValue: tagDefault,
 }
 
@@ -442,6 +446,7 @@ func (e *Encoder) valueToTree(mtype reflect.Type, mval reflect.Value) (*Tree, er
 							Comment:   opts.comment,
 							Commented: opts.commented,
 							Multiline: opts.multiline,
+							Literal:   opts.literal,
 						}, val)
 					}
 				}
@@ -1168,6 +1173,7 @@ func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
 	}
 	commented, _ := strconv.ParseBool(vf.Tag.Get(an.commented))
 	multiline, _ := strconv.ParseBool(vf.Tag.Get(an.multiline))
+	literal, _ := strconv.ParseBool(vf.Tag.Get(an.literal))
 	defaultValue := vf.Tag.Get(tagDefault)
 	result := tomlOpts{
 		name:         vf.Name,
@@ -1175,6 +1181,7 @@ func tomlOptions(vf reflect.StructField, an annotation) tomlOpts {
 		comment:      comment,
 		commented:    commented,
 		multiline:    multiline,
+		literal:      literal,
 		include:      true,
 		omitempty:    false,
 		defaultValue: defaultValue,
