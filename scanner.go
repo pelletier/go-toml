@@ -65,7 +65,7 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 		switch b[i] {
 		case '\'':
 			if scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
-				return b[:i+3], b[:i+3], nil
+				return b[:i+3], b[i+3:], nil
 			}
 		}
 	}
