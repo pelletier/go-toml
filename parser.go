@@ -10,11 +10,11 @@ import (
 )
 
 type parser struct {
-	tree ast.Root
+	builder ast.Builder
 }
 
 func (p *parser) parse(b []byte) error {
-	b, err := p.parseExpression(b)
+	last, b, err := p.parseExpression(b)
 	if err != nil {
 		return err
 	}
@@ -24,9 +24,14 @@ func (p *parser) parse(b []byte) error {
 			return err
 		}
 
-		b, err = p.parseExpression(b)
+		var next ast.Reference
+		next, b, err = p.parseExpression(b)
 		if err != nil {
 			return err
+		}
+		if next.Valid() {
+			p.builder.Chain(last, next)
+			last = next
 		}
 	}
 	return nil
@@ -43,49 +48,48 @@ func (p *parser) parseNewline(b []byte) ([]byte, error) {
 	return nil, fmt.Errorf("expected newline but got %#U", b[0])
 }
 
-func (p *parser) parseExpression(b []byte) ([]byte, error) {
+func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	//expression =  ws [ comment ]
 	//expression =/ ws keyval ws [ comment ]
 	//expression =/ ws table ws [ comment ]
 
+	var ref ast.Reference
+
 	b = p.parseWhitespace(b)
 
 	if len(b) == 0 {
-		return b, nil
+		return ref, b, nil
 	}
 
 	if b[0] == '#' {
 		_, rest, err := scanComment(b)
-		return rest, err
+		return ref, rest, err
 	}
 	if b[0] == '\n' || b[0] == '\r' {
-		return b, nil
+		return ref, b, nil
 	}
 
 	var err error
-	var node ast.Node
 	if b[0] == '[' {
-		node, b, err = p.parseTable(b)
+		ref, b, err = p.parseTable(b)
 	} else {
-		node, b, err = p.parseKeyval(b)
+		ref, b, err = p.parseKeyval(b)
 	}
 	if err != nil {
-		return nil, err
+		return ref, nil, err
 	}
-
-	p.tree = append(p.tree, node)
 
 	b = p.parseWhitespace(b)
 
 	if len(b) > 0 && b[0] == '#' {
 		_, rest, err := scanComment(b)
-		return rest, err
+		return ref, rest, err
 	}
 
-	return b, nil
+	return ref, b, nil
 }
 
-func (p *parser) parseTable(b []byte) (ast.Node, []byte, error) {
+func (p *parser) parseTable(b []byte) (ast.Reference, []byte, error) {
 	//table = std-table / array-table
 	if len(b) > 1 && b[1] == '[' {
 		return p.parseArrayTable(b)
@@ -93,90 +97,95 @@ func (p *parser) parseTable(b []byte) (ast.Node, []byte, error) {
 	return p.parseStdTable(b)
 }
 
-func (p *parser) parseArrayTable(b []byte) (ast.Node, []byte, error) {
+func (p *parser) parseArrayTable(b []byte) (ast.Reference, []byte, error) {
 	//array-table = array-table-open key array-table-close
 	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
 
-	node := ast.Node{
+	ref := p.builder.Push(ast.Node{
 		Kind: ast.ArrayTable,
-	}
+	})
 
 	b = b[2:]
 	b = p.parseWhitespace(b)
 	k, b, err := p.parseKey(b)
 	if err != nil {
-		return node, nil, err
+		return ref, nil, err
 	}
-	node.Children = k
+	p.builder.AttachChild(ref, k)
 	b = p.parseWhitespace(b)
 	b, err = expect(']', b)
 	if err != nil {
-		return node, nil, err
+		return ref, nil, err
 	}
 	b, err = expect(']', b)
-	return node, b, err
+	return ref, b, err
 }
 
-func (p *parser) parseStdTable(b []byte) (ast.Node, []byte, error) {
+func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
 	//std-table = std-table-open key std-table-close
 	//std-table-open  = %x5B ws     ; [ Left square bracket
 	//std-table-close = ws %x5D     ; ] Right square bracket
 
-	node := ast.Node{
+	ref := p.builder.Push(ast.Node{
 		Kind: ast.Table,
-	}
+	})
 
 	b = b[1:]
 	b = p.parseWhitespace(b)
 	key, b, err := p.parseKey(b)
 	if err != nil {
-		return ast.NoNode, nil, err
+		return ref, nil, err
 	}
-	node.Children = key
+
+	p.builder.AttachChild(ref, key)
+
 	b = p.parseWhitespace(b)
 
 	b, err = expect(']', b)
 
-	return node, b, err
+	return ref, b, err
 }
 
-func (p *parser) parseKeyval(b []byte) (ast.Node, []byte, error) {
+func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	//keyval = key keyval-sep val
 
-	node := ast.Node{
+	ref := p.builder.Push(ast.Node{
 		Kind: ast.KeyValue,
-	}
+	})
 
 	key, b, err := p.parseKey(b)
 	if err != nil {
-		return ast.NoNode, nil, err
+		return ast.Reference{}, nil, err
 	}
-	node.Children = append(node.Children, key...)
 
 	//keyval-sep = ws %x3D ws ; =
 
 	b = p.parseWhitespace(b)
 	b, err = expect('=', b)
 	if err != nil {
-		return ast.NoNode, nil, err
+		return ast.Reference{}, nil, err
 	}
 	b = p.parseWhitespace(b)
 
-	valNode, b, err := p.parseVal(b)
-	if err == nil {
-		node.Children = append(node.Children, valNode)
+	valRef, b, err := p.parseVal(b)
+	if err != nil {
+		return ref, b, err
 	}
-	return node, b, err
+	p.builder.Chain(valRef, key)
+	p.builder.AttachChild(ref, valRef)
+
+	return ref, b, err
 }
 
-func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
+func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
+	var ref ast.Reference
+
 	if len(b) == 0 {
-		return ast.NoNode, nil, fmt.Errorf("expected value, not eof")
+		return ref, nil, fmt.Errorf("expected value, not eof")
 	}
 
-	node := ast.Node{}
 	var err error
 	c := b[0]
 
@@ -189,10 +198,12 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 			v, b, err = p.parseBasicString(b)
 		}
 		if err == nil {
-			node.Kind = ast.String
-			node.Data = v
+			ref = p.builder.Push(ast.Node{
+				Kind: ast.String,
+				Data: v,
+			})
 		}
-		return node, b, err
+		return ref, b, err
 	case '\'':
 		var v []byte
 		if scanFollowsMultilineLiteralStringDelimiter(b) {
@@ -201,35 +212,36 @@ func (p *parser) parseVal(b []byte) (ast.Node, []byte, error) {
 			v, b, err = p.parseLiteralString(b)
 		}
 		if err == nil {
-			node.Kind = ast.String
-			node.Data = v
+			ref = p.builder.Push(ast.Node{
+				Kind: ast.String,
+				Data: v,
+			})
 		}
-		return node, b, err
+		return ref, b, err
 	case 't':
 		if !scanFollowsTrue(b) {
-			return node, nil, fmt.Errorf("expected 'true'")
+			return ref, nil, fmt.Errorf("expected 'true'")
 		}
-		node.Kind = ast.Bool
-		node.Data = b[:4]
-		return node, b[4:], nil
+		ref = p.builder.Push(ast.Node{
+			Kind: ast.Bool,
+			Data: b[:4],
+		})
+		return ref, b[4:], nil
 	case 'f':
 		if !scanFollowsFalse(b) {
-			return node, nil, fmt.Errorf("expected 'false'")
+			return ast.Reference{}, nil, fmt.Errorf("expected 'false'")
 		}
-		node.Kind = ast.Bool
-		node.Data = b[:5]
-		return node, b[5:], nil
+		ref = p.builder.Push(ast.Node{
+			Kind: ast.Bool,
+			Data: b[:5],
+		})
+		return ref, b[5:], nil
 	case '[':
-		node.Kind = ast.Array
-		b, err := p.parseValArray(&node, b)
-		return node, b, err
+		return p.parseValArray(b)
 	case '{':
-		node.Kind = ast.InlineTable
-		b, err := p.parseInlineTable(&node, b)
-		return node, b, err
+		return p.parseInlineTable(b)
 	default:
-		b, err = p.parseIntOrFloatOrDateTime(&node, b)
-		return node, b, err
+		return p.parseIntOrFloatOrDateTime(b)
 	}
 }
 
@@ -241,16 +253,22 @@ func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
 	return v[1 : len(v)-1], rest, nil
 }
 
-func (p *parser) parseInlineTable(node *ast.Node, b []byte) ([]byte, error) {
+func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	//inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	//inline-table-open  = %x7B ws     ; {
 	//inline-table-close = ws %x7D     ; }
 	//inline-table-sep   = ws %x2C ws  ; , Comma
 	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 
-	b = b[1:]
+	parent := p.builder.Push(ast.Node{
+		Kind: ast.InlineTable,
+	})
 
 	first := true
+	var child ast.Reference
+
+	b = b[1:]
+
 	var err error
 	for len(b) > 0 {
 		b = p.parseWhitespace(b)
@@ -261,24 +279,32 @@ func (p *parser) parseInlineTable(node *ast.Node, b []byte) ([]byte, error) {
 		if !first {
 			b, err = expect(',', b)
 			if err != nil {
-				return nil, err
+				return parent, nil, err
 			}
 			b = p.parseWhitespace(b)
 		}
-		var kv ast.Node
+		var kv ast.Reference
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
-			return nil, err
+			return parent, nil, err
 		}
-		node.Children = append(node.Children, kv)
+
+		if first {
+			p.builder.AttachChild(parent, kv)
+			first = false
+		} else {
+			p.builder.Chain(child, kv)
+		}
+		child = kv
 
 		first = false
 	}
 
-	return expect('}', b)
+	rest, err := expect('}', b)
+	return parent, rest, err
 }
 
-func (p *parser) parseValArray(node *ast.Node, b []byte) ([]byte, error) {
+func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	//array = array-open [ array-values ] ws-comment-newline array-close
 	//array-open =  %x5B ; [
 	//array-close = %x5D ; ]
@@ -289,16 +315,22 @@ func (p *parser) parseValArray(node *ast.Node, b []byte) ([]byte, error) {
 
 	b = b[1:]
 
+	parent := p.builder.Push(ast.Node{
+		Kind: ast.Array,
+	})
+
 	first := true
+	var lastChild ast.Reference
+
 	var err error
 	for len(b) > 0 {
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
-			return nil, err
+			return parent, nil, err
 		}
 
 		if len(b) == 0 {
-			return nil, unexpectedCharacter{b: b}
+			return parent, nil, unexpectedCharacter{b: b}
 		}
 
 		if b[0] == ']' {
@@ -306,29 +338,38 @@ func (p *parser) parseValArray(node *ast.Node, b []byte) ([]byte, error) {
 		}
 		if b[0] == ',' {
 			if first {
-				return nil, fmt.Errorf("array cannot start with comma")
+				return parent, nil, fmt.Errorf("array cannot start with comma")
 			}
 			b = b[1:]
 			b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
-				return nil, err
+				return parent, nil, err
 			}
 		}
 
-		var valueNode ast.Node
-		valueNode, b, err = p.parseVal(b)
+		var valueRef ast.Reference
+		valueRef, b, err = p.parseVal(b)
 		if err != nil {
-			return nil, err
+			return parent, nil, err
 		}
-		node.Children = append(node.Children, valueNode)
+
+		if first {
+			p.builder.AttachChild(parent, valueRef)
+			first = false
+		} else {
+			p.builder.Chain(lastChild, valueRef)
+		}
+		lastChild = valueRef
+
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
-			return nil, err
+			return parent, nil, err
 		}
 		first = false
 	}
 
-	return expect(']', b)
+	rest, err := expect(']', b)
+	return parent, rest, err
 }
 
 func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error) {
@@ -454,7 +495,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	return builder.Bytes(), rest, nil
 }
 
-func (p *parser) parseKey(b []byte) ([]ast.Node, []byte, error) {
+func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	//key = simple-key / dotted-key
 	//simple-key = quoted-key / unquoted-key
 	//
@@ -464,14 +505,12 @@ func (p *parser) parseKey(b []byte) ([]ast.Node, []byte, error) {
 	//
 	//dot-sep   = ws %x2E ws  ; . Period
 
-	var nodes []ast.Node
-
 	key, b, err := p.parseSimpleKey(b)
 	if err != nil {
-		return nodes, nil, err
+		return ast.Reference{}, nil, err
 	}
 
-	nodes = append(nodes, ast.Node{
+	ref := p.builder.Push(ast.Node{
 		Kind: ast.Key,
 		Data: key,
 	})
@@ -481,14 +520,14 @@ func (p *parser) parseKey(b []byte) ([]ast.Node, []byte, error) {
 		if len(b) > 0 && b[0] == '.' {
 			b, err = expect('.', b)
 			if err != nil {
-				return nodes, nil, err
+				return ref, nil, err
 			}
 			b = p.parseWhitespace(b)
 			key, b, err = p.parseSimpleKey(b)
 			if err != nil {
-				return nodes, nil, err
+				return ref, nil, err
 			}
-			nodes = append(nodes, ast.Node{
+			p.builder.PushAndChain(ast.Node{
 				Kind: ast.Key,
 				Data: key,
 			})
@@ -497,7 +536,7 @@ func (p *parser) parseKey(b []byte) ([]ast.Node, []byte, error) {
 		}
 	}
 
-	return nodes, b, nil
+	return ref, b, nil
 }
 
 func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
@@ -609,28 +648,30 @@ func (p *parser) parseWhitespace(b []byte) []byte {
 	return rest
 }
 
-func (p *parser) parseIntOrFloatOrDateTime(node *ast.Node, b []byte) ([]byte, error) {
+func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, error) {
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
-			return nil, fmt.Errorf("expected 'inf'")
+			return ast.Reference{}, nil, fmt.Errorf("expected 'inf'")
 		}
-		node.Kind = ast.Float
-		node.Data = b[:3]
-		return b[3:], nil
+		return p.builder.Push(ast.Node{
+			Kind: ast.Float,
+			Data: b[:3],
+		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
-			return nil, fmt.Errorf("expected 'nan'")
+			return ast.Reference{}, nil, fmt.Errorf("expected 'nan'")
 		}
-		node.Kind = ast.Float
-		node.Data = b[:3]
-		return b[3:], nil
+		return p.builder.Push(ast.Node{
+			Kind: ast.Float,
+			Data: b[:3],
+		}), b[3:], nil
 	case '+', '-':
-		return p.scanIntOrFloat(node, b)
+		return p.scanIntOrFloat(b)
 	}
 
 	if len(b) < 3 {
-		return p.scanIntOrFloat(node, b)
+		return p.scanIntOrFloat(b)
 	}
 	s := 5
 	if len(b) < s {
@@ -641,10 +682,10 @@ func (p *parser) parseIntOrFloatOrDateTime(node *ast.Node, b []byte) ([]byte, er
 			continue
 		}
 		if idx == 2 && c == ':' || (idx == 4 && c == '-') {
-			return p.scanDateTime(node, b)
+			return p.scanDateTime(b)
 		}
 	}
-	return p.scanIntOrFloat(node, b)
+	return p.scanIntOrFloat(b)
 }
 
 func digitsToInt(b []byte) int {
@@ -656,7 +697,7 @@ func digitsToInt(b []byte) int {
 	return x
 }
 
-func (p *parser) scanDateTime(node *ast.Node, b []byte) ([]byte, error) {
+func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
 
@@ -686,22 +727,25 @@ func (p *parser) scanDateTime(node *ast.Node, b []byte) ([]byte, error) {
 		}
 	}
 
+	var kind ast.Kind
+
 	if hasTime {
 		if hasTz {
-			node.Kind = ast.DateTime
+			kind = ast.DateTime
 		} else {
-			node.Kind = ast.LocalDateTime
+			kind = ast.LocalDateTime
 		}
 	} else {
 		if hasTz {
-			return nil, fmt.Errorf("possible DateTime cannot have a timezone but no time component")
+			return ast.Reference{}, nil, fmt.Errorf("possible DateTime cannot have a timezone but no time component")
 		}
-		node.Kind = ast.LocalDate
+		kind = ast.LocalDate
 	}
 
-	node.Data = b[:i]
-
-	return b[i:], nil
+	return p.builder.Push(ast.Node{
+		Kind: kind,
+		Data: b[:i],
+	}), b[i:], nil
 }
 
 func (p *parser) parseDateTime(b []byte) ([]byte, error) {
@@ -964,7 +1008,7 @@ func (p *parser) parseTime(b []byte) ([]byte, error) {
 	return b[idx:], nil
 }
 
-func (p *parser) scanIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
+func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 	i := 0
 
 	if len(b) > 2 && b[0] == '0' {
@@ -989,9 +1033,10 @@ func (p *parser) scanIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
 			}
 		}
 
-		node.Kind = ast.Integer
-		node.Data = b[:i]
-		return b[i:], nil
+		return p.builder.Push(ast.Node{
+			Kind: ast.Integer,
+			Data: b[:i],
+		}), b[i:], nil
 	}
 
 	isFloat := false
@@ -1010,31 +1055,36 @@ func (p *parser) scanIntOrFloat(node *ast.Node, b []byte) ([]byte, error) {
 
 		if c == 'i' {
 			if scanFollowsInf(b[i:]) {
-				node.Kind = ast.Float
-				node.Data = b[:i+3]
-				return b[i+3:], nil
+				return p.builder.Push(ast.Node{
+					Kind: ast.Float,
+					Data: b[:i+3],
+				}), b[i+3:], nil
 			}
-			return nil, fmt.Errorf("unexpected character i while scanning for a number")
+			return ast.Reference{}, nil, fmt.Errorf("unexpected character i while scanning for a number")
 		}
 		if c == 'n' {
 			if scanFollowsNan(b[i:]) {
-				node.Kind = ast.Float
-				node.Data = b[:i+3]
-				return b[i+3:], nil
+				return p.builder.Push(ast.Node{
+					Kind: ast.Float,
+					Data: b[:i+3],
+				}), b[i+3:], nil
 			}
-			return nil, fmt.Errorf("unexpected character n while scanning for a number")
+			return ast.Reference{}, nil, fmt.Errorf("unexpected character n while scanning for a number")
 		}
 
 		break
 	}
 
+	kind := ast.Integer
+
 	if isFloat {
-		node.Kind = ast.Float
-	} else {
-		node.Kind = ast.Integer
+		kind = ast.Float
 	}
-	node.Data = b[:i]
-	return b[i:], nil
+
+	return p.builder.Push(ast.Node{
+		Kind: kind,
+		Data: b[:i],
+	}), b[i:], nil
 }
 
 func isDigit(r byte) bool {

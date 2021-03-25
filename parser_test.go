@@ -125,43 +125,127 @@ func TestParser_AST_Numbers(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 
-				expected := ast.Root{
-					ast.Node{
+				expected := astRoot{
+					astNode{
 						Kind: ast.KeyValue,
-						Children: []ast.Node{
-							{Kind: ast.Key, Data: []byte(`A`)},
+						Children: []astNode{
 							{Kind: e.kind, Data: []byte(e.input)},
+							{Kind: ast.Key, Data: []byte(`A`)},
 						},
 					},
 				}
 
-				require.Equal(t, expected, p.tree)
+				compareAST(t, expected, p.builder.Finish())
 			}
 		})
 	}
+}
+
+type astRoot []astNode
+type astNode struct {
+	Kind     ast.Kind
+	Data     []byte
+	Children []astNode
+}
+
+func compareAST(t *testing.T, expected astRoot, actual *ast.Root) {
+	it := actual.Iterator()
+	compareIterator(t, expected, it)
+}
+
+func compareIterator(t *testing.T, expected []astNode, actual ast.Iterator) {
+	idx := 0
+
+	for actual.Next() {
+		n := actual.Node()
+
+		if idx >= len(expected) {
+			t.Fatal("extra child in actual tree")
+		}
+		e := expected[idx]
+
+		require.Equal(t, e.Kind, n.Kind)
+		require.Equal(t, e.Data, n.Data)
+
+		compareIterator(t, e.Children, n.Children())
+
+		idx++
+	}
+
+	if idx < len(expected) {
+		t.Fatal("missing children in actual", "idx =", idx, "expected =", len(expected))
+	}
+}
+
+func (r astRoot) toOrig() *ast.Root {
+	builder := &ast.Builder{}
+
+	var last ast.Reference
+
+	for i, n := range r {
+		ref := builder.Push(ast.Node{
+			Kind: n.Kind,
+			Data: n.Data,
+		})
+
+		if i > 0 {
+			builder.Chain(last, ref)
+		}
+		last = ref
+
+		if len(n.Children) > 0 {
+			c := childrenToOrig(builder, n.Children)
+			builder.AttachChild(ref, c)
+		}
+	}
+
+	return builder.Finish()
+}
+
+func childrenToOrig(b *ast.Builder, nodes []astNode) ast.Reference {
+	var first ast.Reference
+	var last ast.Reference
+	for i, n := range nodes {
+		ref := b.Push(ast.Node{
+			Kind: n.Kind,
+			Data: n.Data,
+		})
+		if i == 0 {
+			first = ref
+		} else {
+			b.Chain(last, ref)
+		}
+		last = ref
+
+		if len(n.Children) > 0 {
+			c := childrenToOrig(b, n.Children)
+			b.AttachChild(ref, c)
+		}
+	}
+	return first
 }
 
 func TestParser_AST(t *testing.T) {
 	examples := []struct {
 		desc  string
 		input string
-		ast   ast.Root
+		ast   astRoot
 		err   bool
 	}{
 		{
 			desc:  "simple string assignment",
 			input: `A = "hello"`,
-			ast: ast.Root{
-				ast.Node{
+			ast: astRoot{
+				astNode{
 					Kind: ast.KeyValue,
-					Children: []ast.Node{
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+					Children: []astNode{
 						{
 							Kind: ast.String,
 							Data: []byte(`hello`),
+						},
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
 						},
 					},
 				},
@@ -170,17 +254,17 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "simple bool assignment",
 			input: `A = true`,
-			ast: ast.Root{
-				ast.Node{
+			ast: astRoot{
+				astNode{
 					Kind: ast.KeyValue,
-					Children: []ast.Node{
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+					Children: []astNode{
 						{
 							Kind: ast.Bool,
 							Data: []byte(`true`),
+						},
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
 						},
 					},
 				},
@@ -189,24 +273,20 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "array of strings",
 			input: `A = ["hello", ["world", "again"]]`,
-			ast: ast.Root{
-				ast.Node{
+			ast: astRoot{
+				astNode{
 					Kind: ast.KeyValue,
-					Children: []ast.Node{
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+					Children: []astNode{
 						{
 							Kind: ast.Array,
-							Children: []ast.Node{
+							Children: []astNode{
 								{
 									Kind: ast.String,
 									Data: []byte(`hello`),
 								},
 								{
 									Kind: ast.Array,
-									Children: []ast.Node{
+									Children: []astNode{
 										{
 											Kind: ast.String,
 											Data: []byte(`world`),
@@ -219,6 +299,10 @@ func TestParser_AST(t *testing.T) {
 								},
 							},
 						},
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
+						},
 					},
 				},
 			},
@@ -226,17 +310,13 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "array of arrays of strings",
 			input: `A = ["hello", "world"]`,
-			ast: ast.Root{
-				ast.Node{
+			ast: astRoot{
+				astNode{
 					Kind: ast.KeyValue,
-					Children: []ast.Node{
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+					Children: []astNode{
 						{
 							Kind: ast.Array,
-							Children: []ast.Node{
+							Children: []astNode{
 								{
 									Kind: ast.String,
 									Data: []byte(`hello`),
@@ -247,6 +327,10 @@ func TestParser_AST(t *testing.T) {
 								},
 							},
 						},
+						{
+							Kind: ast.Key,
+							Data: []byte(`A`),
+						},
 					},
 				},
 			},
@@ -254,32 +338,32 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "inline table",
 			input: `name = { first = "Tom", last = "Preston-Werner" }`,
-			ast: ast.Root{
-				ast.Node{
+			ast: astRoot{
+				astNode{
 					Kind: ast.KeyValue,
-					Children: []ast.Node{
-						{
-							Kind: ast.Key,
-							Data: []byte(`name`),
-						},
+					Children: []astNode{
 						{
 							Kind: ast.InlineTable,
-							Children: []ast.Node{
+							Children: []astNode{
 								{
 									Kind: ast.KeyValue,
-									Children: []ast.Node{
-										{Kind: ast.Key, Data: []byte(`first`)},
+									Children: []astNode{
 										{Kind: ast.String, Data: []byte(`Tom`)},
+										{Kind: ast.Key, Data: []byte(`first`)},
 									},
 								},
 								{
 									Kind: ast.KeyValue,
-									Children: []ast.Node{
-										{Kind: ast.Key, Data: []byte(`last`)},
+									Children: []astNode{
 										{Kind: ast.String, Data: []byte(`Preston-Werner`)},
+										{Kind: ast.Key, Data: []byte(`last`)},
 									},
 								},
 							},
+						},
+						{
+							Kind: ast.Key,
+							Data: []byte(`name`),
 						},
 					},
 				},
@@ -295,7 +379,7 @@ func TestParser_AST(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, e.ast, p.tree)
+				compareAST(t, e.ast, p.builder.Finish())
 			}
 		})
 	}

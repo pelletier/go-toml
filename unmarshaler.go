@@ -17,7 +17,7 @@ func Unmarshal(data []byte, v interface{}) error {
 	}
 
 	d := decoder{}
-	return d.fromAst(p.tree, v)
+	return d.fromAst(p.builder.Finish(), v)
 }
 
 type decoder struct {
@@ -41,7 +41,7 @@ func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
 	return idx
 }
 
-func (d *decoder) fromAst(tree ast.Root, v interface{}) error {
+func (d *decoder) fromAst(tree *ast.Root, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
 		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
@@ -54,14 +54,17 @@ func (d *decoder) fromAst(tree ast.Root, v interface{}) error {
 	var skipUntilTable bool
 	var root target = valueTarget(r.Elem())
 	current := root
-	for _, node := range tree {
+
+	it := tree.Iterator()
+	for it.Next() {
+		node := it.Node()
 		var found bool
 		switch node.Kind {
 		case ast.KeyValue:
 			if skipUntilTable {
 				continue
 			}
-			err = d.unmarshalKeyValue(current, &node)
+			err = d.unmarshalKeyValue(current, node)
 			found = true
 		case ast.Table:
 			current, found, err = d.scopeWithKey(root, node.Key())
@@ -91,10 +94,12 @@ func (d *decoder) fromAst(tree ast.Root, v interface{}) error {
 //
 // When encountering slices, it should always use its last element, and error
 // if the slice does not have any.
-func (d *decoder) scopeWithKey(x target, key []ast.Node) (target, bool, error) {
+func (d *decoder) scopeWithKey(x target, key ast.Iterator) (target, bool, error) {
 	var err error
 	found := true
-	for _, n := range key {
+
+	for key.Next() {
+		n := key.Node()
 		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 		if err != nil || !found {
 			return nil, found, err
@@ -108,18 +113,21 @@ func (d *decoder) scopeWithKey(x target, key []ast.Node) (target, bool, error) {
 //
 // It is the same as scopeWithKey, but when scoping the last part of the key
 // it creates a new element in the array instead of using the last one.
-func (d *decoder) scopeWithArrayTable(x target, key []ast.Node) (target, bool, error) {
+func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool, error) {
 	var err error
 	found := true
-	if len(key) > 1 {
-		for _, n := range key[:len(key)-1] {
-			x, found, err = d.scopeTableTarget(false, x, string(n.Data))
-			if err != nil || !found {
-				return nil, found, err
-			}
+	for key.Next() {
+		n := key.Node()
+		if !n.Next().Valid() { // want to stop at one before last
+			break
+		}
+		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
+		if err != nil || !found {
+			return nil, found, err
 		}
 	}
-	x, found, err = d.scopeTableTarget(false, x, string(key[len(key)-1].Data))
+	n := key.Node()
+	x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 	if err != nil || !found {
 		return x, found, err
 	}
@@ -152,7 +160,7 @@ func (d *decoder) scopeWithArrayTable(x target, key []ast.Node) (target, bool, e
 	return x, found, err
 }
 
-func (d *decoder) unmarshalKeyValue(x target, node *ast.Node) error {
+func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
 	assertNode(ast.KeyValue, node)
 
 	x, found, err := d.scopeWithKey(x, node.Key())
@@ -170,7 +178,7 @@ func (d *decoder) unmarshalKeyValue(x target, node *ast.Node) error {
 
 var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 
-func tryTextUnmarshaler(x target, node *ast.Node) (bool, error) {
+func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	v := x.get()
 
 	if v.Kind() != reflect.Struct {
@@ -185,7 +193,7 @@ func tryTextUnmarshaler(x target, node *ast.Node) (bool, error) {
 	return false, nil
 }
 
-func (d *decoder) unmarshalValue(x target, node *ast.Node) error {
+func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 	v := x.get()
 	if v.Kind() == reflect.Ptr {
 		if !v.Elem().IsValid() {
@@ -225,7 +233,7 @@ func (d *decoder) unmarshalValue(x target, node *ast.Node) error {
 	}
 }
 
-func unmarshalLocalDateTime(x target, node *ast.Node) error {
+func unmarshalLocalDateTime(x target, node ast.Node) error {
 	assertNode(ast.LocalDateTime, node)
 	v, rest, err := parseLocalDateTime(node.Data)
 	if err != nil {
@@ -237,7 +245,7 @@ func unmarshalLocalDateTime(x target, node *ast.Node) error {
 	return setLocalDateTime(x, v)
 }
 
-func unmarshalDateTime(x target, node *ast.Node) error {
+func unmarshalDateTime(x target, node ast.Node) error {
 	assertNode(ast.DateTime, node)
 	v, err := parseDateTime(node.Data)
 	if err != nil {
@@ -254,18 +262,18 @@ func setDateTime(x target, v time.Time) error {
 	return x.set(reflect.ValueOf(v))
 }
 
-func unmarshalString(x target, node *ast.Node) error {
+func unmarshalString(x target, node ast.Node) error {
 	assertNode(ast.String, node)
 	return setString(x, string(node.Data))
 }
 
-func unmarshalBool(x target, node *ast.Node) error {
+func unmarshalBool(x target, node ast.Node) error {
 	assertNode(ast.Bool, node)
 	v := node.Data[0] == 't'
 	return setBool(x, v)
 }
 
-func unmarshalInteger(x target, node *ast.Node) error {
+func unmarshalInteger(x target, node ast.Node) error {
 	assertNode(ast.Integer, node)
 	v, err := parseInteger(node.Data)
 	if err != nil {
@@ -274,7 +282,7 @@ func unmarshalInteger(x target, node *ast.Node) error {
 	return setInt64(x, v)
 }
 
-func unmarshalFloat(x target, node *ast.Node) error {
+func unmarshalFloat(x target, node ast.Node) error {
 	assertNode(ast.Float, node)
 	v, err := parseFloat(node.Data)
 	if err != nil {
@@ -283,11 +291,13 @@ func unmarshalFloat(x target, node *ast.Node) error {
 	return setFloat64(x, v)
 }
 
-func (d *decoder) unmarshalInlineTable(x target, node *ast.Node) error {
+func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
 	assertNode(ast.InlineTable, node)
 
-	for _, kv := range node.Children {
-		err := d.unmarshalKeyValue(x, &kv)
+	it := node.Children()
+	for it.Next() {
+		n := it.Node()
+		err := d.unmarshalKeyValue(x, n)
 		if err != nil {
 			return err
 		}
@@ -295,7 +305,7 @@ func (d *decoder) unmarshalInlineTable(x target, node *ast.Node) error {
 	return nil
 }
 
-func (d *decoder) unmarshalArray(x target, node *ast.Node) error {
+func (d *decoder) unmarshalArray(x target, node ast.Node) error {
 	assertNode(ast.Array, node)
 
 	err := ensureValueIndexable(x)
@@ -303,7 +313,10 @@ func (d *decoder) unmarshalArray(x target, node *ast.Node) error {
 		return err
 	}
 
-	for idx, n := range node.Children {
+	it := node.Children()
+	idx := 0
+	for it.Next() {
+		n := it.Node()
 		v, err := elementAt(x, idx)
 		if err != nil {
 			return err
@@ -313,15 +326,16 @@ func (d *decoder) unmarshalArray(x target, node *ast.Node) error {
 			// mimic encoding/json
 			break
 		}
-		err = d.unmarshalValue(v, &n)
+		err = d.unmarshalValue(v, n)
 		if err != nil {
 			return err
 		}
+		idx++
 	}
 	return nil
 }
 
-func assertNode(expected ast.Kind, node *ast.Node) {
+func assertNode(expected ast.Kind, node ast.Node) {
 	if node.Kind != expected {
 		panic(fmt.Errorf("expected node of kind %s, not %s", expected, node.Kind))
 	}

@@ -660,17 +660,17 @@ B = "data"`,
 }
 
 func TestFromAst_KV(t *testing.T) {
-	root := ast.Root{
-		ast.Node{
+	root := astRoot{
+		astNode{
 			Kind: ast.KeyValue,
-			Children: []ast.Node{
-				{
-					Kind: ast.Key,
-					Data: []byte(`Foo`),
-				},
+			Children: []astNode{
 				{
 					Kind: ast.String,
 					Data: []byte(`hello`),
+				},
+				{
+					Kind: ast.Key,
+					Data: []byte(`Foo`),
 				},
 			},
 		},
@@ -682,43 +682,43 @@ func TestFromAst_KV(t *testing.T) {
 
 	x := Doc{}
 	d := decoder{}
-	err := d.fromAst(root, &x)
+	err := d.fromAst(root.toOrig(), &x)
 	require.NoError(t, err)
 	assert.Equal(t, Doc{Foo: "hello"}, x)
 }
 
 func TestFromAst_Table(t *testing.T) {
 	t.Run("one level table on struct", func(t *testing.T) {
-		root := ast.Root{
-			ast.Node{
+		root := astRoot{
+			astNode{
 				Kind: ast.Table,
-				Children: []ast.Node{
+				Children: []astNode{
 					{Kind: ast.Key, Data: []byte(`Level1`)},
 				},
 			},
-			ast.Node{
+			astNode{
 				Kind: ast.KeyValue,
-				Children: []ast.Node{
-					{
-						Kind: ast.Key,
-						Data: []byte(`A`),
-					},
+				Children: []astNode{
 					{
 						Kind: ast.String,
 						Data: []byte(`hello`),
 					},
-				},
-			},
-			ast.Node{
-				Kind: ast.KeyValue,
-				Children: []ast.Node{
 					{
 						Kind: ast.Key,
-						Data: []byte(`B`),
+						Data: []byte(`A`),
 					},
+				},
+			},
+			astNode{
+				Kind: ast.KeyValue,
+				Children: []astNode{
 					{
 						Kind: ast.String,
 						Data: []byte(`world`),
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`B`),
 					},
 				},
 			},
@@ -735,7 +735,7 @@ func TestFromAst_Table(t *testing.T) {
 
 		x := Doc{}
 		d := decoder{}
-		err := d.fromAst(root, &x)
+		err := d.fromAst(root.toOrig(), &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{
 			Level1: Level1{
@@ -745,24 +745,24 @@ func TestFromAst_Table(t *testing.T) {
 		}, x)
 	})
 	t.Run("one level table on struct", func(t *testing.T) {
-		root := ast.Root{
-			ast.Node{
+		root := astRoot{
+			astNode{
 				Kind: ast.Table,
-				Children: []ast.Node{
+				Children: []astNode{
 					{Kind: ast.Key, Data: []byte(`A`)},
 					{Kind: ast.Key, Data: []byte(`B`)},
 				},
 			},
-			ast.Node{
+			astNode{
 				Kind: ast.KeyValue,
-				Children: []ast.Node{
-					{
-						Kind: ast.Key,
-						Data: []byte(`C`),
-					},
+				Children: []astNode{
 					{
 						Kind: ast.String,
 						Data: []byte(`value`),
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`C`),
 					},
 				},
 			},
@@ -782,7 +782,7 @@ func TestFromAst_Table(t *testing.T) {
 
 		x := Doc{}
 		d := decoder{}
-		err := d.fromAst(root, &x)
+		err := d.fromAst(root.toOrig(), &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{
 			A: A{B: B{C: "value"}},
@@ -792,31 +792,32 @@ func TestFromAst_Table(t *testing.T) {
 
 func TestFromAst_InlineTable(t *testing.T) {
 	t.Run("one level of strings", func(t *testing.T) {
-		root := ast.Root{
-			ast.Node{
+		root := astRoot{
+			astNode{
 				Kind: ast.KeyValue,
-				Children: []ast.Node{
-					{
-						Kind: ast.Key,
-						Data: []byte(`Name`)},
+				Children: []astNode{
 					{
 						Kind: ast.InlineTable,
-						Children: []ast.Node{
+						Children: []astNode{
 							{
 								Kind: ast.KeyValue,
-								Children: []ast.Node{
-									{Kind: ast.Key, Data: []byte(`First`)},
+								Children: []astNode{
 									{Kind: ast.String, Data: []byte(`Tom`)},
+									{Kind: ast.Key, Data: []byte(`First`)},
 								},
 							},
 							{
 								Kind: ast.KeyValue,
-								Children: []ast.Node{
-									{Kind: ast.Key, Data: []byte(`Last`)},
+								Children: []astNode{
 									{Kind: ast.String, Data: []byte(`Preston-Werner`)},
+									{Kind: ast.Key, Data: []byte(`Last`)},
 								},
 							},
 						},
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`Name`),
 					},
 				},
 			},
@@ -833,7 +834,7 @@ func TestFromAst_InlineTable(t *testing.T) {
 
 		x := Doc{}
 		d := decoder{}
-		err := d.fromAst(root, &x)
+		err := d.fromAst(root.toOrig(), &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{
 			Name: Name{
@@ -847,17 +848,13 @@ func TestFromAst_InlineTable(t *testing.T) {
 
 func TestFromAst_Slice(t *testing.T) {
 	t.Run("slice of string", func(t *testing.T) {
-		root := ast.Root{
-			ast.Node{
+		root := astRoot{
+			astNode{
 				Kind: ast.KeyValue,
-				Children: []ast.Node{
-					{
-						Kind: ast.Key,
-						Data: []byte(`Foo`),
-					},
+				Children: []astNode{
 					{
 						Kind: ast.Array,
-						Children: []ast.Node{
+						Children: []astNode{
 							{
 								Kind: ast.String,
 								Data: []byte(`hello`),
@@ -867,6 +864,10 @@ func TestFromAst_Slice(t *testing.T) {
 								Data: []byte(`world`),
 							},
 						},
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`Foo`),
 					},
 				},
 			},
@@ -878,23 +879,19 @@ func TestFromAst_Slice(t *testing.T) {
 
 		x := Doc{}
 		d := decoder{}
-		err := d.fromAst(root, &x)
+		err := d.fromAst(root.toOrig(), &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []string{"hello", "world"}}, x)
 	})
 
 	t.Run("slice of interfaces for strings", func(t *testing.T) {
-		root := ast.Root{
-			ast.Node{
+		root := astRoot{
+			astNode{
 				Kind: ast.KeyValue,
-				Children: []ast.Node{
-					{
-						Kind: ast.Key,
-						Data: []byte(`Foo`),
-					},
+				Children: []astNode{
 					{
 						Kind: ast.Array,
-						Children: []ast.Node{
+						Children: []astNode{
 							{
 								Kind: ast.String,
 								Data: []byte(`hello`),
@@ -904,6 +901,10 @@ func TestFromAst_Slice(t *testing.T) {
 								Data: []byte(`world`),
 							},
 						},
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`Foo`),
 					},
 				},
 			},
@@ -915,30 +916,26 @@ func TestFromAst_Slice(t *testing.T) {
 
 		x := Doc{}
 		d := decoder{}
-		err := d.fromAst(root, &x)
+		err := d.fromAst(root.toOrig(), &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []interface{}{"hello", "world"}}, x)
 	})
 
 	t.Run("slice of interfaces with slices", func(t *testing.T) {
-		root := ast.Root{
-			ast.Node{
+		root := astRoot{
+			astNode{
 				Kind: ast.KeyValue,
-				Children: []ast.Node{
-					{
-						Kind: ast.Key,
-						Data: []byte(`Foo`),
-					},
+				Children: []astNode{
 					{
 						Kind: ast.Array,
-						Children: []ast.Node{
+						Children: []astNode{
 							{
 								Kind: ast.String,
 								Data: []byte(`hello`),
 							},
 							{
 								Kind: ast.Array,
-								Children: []ast.Node{
+								Children: []astNode{
 									{
 										Kind: ast.String,
 										Data: []byte(`inner1`),
@@ -951,6 +948,10 @@ func TestFromAst_Slice(t *testing.T) {
 							},
 						},
 					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`Foo`),
+					},
 				},
 			},
 		}
@@ -961,7 +962,7 @@ func TestFromAst_Slice(t *testing.T) {
 
 		x := Doc{}
 		d := decoder{}
-		err := d.fromAst(root, &x)
+		err := d.fromAst(root.toOrig(), &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []interface{}{"hello", []interface{}{"inner1", "inner2"}}}, x)
 	})
