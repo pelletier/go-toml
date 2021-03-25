@@ -613,6 +613,30 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc: "array of structs with table arrays",
+			input: `[[A]]
+			B = "one"
+			[[A]]
+			B = "two"`,
+			gen: func() test {
+				type inner struct {
+					B string
+				}
+				type doc struct {
+					A [4]inner
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: [4]inner{
+							{B: "one"},
+							{B: "two"},
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
@@ -657,7 +681,8 @@ func TestFromAst_KV(t *testing.T) {
 	}
 
 	x := Doc{}
-	err := fromAst(root, &x)
+	d := decoder{}
+	err := d.fromAst(root, &x)
 	require.NoError(t, err)
 	assert.Equal(t, Doc{Foo: "hello"}, x)
 }
@@ -709,7 +734,8 @@ func TestFromAst_Table(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := fromAst(root, &x)
+		d := decoder{}
+		err := d.fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{
 			Level1: Level1{
@@ -755,7 +781,8 @@ func TestFromAst_Table(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := fromAst(root, &x)
+		d := decoder{}
+		err := d.fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{
 			A: A{B: B{C: "value"}},
@@ -805,7 +832,8 @@ func TestFromAst_InlineTable(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := fromAst(root, &x)
+		d := decoder{}
+		err := d.fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{
 			Name: Name{
@@ -849,7 +877,8 @@ func TestFromAst_Slice(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := fromAst(root, &x)
+		d := decoder{}
+		err := d.fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []string{"hello", "world"}}, x)
 	})
@@ -885,7 +914,8 @@ func TestFromAst_Slice(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := fromAst(root, &x)
+		d := decoder{}
+		err := d.fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []interface{}{"hello", "world"}}, x)
 	})
@@ -930,7 +960,8 @@ func TestFromAst_Slice(t *testing.T) {
 		}
 
 		x := Doc{}
-		err := fromAst(root, &x)
+		d := decoder{}
+		err := d.fromAst(root, &x)
 		require.NoError(t, err)
 		assert.Equal(t, Doc{Foo: []interface{}{"hello", []interface{}{"inner1", "inner2"}}}, x)
 	})

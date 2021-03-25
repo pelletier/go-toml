@@ -1883,20 +1883,6 @@ func TestUnmarshalArray(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestUnmarshalArrayFail(t *testing.T) {
-	var actual arrayTooSmallStruct
-	err := toml.Unmarshal([]byte(`str_slice = ["Howdy", "Hey There"]`), &actual)
-	assert.Error(t, err)
-}
-
-func TestUnmarshalArrayFail2(t *testing.T) {
-	doc := `str_slice=["Howdy","Hey There"]`
-
-	var actual arrayTooSmallStruct
-	err := toml.Unmarshal([]byte(doc), &actual)
-	assert.Error(t, err)
-}
-
 func TestUnmarshalArrayFail3(t *testing.T) {
 	doc := `[[struct_slice]]
 String2="1"

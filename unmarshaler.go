@@ -19,7 +19,9 @@ func Unmarshal(data []byte, v interface{}) error {
 	// TODO: remove me; sanity check
 	allValidOrDump(p.tree, p.tree)
 
-	return fromAst(p.tree, v)
+	d := decoder{}
+
+	return d.fromAst(p.tree, v)
 }
 
 func allValidOrDump(tree ast.Root, nodes []ast.Node) bool {
@@ -37,7 +39,28 @@ func allValidOrDump(tree ast.Root, nodes []ast.Node) bool {
 	return true
 }
 
-func fromAst(tree ast.Root, v interface{}) error {
+type decoder struct {
+	// Tracks position in Go arrays.
+	arrayIndexes map[reflect.Value]int
+}
+
+func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
+	if d.arrayIndexes == nil {
+		d.arrayIndexes = make(map[reflect.Value]int, 1)
+	}
+
+	idx, ok := d.arrayIndexes[v]
+
+	if !ok {
+		d.arrayIndexes[v] = 0
+	} else if append {
+		idx++
+		d.arrayIndexes[v] = idx
+	}
+	return idx
+}
+
+func (d *decoder) fromAst(tree ast.Root, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
 		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
@@ -57,12 +80,12 @@ func fromAst(tree ast.Root, v interface{}) error {
 			if skipUntilTable {
 				continue
 			}
-			err = unmarshalKeyValue(current, &node)
+			err = d.unmarshalKeyValue(current, &node)
 			found = true
 		case ast.Table:
-			current, found, err = scopeWithKey(root, node.Key())
+			current, found, err = d.scopeWithKey(root, node.Key())
 		case ast.ArrayTable:
-			current, found, err = scopeWithArrayTable(root, node.Key())
+			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
 			panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
 		}
@@ -87,11 +110,11 @@ func fromAst(tree ast.Root, v interface{}) error {
 //
 // When encountering slices, it should always use its last element, and error
 // if the slice does not have any.
-func scopeWithKey(x target, key []ast.Node) (target, bool, error) {
+func (d *decoder) scopeWithKey(x target, key []ast.Node) (target, bool, error) {
 	var err error
 	found := true
 	for _, n := range key {
-		x, found, err = scopeTableTarget(false, x, string(n.Data))
+		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 		if err != nil || !found {
 			return nil, found, err
 		}
@@ -104,18 +127,18 @@ func scopeWithKey(x target, key []ast.Node) (target, bool, error) {
 //
 // It is the same as scopeWithKey, but when scoping the last part of the key
 // it creates a new element in the array instead of using the last one.
-func scopeWithArrayTable(x target, key []ast.Node) (target, bool, error) {
+func (d *decoder) scopeWithArrayTable(x target, key []ast.Node) (target, bool, error) {
 	var err error
 	found := true
 	if len(key) > 1 {
 		for _, n := range key[:len(key)-1] {
-			x, found, err = scopeTableTarget(false, x, string(n.Data))
+			x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 			if err != nil || !found {
 				return nil, found, err
 			}
 		}
 	}
-	x, found, err = scopeTableTarget(false, x, string(key[len(key)-1].Data))
+	x, found, err = d.scopeTableTarget(false, x, string(key[len(key)-1].Data))
 	if err != nil || !found {
 		return x, found, err
 	}
@@ -138,17 +161,20 @@ func scopeWithArrayTable(x target, key []ast.Node) (target, bool, error) {
 		v = x.get()
 	}
 
-	if v.Kind() == reflect.Slice {
+	switch v.Kind() {
+	case reflect.Slice:
 		x, err = scopeSlice(true, x)
+	case reflect.Array:
+		x, err = d.scopeArray(true, x)
 	}
 
 	return x, found, err
 }
 
-func unmarshalKeyValue(x target, node *ast.Node) error {
+func (d *decoder) unmarshalKeyValue(x target, node *ast.Node) error {
 	assertNode(ast.KeyValue, node)
 
-	x, found, err := scopeWithKey(x, node.Key())
+	x, found, err := d.scopeWithKey(x, node.Key())
 	if err != nil {
 		return err
 	}
@@ -158,10 +184,10 @@ func unmarshalKeyValue(x target, node *ast.Node) error {
 		return nil
 	}
 
-	return unmarshalValue(x, node.Value())
+	return d.unmarshalValue(x, node.Value())
 }
 
-func unmarshalValue(x target, node *ast.Node) error {
+func (d *decoder) unmarshalValue(x target, node *ast.Node) error {
 	switch node.Kind {
 	case ast.String:
 		return unmarshalString(x, node)
@@ -172,9 +198,9 @@ func unmarshalValue(x target, node *ast.Node) error {
 	case ast.Float:
 		return unmarshalFloat(x, node)
 	case ast.Array:
-		return unmarshalArray(x, node)
+		return d.unmarshalArray(x, node)
 	case ast.InlineTable:
-		return unmarshalInlineTable(x, node)
+		return d.unmarshalInlineTable(x, node)
 	case ast.LocalDateTime:
 		return unmarshalLocalDateTime(x, node)
 	case ast.DateTime:
@@ -242,11 +268,11 @@ func unmarshalFloat(x target, node *ast.Node) error {
 	return setFloat64(x, v)
 }
 
-func unmarshalInlineTable(x target, node *ast.Node) error {
+func (d *decoder) unmarshalInlineTable(x target, node *ast.Node) error {
 	assertNode(ast.InlineTable, node)
 
 	for _, kv := range node.Children {
-		err := unmarshalKeyValue(x, &kv)
+		err := d.unmarshalKeyValue(x, &kv)
 		if err != nil {
 			return err
 		}
@@ -254,20 +280,25 @@ func unmarshalInlineTable(x target, node *ast.Node) error {
 	return nil
 }
 
-func unmarshalArray(x target, node *ast.Node) error {
+func (d *decoder) unmarshalArray(x target, node *ast.Node) error {
 	assertNode(ast.Array, node)
 
-	err := ensureSlice(x)
+	err := ensureValueIndexable(x)
 	if err != nil {
 		return err
 	}
 
-	for _, n := range node.Children {
-		v, err := pushNew(x)
+	for idx, n := range node.Children {
+		v, err := elementAt(x, idx)
 		if err != nil {
 			return err
 		}
-		err = unmarshalValue(v, &n)
+		if v == nil {
+			// when we go out of bound for an array just stop processing it to
+			// mimic encoding/json
+			break
+		}
+		err = d.unmarshalValue(v, &n)
 		if err != nil {
 			return err
 		}

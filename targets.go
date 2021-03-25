@@ -120,7 +120,9 @@ func (t mapTarget) setFloat64(v float64) error {
 	return t.set(reflect.ValueOf(v))
 }
 
-func ensureSlice(t target) error {
+// makes sure that the value pointed at by t is indexable (Slice, Array), or
+// dereferences to an indexable (Ptr, Interface).
+func ensureValueIndexable(t target) error {
 	f := t.get()
 
 	switch f.Type().Kind() {
@@ -144,7 +146,9 @@ func ensureSlice(t target) error {
 			}
 			f = t.get()
 		}
-		return ensureSlice(valueTarget(f.Elem()))
+		return ensureValueIndexable(valueTarget(f.Elem()))
+	case reflect.Array:
+		// arrays are always initialized.
 	default:
 		return fmt.Errorf("cannot initialize a slice in %s", f.Kind())
 	}
@@ -305,24 +309,34 @@ func setFloat64(t target, v float64) error {
 	}
 }
 
-func pushNew(t target) (target, error) {
+// Returns the element at idx of the value pointed at by target, or an error if
+// t does not point to an indexable.
+// If the target points to an Array and idx is out of bounds, it returns
+// (nil, nil) as this is not a fatal error (the unmarshaler will skip).
+func elementAt(t target, idx int) (target, error) {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Slice:
+		// TODO: use the idx function argument and avoid alloc if possible.
 		idx := f.Len()
 		err := t.set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
 		if err != nil {
 			return nil, err
 		}
 		return valueTarget(t.get().Index(idx)), nil
+	case reflect.Array:
+		if idx >= f.Len() {
+			return nil, nil
+		}
+		return valueTarget(f.Index(idx)), nil
 	case reflect.Interface:
 		if f.IsNil() {
 			panic("interface should have been initialized")
 		}
 		ifaceElem := f.Elem()
 		if ifaceElem.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
+			return nil, fmt.Errorf("cannot elementAt on a %s", f.Kind())
 		}
 		idx := ifaceElem.Len()
 		newElem := reflect.New(ifaceElem.Type().Elem()).Elem()
@@ -333,13 +347,13 @@ func pushNew(t target) (target, error) {
 		}
 		return valueTarget(t.get().Elem().Index(idx)), nil
 	case reflect.Ptr:
-		return pushNew(valueTarget(f.Elem()))
+		return elementAt(valueTarget(f.Elem()), idx)
 	default:
-		return nil, fmt.Errorf("cannot pushNew on a %s", f.Kind())
+		return nil, fmt.Errorf("cannot elementAt on a %s", f.Kind())
 	}
 }
 
-func scopeTableTarget(append bool, t target, name string) (target, bool, error) {
+func (d *decoder) scopeTableTarget(append bool, t target, name string) (target, bool, error) {
 	x := t.get()
 
 	switch x.Kind() {
@@ -350,20 +364,27 @@ func scopeTableTarget(append bool, t target, name string) (target, bool, error) 
 		if err != nil {
 			return t, false, err
 		}
-		return scopeTableTarget(append, t, name)
+		return d.scopeTableTarget(append, t, name)
 	case reflect.Ptr:
 		t, err := scopePtr(t)
 		if err != nil {
 			return t, false, err
 		}
-		return scopeTableTarget(append, t, name)
+		return d.scopeTableTarget(append, t, name)
 	case reflect.Slice:
 		t, err := scopeSlice(append, t)
 		if err != nil {
 			return t, false, err
 		}
 		append = false
-		return scopeTableTarget(append, t, name)
+		return d.scopeTableTarget(append, t, name)
+	case reflect.Array:
+		t, err := d.scopeArray(append, t)
+		if err != nil {
+			return t, false, err
+		}
+		append = false
+		return d.scopeTableTarget(append, t, name)
 
 	// Terminal kinds
 
@@ -441,6 +462,18 @@ func scopeSlice(append bool, t target) (target, error) {
 		v = t.get()
 	}
 	return valueTarget(v.Index(v.Len() - 1)), nil
+}
+
+func (d *decoder) scopeArray(append bool, t target) (target, error) {
+	v := t.get()
+
+	idx := d.arrayIndex(append, v)
+
+	if idx >= v.Len() {
+		return nil, fmt.Errorf("not enough space in the array")
+	}
+
+	return valueTarget(v.Index(idx)), nil
 }
 
 func scopeMap(v reflect.Value, name string) (target, bool, error) {

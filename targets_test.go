@@ -39,9 +39,10 @@ func TestStructTarget_Ensure(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			target, _, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			d := decoder{}
+			target, _, err := d.scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
-			err = ensureSlice(target)
+			err = ensureValueIndexable(target)
 			v := target.get()
 			e.test(v, err)
 		})
@@ -86,7 +87,8 @@ func TestStructTarget_SetString(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			target, _, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			d := decoder{}
+			target, _, err := d.scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
 			err = setString(target, str)
 			v := target.get()
@@ -102,15 +104,16 @@ func TestPushNew(t *testing.T) {
 		}
 		d := Doc{}
 
-		x, _, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
+		dec := decoder{}
+		x, _, err := dec.scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
-		n, err := pushNew(x)
+		n, err := elementAt(x, 0)
 		require.NoError(t, err)
 		require.NoError(t, n.setString("hello"))
 		require.Equal(t, []string{"hello"}, d.A)
 
-		n, err = pushNew(x)
+		n, err = elementAt(x, 1)
 		require.NoError(t, err)
 		require.NoError(t, n.setString("world"))
 		require.Equal(t, []string{"hello", "world"}, d.A)
@@ -122,15 +125,16 @@ func TestPushNew(t *testing.T) {
 		}
 		d := Doc{}
 
-		x, _, err := scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
+		dec := decoder{}
+		x, _, err := dec.scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
-		n, err := pushNew(x)
+		n, err := elementAt(x, 0)
 		require.NoError(t, err)
 		require.NoError(t, setString(n, "hello"))
 		require.Equal(t, []interface{}{"hello"}, d.A)
 
-		n, err = pushNew(x)
+		n, err = elementAt(x, 1)
 		require.NoError(t, err)
 		require.NoError(t, setString(n, "world"))
 		require.Equal(t, []interface{}{"hello", "world"}, d.A)
@@ -164,7 +168,8 @@ func TestScope_Struct(t *testing.T) {
 
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
-			x, found, err := scopeTableTarget(false, valueTarget(e.input), e.name)
+			dec := decoder{}
+			x, found, err := dec.scopeTableTarget(false, valueTarget(e.input), e.name)
 			assert.Equal(t, e.found, found)
 			if e.err {
 				assert.Error(t, err)
