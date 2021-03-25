@@ -14,15 +14,15 @@ Development branch. Probably does not work.
 - [x] Support Arrays.
 - [x] Support Unmarshaler interface.
 - [x] Original go-toml unmarshal tests pass.
-- [ ] Benchmark!
-- [ ] Abstract AST.
+- [x] Benchmark!
+- [x] Abstract AST.
 - [ ] Attach comments to AST (gated by parser flag).
 - [ ] Track file position (line, column) for errors.
 - [ ] Benchmark again!
 
 ## Further work
 
-- [ ] Rewrite AST to use a single array as storage instead of one allocation per
+- [x] Rewrite AST to use a single array as storage instead of one allocation per
       node.
 - [ ] Provide "minimal allocations" option that uses `unsafe` to reuse the input
       byte array as storage for strings.
