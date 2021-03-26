@@ -5,6 +5,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 type target interface {
@@ -466,41 +467,71 @@ func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	}, true, nil
 }
 
+type fieldPathsMap = map[string][]int
+
+type fieldPathsCache struct {
+	m map[reflect.Type]fieldPathsMap
+	l sync.RWMutex
+}
+
+func (c *fieldPathsCache) get(t reflect.Type) (fieldPathsMap, bool) {
+	c.l.RLock()
+	paths, ok := c.m[t]
+	c.l.RUnlock()
+	return paths, ok
+}
+
+func (c *fieldPathsCache) set(t reflect.Type, m fieldPathsMap) {
+	c.l.Lock()
+	c.m[t] = m
+	c.l.Unlock()
+}
+
+var globalFieldPathsCache = fieldPathsCache{
+	m: map[reflect.Type]fieldPathsMap{},
+	l: sync.RWMutex{},
+}
+
 func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 	// TODO: cache this, and reduce allocations
 
-	fieldPaths := map[string][]int{}
+	fieldPaths, ok := globalFieldPathsCache.get(v.Type())
+	if !ok {
+		fieldPaths = map[string][]int{}
 
-	path := make([]int, 0, 16)
-	var walk func(reflect.Value)
-	walk = func(v reflect.Value) {
-		t := v.Type()
-		for i := 0; i < t.NumField(); i++ {
-			l := len(path)
-			path = append(path, i)
-			f := t.Field(i)
-			if f.PkgPath != "" {
-				// only consider exported fields
-			} else if f.Anonymous {
-				walk(v.Field(i))
-			} else {
-				fieldName, ok := f.Tag.Lookup("toml")
-				if !ok {
-					fieldName = f.Name
+		path := make([]int, 0, 16)
+		var walk func(reflect.Value)
+		walk = func(v reflect.Value) {
+			t := v.Type()
+			for i := 0; i < t.NumField(); i++ {
+				l := len(path)
+				path = append(path, i)
+				f := t.Field(i)
+				if f.PkgPath != "" {
+					// only consider exported fields
+				} else if f.Anonymous {
+					walk(v.Field(i))
+				} else {
+					fieldName, ok := f.Tag.Lookup("toml")
+					if !ok {
+						fieldName = f.Name
+					}
+
+					pathCopy := make([]int, len(path))
+					copy(pathCopy, path)
+
+					fieldPaths[fieldName] = pathCopy
+					// extra copy for the case-insensitive match
+					fieldPaths[strings.ToLower(fieldName)] = pathCopy
 				}
-
-				pathCopy := make([]int, len(path))
-				copy(pathCopy, path)
-
-				fieldPaths[fieldName] = pathCopy
-				// extra copy for the case-insensitive match
-				fieldPaths[strings.ToLower(fieldName)] = pathCopy
+				path = path[:l]
 			}
-			path = path[:l]
 		}
-	}
 
-	walk(v)
+		walk(v)
+
+		globalFieldPathsCache.set(v.Type(), fieldPaths)
+	}
 
 	path, ok := fieldPaths[name]
 	if !ok {
