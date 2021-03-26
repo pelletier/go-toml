@@ -11,7 +11,7 @@ jobs:
         os: [ 'ubuntu-latest', 'windows-latest', 'macos-latest']
         go: [ '1.15', '1.16' ]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }}/${{ matrix.go }}
+    name: ${{ matrix.go }}/${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
       - name: Setup go ${{ matrix.go }}
