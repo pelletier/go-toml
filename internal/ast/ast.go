@@ -12,20 +12,14 @@ import (
 // for it.Next() {
 // 		it.Node()
 // }
-type Iterator interface {
-	// Next moves the iterator forward and returns true if points to a node, false
-	// otherwise.
-	Next() bool
-	// Node returns a copy of the node pointed at by the iterator.
-	Node() Node
-}
-
-type chainIterator struct {
+type Iterator struct {
 	started bool
 	node    Node
 }
 
-func (c *chainIterator) Next() bool {
+// Next moves the iterator forward and returns true if points to a node, false
+// otherwise.
+func (c *Iterator) Next() bool {
 	if !c.started {
 		c.started = true
 	} else if c.node.Valid() {
@@ -34,7 +28,8 @@ func (c *chainIterator) Next() bool {
 	return c.node.Valid()
 }
 
-func (c *chainIterator) Node() Node {
+// Node returns a copy of the node pointed at by the iterator.
+func (c *Iterator) Node() Node {
 	return c.node
 }
 
@@ -43,7 +38,7 @@ type Root struct {
 }
 
 func (r *Root) Iterator() Iterator {
-	it := &chainIterator{}
+	it := Iterator{}
 	if len(r.nodes) > 0 {
 		it.node = r.nodes[0]
 	}
@@ -114,9 +109,9 @@ func (n *Node) Key() Iterator {
 		if !value.Valid() {
 			panic(fmt.Errorf("KeyValue should have at least two children"))
 		}
-		return &chainIterator{node: value.Next()}
+		return Iterator{node: value.Next()}
 	case Table, ArrayTable:
-		return &chainIterator{node: n.Child()}
+		return Iterator{node: n.Child()}
 	default:
 		panic(fmt.Errorf("Key() is not supported on a %s", n.Kind))
 	}
@@ -131,7 +126,7 @@ func (n Node) Value() Node {
 }
 
 func (n Node) Children() Iterator {
-	return &chainIterator{node: n.Child()}
+	return Iterator{node: n.Child()}
 }
 
 func assertKind(k Kind, n Node) {
