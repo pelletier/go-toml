@@ -1,13 +1,12 @@
-package toml
+package toml_test
 
 import (
 	"math"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/pelletier/go-toml/v2/internal/ast"
 )
 
 func TestUnmarshal_Integers(t *testing.T) {
@@ -61,7 +60,7 @@ func TestUnmarshal_Integers(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			doc := doc{}
-			err := Unmarshal([]byte(`A = `+e.input), &doc)
+			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			require.NoError(t, err)
 			assert.Equal(t, e.expected, doc.A)
 		})
@@ -157,7 +156,7 @@ func TestUnmarshal_Floats(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			doc := doc{}
-			err := Unmarshal([]byte(`A = `+e.input), &doc)
+			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			require.NoError(t, err)
 			if e.testFn != nil {
 				e.testFn(t, doc.A)
@@ -648,7 +647,7 @@ B = "data"`,
 			if test.err && test.expected != nil {
 				panic("invalid test: cannot expect both an error and a value")
 			}
-			err := Unmarshal([]byte(e.input), test.target)
+			err := toml.Unmarshal([]byte(e.input), test.target)
 			if test.err {
 				require.Error(t, err)
 			} else {
@@ -657,313 +656,4 @@ B = "data"`,
 			}
 		})
 	}
-}
-
-func TestFromAst_KV(t *testing.T) {
-	root := astRoot{
-		astNode{
-			Kind: ast.KeyValue,
-			Children: []astNode{
-				{
-					Kind: ast.String,
-					Data: []byte(`hello`),
-				},
-				{
-					Kind: ast.Key,
-					Data: []byte(`Foo`),
-				},
-			},
-		},
-	}
-
-	type Doc struct {
-		Foo string
-	}
-
-	x := Doc{}
-	d := decoder{}
-	err := d.fromAst(root.toOrig(), &x)
-	require.NoError(t, err)
-	assert.Equal(t, Doc{Foo: "hello"}, x)
-}
-
-func TestFromAst_Table(t *testing.T) {
-	t.Run("one level table on struct", func(t *testing.T) {
-		root := astRoot{
-			astNode{
-				Kind: ast.Table,
-				Children: []astNode{
-					{Kind: ast.Key, Data: []byte(`Level1`)},
-				},
-			},
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.String,
-						Data: []byte(`hello`),
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`A`),
-					},
-				},
-			},
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.String,
-						Data: []byte(`world`),
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`B`),
-					},
-				},
-			},
-		}
-
-		type Level1 struct {
-			A string
-			B string
-		}
-
-		type Doc struct {
-			Level1 Level1
-		}
-
-		x := Doc{}
-		d := decoder{}
-		err := d.fromAst(root.toOrig(), &x)
-		require.NoError(t, err)
-		assert.Equal(t, Doc{
-			Level1: Level1{
-				A: "hello",
-				B: "world",
-			},
-		}, x)
-	})
-	t.Run("one level table on struct", func(t *testing.T) {
-		root := astRoot{
-			astNode{
-				Kind: ast.Table,
-				Children: []astNode{
-					{Kind: ast.Key, Data: []byte(`A`)},
-					{Kind: ast.Key, Data: []byte(`B`)},
-				},
-			},
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.String,
-						Data: []byte(`value`),
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`C`),
-					},
-				},
-			},
-		}
-
-		type B struct {
-			C string
-		}
-
-		type A struct {
-			B B
-		}
-
-		type Doc struct {
-			A A
-		}
-
-		x := Doc{}
-		d := decoder{}
-		err := d.fromAst(root.toOrig(), &x)
-		require.NoError(t, err)
-		assert.Equal(t, Doc{
-			A: A{B: B{C: "value"}},
-		}, x)
-	})
-}
-
-func TestFromAst_InlineTable(t *testing.T) {
-	t.Run("one level of strings", func(t *testing.T) {
-		root := astRoot{
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.InlineTable,
-						Children: []astNode{
-							{
-								Kind: ast.KeyValue,
-								Children: []astNode{
-									{Kind: ast.String, Data: []byte(`Tom`)},
-									{Kind: ast.Key, Data: []byte(`First`)},
-								},
-							},
-							{
-								Kind: ast.KeyValue,
-								Children: []astNode{
-									{Kind: ast.String, Data: []byte(`Preston-Werner`)},
-									{Kind: ast.Key, Data: []byte(`Last`)},
-								},
-							},
-						},
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`Name`),
-					},
-				},
-			},
-		}
-
-		type Name struct {
-			First string
-			Last  string
-		}
-
-		type Doc struct {
-			Name Name
-		}
-
-		x := Doc{}
-		d := decoder{}
-		err := d.fromAst(root.toOrig(), &x)
-		require.NoError(t, err)
-		assert.Equal(t, Doc{
-			Name: Name{
-				First: "Tom",
-				Last:  "Preston-Werner",
-			},
-		}, x)
-
-	})
-}
-
-func TestFromAst_Slice(t *testing.T) {
-	t.Run("slice of string", func(t *testing.T) {
-		root := astRoot{
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.Array,
-						Children: []astNode{
-							{
-								Kind: ast.String,
-								Data: []byte(`hello`),
-							},
-							{
-								Kind: ast.String,
-								Data: []byte(`world`),
-							},
-						},
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`Foo`),
-					},
-				},
-			},
-		}
-
-		type Doc struct {
-			Foo []string
-		}
-
-		x := Doc{}
-		d := decoder{}
-		err := d.fromAst(root.toOrig(), &x)
-		require.NoError(t, err)
-		assert.Equal(t, Doc{Foo: []string{"hello", "world"}}, x)
-	})
-
-	t.Run("slice of interfaces for strings", func(t *testing.T) {
-		root := astRoot{
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.Array,
-						Children: []astNode{
-							{
-								Kind: ast.String,
-								Data: []byte(`hello`),
-							},
-							{
-								Kind: ast.String,
-								Data: []byte(`world`),
-							},
-						},
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`Foo`),
-					},
-				},
-			},
-		}
-
-		type Doc struct {
-			Foo []interface{}
-		}
-
-		x := Doc{}
-		d := decoder{}
-		err := d.fromAst(root.toOrig(), &x)
-		require.NoError(t, err)
-		assert.Equal(t, Doc{Foo: []interface{}{"hello", "world"}}, x)
-	})
-
-	t.Run("slice of interfaces with slices", func(t *testing.T) {
-		root := astRoot{
-			astNode{
-				Kind: ast.KeyValue,
-				Children: []astNode{
-					{
-						Kind: ast.Array,
-						Children: []astNode{
-							{
-								Kind: ast.String,
-								Data: []byte(`hello`),
-							},
-							{
-								Kind: ast.Array,
-								Children: []astNode{
-									{
-										Kind: ast.String,
-										Data: []byte(`inner1`),
-									},
-									{
-										Kind: ast.String,
-										Data: []byte(`inner2`),
-									},
-								},
-							},
-						},
-					},
-					{
-						Kind: ast.Key,
-						Data: []byte(`Foo`),
-					},
-				},
-			},
-		}
-
-		type Doc struct {
-			Foo []interface{}
-		}
-
-		x := Doc{}
-		d := decoder{}
-		err := d.fromAst(root.toOrig(), &x)
-		require.NoError(t, err)
-		assert.Equal(t, Doc{Foo: []interface{}{"hello", []interface{}{"inner1", "inner2"}}}, x)
-	})
 }

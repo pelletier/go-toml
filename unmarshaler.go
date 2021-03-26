@@ -11,13 +11,9 @@ import (
 
 func Unmarshal(data []byte, v interface{}) error {
 	p := parser{}
-	err := p.parse(data)
-	if err != nil {
-		return err
-	}
-
+	p.Reset(data)
 	d := decoder{}
-	return d.fromAst(p.builder.Finish(), v)
+	return d.FromParser(&p, v)
 }
 
 type decoder struct {
@@ -41,7 +37,7 @@ func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
 	return idx
 }
 
-func (d *decoder) fromAst(tree *ast.Root, v interface{}) error {
+func (d *decoder) FromParser(p *parser, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
 		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
@@ -55,9 +51,8 @@ func (d *decoder) fromAst(tree *ast.Root, v interface{}) error {
 	var root target = valueTarget(r.Elem())
 	current := root
 
-	it := tree.Iterator()
-	for it.Next() {
-		node := it.Node()
+	for p.NextExpression() {
+		node := p.Expression()
 		var found bool
 		switch node.Kind {
 		case ast.KeyValue:
@@ -83,7 +78,7 @@ func (d *decoder) fromAst(tree *ast.Root, v interface{}) error {
 		}
 	}
 
-	return nil
+	return p.Error()
 }
 
 // scopeWithKey performs target scoping when unmarshaling an ast.KeyValue node.

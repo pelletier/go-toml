@@ -11,30 +11,63 @@ import (
 
 type parser struct {
 	builder ast.Builder
+	ref     ast.Reference
+	data    []byte
+	left    []byte
+	err     error
+	first   bool
 }
 
-func (p *parser) parse(b []byte) error {
-	last, b, err := p.parseExpression(b)
-	if err != nil {
-		return err
+func (p *parser) Reset(b []byte) {
+	p.builder.Reset()
+	p.ref = ast.Reference{}
+	p.data = b
+	p.left = b
+	p.err = nil
+	p.first = true
+}
+
+func (p *parser) NextExpression() bool {
+	if len(p.left) == 0 || p.err != nil {
+		return false
 	}
-	for len(b) > 0 {
-		b, err = p.parseNewline(b)
-		if err != nil {
-			return err
+
+	p.builder.Reset()
+	p.ref = ast.Reference{}
+
+	for {
+		if len(p.left) == 0 || p.err != nil {
+			return false
 		}
 
-		var next ast.Reference
-		next, b, err = p.parseExpression(b)
-		if err != nil {
-			return err
+		if !p.first {
+			p.left, p.err = p.parseNewline(p.left)
 		}
-		if next.Valid() {
-			p.builder.Chain(last, next)
-			last = next
+
+		if len(p.left) == 0 || p.err != nil {
+			return false
 		}
+
+		p.ref, p.left, p.err = p.parseExpression(p.left)
+
+		if p.err != nil {
+			return false
+		}
+
+		if p.ref.Valid() {
+			return true
+		}
+
+		p.first = false
 	}
-	return nil
+}
+
+func (p *parser) Expression() ast.Node {
+	return p.builder.NodeAt(p.ref)
+}
+
+func (p *parser) Error() error {
+	return p.err
 }
 
 func (p *parser) parseNewline(b []byte) ([]byte, error) {

@@ -119,23 +119,22 @@ func TestParser_AST_Numbers(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			p := parser{}
-			err := p.parse([]byte(`A = ` + e.input))
+			p.Reset([]byte(`A = ` + e.input))
+			p.NextExpression()
+			err := p.Error()
 			if e.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 
-				expected := astRoot{
-					astNode{
-						Kind: ast.KeyValue,
-						Children: []astNode{
-							{Kind: e.kind, Data: []byte(e.input)},
-							{Kind: ast.Key, Data: []byte(`A`)},
-						},
+				expected := astNode{
+					Kind: ast.KeyValue,
+					Children: []astNode{
+						{Kind: e.kind, Data: []byte(e.input)},
+						{Kind: ast.Key, Data: []byte(`A`)},
 					},
 				}
-
-				compareAST(t, expected, p.builder.Finish())
+				compareNode(t, expected, p.Expression())
 			}
 		})
 	}
@@ -153,6 +152,13 @@ func compareAST(t *testing.T, expected astRoot, actual *ast.Root) {
 	compareIterator(t, expected, it)
 }
 
+func compareNode(t *testing.T, e astNode, n ast.Node) {
+	require.Equal(t, e.Kind, n.Kind)
+	require.Equal(t, e.Data, n.Data)
+
+	compareIterator(t, e.Children, n.Children())
+}
+
 func compareIterator(t *testing.T, expected []astNode, actual ast.Iterator) {
 	idx := 0
 
@@ -164,10 +170,7 @@ func compareIterator(t *testing.T, expected []astNode, actual ast.Iterator) {
 		}
 		e := expected[idx]
 
-		require.Equal(t, e.Kind, n.Kind)
-		require.Equal(t, e.Data, n.Data)
-
-		compareIterator(t, e.Children, n.Children())
+		compareNode(t, e, n)
 
 		idx++
 	}
@@ -199,7 +202,7 @@ func (r astRoot) toOrig() *ast.Root {
 		}
 	}
 
-	return builder.Finish()
+	return builder.Tree()
 }
 
 func childrenToOrig(b *ast.Builder, nodes []astNode) ast.Reference {
@@ -229,24 +232,22 @@ func TestParser_AST(t *testing.T) {
 	examples := []struct {
 		desc  string
 		input string
-		ast   astRoot
+		ast   astNode
 		err   bool
 	}{
 		{
 			desc:  "simple string assignment",
 			input: `A = "hello"`,
-			ast: astRoot{
-				astNode{
-					Kind: ast.KeyValue,
-					Children: []astNode{
-						{
-							Kind: ast.String,
-							Data: []byte(`hello`),
-						},
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+			ast: astNode{
+				Kind: ast.KeyValue,
+				Children: []astNode{
+					{
+						Kind: ast.String,
+						Data: []byte(`hello`),
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`A`),
 					},
 				},
 			},
@@ -254,18 +255,16 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "simple bool assignment",
 			input: `A = true`,
-			ast: astRoot{
-				astNode{
-					Kind: ast.KeyValue,
-					Children: []astNode{
-						{
-							Kind: ast.Bool,
-							Data: []byte(`true`),
-						},
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+			ast: astNode{
+				Kind: ast.KeyValue,
+				Children: []astNode{
+					{
+						Kind: ast.Bool,
+						Data: []byte(`true`),
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`A`),
 					},
 				},
 			},
@@ -273,36 +272,34 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "array of strings",
 			input: `A = ["hello", ["world", "again"]]`,
-			ast: astRoot{
-				astNode{
-					Kind: ast.KeyValue,
-					Children: []astNode{
-						{
-							Kind: ast.Array,
-							Children: []astNode{
-								{
-									Kind: ast.String,
-									Data: []byte(`hello`),
-								},
-								{
-									Kind: ast.Array,
-									Children: []astNode{
-										{
-											Kind: ast.String,
-											Data: []byte(`world`),
-										},
-										{
-											Kind: ast.String,
-											Data: []byte(`again`),
-										},
+			ast: astNode{
+				Kind: ast.KeyValue,
+				Children: []astNode{
+					{
+						Kind: ast.Array,
+						Children: []astNode{
+							{
+								Kind: ast.String,
+								Data: []byte(`hello`),
+							},
+							{
+								Kind: ast.Array,
+								Children: []astNode{
+									{
+										Kind: ast.String,
+										Data: []byte(`world`),
+									},
+									{
+										Kind: ast.String,
+										Data: []byte(`again`),
 									},
 								},
 							},
 						},
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`A`),
 					},
 				},
 			},
@@ -310,27 +307,25 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "array of arrays of strings",
 			input: `A = ["hello", "world"]`,
-			ast: astRoot{
-				astNode{
-					Kind: ast.KeyValue,
-					Children: []astNode{
-						{
-							Kind: ast.Array,
-							Children: []astNode{
-								{
-									Kind: ast.String,
-									Data: []byte(`hello`),
-								},
-								{
-									Kind: ast.String,
-									Data: []byte(`world`),
-								},
+			ast: astNode{
+				Kind: ast.KeyValue,
+				Children: []astNode{
+					{
+						Kind: ast.Array,
+						Children: []astNode{
+							{
+								Kind: ast.String,
+								Data: []byte(`hello`),
+							},
+							{
+								Kind: ast.String,
+								Data: []byte(`world`),
 							},
 						},
-						{
-							Kind: ast.Key,
-							Data: []byte(`A`),
-						},
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`A`),
 					},
 				},
 			},
@@ -338,33 +333,31 @@ func TestParser_AST(t *testing.T) {
 		{
 			desc:  "inline table",
 			input: `name = { first = "Tom", last = "Preston-Werner" }`,
-			ast: astRoot{
-				astNode{
-					Kind: ast.KeyValue,
-					Children: []astNode{
-						{
-							Kind: ast.InlineTable,
-							Children: []astNode{
-								{
-									Kind: ast.KeyValue,
-									Children: []astNode{
-										{Kind: ast.String, Data: []byte(`Tom`)},
-										{Kind: ast.Key, Data: []byte(`first`)},
-									},
+			ast: astNode{
+				Kind: ast.KeyValue,
+				Children: []astNode{
+					{
+						Kind: ast.InlineTable,
+						Children: []astNode{
+							{
+								Kind: ast.KeyValue,
+								Children: []astNode{
+									{Kind: ast.String, Data: []byte(`Tom`)},
+									{Kind: ast.Key, Data: []byte(`first`)},
 								},
-								{
-									Kind: ast.KeyValue,
-									Children: []astNode{
-										{Kind: ast.String, Data: []byte(`Preston-Werner`)},
-										{Kind: ast.Key, Data: []byte(`last`)},
-									},
+							},
+							{
+								Kind: ast.KeyValue,
+								Children: []astNode{
+									{Kind: ast.String, Data: []byte(`Preston-Werner`)},
+									{Kind: ast.Key, Data: []byte(`last`)},
 								},
 							},
 						},
-						{
-							Kind: ast.Key,
-							Data: []byte(`name`),
-						},
+					},
+					{
+						Kind: ast.Key,
+						Data: []byte(`name`),
 					},
 				},
 			},
@@ -374,12 +367,14 @@ func TestParser_AST(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			p := parser{}
-			err := p.parse([]byte(e.input))
+			p.Reset([]byte(e.input))
+			p.NextExpression()
+			err := p.Error()
 			if e.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				compareAST(t, e.ast, p.builder.Finish())
+				compareNode(t, e.ast, p.Expression())
 			}
 		})
 	}
