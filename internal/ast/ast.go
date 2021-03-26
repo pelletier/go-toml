@@ -33,20 +33,20 @@ func (c *Iterator) Node() Node {
 	return c.node
 }
 
+// Root contains a full AST.
+//
+// It is immutable once constructed with Builder.
 type Root struct {
 	nodes []Node
 }
 
+// Iterator over the top level nodes.
 func (r *Root) Iterator() Iterator {
 	it := Iterator{}
 	if len(r.nodes) > 0 {
 		it.node = r.nodes[0]
 	}
 	return it
-}
-
-func (r *Root) Reset() {
-	r.nodes = r.nodes[:0]
 }
 
 func (r *Root) at(idx int) Node {
@@ -77,7 +77,7 @@ type Node struct {
 // next node.
 func (n Node) Next() Node {
 	if n.next <= 0 {
-		return NoNode
+		return noNode
 	}
 	return n.root.at(n.next)
 }
@@ -87,16 +87,17 @@ func (n Node) Next() Node {
 // Returns an invalid Node if there is none.
 func (n Node) Child() Node {
 	if n.child <= 0 {
-		return NoNode
+		return noNode
 	}
 	return n.root.at(n.child)
 }
 
+// Valid returns true if the node's kind is set (not to Invalid).
 func (n Node) Valid() bool {
 	return n.Kind != Invalid
 }
 
-var NoNode = Node{}
+var noNode = Node{}
 
 // Key returns the child nodes making the Key on a supported node. Panics
 // otherwise.
@@ -125,6 +126,7 @@ func (n Node) Value() Node {
 	return n.Child()
 }
 
+// Children returns an iterator over a node's children.
 func (n Node) Children() Iterator {
 	return Iterator{node: n.Child()}
 }
