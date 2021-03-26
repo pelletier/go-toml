@@ -1294,6 +1294,32 @@ NonCommented = "Not commented line"
 	}
 }
 
+func TestMarshalMultilineLiteral(t *testing.T) {
+	type Doc struct {
+		Value string `multiline:"true" literal:"true"`
+	}
+
+	d := Doc{
+		Value: "hello\nworld\ttest\nend",
+	}
+
+	expected := []byte(`Value = '''
+hello
+world	test
+end
+'''
+`)
+
+	b, err := Marshal(d)
+	if err != nil {
+		t.Fatal("unexpected error")
+	}
+
+	if !bytes.Equal(b, expected) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, b)
+	}
+}
+
 func TestMarshalNonPrimitiveTypeCommented(t *testing.T) {
 	expectedToml := []byte(`
 # [CommentedMapField]
