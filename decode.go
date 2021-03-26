@@ -200,6 +200,12 @@ func parseFloat(b []byte) (float64, error) {
 		return 0, err
 	}
 	cleanedVal := cleanupNumberToken(tok)
+	if cleanedVal[0] == '.' {
+		return 0, fmt.Errorf("float cannot start with a dot")
+	}
+	if cleanedVal[len(cleanedVal)-1] == '.' {
+		return 0, fmt.Errorf("float cannot end with a dot")
+	}
 	return strconv.ParseFloat(cleanedVal, 64)
 }
 

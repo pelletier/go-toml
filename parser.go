@@ -1108,6 +1108,10 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 		break
 	}
 
+	if i == 0 {
+		return ast.Reference{}, b, fmt.Errorf("expected integer or float")
+	}
+
 	kind := ast.Integer
 
 	if isFloat {

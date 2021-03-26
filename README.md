@@ -16,6 +16,7 @@ Development branch. Probably does not work.
 - [x] Original go-toml unmarshal tests pass.
 - [x] Benchmark!
 - [x] Abstract AST.
+- [ ] Original go-toml testgen tests pass.
 - [ ] Attach comments to AST (gated by parser flag).
 - [ ] Track file position (line, column) for errors.
 - [ ] Benchmark again!
