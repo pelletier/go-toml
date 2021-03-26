@@ -26,7 +26,7 @@ Development branch. Probably does not work.
       node.
 - [ ] Provide "minimal allocations" option that uses `unsafe` to reuse the input
       byte array as storage for strings.
-- [ ] Cache reflection operations per type.
+- [x] Cache reflection operations per type.
 
 ## Ideas
 
