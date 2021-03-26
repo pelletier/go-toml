@@ -1,0 +1,20 @@
+name: build-test
+on:
+  push:
+    branches:
+      - v2-wip
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.15', '1.16' ]
+    name: Test on ${{ matrix.go }}
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@master
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go test ./...
