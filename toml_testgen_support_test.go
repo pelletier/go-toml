@@ -4,7 +4,6 @@ package toml_test
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"testing"
 	"time"
@@ -70,7 +69,6 @@ func testGenTranslateDesc(input interface{}) interface{} {
 
 	d := input.(map[string]interface{})
 
-	log.Printf("%+v", d)
 	var dtype string
 	var dvalue interface{}
 
