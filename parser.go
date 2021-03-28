@@ -380,6 +380,11 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 			}
 		}
 
+		// TOML allows trailing commas in arrays.
+		if len(b) > 0  && b[0] == ']' {
+			break
+		}
+
 		var valueRef ast.Reference
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
@@ -406,18 +411,25 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 }
 
 func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error) {
-	var err error
-	b = p.parseWhitespace(b)
-	if len(b) > 0 && b[0] == '#' {
-		_, b, err = scanComment(b)
-		if err != nil {
-			return nil, err
+	for len(b) > 0 {
+		var err error
+		b = p.parseWhitespace(b)
+		if len(b) > 0 && b[0] == '#' {
+			_, b, err = scanComment(b)
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
-	if len(b) > 0 && (b[0] == '\n' || b[0] == '\r') {
-		b, err = p.parseNewline(b)
-		if err != nil {
-			return nil, err
+		if len(b) == 0 {
+			break
+		}
+		if b[0] == '\n' || b[0] == '\r' {
+			b, err = p.parseNewline(b)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
 		}
 	}
 	return b, nil
