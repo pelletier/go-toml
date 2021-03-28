@@ -2,8 +2,8 @@ package toml
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
@@ -381,7 +381,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		// TOML allows trailing commas in arrays.
-		if len(b) > 0  && b[0] == ']' {
+		if len(b) > 0 && b[0] == ']' {
 			break
 		}
 
@@ -677,11 +677,11 @@ func hexToString(b []byte, length int) (string, error) {
 		return "", fmt.Errorf("unicode point needs %d hex characters", length)
 	}
 	// TODO: slow
-	b, err := hex.DecodeString(string(b[:length]))
+	intcode, err := strconv.ParseInt(string(b[:length]), 16, 32)
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return string(rune(intcode)), nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {
