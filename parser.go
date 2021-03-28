@@ -449,8 +449,7 @@ func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	} else if token[i] == '\r' && token[i+1] == '\n' {
 		i += 2
 	}
-
-	return token[i : len(b)-3], rest, err
+	return token[i : len(token)-3], rest, err
 }
 
 func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
