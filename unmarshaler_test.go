@@ -193,6 +193,20 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "multiline basic string",
+			input: `A = """\
+					Test"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "Test"},
+				}
+			},
+		},
+		{
 			desc:  "kv bool true",
 			input: `A = true`,
 			gen: func() test {

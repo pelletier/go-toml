@@ -493,6 +493,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				for ; i < len(token)-3; i++ {
 					c := token[i]
 					if !(c == '\n' || c == '\r' || c == ' ' || c == '\t') {
+						i--
 						break
 					}
 				}
