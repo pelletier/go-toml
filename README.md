@@ -16,7 +16,7 @@ Development branch. Probably does not work.
 - [x] Original go-toml unmarshal tests pass.
 - [x] Benchmark!
 - [x] Abstract AST.
-- [ ] Original go-toml testgen tests pass.
+- [x] Original go-toml testgen tests pass.
 - [ ] Attach comments to AST (gated by parser flag).
 - [ ] Track file position (line, column) for errors.
 - [ ] Benchmark again!
@@ -28,6 +28,7 @@ Development branch. Probably does not work.
 - [ ] Provide "minimal allocations" option that uses `unsafe` to reuse the input
       byte array as storage for strings.
 - [x] Cache reflection operations per type.
+- [ ] Optimize tracker pass.
 
 ## Ideas
 
