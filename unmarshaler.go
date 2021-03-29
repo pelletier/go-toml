@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
+	"github.com/pelletier/go-toml/v2/internal/tracker"
 )
 
 func Unmarshal(data []byte, v interface{}) error {
@@ -19,6 +20,9 @@ func Unmarshal(data []byte, v interface{}) error {
 type decoder struct {
 	// Tracks position in Go arrays.
 	arrayIndexes map[reflect.Value]int
+
+	// Tracks keys that have been seen, with which type.
+	seen tracker.Seen
 }
 
 func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
@@ -46,19 +50,25 @@ func (d *decoder) FromParser(p *parser, v interface{}) error {
 		return fmt.Errorf("target pointer must be non-nil")
 	}
 
-	var err error
 	var skipUntilTable bool
 	var root target = valueTarget(r.Elem())
 	current := root
 
 	for p.NextExpression() {
 		node := p.Expression()
+
+		if node.Kind == ast.KeyValue && skipUntilTable {
+			continue
+		}
+
+		err := d.seen.CheckExpression(node)
+		if err != nil {
+			return err
+		}
+
 		var found bool
 		switch node.Kind {
 		case ast.KeyValue:
-			if skipUntilTable {
-				continue
-			}
 			err = d.unmarshalKeyValue(current, node)
 			found = true
 		case ast.Table:
