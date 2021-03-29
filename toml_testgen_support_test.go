@@ -13,6 +13,7 @@ import (
 )
 
 func testgenInvalid(t *testing.T, input string) {
+	t.Helper()
 	t.Logf("Input TOML:\n%s", input)
 
 	doc := map[string]interface{}{}
@@ -25,6 +26,7 @@ func testgenInvalid(t *testing.T, input string) {
 }
 
 func testgenValid(t *testing.T, input string, jsonRef string) {
+	t.Helper()
 	t.Logf("Input TOML:\n%s", input)
 
 	doc := map[string]interface{}{}
