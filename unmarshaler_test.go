@@ -2,6 +2,7 @@ package toml_test
 
 import (
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -670,4 +671,35 @@ B = "data"`,
 			}
 		})
 	}
+}
+
+
+type Integer484 struct {
+	Value int
+}
+
+func (i Integer484) MarshalText() ([]byte, error) {
+	return []byte(strconv.Itoa(i.Value)), nil
+}
+func (i *Integer484) UnmarshalText(data []byte) error {
+	conv, err := strconv.Atoi(string(data))
+	if err != nil {
+		return err
+	}
+	i.Value = conv
+	return nil
+}
+
+type Config struct {
+	Integers []Integer484 `toml:"integers"`
+}
+
+func TestIssue484(t *testing.T)  {
+	raw := []byte(`integers = ["1","2","3","100"]`)
+	var cfg Config
+	err := toml.Unmarshal(raw, &cfg)
+	require.NoError(t, err)
+	assert.Equal(t, Config{
+		Integers: []Integer484{{1}, {2}, {3}, {100}},
+	}, cfg)
 }
