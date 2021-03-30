@@ -50,6 +50,21 @@ func TestParser_AST_Numbers(t *testing.T) {
 			kind:  ast.Integer,
 		},
 		{
+			desc:  "float zero",
+			input: `0.0`,
+			kind:  ast.Float,
+		},
+		{
+			desc:  "float positive zero",
+			input: `+0.0`,
+			kind:  ast.Float,
+		},
+		{
+			desc:  "float negative zero",
+			input: `-0.0`,
+			kind:  ast.Float,
+		},
+		{
 			desc:  "float pi",
 			input: `3.1415`,
 			kind:  ast.Float,
