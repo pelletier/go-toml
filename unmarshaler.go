@@ -3,6 +3,8 @@ package toml
 import (
 	"encoding"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"reflect"
 	"time"
 
@@ -15,6 +17,28 @@ func Unmarshal(data []byte, v interface{}) error {
 	p.Reset(data)
 	d := decoder{}
 	return d.FromParser(&p, v)
+}
+
+// Decoder reads and decode a TOML document from an input stream.
+type Decoder struct {
+	r io.Reader
+}
+
+// NewDecoder creates a new Decoder that will read from r.
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{r: r}
+}
+
+// Decode the whole content of r into v.
+func (d *Decoder) Decode(v interface{}) error {
+	b, err := ioutil.ReadAll(d.r)
+	if err != nil {
+		return err
+	}
+	p := parser{}
+	p.Reset(b)
+	dec := decoder{}
+	return dec.FromParser(&p, v)
 }
 
 type decoder struct {
