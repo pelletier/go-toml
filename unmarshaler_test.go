@@ -194,6 +194,23 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc: "issue 475 - space between dots in key",
+			input: `fruit. color = "yellow"
+					fruit . flavor = "banana"`,
+			gen: func() test {
+				m := map[string]interface{}{}
+				return test{
+					target:   &m,
+					expected: &map[string]interface{}{
+						"fruit": map[string]interface{}{
+							"color": "yellow",
+							"flavor": "banana",
+						},
+					},
+				}
+			},
+		},
+		{
 			desc:  "multiline basic string",
 			input: `A = """\
 					Test"""`,
