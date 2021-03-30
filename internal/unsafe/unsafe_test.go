@@ -1,4 +1,4 @@
-package errors_test
+package unsafe_test
 
 import (
 	"testing"
@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pelletier/go-toml/v2/internal/errors"
+	"github.com/pelletier/go-toml/v2/internal/unsafe"
 )
 
 func TestUnsafeSubsliceOffsetValid(t *testing.T) {
-	examples := []struct{
-		desc string
-		test func() ([]byte, []byte)
+	examples := []struct {
+		desc   string
+		test   func() ([]byte, []byte)
 		offset int
 	}{
 		{
@@ -28,14 +28,14 @@ func TestUnsafeSubsliceOffsetValid(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			d, s := e.test()
-			offset := errors.UnsafeSubsliceOffset(d, s)
+			offset := unsafe.SubsliceOffset(d, s)
 			assert.Equal(t, e.offset, offset)
 		})
 	}
 }
 
 func TestUnsafeSubsliceOffsetInvalid(t *testing.T) {
-	examples := []struct{
+	examples := []struct {
 		desc string
 		test func() ([]byte, []byte)
 	}{
@@ -72,7 +72,7 @@ func TestUnsafeSubsliceOffsetInvalid(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			d, s := e.test()
 			require.Panics(t, func() {
-				errors.UnsafeSubsliceOffset(d, s)
+				unsafe.SubsliceOffset(d, s)
 			})
 		})
 	}
