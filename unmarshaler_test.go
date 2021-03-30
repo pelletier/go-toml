@@ -211,6 +211,21 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc: "issue 427 - quotation marks in key",
+			input: `'"a"' = 1
+					"\"b\"" = 2`,
+			gen: func() test {
+				m := map[string]interface{}{}
+				return test{
+					target:   &m,
+					expected: &map[string]interface{}{
+						`"a"`: int64(1),
+						`"b"`: int64(2),
+					},
+				}
+			},
+		},
+		{
 			desc:  "multiline basic string",
 			input: `A = """\
 					Test"""`,

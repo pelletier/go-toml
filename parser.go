@@ -594,7 +594,7 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	}
 
 	if b[0] == '\'' {
-		key, rest, err = scanLiteralString(b)
+		key, rest, err = p.parseLiteralString(b)
 	} else if b[0] == '"' {
 		key, rest, err = p.parseBasicString(b)
 	} else if isUnquotedKeyChar(b[0]) {
