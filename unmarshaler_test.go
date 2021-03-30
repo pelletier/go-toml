@@ -690,16 +690,41 @@ func (i *Integer484) UnmarshalText(data []byte) error {
 	return nil
 }
 
-type Config struct {
+type Config484 struct {
 	Integers []Integer484 `toml:"integers"`
 }
 
 func TestIssue484(t *testing.T)  {
 	raw := []byte(`integers = ["1","2","3","100"]`)
-	var cfg Config
+	var cfg Config484
 	err := toml.Unmarshal(raw, &cfg)
 	require.NoError(t, err)
-	assert.Equal(t, Config{
+	assert.Equal(t, Config484{
 		Integers: []Integer484{{1}, {2}, {3}, {100}},
 	}, cfg)
+}
+
+type Map458 map[string]interface{}
+type Slice458 []interface{}
+
+func (m Map458) A(s string) Slice458 {
+	return m[s].([]interface{})
+}
+
+func TestIssue458(t *testing.T) {
+	s := []byte(`[[package]]
+dependencies = ["regex"]
+name = "decode"
+version = "0.1.0"`)
+	m := Map458{}
+	err := toml.Unmarshal(s, &m)
+	require.NoError(t, err)
+	a := m.A("package")
+	expected := Slice458{
+		map[string]interface {}{
+			"dependencies": []interface {}{"regex"},
+			"name":"decode",
+			"version":"0.1.0"},
+	}
+	assert.Equal(t, expected, a)
 }
