@@ -22,6 +22,24 @@ type DecodeError struct {
 	human string
 }
 
+// internal version of DecodeError that is used as the base to create a
+// DecodeError with full context.
+type decodeError struct {
+	highlight []byte
+	message   string
+}
+
+func (de *decodeError) Error() string {
+	return de.message
+}
+
+func newDecodeError(highlight []byte, format string, args ...interface{}) error {
+	return &decodeError{
+		highlight: highlight,
+		message:   fmt.Sprintf(format, args...),
+	}
+}
+
 // Error returns the error message contained in the DecodeError.
 func (e *DecodeError) Error() string {
 	return e.message
@@ -45,15 +63,18 @@ func (e *DecodeError) Position() (row int, column int) {
 //
 // The function copies all bytes used in DecodeError, so that document and
 // highlight can be freely deallocated.
-func decodeErrorFromHighlight(document []byte, highlight []byte, message string) error {
+func wrapDecodeError(document []byte, de *decodeError) error {
+	if de == nil {
+		return nil
+	}
 	err := &DecodeError{
-		message: message,
+		message: de.message,
 	}
 
-	offset := unsafe.SubsliceOffset(document, highlight)
+	offset := unsafe.SubsliceOffset(document, de.highlight)
 
 	err.line, err.column = positionAtEnd(document[:offset])
-	before, after := linesOfContext(document, highlight, offset, 3)
+	before, after := linesOfContext(document, de.highlight, offset, 3)
 
 	var buf strings.Builder
 
@@ -74,7 +95,7 @@ func decodeErrorFromHighlight(document []byte, highlight []byte, message string)
 	if len(before) > 0 {
 		buf.Write(before[0])
 	}
-	buf.Write(highlight)
+	buf.Write(de.highlight)
 	if len(after) > 0 {
 		buf.Write(after[0])
 	}
@@ -84,7 +105,7 @@ func decodeErrorFromHighlight(document []byte, highlight []byte, message string)
 	if len(before) > 0 {
 		buf.WriteString(strings.Repeat(" ", len(before[0])))
 	}
-	buf.WriteString(strings.Repeat("~", len(highlight)))
+	buf.WriteString(strings.Repeat("~", len(de.highlight)))
 	buf.WriteString(" ")
 	buf.WriteString(err.message)
 

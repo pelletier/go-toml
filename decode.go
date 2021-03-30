@@ -19,7 +19,7 @@ func parseInteger(b []byte) (int64, error) {
 		case 'o':
 			return parseIntOct(b)
 		default:
-			return 0, fmt.Errorf("invalid base: '%c'", b[1])
+			return 0, newDecodeError(b[1:2], "invalid base: '%c'", b[1])
 		}
 	}
 	return parseIntDec(b)

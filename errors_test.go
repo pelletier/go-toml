@@ -136,7 +136,10 @@ before `, "highlighted", ``},
 			doc := b.Bytes()
 			hl := doc[start:end]
 
-			err := decodeErrorFromHighlight(doc, hl, e.msg)
+			err := wrapDecodeError(doc, &decodeError{
+				highlight: hl,
+				message:   e.msg,
+			})
 			derr := err.(*DecodeError)
 			assert.Equal(t, strings.Trim(e.expected, "\n"), derr.String())
 		})

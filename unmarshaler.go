@@ -66,6 +66,17 @@ func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
 }
 
 func (d *decoder) FromParser(p *parser, v interface{}) error {
+	err := d.fromParser(p, v)
+	if err != nil {
+		de, ok := err.(*decodeError)
+		if ok {
+			err = wrapDecodeError(p.data, de)
+		}
+	}
+	return err
+}
+
+func (d *decoder) fromParser(p *parser, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
 		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
