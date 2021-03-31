@@ -363,7 +363,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		if len(b) == 0 {
-			return parent, nil, unexpectedCharacter{b: b}
+			return parent, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
 		}
 
 		if b[0] == ']' {
@@ -590,7 +590,7 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	//quoted-key = basic-string / literal-string
 
 	if len(b) == 0 {
-		return nil, nil, unexpectedCharacter{b: b}
+		return nil, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
 	}
 
 	if b[0] == '\'' {
@@ -600,7 +600,7 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	} else if isUnquotedKeyChar(b[0]) {
 		key, rest, err = scanUnquotedKey(b)
 	} else {
-		err = unexpectedCharacter{b: b}
+		err = unexpectedCharacter{b: b} // TODO: should contain expected characters
 	}
 	return
 }
@@ -1158,8 +1158,11 @@ func isValidBinaryRune(r byte) bool {
 }
 
 func expect(x byte, b []byte) ([]byte, error) {
-	if len(b) == 0 || b[0] != x {
-		return nil, unexpectedCharacter{r: x, b: b}
+	if len(b) == 0 {
+		return nil, newDecodeError(b[:0], "expecting %#U", x)
+	}
+	if b[0] != x {
+		return nil, newDecodeError(b[0:1], "expected character %U", x)
 	}
 	return b[1:], nil
 }

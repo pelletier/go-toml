@@ -23,7 +23,7 @@ func SubsliceOffset(data []byte, subslice []byte) int {
 
 	intoffset := int(offset)
 
-	if intoffset >= datap.Len {
+	if intoffset > datap.Len {
 		panic(fmt.Errorf("slice offset (%d) is farther than data length (%d)", intoffset, datap.Len))
 	}
 

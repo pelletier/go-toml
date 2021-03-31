@@ -200,10 +200,10 @@ func TestUnmarshal(t *testing.T) {
 			gen: func() test {
 				m := map[string]interface{}{}
 				return test{
-					target:   &m,
+					target: &m,
 					expected: &map[string]interface{}{
 						"fruit": map[string]interface{}{
-							"color": "yellow",
+							"color":  "yellow",
 							"flavor": "banana",
 						},
 					},
@@ -217,7 +217,7 @@ func TestUnmarshal(t *testing.T) {
 			gen: func() test {
 				m := map[string]interface{}{}
 				return test{
-					target:   &m,
+					target: &m,
 					expected: &map[string]interface{}{
 						`"a"`: int64(1),
 						`"b"`: int64(2),
@@ -226,7 +226,7 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
-			desc:  "multiline basic string",
+			desc: "multiline basic string",
 			input: `A = """\
 					Test"""`,
 			gen: func() test {
@@ -705,7 +705,6 @@ B = "data"`,
 	}
 }
 
-
 type Integer484 struct {
 	Value int
 }
@@ -726,7 +725,7 @@ type Config484 struct {
 	Integers []Integer484 `toml:"integers"`
 }
 
-func TestIssue484(t *testing.T)  {
+func TestIssue484(t *testing.T) {
 	raw := []byte(`integers = ["1","2","3","100"]`)
 	var cfg Config484
 	err := toml.Unmarshal(raw, &cfg)
@@ -753,10 +752,101 @@ version = "0.1.0"`)
 	require.NoError(t, err)
 	a := m.A("package")
 	expected := Slice458{
-		map[string]interface {}{
-			"dependencies": []interface {}{"regex"},
-			"name":"decode",
-			"version":"0.1.0"},
+		map[string]interface{}{
+			"dependencies": []interface{}{"regex"},
+			"name":         "decode",
+			"version":      "0.1.0"},
 	}
 	assert.Equal(t, expected, a)
+}
+
+func TestUnmarshalDecodeErrors(t *testing.T) {
+	examples := []struct {
+		desc string
+		data string
+		msg  string
+	}{
+		{
+			desc: "int with wrong base",
+			data: `a = 0f2`,
+		},
+		{
+			desc: "literal string with new lines",
+			data: `a = 'hello
+world'`,
+			msg: `literal strings cannot have new lines`,
+		},
+		{
+			desc: "unterminated literal string",
+			data: `a = 'hello`,
+			msg:  `unterminated literal string`,
+		},
+		{
+			desc: "unterminated multiline literal string",
+			data: `a = '''hello`,
+			msg:  `multiline literal string not terminated by '''`,
+		},
+		{
+			desc: "basic string with new lines",
+			data: `a = "hello
+"`,
+			msg: `basic strings cannot have new lines`,
+		},
+		{
+			desc: "basic string with unfinished escape",
+			data: `a = "hello \`,
+			msg:  `need a character after \`,
+		},
+		{
+			desc: "basic unfinished multiline string",
+			data: `a = """hello`,
+			msg:  `multiline basic string not terminated by """`,
+		},
+		{
+			desc: "basic unfinished escape in multiline string",
+			data: `a = """hello \`,
+			msg:  `need a character after \`,
+		},
+		{
+			desc: "malformed local date",
+			data: `a = 2021-033-0`,
+			msg:  `dates are expected to have the format YYYY-MM-DD`,
+		},
+		{
+			desc: "malformed tz",
+			data: `a = 2021-03-30 21:31:00+1`,
+			msg:  `invalid date-time timezone`,
+		},
+		{
+			desc: "malformed tz first char",
+			data: `a = 2021-03-30 21:31:00:1`,
+			msg:  `extra characters at the end of a local date time`,
+		},
+		{
+			desc: "bad char between hours and minutes",
+			data: `a = 2021-03-30 213:1:00`,
+			msg:  `expecting colon between hours and minutes`,
+		},
+		{
+			desc: "bad char between minutes and seconds",
+			data: `a = 2021-03-30 21:312:0`,
+			msg:  `expecting colon between minutes and seconds`,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			m := map[string]interface{}{}
+			err := toml.Unmarshal([]byte(e.data), &m)
+			require.Error(t, err)
+			de, ok := err.(*toml.DecodeError)
+			if !ok {
+				t.Fatalf("err should have been a *toml.DecodeError, but got %s (%T)", err, err)
+			}
+			if e.msg != "" {
+				t.Log("\n" + de.String())
+				require.Equal(t, e.msg, de.Error())
+			}
+		})
+	}
 }

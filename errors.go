@@ -129,8 +129,16 @@ func formatLineNumber(line int, width int) string {
 func linesOfContext(document []byte, highlight []byte, offset int, linesAround int) ([][]byte, [][]byte) {
 	var beforeLines [][]byte
 	for beforeOffset, lastOffset := offset, offset; beforeOffset >= 0 && len(beforeLines) <= linesAround; beforeOffset-- {
+		if beforeOffset == len(document) {
+			beforeLines = append(beforeLines, []byte{})
+			continue
+		}
 		if document[beforeOffset] == '\n' {
-			beforeLines = append(beforeLines, document[beforeOffset+1:lastOffset])
+			if beforeOffset == lastOffset {
+				beforeLines = append(beforeLines, []byte{})
+			} else {
+				beforeLines = append(beforeLines, document[beforeOffset+1:lastOffset])
+			}
 			lastOffset = beforeOffset
 		} else if beforeOffset == 0 && beforeOffset != lastOffset {
 			beforeLines = append(beforeLines, document[beforeOffset:lastOffset])

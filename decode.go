@@ -34,7 +34,7 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 	date := LocalDate{}
 
 	if len(b) != 10 || b[4] != '-' || b[7] != '-' {
-		return date, fmt.Errorf("dates are expected to have the format YYYY-MM-DD")
+		return date, newDecodeError(b, "dates are expected to have the format YYYY-MM-DD")
 	}
 
 	var err error
@@ -89,7 +89,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 		zone = time.UTC
 	} else {
 		if len(b) != 6 {
-			return time.Time{}, fmt.Errorf("invalid date-time timezone")
+			return time.Time{}, newDecodeError(b, "invalid date-time timezone")
 		}
 		direction := 1
 		switch b[0] {
@@ -97,7 +97,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 		case '-':
 			direction = -1
 		default:
-			return time.Time{}, fmt.Errorf("invalid timezone offset character")
+			return time.Time{}, newDecodeError(b[0:1], "invalid timezone offset character")
 		}
 
 		hours := digitsToInt(b[1:3])
@@ -107,7 +107,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 	}
 
 	if len(b) > 0 {
-		return time.Time{}, fmt.Errorf("extra bytes at the end of the timezone")
+		return time.Time{}, newDecodeError(b, "extra bytes at the end of the timezone")
 	}
 
 	t := time.Date(
@@ -166,14 +166,14 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, err
 	}
 	if b[2] != ':' {
-		return t, nil, fmt.Errorf("expecting colon between hours and minutes")
+		return t, nil, newDecodeError(b[2:3], "expecting colon between hours and minutes")
 	}
 	t.Minute, err = parseDecimalDigits(b[3:5])
 	if err != nil {
 		return t, nil, err
 	}
 	if b[5] != ':' {
-		return t, nil, fmt.Errorf("expecting colon between minutes and seconds")
+		return t, nil, newDecodeError(b[5:6], "expecting colon between minutes and seconds")
 	}
 	t.Second, err = parseDecimalDigits(b[6:8])
 	if err != nil {

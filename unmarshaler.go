@@ -268,9 +268,20 @@ func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 		return unmarshalLocalDateTime(x, node)
 	case ast.DateTime:
 		return unmarshalDateTime(x, node)
+	case ast.LocalDate:
+		return unmarshalLocalDate(x, node)
 	default:
 		panic(fmt.Errorf("unhandled unmarshalValue kind %s", node.Kind))
 	}
+}
+
+func unmarshalLocalDate(x target, node ast.Node) error {
+	assertNode(ast.LocalDate, node)
+	v, err := parseLocalDate(node.Data)
+	if err != nil {
+		return err
+	}
+	return setDate(x, v)
 }
 
 func unmarshalLocalDateTime(x target, node ast.Node) error {
@@ -280,7 +291,7 @@ func unmarshalLocalDateTime(x target, node ast.Node) error {
 		return err
 	}
 	if len(rest) > 0 {
-		return fmt.Errorf("extra characters at the end of a local date time")
+		return newDecodeError(rest, "extra characters at the end of a local date time")
 	}
 	return setLocalDateTime(x, v)
 }
@@ -299,6 +310,10 @@ func setLocalDateTime(x target, v LocalDateTime) error {
 }
 
 func setDateTime(x target, v time.Time) error {
+	return x.set(reflect.ValueOf(v))
+}
+
+func setDate(x target, v LocalDate) error {
 	return x.set(reflect.ValueOf(v))
 }
 

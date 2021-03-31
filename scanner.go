@@ -30,7 +30,7 @@ func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
 			return b[:i], b[i:], nil
 		}
 	}
-	return b, nil, nil
+	return b, b[len(b):], nil
 }
 
 func isUnquotedKeyChar(r byte) bool {
@@ -46,10 +46,10 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 		case '\'':
 			return b[:i+1], b[i+1:], nil
 		case '\n':
-			return nil, nil, fmt.Errorf("literal strings cannot have new lines")
+			return nil, nil, newDecodeError(b[i:i+1], "literal strings cannot have new lines")
 		}
 	}
-	return nil, nil, fmt.Errorf("unterminated literal string")
+	return nil, nil, newDecodeError(b[len(b):], "unterminated literal string")
 }
 
 func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
@@ -70,7 +70,7 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 		}
 	}
 
-	return nil, nil, fmt.Errorf(`multiline literal string not terminated by '''`)
+	return nil, nil, newDecodeError(b[len(b):], `multiline literal string not terminated by '''`)
 }
 
 func scanWindowsNewline(b []byte) ([]byte, []byte, error) {
@@ -92,7 +92,7 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 			return b[:i], b[i:]
 		}
 	}
-	return b, nil
+	return b, b[len(b):]
 }
 
 func scanComment(b []byte) ([]byte, []byte, error) {
@@ -125,10 +125,10 @@ func scanBasicString(b []byte) ([]byte, []byte, error) {
 		case '"':
 			return b[:i+1], b[i+1:], nil
 		case '\n':
-			return nil, nil, fmt.Errorf("basic strings cannot have new lines")
+			return nil, nil, newDecodeError(b[i:i+1], "basic strings cannot have new lines")
 		case '\\':
 			if len(b) < i+2 {
-				return nil, nil, fmt.Errorf("need a character after \\")
+				return nil, nil, newDecodeError(b[i:i+1], "need a character after \\")
 			}
 			i++ // skip the next character
 		}
@@ -158,11 +158,11 @@ func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
 			}
 		case '\\':
 			if len(b) < i+2 {
-				return nil, nil, fmt.Errorf("need a character after \\")
+				return nil, nil, newDecodeError(b[len(b):], "need a character after \\")
 			}
 			i++ // skip the next character
 		}
 	}
 
-	return nil, nil, fmt.Errorf(`multiline basic string not terminated by """`)
+	return nil, nil, newDecodeError(b[len(b):], `multiline basic string not terminated by """`)
 }

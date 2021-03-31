@@ -17,7 +17,7 @@ Development branch. Probably does not work.
 - [x] Benchmark!
 - [x] Abstract AST.
 - [x] Original go-toml testgen tests pass.
-- [ ] Track file position (line, column) for errors.
+- [x] Track file position (line, column) for errors.
 - [ ] Attach comments to AST (gated by parser flag).
 - [ ] Benchmark again!
 
