@@ -1,10 +1,14 @@
 # go-toml V2
 
-Development branch. Probably does not work.
+Development branch. Use at your own risk.
 
 [👉 Discussion on github](https://github.com/pelletier/go-toml/discussions/471).
 
+* `toml.Unmarshal()` should work as well as v1.
+
 ## Must do
+
+### Unmarshal
 
 - [x] Unmarshal into maps.
 - [x] Support Array Tables.
@@ -18,11 +22,20 @@ Development branch. Probably does not work.
 - [x] Abstract AST.
 - [x] Original go-toml testgen tests pass.
 - [x] Track file position (line, column) for errors.
-- [ ] Attach comments to AST (gated by parser flag).
-- [ ] Benchmark again!
+- [ ] Strict mode.
 
-## Further work
+### Marshal
 
+- [ ] Minimal implementation
+
+### Document
+
+- [ ] Gather requirements and design API.
+
+## Ideas
+
+- [ ] Allow types to implement a `ASTUnmarshaler` interface to unmarshal
+      straight from the AST?
 - [x] Rewrite AST to use a single array as storage instead of one allocation per
       node.
 - [ ] Provide "minimal allocations" option that uses `unsafe` to reuse the input
@@ -30,10 +43,9 @@ Development branch. Probably does not work.
 - [x] Cache reflection operations per type.
 - [ ] Optimize tracker pass.
 
-## Ideas
+## Differences with v1
 
-- [ ] Allow types to implement a `ASTUnmarshaler` interface to unmarshal
-      straight from the AST?
+* [unmarshal](https://github.com/pelletier/go-toml/discussions/488)
 
 ## License
 
