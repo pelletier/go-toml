@@ -123,6 +123,28 @@ before `, "highlighted", ``},
   |        ~~~~~~~~~~~ this is wrong
 `,
 		},
+		{
+			desc: "handle empty lines in the before/after blocks",
+			doc: [3]string{`line1
+
+line 2
+before `, "highlighted", ` after
+line 3
+
+line 4
+line 5`,
+			},
+			expected: `
+1| line1
+2| 
+3| line 2
+4| before highlighted after
+ |        ~~~~~~~~~~~ 
+5| line 3
+6| 
+7| line 4
+`,
+		},
 	}
 
 	for _, e := range examples {

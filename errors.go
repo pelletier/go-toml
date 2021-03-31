@@ -128,33 +128,42 @@ func formatLineNumber(line int, width int) string {
 
 func linesOfContext(document []byte, highlight []byte, offset int, linesAround int) ([][]byte, [][]byte) {
 	var beforeLines [][]byte
-	for beforeOffset, lastOffset := offset, offset; beforeOffset >= 0 && len(beforeLines) <= linesAround; beforeOffset-- {
-		if beforeOffset == len(document) {
-			beforeLines = append(beforeLines, []byte{})
-			continue
-		}
-		if document[beforeOffset] == '\n' {
-			if beforeOffset == lastOffset {
-				beforeLines = append(beforeLines, []byte{})
-			} else {
-				beforeLines = append(beforeLines, document[beforeOffset+1:lastOffset])
-			}
-			lastOffset = beforeOffset
-		} else if beforeOffset == 0 && beforeOffset != lastOffset {
-			beforeLines = append(beforeLines, document[beforeOffset:lastOffset])
+
+	// Walk the document in reverse from the highlight to find previous lines
+	// of context.
+	rest := document[:offset]
+	for o := len(rest) - 1; o >= 0 && len(beforeLines) <= linesAround && len(rest) > 0; {
+		if rest[o] == '\n' {
+			// handle individual lines
+			beforeLines = append(beforeLines, rest[o+1:])
+			rest = rest[:o]
+			o = len(rest) - 1
+		} else if o == 0 {
+			// add the first line only if it's non-empty
+			beforeLines = append(beforeLines, rest)
+			break
+		} else {
+			o--
 		}
 	}
 
 	var afterLines [][]byte
 
-	document = document[offset+len(highlight):]
-	for afterOffset, lastOffset := 0, 0; afterOffset < len(document) && len(afterLines) <= linesAround; afterOffset++ {
-		if document[afterOffset] == '\n' {
-			afterLines = append(afterLines, document[lastOffset:afterOffset])
-			afterOffset++ // skip \n
-			lastOffset = afterOffset
-		} else if afterOffset == len(document)-1 && lastOffset != afterOffset+1 {
-			afterLines = append(afterLines, document[lastOffset:afterOffset+1])
+	// Walk the document forward from the highlight to find the following
+	// lines of context.
+	rest = document[offset+len(highlight):]
+	for o := 0; o < len(rest) && len(afterLines) <= linesAround; {
+		if rest[o] == '\n' {
+			// handle individual lines
+			afterLines = append(afterLines, rest[:o])
+			rest = rest[o+1:]
+			o = 0
+		} else if o == len(rest)-1 && o > 0 {
+			// add last line only if it's non-empty
+			afterLines = append(afterLines, rest)
+			break
+		} else {
+			o++
 		}
 	}
 	return beforeLines, afterLines
