@@ -760,6 +760,26 @@ version = "0.1.0"`)
 	assert.Equal(t, expected, a)
 }
 
+func TestIssue252(t *testing.T) {
+	type config struct {
+		Val1 string `toml:"val1"`
+		Val2 string `toml:"val2"`
+	}
+
+	var configFile = []byte(
+		`
+val1 = "test1"
+`)
+
+	cfg := &config{
+		Val2: "test2",
+	}
+
+	err := toml.Unmarshal(configFile, cfg)
+	require.NoError(t, err)
+	require.Equal(t, "test2", cfg.Val2)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
