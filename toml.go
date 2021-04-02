@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -308,7 +310,8 @@ func (t *Tree) GetDefault(key string, def interface{}) interface{} {
 	return val
 }
 
-// SetOptions arguments are supplied to the SetWithOptions and SetPathWithOptions functions to modify marshalling behaviour.
+// SetOptions arguments are supplied to the SetWithOptions and SetPathWithOptions functions
+// to modify marshalling behaviour.
 // The default values within the struct are valid default options.
 type SetOptions struct {
 	Comment   string
@@ -419,9 +422,9 @@ func (t *Tree) DeletePath(keys []string) error {
 		return nil
 	}
 	tree := t.GetPath(keys[:keyLen-1])
-	item := keys[keyLen-1]
-	switch node := tree.(type) {
-	case *Tree:
+
+	if node, ok := tree.(*Tree); ok {
+		item := keys[keyLen-1]
 		delete(node.values, item)
 		return nil
 	}
@@ -520,10 +523,15 @@ func Load(content string) (tree *Tree, err error) {
 
 // LoadFile creates a Tree from a file.
 func LoadFile(path string) (tree *Tree, err error) {
-	file, err := os.Open(path)
+	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("error closing file: %v", err)
+		}
+	}()
+
 	return LoadReader(file)
 }

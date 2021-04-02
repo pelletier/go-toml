@@ -54,10 +54,10 @@ func TestTokenString(t *testing.T) {
 		tok    token
 		expect string
 	}{
-		{token{Position{1, 1}, tokenEOF, ""}, "EOF"},
-		{token{Position{1, 1}, tokenError, "Δt"}, "Δt"},
-		{token{Position{1, 1}, tokenString, "bar"}, `"bar"`},
-		{token{Position{1, 1}, tokenString, "123456789012345"}, `"123456789012345"`},
+		{token{Position: Position{1, 1}, typ: tokenEOF, val: ""}, "EOF"},
+		{token{Position: Position{1, 1}, typ: tokenError, val: "Δt"}, "Δt"},
+		{token{Position: Position{1, 1}, typ: tokenString, val: "bar"}, `"bar"`},
+		{token{Position: Position{1, 1}, typ: tokenString, val: "123456789012345"}, `"123456789012345"`},
 	}
 
 	for i, test := range tests {

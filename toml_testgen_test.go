@@ -368,7 +368,7 @@ func TestValidCommentsEverywhere(t *testing.T) {
 [group] # Comment
 answer = 42 # Comment
 # no-extraneous-keys-please = 999
-# Inbetween comment.
+# In between comment.
 more = [ # Comment
   # What about multiple # comments?
   # Can you handle it?
@@ -831,7 +831,7 @@ name = "Born to Run"
 
 [[albums]]
 name = "Born in the USA"
-  
+
   [[albums.songs]]
   name = "Glory Days"
 

@@ -3,34 +3,52 @@ package toml
 // PubTOMLValue wrapping tomlValue in order to access all properties from outside.
 type PubTOMLValue = tomlValue
 
+// Value returns the property Value of tomlValue.
 func (ptv *PubTOMLValue) Value() interface{} {
 	return ptv.value
 }
+
+// Comment returns the property Comment of tomlValue.
 func (ptv *PubTOMLValue) Comment() string {
 	return ptv.comment
 }
+
+// Commented returns the property Commented of tomlValue.
 func (ptv *PubTOMLValue) Commented() bool {
 	return ptv.commented
 }
+
+// Multiline returns the property Multiline of tomlValue.
 func (ptv *PubTOMLValue) Multiline() bool {
 	return ptv.multiline
 }
+
+// Position returns the property Position of tomlValue.
 func (ptv *PubTOMLValue) Position() Position {
 	return ptv.position
 }
 
+// SetValue returns the property SetValue of tomlValue.
 func (ptv *PubTOMLValue) SetValue(v interface{}) {
 	ptv.value = v
 }
+
+// SetComment returns the property SetComment of tomlValue.
 func (ptv *PubTOMLValue) SetComment(s string) {
 	ptv.comment = s
 }
+
+// SetCommented returns the property SetCommented of tomlValue.
 func (ptv *PubTOMLValue) SetCommented(c bool) {
 	ptv.commented = c
 }
+
+// SetMultiline returns the property SetMultiline of tomlValue.
 func (ptv *PubTOMLValue) SetMultiline(m bool) {
 	ptv.multiline = m
 }
+
+// SetPosition returns the property SetPosition of tomlValue.
 func (ptv *PubTOMLValue) SetPosition(p Position) {
 	ptv.position = p
 }
@@ -38,34 +56,42 @@ func (ptv *PubTOMLValue) SetPosition(p Position) {
 // PubTree wrapping Tree in order to access all properties from outside.
 type PubTree = Tree
 
-func (pt *PubTree) Values() map[string]interface{} {
-	return pt.values
+// Values return the property Values of Tree.
+func (t *PubTree) Values() map[string]interface{} {
+	return t.values
 }
 
-func (pt *PubTree) Comment() string {
-	return pt.comment
+// Comment return the property Comment of Tree.
+func (t *PubTree) Comment() string {
+	return t.comment
 }
 
-func (pt *PubTree) Commented() bool {
-	return pt.commented
+// Commented return the property Commented of Tree.
+func (t *PubTree) Commented() bool {
+	return t.commented
 }
 
-func (pt *PubTree) Inline() bool {
-	return pt.inline
+// Inline return the property Inline of Tree.
+func (t *PubTree) Inline() bool {
+	return t.inline
 }
 
-func (pt *PubTree) SetValues(v map[string]interface{}) {
-	pt.values = v
+// SetValues return the property SetValues of Tree.
+func (t *PubTree) SetValues(v map[string]interface{}) {
+	t.values = v
 }
 
-func (pt *PubTree) SetComment(c string) {
-	pt.comment = c
+// SetComment return the property SetComment of Tree.
+func (t *PubTree) SetComment(c string) {
+	t.comment = c
 }
 
-func (pt *PubTree) SetCommented(c bool) {
-	pt.commented = c
+// SetCommented return the property SetCommented of Tree.
+func (t *PubTree) SetCommented(c bool) {
+	t.commented = c
 }
 
-func (pt *PubTree) SetInline(i bool) {
-	pt.inline = i
+// SetInline return the property SetInline of Tree.
+func (t *PubTree) SetInline(i bool) {
+	t.inline = i
 }

@@ -11,8 +11,6 @@ import (
 	"fmt"
 )
 
-const maxInt = int(^uint(0) >> 1)
-
 type queryParser struct {
 	flow         chan token
 	tokensBuffer []token
@@ -60,11 +58,15 @@ func (p *queryParser) lookahead(types ...tokenType) bool {
 		tok := p.getToken()
 		if tok == nil {
 			result = false
+
 			break
 		}
+
 		buffer = append(buffer, *tok)
+
 		if tok.typ != typ {
 			result = false
+
 			break
 		}
 	}
@@ -79,6 +81,7 @@ func (p *queryParser) getToken() *token {
 		p.tokensBuffer = p.tokensBuffer[1:]
 		return &tok
 	}
+
 	tok, ok := <-p.flow
 	if !ok {
 		return nil
@@ -254,15 +257,18 @@ func (p *queryParser) parseFilterExpr() queryParserStateFn {
 	if tok.typ != tokenLeftParen {
 		return p.parseError(tok, "expected left-parenthesis for filter expression")
 	}
+
 	tok = p.getToken()
 	if tok.typ != tokenKey && tok.typ != tokenString {
 		return p.parseError(tok, "expected key or string for filter function name")
 	}
 	name := tok.val
+
 	tok = p.getToken()
 	if tok.typ != tokenRightParen {
 		return p.parseError(tok, "expected right-parenthesis for filter expression")
 	}
+
 	p.union = append(p.union, newMatchFilterFn(name, tok.Position))
 	return p.parseUnionExpr
 }

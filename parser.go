@@ -96,7 +96,12 @@ func (p *tomlParser) parseGroupArray() tomlParserStateFn {
 	if err != nil {
 		p.raiseError(key, "invalid table array key: %s", err)
 	}
-	p.tree.createSubTree(keys[:len(keys)-1], startToken.Position) // create parent entries
+
+	// create parent entries
+	if err := p.tree.createSubTree(keys[:len(keys)-1], startToken.Position); err != nil {
+		p.raiseError(key, "unable to create subtree: %s", err)
+	}
+
 	destTree := p.tree.GetPath(keys)
 	var array []*Tree
 	if destTree == nil {
@@ -267,7 +272,7 @@ func hexNumberContainsInvalidUnderscore(value string) error {
 }
 
 func cleanupNumberToken(value string) string {
-	cleanedVal := strings.Replace(value, "_", "", -1)
+	cleanedVal := strings.ReplaceAll(value, "_", "")
 	return cleanedVal
 }
 
@@ -476,7 +481,7 @@ func (p *tomlParser) parseArray() interface{} {
 
 	// if the array is a mixed-type array or its length is 0,
 	// don't convert it to a table array
-	if len(array) <= 0 {
+	if len(array) == 0 {
 		arrayType = nil
 	}
 	// An array of Trees is actually an array of inline

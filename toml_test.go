@@ -109,8 +109,8 @@ func TestTomlDelete(t *testing.T) {
 	tree, _ := Load(`
         key = "value"
     `)
-	err := tree.Delete("key")
-	if err != nil {
+
+	if err := tree.Delete("key"); err != nil {
 		t.Errorf("Delete - unexpected error while deleting key: %s", err.Error())
 	}
 
@@ -124,8 +124,8 @@ func TestTomlDeleteUnparsableKey(t *testing.T) {
 	tree, _ := Load(`
         key = "value"
     `)
-	err := tree.Delete(".")
-	if err == nil {
+
+	if err := tree.Delete("."); err == nil {
 		t.Errorf("Delete should error")
 	}
 }
@@ -213,6 +213,8 @@ func TestTomlGetArrayPath(t *testing.T) {
 			},
 		},
 	} {
+		item := item
+		idx := idx
 		t.Run(item.Name, func(t *testing.T) {
 			tree, expected := item.Make()
 			result := tree.GetArrayPath(item.Path)

@@ -46,7 +46,9 @@ func assertTree(t *testing.T, tree *Tree, err error, ref map[string]interface{})
 
 func TestCreateSubTree(t *testing.T) {
 	tree := newTree()
-	tree.createSubTree([]string{"a", "b", "c"}, Position{})
+	if err := tree.createSubTree([]string{"a", "b", "c"}, Position{}); err != nil {
+		t.Fail()
+	}
 	tree.Set("a.b.c", 42)
 	if tree.Get("a.b.c") != 42 {
 		t.Fail()
@@ -275,15 +277,13 @@ func TestLocalDate(t *testing.T) {
 }
 
 func TestLocalDateError(t *testing.T) {
-	_, err := Load("a = 2020-09-31")
-	if err == nil {
+	if _, err := Load("a = 2020-09-31"); err == nil {
 		t.Fatalf("should error")
 	}
 }
 
 func TestLocalTimeError(t *testing.T) {
-	_, err := Load("a = 07:99:00")
-	if err == nil {
+	if _, err := Load("a = 07:99:00"); err == nil {
 		t.Fatalf("should error")
 	}
 }
@@ -925,7 +925,9 @@ func TestParseKeyGroupArrayQueryExample(t *testing.T) {
 }
 
 func TestParseKeyGroupArraySpec(t *testing.T) {
-	tree, err := Load("[[fruit]]\n name=\"apple\"\n [fruit.physical]\n color=\"red\"\n shape=\"round\"\n [[fruit]]\n name=\"banana\"")
+	tree, err := Load(
+		"[[fruit]]\n name=\"apple\"\n [fruit.physical]\n color=\"red\"\n shape=\"round\"\n [[fruit]]\n name=\"banana\"",
+	)
 	assertTree(t, tree, err, map[string]interface{}{
 		"fruit": []map[string]interface{}{
 			{"name": "apple", "physical": map[string]interface{}{"color": "red", "shape": "round"}},
@@ -966,9 +968,8 @@ func TestToStringMapStringString(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	want := "\n[m]\n  v = \"abc\"\n"
-	got := tree.String()
 
-	if got != want {
+	if got := tree.String(); got != want {
 		t.Errorf("want:\n%q\ngot:\n%q", want, got)
 	}
 }
@@ -1061,18 +1062,20 @@ func TestGroupArrayReassign(t *testing.T) {
 }
 
 func TestInvalidFloatParsing(t *testing.T) {
+	const errInvUseOfUnderscoreInNum = "(1, 3): invalid use of _ in number"
+
 	_, err := Load("a=1e_2")
-	if err.Error() != "(1, 3): invalid use of _ in number" {
+	if err.Error() != errInvUseOfUnderscoreInNum {
 		t.Error("Bad error message:", err.Error())
 	}
 
 	_, err = Load("a=1e2_")
-	if err.Error() != "(1, 3): invalid use of _ in number" {
+	if err.Error() != errInvUseOfUnderscoreInNum {
 		t.Error("Bad error message:", err.Error())
 	}
 
 	_, err = Load("a=1__2")
-	if err.Error() != "(1, 3): invalid use of _ in number" {
+	if err.Error() != errInvUseOfUnderscoreInNum {
 		t.Error("Bad error message:", err.Error())
 	}
 

@@ -45,40 +45,42 @@ const (
 	tokenEOL
 )
 
-var tokenTypeNames = []string{
-	"Error",
-	"EOF",
-	"Comment",
-	"Key",
-	"String",
-	"Integer",
-	"True",
-	"False",
-	"Float",
-	"Inf",
-	"NaN",
-	"=",
-	"[",
-	"]",
-	"{",
-	"}",
-	"(",
-	")",
-	"]]",
-	"[[",
-	"LocalDate",
-	"LocalTime",
-	"TimeOffset",
-	"KeyGroup",
-	"KeyGroupArray",
-	",",
-	":",
-	"$",
-	"*",
-	"?",
-	".",
-	"..",
-	"EOL",
+func tokenTypeNames() []string {
+	return []string{
+		"Error",
+		"EOF",
+		"Comment",
+		"Key",
+		"String",
+		"Integer",
+		"True",
+		"False",
+		"Float",
+		"Inf",
+		"NaN",
+		"=",
+		"[",
+		"]",
+		"{",
+		"}",
+		"(",
+		")",
+		"]]",
+		"[[",
+		"LocalDate",
+		"LocalTime",
+		"TimeOffset",
+		"KeyGroup",
+		"KeyGroupArray",
+		",",
+		":",
+		"$",
+		"*",
+		"?",
+		".",
+		"..",
+		"EOL",
+	}
 }
 
 type token struct {
@@ -88,9 +90,8 @@ type token struct {
 }
 
 func (tt tokenType) String() string {
-	idx := int(tt)
-	if idx < len(tokenTypeNames) {
-		return tokenTypeNames[idx]
+	if idx := int(tt); idx < len(tokenTypeNames()) {
+		return tokenTypeNames()[idx]
 	}
 	return "Unknown"
 }

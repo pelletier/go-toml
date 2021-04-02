@@ -1073,7 +1073,7 @@ func TestNestedTextMarshaler(t *testing.T) {
 		Stranger *textMarshaler  `toml:"stranger"`
 	}{
 		Self:     textMarshaler{FirstName: "Maiku", LastName: "Suteda"},
-		Friends:  []textMarshaler{textMarshaler{FirstName: "Sally", LastName: "Fields"}},
+		Friends:  []textMarshaler{{FirstName: "Sally", LastName: "Fields"}},
 		Stranger: &textMarshaler{FirstName: "Earl", LastName: "Henson"},
 	}
 

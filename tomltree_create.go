@@ -6,29 +6,31 @@ import (
 	"time"
 )
 
-var kindToType = [reflect.String + 1]reflect.Type{
-	reflect.Bool:    reflect.TypeOf(true),
-	reflect.String:  reflect.TypeOf(""),
-	reflect.Float32: reflect.TypeOf(float64(1)),
-	reflect.Float64: reflect.TypeOf(float64(1)),
-	reflect.Int:     reflect.TypeOf(int64(1)),
-	reflect.Int8:    reflect.TypeOf(int64(1)),
-	reflect.Int16:   reflect.TypeOf(int64(1)),
-	reflect.Int32:   reflect.TypeOf(int64(1)),
-	reflect.Int64:   reflect.TypeOf(int64(1)),
-	reflect.Uint:    reflect.TypeOf(uint64(1)),
-	reflect.Uint8:   reflect.TypeOf(uint64(1)),
-	reflect.Uint16:  reflect.TypeOf(uint64(1)),
-	reflect.Uint32:  reflect.TypeOf(uint64(1)),
-	reflect.Uint64:  reflect.TypeOf(uint64(1)),
+func kindToType() [reflect.String + 1]reflect.Type {
+	return [reflect.String + 1]reflect.Type{
+		reflect.Bool:    reflect.TypeOf(true),
+		reflect.String:  reflect.TypeOf(""),
+		reflect.Float32: reflect.TypeOf(float64(1)),
+		reflect.Float64: reflect.TypeOf(float64(1)),
+		reflect.Int:     reflect.TypeOf(int64(1)),
+		reflect.Int8:    reflect.TypeOf(int64(1)),
+		reflect.Int16:   reflect.TypeOf(int64(1)),
+		reflect.Int32:   reflect.TypeOf(int64(1)),
+		reflect.Int64:   reflect.TypeOf(int64(1)),
+		reflect.Uint:    reflect.TypeOf(uint64(1)),
+		reflect.Uint8:   reflect.TypeOf(uint64(1)),
+		reflect.Uint16:  reflect.TypeOf(uint64(1)),
+		reflect.Uint32:  reflect.TypeOf(uint64(1)),
+		reflect.Uint64:  reflect.TypeOf(uint64(1)),
+	}
 }
 
 // typeFor returns a reflect.Type for a reflect.Kind, or nil if none is found.
 // supported values:
 // string, bool, int64, uint64, float64, time.Time, int, int8, int16, int32, uint, uint8, uint16, uint32, float32
 func typeFor(k reflect.Kind) reflect.Type {
-	if k > 0 && int(k) < len(kindToType) {
-		return kindToType[k]
+	if k > 0 && int(k) < len(kindToType()) {
+		return kindToType()[k]
 	}
 	return nil
 }

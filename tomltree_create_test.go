@@ -73,9 +73,11 @@ func TestTreeCreateToTree(t *testing.T) {
 	validateTree(t, tree)
 }
 
+const errCannotConvertTestingToTree = "cannot convert type *testing.T to Tree"
+
 func TestTreeCreateToTreeInvalidLeafType(t *testing.T) {
 	_, err := TreeFromMap(map[string]interface{}{"foo": t})
-	expected := "cannot convert type *testing.T to Tree"
+	expected := errCannotConvertTestingToTree
 	if err.Error() != expected {
 		t.Fatalf("expected error %s, got %s", expected, err.Error())
 	}
@@ -91,7 +93,7 @@ func TestTreeCreateToTreeInvalidMapKeyType(t *testing.T) {
 
 func TestTreeCreateToTreeInvalidArrayMemberType(t *testing.T) {
 	_, err := TreeFromMap(map[string]interface{}{"foo": []*testing.T{t}})
-	expected := "cannot convert type *testing.T to Tree"
+	expected := errCannotConvertTestingToTree
 	if err.Error() != expected {
 		t.Fatalf("expected error %s, got %s", expected, err.Error())
 	}
@@ -99,7 +101,7 @@ func TestTreeCreateToTreeInvalidArrayMemberType(t *testing.T) {
 
 func TestTreeCreateToTreeInvalidTableGroupType(t *testing.T) {
 	_, err := TreeFromMap(map[string]interface{}{"foo": []map[string]interface{}{{"hello": t}}})
-	expected := "cannot convert type *testing.T to Tree"
+	expected := errCannotConvertTestingToTree
 	if err.Error() != expected {
 		t.Fatalf("expected error %s, got %s", expected, err.Error())
 	}
@@ -119,15 +121,17 @@ func TestRoundTripArrayOfTables(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	want := orig
-	got := tree.String()
 
-	if got != want {
+	if got := tree.String(); got != want {
 		t.Errorf("want:\n%s\ngot:\n%s", want, got)
 	}
 }
 
 func TestTomlSliceOfSlice(t *testing.T) {
 	tree, err := Load(` hosts=[["10.1.0.107:9092","10.1.0.107:9093", "192.168.0.40:9094"] ] `)
+	if err != nil {
+		t.Error("should not error", err)
+	}
 	m := tree.ToMap()
 	tree, err = TreeFromMap(m)
 	if err != nil {
@@ -136,10 +140,12 @@ func TestTomlSliceOfSlice(t *testing.T) {
 	type Struct struct {
 		Hosts [][]string
 	}
-	var actual Struct
-	tree.Unmarshal(&actual)
 
-	expected := Struct{Hosts: [][]string{[]string{"10.1.0.107:9092", "10.1.0.107:9093", "192.168.0.40:9094"}}}
+	var actual Struct
+	if err := tree.Unmarshal(&actual); err != nil {
+		t.Error("should not error", err)
+	}
+	expected := Struct{Hosts: [][]string{{"10.1.0.107:9092", "10.1.0.107:9093", "192.168.0.40:9094"}}}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
@@ -148,6 +154,9 @@ func TestTomlSliceOfSlice(t *testing.T) {
 
 func TestTomlSliceOfSliceOfSlice(t *testing.T) {
 	tree, err := Load(` hosts=[[["10.1.0.107:9092","10.1.0.107:9093", "192.168.0.40:9094"] ]] `)
+	if err != nil {
+		t.Error("should not error", err)
+	}
 	m := tree.ToMap()
 	tree, err = TreeFromMap(m)
 	if err != nil {
@@ -157,9 +166,11 @@ func TestTomlSliceOfSliceOfSlice(t *testing.T) {
 		Hosts [][][]string
 	}
 	var actual Struct
-	tree.Unmarshal(&actual)
+	if err := tree.Unmarshal(&actual); err != nil {
+		t.Error("should not error", err)
+	}
 
-	expected := Struct{Hosts: [][][]string{[][]string{[]string{"10.1.0.107:9092", "10.1.0.107:9093", "192.168.0.40:9094"}}}}
+	expected := Struct{Hosts: [][][]string{{{"10.1.0.107:9092", "10.1.0.107:9093", "192.168.0.40:9094"}}}}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
@@ -168,6 +179,9 @@ func TestTomlSliceOfSliceOfSlice(t *testing.T) {
 
 func TestTomlSliceOfSliceInt(t *testing.T) {
 	tree, err := Load(` hosts=[[1,2,3],[4,5,6] ] `)
+	if err != nil {
+		t.Error("should not error", err)
+	}
 	m := tree.ToMap()
 	tree, err = TreeFromMap(m)
 	if err != nil {
@@ -176,13 +190,13 @@ func TestTomlSliceOfSliceInt(t *testing.T) {
 	type Struct struct {
 		Hosts [][]int
 	}
+
 	var actual Struct
-	err = tree.Unmarshal(&actual)
-	if err != nil {
+	if err := tree.Unmarshal(&actual); err != nil {
 		t.Error("should not error", err)
 	}
 
-	expected := Struct{Hosts: [][]int{[]int{1, 2, 3}, []int{4, 5, 6}}}
+	expected := Struct{Hosts: [][]int{{1, 2, 3}, {4, 5, 6}}}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
@@ -191,6 +205,9 @@ func TestTomlSliceOfSliceInt(t *testing.T) {
 }
 func TestTomlSliceOfSliceInt64(t *testing.T) {
 	tree, err := Load(` hosts=[[1,2,3],[4,5,6] ] `)
+	if err != nil {
+		t.Error("should not error", err)
+	}
 	m := tree.ToMap()
 	tree, err = TreeFromMap(m)
 	if err != nil {
@@ -200,12 +217,11 @@ func TestTomlSliceOfSliceInt64(t *testing.T) {
 		Hosts [][]int64
 	}
 	var actual Struct
-	err = tree.Unmarshal(&actual)
-	if err != nil {
+	if err := tree.Unmarshal(&actual); err != nil {
 		t.Error("should not error", err)
 	}
 
-	expected := Struct{Hosts: [][]int64{[]int64{1, 2, 3}, []int64{4, 5, 6}}}
+	expected := Struct{Hosts: [][]int64{{1, 2, 3}, {4, 5, 6}}}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
@@ -214,7 +230,7 @@ func TestTomlSliceOfSliceInt64(t *testing.T) {
 }
 
 func TestTomlSliceOfSliceInt64FromMap(t *testing.T) {
-	tree, err := TreeFromMap(map[string]interface{}{"hosts": [][]interface{}{[]interface{}{int32(1), int8(2), 3}}})
+	tree, err := TreeFromMap(map[string]interface{}{"hosts": [][]interface{}{{int32(1), int8(2), 3}}})
 	if err != nil {
 		t.Error("should not error", err)
 	}
@@ -227,7 +243,7 @@ func TestTomlSliceOfSliceInt64FromMap(t *testing.T) {
 		t.Error("should not error", err)
 	}
 
-	expected := Struct{Hosts: [][]int64{[]int64{1, 2, 3}}}
+	expected := Struct{Hosts: [][]int64{{1, 2, 3}}}
 
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Bad unmarshal: expected %+v, got %+v", expected, actual)
@@ -235,7 +251,7 @@ func TestTomlSliceOfSliceInt64FromMap(t *testing.T) {
 
 }
 func TestTomlSliceOfSliceError(t *testing.T) { // make Codecov happy
-	_, err := TreeFromMap(map[string]interface{}{"hosts": [][]interface{}{[]interface{}{1, 2, []struct{}{}}}})
+	_, err := TreeFromMap(map[string]interface{}{"hosts": [][]interface{}{{1, 2, []struct{}{}}}})
 	expected := "cannot convert type []struct {} to Tree"
 	if err.Error() != expected {
 		t.Fatalf("unexpected error: %s", err)
