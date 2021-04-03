@@ -932,6 +932,8 @@ func TestUnmarshalInvalidPointerKind(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused
 type testDuration struct {
 	Nanosec   time.Duration  `toml:"nanosec"`
 	Microsec1 time.Duration  `toml:"microsec1"`
