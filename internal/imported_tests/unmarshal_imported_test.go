@@ -832,6 +832,8 @@ var customMultilineTagTestToml = []byte(`int_slice = [
 ]
 `)
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var testDocBasicToml = []byte(`
 [document]
   bool_val = true
