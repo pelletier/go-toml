@@ -944,6 +944,8 @@ type testDuration struct {
 	AString   string         `toml:"a_string"`
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var testDurationToml = []byte(`
 nanosec = "1ns"
 microsec1 = "1us"
