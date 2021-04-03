@@ -969,6 +969,8 @@ nanosec = "1ns"
 sec = "1s"
 `)
 
+// TODO: Remove nolint once type is used by a test
+//nolint:deadcode,unused
 type testBadDuration struct {
 	Val time.Duration `toml:"val"`
 }
