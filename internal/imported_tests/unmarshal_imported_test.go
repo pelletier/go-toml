@@ -652,11 +652,14 @@ func (m *customPointerMarshaler) MarshalTOML() ([]byte, error) {
 	return []byte(`"hidden"`), nil
 }
 
+// TODO: Remove nolint once type and method are used by a test
+//nolint:unused
 type textPointerMarshaler struct {
 	FirstName string
 	LastName  string
 }
 
+//nolint:unused
 func (m *textPointerMarshaler) MarshalText() ([]byte, error) {
 	return []byte("hidden"), nil
 }
