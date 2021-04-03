@@ -626,15 +626,19 @@ func TestUnmarshalTextMarshaler(t *testing.T) {
 	}
 }
 
+// TODO: Remove nolint once type and methods are used by a test
+//nolint:unused
 type precedentMarshaler struct {
 	FirstName string
 	LastName  string
 }
 
+//nolint:unused
 func (m precedentMarshaler) MarshalText() ([]byte, error) {
 	return []byte("shadowed"), nil
 }
 
+//nolint:unused
 func (m precedentMarshaler) MarshalTOML() ([]byte, error) {
 	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
 	return []byte(fullName), nil
