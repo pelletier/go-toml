@@ -743,6 +743,8 @@ var mapsTestToml = []byte(`
       "is.Nested" = true
 `)
 
+// TODO: Remove nolint once type is used by a test
+//nolint:deadcode,unused
 type structArrayNoTag struct {
 	A struct {
 		B []int64
