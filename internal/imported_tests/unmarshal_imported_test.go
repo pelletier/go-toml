@@ -956,6 +956,8 @@ mixed = "1h1m1s1ms1µs1ns"
 a_string = "15s"
 `)
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var testDurationToml2 = []byte(`a_string = "15s"
 hour = "1h0m0s"
 microsec1 = "1µs"
