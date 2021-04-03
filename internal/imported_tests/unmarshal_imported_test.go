@@ -848,6 +848,8 @@ type testDocCustomTag struct {
 	Doc testDocBasicsCustomTag `file:"document"`
 }
 
+// TODO: Remove nolint once type is used by a test
+//nolint:deadcode
 type testDocBasicsCustomTag struct {
 	Bool       bool      `file:"bool_val"`
 	Date       time.Time `file:"date_val"`
