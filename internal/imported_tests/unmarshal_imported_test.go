@@ -961,8 +961,10 @@ type testBadDuration struct {
 	Val time.Duration `toml:"val"`
 }
 
-var testCamelCaseKeyToml = []byte(`fooBar = 10`)
+// TODO: add back camelCase test
+var testCamelCaseKeyToml = []byte(`fooBar = 10`) //nolint:unused
 
+//nolint:unused
 func TestUnmarshalCamelCaseKey(t *testing.T) {
 	t.Skipf("don't know if it is a good idea to automatically convert like that yet")
 	var x struct {
