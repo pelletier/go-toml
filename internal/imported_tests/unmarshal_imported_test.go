@@ -842,9 +842,12 @@ var testDocBasicToml = []byte(`
   uint_val = 5001
 `)
 
+// TODO: Remove nolint once type is used by a test
+//nolint:deadcode
 type testDocCustomTag struct {
 	Doc testDocBasicsCustomTag `file:"document"`
 }
+
 type testDocBasicsCustomTag struct {
 	Bool       bool      `file:"bool_val"`
 	Date       time.Time `file:"date_val"`
