@@ -858,6 +858,8 @@ type testDocBasicsCustomTag struct {
 	unexported int       `file:"shouldntBeHere"`
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,varcheck
 var testDocCustomTagData = testDocCustomTag{
 	Doc: testDocBasicsCustomTag{
 		Bool:       true,
