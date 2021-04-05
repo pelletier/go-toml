@@ -764,6 +764,8 @@ var customTagTestToml = []byte(`
     My = "Baar"
 `)
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var customCommentTagTestToml = []byte(`
 # db connection
 [postgres]
