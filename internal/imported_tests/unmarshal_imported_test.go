@@ -578,6 +578,9 @@ var nestedCustomMarshalerData = customMarshalerParent{
 	Self:    customMarshaler{FirstName: "Maiku", LastName: "Suteda"},
 	Friends: []customMarshaler{customMarshalerData},
 }
+
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
 me = "Maiku Suteda"
 `)
