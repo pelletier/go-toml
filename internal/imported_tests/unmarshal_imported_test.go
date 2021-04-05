@@ -149,6 +149,8 @@ type quotedKeyMarshalTestStruct struct {
 	SubList []basicMarshalTestSubStruct `toml:"W.sublist-𝟘"`
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	String:  "Hello",
 	Float:   3.5,
