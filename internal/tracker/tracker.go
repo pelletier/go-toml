@@ -97,7 +97,7 @@ func (s *Seen) CheckExpression(node ast.Node) error {
 	default:
 		panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
 	}
-	return nil
+
 }
 func (s *Seen) checkTable(node ast.Node) error {
 	s.current = s.root
