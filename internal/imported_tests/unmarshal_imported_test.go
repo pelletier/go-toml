@@ -752,6 +752,8 @@ type structArrayNoTag struct {
 	}
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var customTagTestToml = []byte(`
 [postgres]
   password = "bvalue"
