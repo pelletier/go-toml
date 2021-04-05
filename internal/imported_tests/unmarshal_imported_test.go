@@ -1012,7 +1012,7 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 
 func TestUnmarshalNegativeUint(t *testing.T) {
 	t.Skipf("not sure if we this should always error")
-	type check struct{ U uint }
+	type check struct{ U uint } // nolint:unused
 	err := toml.Unmarshal([]byte("U = -1"), &check{})
 	assert.Error(t, err)
 }
