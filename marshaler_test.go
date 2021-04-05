@@ -62,6 +62,8 @@ hello = 'world'`,
 a = 'test'`,
 		},
 		{
+			// TODO: this test is flaky because output changes depending on
+			//   the map iteration order.
 			desc: "map in map in map and string with values",
 			v: map[string]interface{}{
 				"this": map[string]interface{}{
@@ -82,6 +84,30 @@ also = 'that'`,
 			desc: "simple string array",
 			v: map[string][]string{
 				"array": {"one", "two", "three"},
+			},
+			expected: `array = ['one', 'two', 'three']`,
+		},
+		{
+			desc: "nested string arrays",
+			v: map[string][][]string{
+				"array": {{"one", "two"}, {"three"}},
+			},
+			expected: `array = [['one', 'two'], ['three']]`,
+		},
+		{
+			desc: "mixed strings and nested string arrays",
+			v: map[string][]interface{}{
+				"array": {"a string", []string{"one", "two"}, "last"},
+			},
+			expected: `array = ['a string', ['one', 'two'], 'last']`,
+		},
+		{
+			desc: "slice of maps",
+			v: map[string][]map[string]string{
+				"top": {
+					{"map1.1": "v1.1"},
+					{"map2.1": "v2.1"},
+				},
 			},
 			expected: ``,
 		},

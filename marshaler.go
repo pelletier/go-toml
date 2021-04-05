@@ -32,19 +32,6 @@ type encCtx struct {
 	flushed bool
 }
 
-func (enc *Encoder) push(k string) {
-	enc.ctx.key = append(enc.ctx.key, k)
-	enc.ctx.flushed = false
-}
-
-func (enc *Encoder) pop() {
-	enc.ctx.key = enc.ctx.key[:len(enc.ctx.key)-1]
-}
-
-func (enc *Encoder) top() string {
-	return enc.ctx.key[len(enc.ctx.key)-1]
-}
-
 // NewEncoder returns a new Encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
@@ -137,10 +124,6 @@ func (enc *Encoder) encodeUnquotedKey(b []byte, v string) []byte {
 	return append(b, v...)
 }
 
-func (enc *Encoder) hasContext() bool {
-	return len(enc.ctx.key) > 1
-}
-
 func (enc *Encoder) encodeTableHeaderFromContext(b []byte) ([]byte, error) {
 	b = append(b, '[')
 
@@ -159,7 +142,10 @@ func (enc *Encoder) encodeTableHeaderFromContext(b []byte) ([]byte, error) {
 	}
 
 	b = append(b, "]\n"...)
-	enc.ctx.flushed = true
+
+	enc.ctx.key[0] = enc.ctx.key[len(enc.ctx.key)-1]
+	enc.ctx.key = enc.ctx.key[:1]
+
 	return b, nil
 }
 
@@ -206,7 +192,7 @@ func (enc *Encoder) encodeMap(b []byte, v reflect.Value) ([]byte, error) {
 
 		enc.push(k)
 
-		if willConvertToTable(v.Type()) {
+		if willConvertToTable(v) {
 			b, err = enc.encode(b, v)
 		} else {
 			b, err = enc.encodeKv(b, v)
@@ -232,23 +218,60 @@ func willConvertToTable(v reflect.Value) bool {
 			return false
 		}
 		return willConvertToTable(v.Elem())
+	case reflect.Slice:
+		// To support mixed-types arrays, a slice encodes into a an array table
+		// iff all elements would convert to a table.
+		for i := 0; i < v.Len(); i++ {
+			if !willConvertToTable(v.Index(i)) {
+				return false
+			}
+		}
+		return true
 	default:
 		return false
 	}
 }
 
 func (enc *Encoder) encodeSlice(b []byte, v reflect.Value) ([]byte, error) {
-	arrayTable := willConvertToTable(v.Type().Elem())
-
-	if arrayTable {
+	if willConvertToTable(v) {
 		return enc.encodeSliceAsArrayTable(b, v)
 	}
 
 	return enc.encodeSliceAsArray(b, v)
 }
 
+// caller should have checked that v is a slice that only contains values that
+// encode into tables.
 func (enc *Encoder) encodeSliceAsArrayTable(b []byte, v reflect.Value) ([]byte, error) {
-	panic("TODO")
+	if v.Len() == 0 {
+		return b, nil
+	}
+
+	var err error
+	scratch := make([]byte, 0, 64)
+
+	scratch = scratch[:0]
+	scratch = append(scratch, "[["...)
+	for i, k := range enc.ctx.key {
+		if i > 0 {
+			scratch = append(scratch, '.')
+		}
+		scratch, err = enc.encodeKey(scratch, k)
+		if err != nil {
+			return nil, err
+		}
+	}
+	scratch = append(scratch, "]]\n"...)
+
+	enc.ctx.key = enc.ctx.key[:0]
+	for i := 0; i < v.Len(); i++ {
+		b = append(b, scratch...)
+		b, err = enc.encode(b, v.Index(i))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return b, nil
 }
 
 func (enc *Encoder) encodeSliceAsArray(b []byte, v reflect.Value) ([]byte, error) {
