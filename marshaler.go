@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -42,6 +43,16 @@ func NewEncoder(w io.Writer) *Encoder {
 // Encode writes a TOML representation of v to the stream.
 //
 // If v cannot be represented to TOML it returns an error.
+//
+// Encoding rules:
+//
+// 1. A top level slice containing only maps or structs is encoded as [[table
+// array]].
+//
+// 2. All slices not matching rule 1 are encoded as [array]. As a result, any
+// map or struct they contain is encoded as an {inline table}.
+//
+// 3. Nil interfaces and nil pointers are not supported.
 func (enc *Encoder) Encode(v interface{}) error {
 	var b []byte
 	b, err := enc.encode(b, reflect.ValueOf(v))
@@ -179,7 +190,6 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 }
 
 func (enc *Encoder) encodeMap(b []byte, v reflect.Value) ([]byte, error) {
-	var err error
 	if v.Type().Key().Kind() != reflect.String {
 		return nil, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
 	}
@@ -192,7 +202,12 @@ func (enc *Encoder) encodeMap(b []byte, v reflect.Value) ([]byte, error) {
 
 		enc.push(k)
 
-		if willConvertToTable(v) {
+		table, err := willConvertToTable(v)
+		if err != nil {
+			return nil, err
+		}
+
+		if table {
 			b, err = enc.encode(b, v)
 		} else {
 			b, err = enc.encodeKv(b, v)
@@ -208,32 +223,49 @@ func (enc *Encoder) encodeMap(b []byte, v reflect.Value) ([]byte, error) {
 	return b, nil
 }
 
-func willConvertToTable(v reflect.Value) bool {
+var errNilInterface = errors.New("nil interface not supported")
+var errNilPointer = errors.New("nil pointer not supported")
+
+func willConvertToTable(v reflect.Value) (bool, error) {
 	t := v.Type()
 	switch t.Kind() {
 	case reflect.Map, reflect.Struct:
-		return true
-	case reflect.Interface, reflect.Ptr:
+		return true, nil
+	case reflect.Interface:
 		if v.IsNil() {
-			return false
+			return false, errNilInterface
 		}
 		return willConvertToTable(v.Elem())
-	case reflect.Slice:
-		// To support mixed-types arrays, a slice encodes into a an array table
-		// iff all elements would convert to a table.
-		for i := 0; i < v.Len(); i++ {
-			if !willConvertToTable(v.Index(i)) {
-				return false
-			}
+	case reflect.Ptr:
+		if v.IsNil() {
+			return false, errNilPointer
 		}
-		return true
+		return willConvertToTable(v.Elem())
 	default:
-		return false
+		return false, nil
 	}
 }
 
 func (enc *Encoder) encodeSlice(b []byte, v reflect.Value) ([]byte, error) {
-	if willConvertToTable(v) {
+	if v.Len() == 0 {
+		b = append(b, "[]"...)
+		return b, nil
+	}
+
+	allTables := true
+
+	for i := 0; i < v.Len(); i++ {
+		t, err := willConvertToTable(v.Index(i))
+		if err != nil {
+			return nil, err
+		}
+		if !t {
+			allTables = false
+			// do not break to check the whole slice for nil elements
+		}
+	}
+
+	if allTables {
 		return enc.encodeSliceAsArrayTable(b, v)
 	}
 
