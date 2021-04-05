@@ -703,6 +703,8 @@ type mapsTestStruct struct {
 	}
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var mapsTestData = mapsTestStruct{
 	Simple: map[string]string{
 		"one plus one": "two",
