@@ -573,6 +573,9 @@ func (c customMarshaler) MarshalTOML() ([]byte, error) {
 }
 
 var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
+
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var customMarshalerToml = []byte(`Sally Fields`)
 
 // TODO: Remove nolint once var is used by a test
