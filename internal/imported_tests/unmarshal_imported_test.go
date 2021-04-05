@@ -156,6 +156,8 @@ var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	SubList: []basicMarshalTestSubStruct{{"Two"}, {"Three"}},
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
 "Z.string-àéù" = "Hello"
 
