@@ -264,6 +264,8 @@ var docData = testDoc{
 	SubDocPtrs: []*testSubDoc{&subdoc},
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var mapTestDoc = testMapDoc{
 	Title: "TOML Marshal Testing",
 	BasicMap: map[string]string{
