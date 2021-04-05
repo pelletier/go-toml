@@ -668,6 +668,8 @@ func (m *textPointerMarshaler) MarshalText() ([]byte, error) {
 	return []byte("hidden"), nil
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var commentTestToml = []byte(`
 # it's a comment on type
 [postgres]
