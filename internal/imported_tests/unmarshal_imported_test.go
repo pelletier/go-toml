@@ -723,6 +723,9 @@ var mapsTestData = mapsTestStruct{
 		},
 	},
 }
+
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var mapsTestToml = []byte(`
 [Other]
   "testing" = 3.9999
