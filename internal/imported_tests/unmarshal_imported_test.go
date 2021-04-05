@@ -775,6 +775,8 @@ var customCommentTagTestToml = []byte(`
   user = "avalue"
 `)
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var customCommentedTagTestToml = []byte(`
 [postgres]
   # password = "bvalue"
