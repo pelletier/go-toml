@@ -574,6 +574,9 @@ func (c customMarshaler) MarshalTOML() ([]byte, error) {
 
 var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
 var customMarshalerToml = []byte(`Sally Fields`)
+
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var nestedCustomMarshalerData = customMarshalerParent{
 	Self:    customMarshaler{FirstName: "Maiku", LastName: "Suteda"},
 	Friends: []customMarshaler{customMarshalerData},
