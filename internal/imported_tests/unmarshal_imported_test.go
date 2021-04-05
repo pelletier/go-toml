@@ -827,6 +827,8 @@ func TestUnmarshalTabInStringAndQuotedKey(t *testing.T) {
 	}
 }
 
+// TODO: Remove nolint once var is used by a test
+//nolint:deadcode,unused,varcheck
 var customMultilineTagTestToml = []byte(`int_slice = [
   1,
   2,
