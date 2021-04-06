@@ -24,13 +24,11 @@ func Marshal(v interface{}) ([]byte, error) {
 
 // Encoder writes a TOML document to an output stream.
 type Encoder struct {
-	w   io.Writer
-	ctx encCtx
+	w io.Writer
 }
 
-type encCtx struct {
-	key     []string
-	flushed bool
+type encoderCtx struct {
+	key []string
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -53,9 +51,12 @@ func NewEncoder(w io.Writer) *Encoder {
 // map or struct they contain is encoded as an {inline table}.
 //
 // 3. Nil interfaces and nil pointers are not supported.
+//
+// 4. Keys in key-values always have one part.
 func (enc *Encoder) Encode(v interface{}) error {
 	var b []byte
-	b, err := enc.encode(b, reflect.ValueOf(v))
+	var ctx encoderCtx
+	b, _, err := enc.encode(b, ctx, reflect.ValueOf(v))
 	if err != nil {
 		return err
 	}
@@ -63,18 +64,23 @@ func (enc *Encoder) Encode(v interface{}) error {
 	return err
 }
 
-func (enc *Encoder) encode(b []byte, v reflect.Value) ([]byte, error) {
+func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	// containers
 	switch v.Kind() {
 	case reflect.Map:
-		return enc.encodeMap(b, v)
+		return enc.encodeMap(b, ctx, v)
 	case reflect.Slice:
-		return enc.encodeSlice(b, v)
-	case reflect.Interface, reflect.Ptr:
+		return enc.encodeSlice(b, ctx, v)
+	case reflect.Interface:
 		if v.IsNil() {
-			return b, nil
+			return nil, encoderCtx{}, errNilInterface
 		}
-		return enc.encode(b, v.Elem())
+		return enc.encode(b, ctx, v.Elem())
+	case reflect.Ptr:
+		if v.IsNil() {
+			return nil, encoderCtx{}, errNilPointer
+		}
+		return enc.encode(b, ctx, v.Elem())
 	}
 
 	// values
@@ -86,29 +92,27 @@ func (enc *Encoder) encode(b []byte, v reflect.Value) ([]byte, error) {
 		err = fmt.Errorf("unsupported encode value kind: %s", v.Kind())
 	}
 	if err != nil {
-		return nil, err
+		return nil, encoderCtx{}, err
 	}
 
-	return b, nil
+	return b, ctx, nil
 }
 
-func (enc *Encoder) encodeKv(b []byte, v reflect.Value) ([]byte, error) {
+func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	var err error
-	if enc.hasContext() {
-		b, err = enc.encodeTableHeaderFromContext(b)
-		if err != nil {
-			return nil, err
-		}
+	b, err = enc.encodeTableHeader(b, ctx.key[:len(ctx.key)-1])
+	if err != nil {
+		return nil, ctx, err
 	}
 
-	b, err = enc.encodeKey(b, enc.top())
+	b, err = enc.encodeKey(b, ctx.key[len(ctx.key)-1])
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	b = append(b, " = "...)
 
-	return enc.encode(b, v)
+	return enc.encode(b, ctx, v)
 }
 
 const literalQuote = '\''
@@ -135,27 +139,28 @@ func (enc *Encoder) encodeUnquotedKey(b []byte, v string) []byte {
 	return append(b, v...)
 }
 
-func (enc *Encoder) encodeTableHeaderFromContext(b []byte) ([]byte, error) {
+func (enc *Encoder) encodeTableHeader(b []byte, key []string) ([]byte, error) {
+	if len(key) == 0 {
+		return b, nil
+	}
+
 	b = append(b, '[')
 
 	var err error
-	b, err = enc.encodeKey(b, enc.ctx.key[0])
+	b, err = enc.encodeKey(b, key[0])
 	if err != nil {
 		return nil, err
 	}
 
-	for i := 1; i < len(enc.ctx.key)-1; i++ {
+	for _, k := range key[1:] {
 		b = append(b, '.')
-		b, err = enc.encodeKey(b, enc.ctx.key[i])
+		b, err = enc.encodeKey(b, k)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	b = append(b, "]\n"...)
-
-	enc.ctx.key[0] = enc.ctx.key[len(enc.ctx.key)-1]
-	enc.ctx.key = enc.ctx.key[:1]
 
 	return b, nil
 }
@@ -189,38 +194,39 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	return b, nil
 }
 
-func (enc *Encoder) encodeMap(b []byte, v reflect.Value) ([]byte, error) {
+func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	if v.Type().Key().Kind() != reflect.String {
-		return nil, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
+		return nil, encoderCtx{}, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
 	}
 
 	iter := v.MapRange()
 	for iter.Next() {
-		key := iter.Key()
-		k := key.String()
+		k := iter.Key().String()
 		v := iter.Value()
 
-		enc.push(k)
-
-		table, err := willConvertToTable(v)
+		table, err := willConvertToTableOrArrayTable(v)
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
+
+		originalKeyLength := len(ctx.key)
+		ctx.key = append(ctx.key, k)
 
 		if table {
-			b, err = enc.encode(b, v)
+			b, ctx, err = enc.encode(b, ctx, v)
 		} else {
-			b, err = enc.encodeKv(b, v)
+			b, ctx, err = enc.encodeKv(b, ctx, v)
 		}
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 
-		enc.pop()
+		ctx.key = ctx.key[:originalKeyLength]
+
 		b = append(b, '\n')
 	}
 
-	return b, nil
+	return b, ctx, nil
 }
 
 var errNilInterface = errors.New("nil interface not supported")
@@ -246,37 +252,47 @@ func willConvertToTable(v reflect.Value) (bool, error) {
 	}
 }
 
-func (enc *Encoder) encodeSlice(b []byte, v reflect.Value) ([]byte, error) {
-	if v.Len() == 0 {
-		b = append(b, "[]"...)
-		return b, nil
+func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
+	t := v.Type()
+	if t.Kind() == reflect.Slice {
+		for i := 0; i < v.Len(); i++ {
+			t, err := willConvertToTable(v.Index(i))
+			if err != nil {
+				return false, err
+			}
+			if !t {
+				return false, nil
+			}
+		}
+		return true, nil
 	}
 
-	allTables := true
+	return willConvertToTable(v)
+}
 
-	for i := 0; i < v.Len(); i++ {
-		t, err := willConvertToTable(v.Index(i))
-		if err != nil {
-			return nil, err
-		}
-		if !t {
-			allTables = false
-			// do not break to check the whole slice for nil elements
-		}
+func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
+	if v.Len() == 0 {
+		b = append(b, "[]"...)
+		return b, ctx, nil
+	}
+
+	allTables, err := willConvertToTableOrArrayTable(v)
+	if err != nil {
+		return nil, ctx, err
 	}
 
 	if allTables {
-		return enc.encodeSliceAsArrayTable(b, v)
+		return enc.encodeSliceAsArrayTable(b, ctx, v)
 	}
 
-	return enc.encodeSliceAsArray(b, v)
+	return enc.encodeSliceAsArray(b, ctx, v)
 }
 
 // caller should have checked that v is a slice that only contains values that
 // encode into tables.
-func (enc *Encoder) encodeSliceAsArrayTable(b []byte, v reflect.Value) ([]byte, error) {
+func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	if v.Len() == 0 {
-		return b, nil
+		return b, ctx, nil
 	}
 
 	var err error
@@ -284,29 +300,29 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, v reflect.Value) ([]byte, 
 
 	scratch = scratch[:0]
 	scratch = append(scratch, "[["...)
-	for i, k := range enc.ctx.key {
+	for i, k := range ctx.key {
 		if i > 0 {
 			scratch = append(scratch, '.')
 		}
 		scratch, err = enc.encodeKey(scratch, k)
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 	}
 	scratch = append(scratch, "]]\n"...)
 
-	enc.ctx.key = enc.ctx.key[:0]
+	ctx.key = ctx.key[:0]
 	for i := 0; i < v.Len(); i++ {
 		b = append(b, scratch...)
-		b, err = enc.encode(b, v.Index(i))
+		b, ctx, err = enc.encode(b, ctx, v.Index(i))
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 	}
-	return b, nil
+	return b, ctx, nil
 }
 
-func (enc *Encoder) encodeSliceAsArray(b []byte, v reflect.Value) ([]byte, error) {
+func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	b = append(b, '[')
 
 	var err error
@@ -317,12 +333,12 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, v reflect.Value) ([]byte, error
 		}
 		first = false
 
-		b, err = enc.encode(b, v.Index(i))
+		b, ctx, err = enc.encode(b, ctx, v.Index(i))
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 	}
 
 	b = append(b, ']')
-	return b, nil
+	return b, ctx, nil
 }

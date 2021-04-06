@@ -109,7 +109,12 @@ also = 'that'`,
 					{"map2.1": "v2.1"},
 				},
 			},
-			expected: ``,
+			expected: `
+[[top]]
+'map1.1' = 'v1.1'
+[[top]]
+'map2.1' = 'v2.1'
+`,
 		},
 	}
 
