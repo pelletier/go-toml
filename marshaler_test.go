@@ -74,11 +74,10 @@ a = 'test'`,
 				},
 			},
 			expected: `
-[this.is]
-a = 'test'
-
 [this]
-also = 'that'`,
+also = 'that'
+[this.is]
+a = 'test'`,
 		},
 		{
 			desc: "simple string array",
@@ -134,6 +133,25 @@ key2 = 'value2'`,
 				A: "foo",
 			},
 			expected: `A = 'foo'`,
+		},
+		{
+			desc: "one level of structs within structs",
+			v: struct {
+				A interface{}
+			}{
+				A: struct {
+					K1 string
+					K2 string
+				}{
+					K1: "v1",
+					K2: "v2",
+				},
+			},
+			expected: `
+[A]
+K1 = 'v1'
+K2 = 'v2'
+`,
 		},
 	}
 

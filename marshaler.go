@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -28,7 +29,8 @@ type Encoder struct {
 }
 
 type encoderCtx struct {
-	key []string
+	parentKey []string
+	key       []string
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -90,6 +92,20 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	switch v.Kind() {
 	case reflect.String:
 		b, err = enc.encodeString(b, v.String())
+	case reflect.Float32:
+		b = strconv.AppendFloat(b, v.Float(), 'e', -1, 32)
+	case reflect.Float64:
+		b = strconv.AppendFloat(b, v.Float(), 'e', -1, 64)
+	case reflect.Bool:
+		if v.Bool() {
+			b = append(b, "true"...)
+		} else {
+			b = append(b, "false"...)
+		}
+	case reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8, reflect.Uint:
+		b = strconv.AppendUint(b, v.Uint(), 10)
+	case reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Int:
+		b = strconv.AppendInt(b, v.Int(), 10)
 	default:
 		err = fmt.Errorf("unsupported encode value kind: %s", v.Kind())
 	}
@@ -102,19 +118,40 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	var err error
-	b, err = enc.encodeTableHeader(b, ctx.key[:len(ctx.key)-1])
-	if err != nil {
-		return nil, ctx, err
+
+	// If there is more than one part to the key, emit a table header to
+	// respect rule 4.
+	if len(ctx.key) > 1 {
+		b, err = enc.encodeTableHeader(b, ctx.key[:len(ctx.key)-1])
+		if err != nil {
+			return nil, ctx, err
+		}
+		ctx.parentKey = append(ctx.parentKey, ctx.key[:len(ctx.key)-1]...)
+		ctx.key[0] = ctx.key[len(ctx.key)-1]
+		ctx.key = ctx.key[:1]
 	}
 
-	b, err = enc.encodeKey(b, ctx.key[len(ctx.key)-1])
+	b, err = enc.encodeKey(b, ctx.key[0])
 	if err != nil {
 		return nil, ctx, err
 	}
 
 	b = append(b, " = "...)
 
-	return enc.encode(b, ctx, v)
+	// create a copy of the context because the value of a KV shouldn't
+	// modify the global context.
+	subctx := ctx
+	subctx.parentKey = append(subctx.parentKey, subctx.key[0])
+	subctx.key = subctx.key[:0]
+
+	b, _, err = enc.encode(b, subctx, v)
+	if err != nil {
+		return nil, ctx, err
+	}
+
+	fmt.Println("=>", ctx)
+
+	return b, ctx, nil
 }
 
 const literalQuote = '\''
@@ -197,13 +234,21 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 }
 
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
+	type pair struct {
+		k reflect.Value
+		v reflect.Value
+	}
+
 	if v.Type().Key().Kind() != reflect.String {
 		return nil, encoderCtx{}, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
 	}
 
+	nonTablePairs := []pair{}
+	tablePairs := []pair{}
+
 	iter := v.MapRange()
 	for iter.Next() {
-		k := iter.Key().String()
+		k := iter.Key()
 		v := iter.Value()
 
 		table, err := willConvertToTableOrArrayTable(v)
@@ -211,19 +256,36 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 			return nil, ctx, err
 		}
 
-		originalKeyLength := len(ctx.key)
-		ctx.key = append(ctx.key, k)
+		kv := pair{
+			k: k,
+			v: v,
+		}
 
 		if table {
-			b, ctx, err = enc.encode(b, ctx, v)
+			tablePairs = append(tablePairs, kv)
 		} else {
-			b, ctx, err = enc.encodeKv(b, ctx, v)
+			nonTablePairs = append(nonTablePairs, kv)
 		}
+	}
+
+	var err error
+
+	for _, kv := range nonTablePairs {
+		ctx.key = append(ctx.key, kv.k.String())
+		b, ctx, err = enc.encodeKv(b, ctx, kv.v)
 		if err != nil {
 			return nil, ctx, err
 		}
 
-		ctx.key = ctx.key[:originalKeyLength]
+		b = append(b, '\n')
+	}
+
+	for _, kv := range tablePairs {
+		ctx.key = append(ctx.key, kv.k.String())
+		b, ctx, err = enc.encode(b, ctx, kv.v)
+		if err != nil {
+			return nil, ctx, err
+		}
 
 		b = append(b, '\n')
 	}
@@ -234,29 +296,43 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	t := v.Type()
 
-	for i := 0; i < t.NumField(); i++ {
-		k := t.Field(i).Name
-		v := v.Field(i)
+	nonTableFields := []int{}
+	tableFields := []int{}
 
+	for i := 0; i < t.NumField(); i++ {
 		table, err := willConvertToTableOrArrayTable(v)
 		if err != nil {
 			return nil, ctx, err
 		}
-
-		originalKeyLength := len(ctx.key)
-		ctx.key = append(ctx.key, k)
-
 		if table {
-			b, ctx, err = enc.encode(b, ctx, v)
+			tableFields = append(tableFields, i)
 		} else {
-			b, ctx, err = enc.encodeKv(b, ctx, v)
+			nonTableFields = append(tableFields, i)
 		}
+	}
+
+	var err error
+
+	for _, i := range nonTableFields {
+		k := t.Field(i).Name
+		v := v.Field(i)
+
+		ctx.key = append(ctx.key, k)
+		b, ctx, err = enc.encodeKv(b, ctx, v)
 		if err != nil {
 			return nil, ctx, err
 		}
+		b = append(b, '\n')
+	}
 
-		ctx.key = ctx.key[:originalKeyLength]
-
+	for _, i := range tableFields {
+		k := t.Field(i).Name
+		v := v.Field(i)
+		ctx.key = append(ctx.key, k)
+		b, ctx, err = enc.encode(b, ctx, v)
+		if err != nil {
+			return nil, ctx, err
+		}
 		b = append(b, '\n')
 	}
 

@@ -38,6 +38,19 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	refDoc := testgenBuildRefDoc(jsonRef)
 
 	require.Equal(t, refDoc, doc)
+
+	return // TODO: remove me
+
+	out, err := toml.Marshal(doc)
+	require.NoError(t, err)
+
+	t.Log("==== out >\n", string(out))
+
+	doc2 := map[string]interface{}{}
+	err = toml.Unmarshal(out, &doc2)
+	require.NoError(t, err)
+
+	require.Equal(t, refDoc, doc2)
 }
 
 type testGenDescNode struct {
