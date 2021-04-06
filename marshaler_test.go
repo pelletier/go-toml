@@ -116,6 +116,25 @@ also = 'that'`,
 'map2.1' = 'v2.1'
 `,
 		},
+		{
+			desc: "map with two keys",
+			v: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			expected: `
+key1 = 'value1'
+key2 = 'value2'`,
+		},
+		{
+			desc: "simple struct",
+			v: struct {
+				A string
+			}{
+				A: "foo",
+			},
+			expected: `A = 'foo'`,
+		},
 	}
 
 	for _, e := range examples {

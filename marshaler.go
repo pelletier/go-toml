@@ -69,6 +69,8 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	switch v.Kind() {
 	case reflect.Map:
 		return enc.encodeMap(b, ctx, v)
+	case reflect.Struct:
+		return enc.encodeStruct(b, ctx, v)
 	case reflect.Slice:
 		return enc.encodeSlice(b, ctx, v)
 	case reflect.Interface:
@@ -203,6 +205,38 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 	for iter.Next() {
 		k := iter.Key().String()
 		v := iter.Value()
+
+		table, err := willConvertToTableOrArrayTable(v)
+		if err != nil {
+			return nil, ctx, err
+		}
+
+		originalKeyLength := len(ctx.key)
+		ctx.key = append(ctx.key, k)
+
+		if table {
+			b, ctx, err = enc.encode(b, ctx, v)
+		} else {
+			b, ctx, err = enc.encodeKv(b, ctx, v)
+		}
+		if err != nil {
+			return nil, ctx, err
+		}
+
+		ctx.key = ctx.key[:originalKeyLength]
+
+		b = append(b, '\n')
+	}
+
+	return b, ctx, nil
+}
+
+func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
+	t := v.Type()
+
+	for i := 0; i < t.NumField(); i++ {
+		k := t.Field(i).Name
+		v := v.Field(i)
 
 		table, err := willConvertToTableOrArrayTable(v)
 		if err != nil {
