@@ -39,8 +39,6 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 
 	require.Equal(t, refDoc, doc)
 
-	return // TODO: remove me
-
 	out, err := toml.Marshal(doc)
 	require.NoError(t, err)
 

@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
+	"unicode/utf8"
 )
 
 // Marshal serializes a Go value as a TOML document.
@@ -97,6 +99,12 @@ func (enc *Encoder) Encode(v interface{}) error {
 }
 
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
+	switch i := v.Interface().(type) {
+	case time.Time: // TODO: add TextMarshaler
+		b = i.AppendFormat(b, time.RFC3339)
+		return b, nil
+	}
+
 	// containers
 	switch v.Kind() {
 	case reflect.Map:
@@ -177,12 +185,16 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte,
 const literalQuote = '\''
 
 func (enc *Encoder) encodeString(b []byte, v string) ([]byte, error) {
-	if strings.ContainsRune(v, literalQuote) {
-		panic("encoding strings with ' is not supported")
+	if needsQuoting(v) {
+		b = enc.encodeQuotedString(b, v)
 	} else {
 		b = enc.encodeLiteralString(b, v)
 	}
 	return b, nil
+}
+
+func needsQuoting(v string) bool {
+	return strings.ContainsAny(v, "'\b\f\n\r\t")
 }
 
 // caller should have checked that the string does not contain new lines or '
@@ -190,6 +202,59 @@ func (enc *Encoder) encodeLiteralString(b []byte, v string) []byte {
 	b = append(b, literalQuote)
 	b = append(b, v...)
 	b = append(b, literalQuote)
+	return b
+}
+
+func (enc *Encoder) encodeQuotedString(b []byte, v string) []byte {
+	const stringQuote = '"'
+
+	b = append(b, stringQuote)
+
+	for _, r := range v {
+		switch r {
+		case '\\':
+			b = append(b, `\\`...)
+			continue
+		case '"':
+			b = append(b, `\"`...)
+			continue
+		case '\b':
+			b = append(b, `\b`...)
+			continue
+		case '\f':
+			b = append(b, `\f`...)
+			continue
+		case '\n':
+			b = append(b, `\n`...)
+			continue
+		case '\r':
+			b = append(b, `\r`...)
+			continue
+		case '\t':
+			b = append(b, `\t`...)
+			continue
+		}
+		if r == 0x20 || r == 0x09 || r == 0x21 || (r >= 0x23 && r <= 0x5B) || (r >= 0x5D && r <= 0x7E) {
+			b = append(b, byte(r))
+		} else if (r >= 0x80 && r <= 0xD7FF) || (r >= 0xE000 && r <= 0x10FFFF) {
+			l := utf8.RuneLen(r)
+			buf := make([]byte, l)
+			utf8.EncodeRune(buf, r)
+			b = append(b, buf...)
+		} else {
+			var h []byte
+			if r > 0xFFFF {
+				h = []byte(fmt.Sprintf("%08x", r))
+
+			} else {
+				h = []byte(fmt.Sprintf("%04x", r))
+			}
+			b = append(b, `\u`...)
+			b = append(b, h...)
+		}
+	}
+
+	b = append(b, stringQuote)
 	return b
 }
 
@@ -242,8 +307,7 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	}
 
 	if cannotUseLiteral {
-		// TODO: encode key using quotes and escaping
-		panic("not implemented")
+		b = enc.encodeQuotedString(b, k)
 	} else if needsQuotation {
 		b = enc.encodeLiteralString(b, k)
 	} else {
@@ -256,7 +320,7 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	if ctx.insideKv {
 		// TODO
-		panic("literal tables not supported yet")
+		panic("inline tables not supported yet")
 	}
 
 	if v.Type().Key().Kind() != reflect.String {
@@ -319,6 +383,7 @@ func (t *table) hasKVs() bool {
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	t := table{}
 
+	// TODO: cache this?
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
 		fieldType := typ.Field(i)
@@ -333,7 +398,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			k = fieldType.Name
 		}
 
-		// special field name incicating skip
+		// special field name to skip field
 		if k == "-" {
 			continue
 		}
@@ -392,6 +457,11 @@ var errNilInterface = errors.New("nil interface not supported")
 var errNilPointer = errors.New("nil pointer not supported")
 
 func willConvertToTable(v reflect.Value) (bool, error) {
+	switch v.Interface().(type) {
+	case time.Time: // TODO: add TextMarshaler
+		return false, nil
+	}
+
 	t := v.Type()
 	switch t.Kind() {
 	case reflect.Map, reflect.Struct:
