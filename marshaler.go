@@ -258,21 +258,15 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 		panic("literal tables not supported yet")
 	}
 
-	type pair struct {
-		k reflect.Value
-		v reflect.Value
-	}
-
 	if v.Type().Key().Kind() != reflect.String {
 		return nil, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
 	}
 
-	nonTablePairs := []pair{}
-	tablePairs := []pair{}
+	t := table{}
 
 	iter := v.MapRange()
 	for iter.Next() {
-		k := iter.Key()
+		k := iter.Key().String()
 		v := iter.Value()
 
 		table, err := willConvertToTableOrArrayTable(v)
@@ -280,77 +274,66 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 			return nil, err
 		}
 
-		kv := pair{
-			k: k,
-			v: v,
-		}
-
 		if table {
-			tablePairs = append(tablePairs, kv)
+			t.pushTable(k, v)
 		} else {
-			nonTablePairs = append(nonTablePairs, kv)
+			t.pushKV(k, v)
 		}
 	}
 
-	var err error
+	return enc.encodeTable(b, ctx, t)
+}
 
-	ctx.shiftKey()
+type entry struct {
+	Key   string
+	Value reflect.Value
+}
 
-	if len(nonTablePairs) > 0 && !ctx.skipTableHeader {
-		b, err = enc.encodeTableHeader(b, ctx.parentKey)
-		if err != nil {
-			return nil, err
-		}
-	}
-	ctx.skipTableHeader = false
+type table struct {
+	kvs    []entry
+	tables []entry
+}
 
-	for _, kv := range nonTablePairs {
-		ctx.setKey(kv.k.String())
-		b, err = enc.encodeKv(b, ctx, kv.v)
-		if err != nil {
-			return nil, err
-		}
+func (t *table) pushKV(k string, v reflect.Value) {
+	t.kvs = append(t.kvs, entry{Key: k, Value: v})
+}
 
-		b = append(b, '\n')
-	}
+func (t *table) pushTable(k string, v reflect.Value) {
+	t.tables = append(t.tables, entry{Key: k, Value: v})
+}
 
-	for _, kv := range tablePairs {
-		ctx.setKey(kv.k.String())
-		b, err = enc.encode(b, ctx, kv.v)
-		if err != nil {
-			return nil, err
-		}
-
-		b = append(b, '\n')
-	}
-
-	return b, nil
+func (t *table) hasKVs() bool {
+	return len(t.kvs) > 0
 }
 
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	t := v.Type()
+	t := table{}
 
-	nonTableFields := []int{}
-	tableFields := []int{}
-
-	for i := 0; i < t.NumField(); i++ {
+	typ := v.Type()
+	for i := 0; i < typ.NumField(); i++ {
+		k := typ.Field(i).Name
 		f := v.Field(i)
-		table, err := willConvertToTableOrArrayTable(f)
+		willConvert, err := willConvertToTableOrArrayTable(f)
 		if err != nil {
 			return nil, err
 		}
-		if table {
-			tableFields = append(tableFields, i)
+
+		if willConvert {
+			t.pushTable(k, f)
 		} else {
-			nonTableFields = append(nonTableFields, i)
+			t.pushKV(k, f)
 		}
 	}
 
+	return enc.encodeTable(b, ctx, t)
+}
+
+func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
 	ctx.shiftKey()
 
-	if len(nonTableFields) > 0 && !ctx.skipTableHeader {
+	if t.hasKVs() && !ctx.skipTableHeader {
 		b, err = enc.encodeTableHeader(b, ctx.parentKey)
 		if err != nil {
 			return nil, err
@@ -358,24 +341,18 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 	}
 	ctx.skipTableHeader = false
 
-	for _, i := range nonTableFields {
-		k := t.Field(i).Name
-		f := v.Field(i)
-
-		ctx.setKey(k)
-		b, err = enc.encodeKv(b, ctx, f)
+	for _, kv := range t.kvs {
+		ctx.setKey(kv.Key)
+		b, err = enc.encodeKv(b, ctx, kv.Value)
 		if err != nil {
 			return nil, err
 		}
 		b = append(b, '\n')
 	}
 
-	for _, i := range tableFields {
-		k := t.Field(i).Name
-		f := v.Field(i)
-
-		ctx.setKey(k)
-		b, err = enc.encode(b, ctx, f)
+	for _, table := range t.tables {
+		ctx.setKey(table.Key)
+		b, err = enc.encode(b, ctx, table.Value)
 		if err != nil {
 			return nil, err
 		}
