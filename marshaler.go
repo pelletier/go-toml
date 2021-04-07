@@ -112,7 +112,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 		return enc.encode(b, ctx, v.Elem())
 	case reflect.Ptr:
 		if v.IsNil() {
-			return nil, errNilPointer
+			return enc.encode(b, ctx, reflect.Zero(v.Type().Elem()))
 		}
 		return enc.encode(b, ctx, v.Elem())
 	}
@@ -123,9 +123,9 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case reflect.String:
 		b, err = enc.encodeString(b, v.String())
 	case reflect.Float32:
-		b = strconv.AppendFloat(b, v.Float(), 'e', -1, 32)
+		b = strconv.AppendFloat(b, v.Float(), 'f', -1, 32)
 	case reflect.Float64:
-		b = strconv.AppendFloat(b, v.Float(), 'e', -1, 64)
+		b = strconv.AppendFloat(b, v.Float(), 'f', -1, 64)
 	case reflect.Bool:
 		if v.Bool() {
 			b = append(b, "true"...)
@@ -321,7 +321,23 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
-		k := typ.Field(i).Name
+		fieldType := typ.Field(i)
+
+		// only consider exported fields
+		if fieldType.PkgPath != "" {
+			continue
+		}
+
+		k, ok := fieldType.Tag.Lookup("toml")
+		if !ok {
+			k = fieldType.Name
+		}
+
+		// special field name incicating skip
+		if k == "-" {
+			continue
+		}
+
 		f := v.Field(i)
 		willConvert, err := willConvertToTableOrArrayTable(f)
 		if err != nil {
@@ -387,7 +403,7 @@ func willConvertToTable(v reflect.Value) (bool, error) {
 		return willConvertToTable(v.Elem())
 	case reflect.Ptr:
 		if v.IsNil() {
-			return false, errNilPointer
+			return false, nil
 		}
 		return willConvertToTable(v.Elem())
 	default:
