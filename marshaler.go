@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -281,7 +282,16 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 		}
 	}
 
+	sortEntriesByKey(t.kvs)
+	sortEntriesByKey(t.tables)
+
 	return enc.encodeTable(b, ctx, t)
+}
+
+func sortEntriesByKey(e []entry) {
+	sort.Slice(e, func(i, j int) bool {
+		return e[i].Key < e[j].Key
+	})
 }
 
 type entry struct {
