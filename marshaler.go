@@ -29,8 +29,38 @@ type Encoder struct {
 }
 
 type encoderCtx struct {
+	// Current top-level key.
 	parentKey []string
-	key       []string
+
+	// Key that should be used for a KV.
+	key string
+	// Extra flag to account for the empty string
+	hasKey bool
+
+	// Set to true to indicate that the encoder is inside a KV, so that all
+	// tables need to be inlined.
+	insideKv bool
+
+	// Set to true when this context's parentKey has already been printed.
+	parentKeyEmitted bool
+}
+
+func (ctx *encoderCtx) shiftKey() {
+	if ctx.hasKey {
+		ctx.parentKey = append(ctx.parentKey, ctx.key)
+		ctx.clearKey()
+		ctx.parentKeyEmitted = false
+	}
+}
+
+func (ctx *encoderCtx) setKey(k string) {
+	ctx.key = k
+	ctx.hasKey = true
+}
+
+func (ctx *encoderCtx) clearKey() {
+	ctx.key = ""
+	ctx.hasKey = false
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -119,19 +149,21 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
 	var err error
 
+	if !ctx.hasKey {
+		panic("caller of encodeKv should have set the key in the context")
+	}
+
 	// If there is more than one part to the key, emit a table header to
 	// respect rule 4.
-	if len(ctx.key) > 1 {
-		b, err = enc.encodeTableHeader(b, ctx.key[:len(ctx.key)-1])
+	if !ctx.parentKeyEmitted {
+		b, err = enc.encodeTableHeader(b, ctx.parentKey)
 		if err != nil {
 			return nil, ctx, err
 		}
-		ctx.parentKey = append(ctx.parentKey, ctx.key[:len(ctx.key)-1]...)
-		ctx.key[0] = ctx.key[len(ctx.key)-1]
-		ctx.key = ctx.key[:1]
+		ctx.parentKeyEmitted = true
 	}
 
-	b, err = enc.encodeKey(b, ctx.key[0])
+	b, err = enc.encodeKey(b, ctx.key)
 	if err != nil {
 		return nil, ctx, err
 	}
@@ -141,15 +173,13 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte,
 	// create a copy of the context because the value of a KV shouldn't
 	// modify the global context.
 	subctx := ctx
-	subctx.parentKey = append(subctx.parentKey, subctx.key[0])
-	subctx.key = subctx.key[:0]
+	subctx.insideKv = true
+	subctx.shiftKey()
 
 	b, _, err = enc.encode(b, subctx, v)
 	if err != nil {
 		return nil, ctx, err
 	}
-
-	fmt.Println("=>", ctx)
 
 	return b, ctx, nil
 }
@@ -234,6 +264,11 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 }
 
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, encoderCtx, error) {
+	if ctx.insideKv {
+		// TODO
+		panic("literal tables not supported yet")
+	}
+
 	type pair struct {
 		k reflect.Value
 		v reflect.Value
@@ -270,8 +305,10 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 
 	var err error
 
+	ctx.shiftKey()
+
 	for _, kv := range nonTablePairs {
-		ctx.key = append(ctx.key, kv.k.String())
+		ctx.setKey(kv.k.String())
 		b, ctx, err = enc.encodeKv(b, ctx, kv.v)
 		if err != nil {
 			return nil, ctx, err
@@ -281,7 +318,7 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 	}
 
 	for _, kv := range tablePairs {
-		ctx.key = append(ctx.key, kv.k.String())
+		ctx.setKey(kv.k.String())
 		b, ctx, err = enc.encode(b, ctx, kv.v)
 		if err != nil {
 			return nil, ctx, err
@@ -300,25 +337,28 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 	tableFields := []int{}
 
 	for i := 0; i < t.NumField(); i++ {
-		table, err := willConvertToTableOrArrayTable(v)
+		f := v.Field(i)
+		table, err := willConvertToTableOrArrayTable(f)
 		if err != nil {
 			return nil, ctx, err
 		}
 		if table {
 			tableFields = append(tableFields, i)
 		} else {
-			nonTableFields = append(tableFields, i)
+			nonTableFields = append(nonTableFields, i)
 		}
 	}
 
 	var err error
 
+	ctx.shiftKey()
+
 	for _, i := range nonTableFields {
 		k := t.Field(i).Name
-		v := v.Field(i)
+		f := v.Field(i)
 
-		ctx.key = append(ctx.key, k)
-		b, ctx, err = enc.encodeKv(b, ctx, v)
+		ctx.setKey(k)
+		b, ctx, err = enc.encodeKv(b, ctx, f)
 		if err != nil {
 			return nil, ctx, err
 		}
@@ -327,9 +367,10 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 
 	for _, i := range tableFields {
 		k := t.Field(i).Name
-		v := v.Field(i)
-		ctx.key = append(ctx.key, k)
-		b, ctx, err = enc.encode(b, ctx, v)
+		f := v.Field(i)
+
+		ctx.setKey(k)
+		b, ctx, err = enc.encode(b, ctx, f)
 		if err != nil {
 			return nil, ctx, err
 		}
@@ -405,12 +446,12 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 		return b, ctx, nil
 	}
 
+	ctx.shiftKey()
+
 	var err error
 	scratch := make([]byte, 0, 64)
-
-	scratch = scratch[:0]
 	scratch = append(scratch, "[["...)
-	for i, k := range ctx.key {
+	for i, k := range ctx.parentKey {
 		if i > 0 {
 			scratch = append(scratch, '.')
 		}
@@ -421,9 +462,9 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 	}
 	scratch = append(scratch, "]]\n"...)
 
-	ctx.key = ctx.key[:0]
 	for i := 0; i < v.Len(); i++ {
 		b = append(b, scratch...)
+		ctx.parentKeyEmitted = true
 		b, ctx, err = enc.encode(b, ctx, v.Index(i))
 		if err != nil {
 			return nil, ctx, err
