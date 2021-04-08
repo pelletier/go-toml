@@ -154,11 +154,24 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	return b, nil
 }
 
+func isNil(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	var err error
 
 	if !ctx.hasKey {
 		panic("caller of encodeKv should have set the key in the context")
+	}
+
+	if isNil(v) {
+		return b, nil
 	}
 
 	b, err = enc.encodeKey(b, ctx.key)
@@ -318,11 +331,6 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 }
 
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	if ctx.insideKv {
-		// TODO
-		panic("inline tables not supported yet")
-	}
-
 	if v.Type().Key().Kind() != reflect.String {
 		return nil, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
 	}
@@ -424,6 +432,41 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 
 	ctx.shiftKey()
 
+	if ctx.insideKv {
+		b = append(b, '{')
+
+		first := true
+		for _, kv := range t.kvs {
+			if first {
+				first = false
+			} else {
+				b = append(b, `, `...)
+			}
+			ctx.setKey(kv.Key)
+			b, err = enc.encodeKv(b, ctx, kv.Value)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		for _, table := range t.tables {
+			if first {
+				first = false
+			} else {
+				b = append(b, `, `...)
+			}
+			ctx.setKey(table.Key)
+			b, err = enc.encode(b, ctx, table.Value)
+			if err != nil {
+				return nil, err
+			}
+			b = append(b, '\n')
+		}
+
+		b = append(b, "}\n"...)
+		return b, nil
+	}
+
 	if t.hasKVs() && !ctx.skipTableHeader {
 		b, err = enc.encodeTableHeader(b, ctx.parentKey)
 		if err != nil {
@@ -483,6 +526,14 @@ func willConvertToTable(v reflect.Value) (bool, error) {
 
 func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 	t := v.Type()
+
+	if t.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return false, errNilInterface
+		}
+		return willConvertToTableOrArrayTable(v.Elem())
+	}
+
 	if t.Kind() == reflect.Slice {
 		for i := 0; i < v.Len(); i++ {
 			t, err := willConvertToTable(v.Index(i))

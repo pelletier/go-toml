@@ -153,6 +153,23 @@ K1 = 'v1'
 K2 = 'v2'
 `,
 		},
+		{
+			desc: "structs in slice with interfaces",
+			v: map[string]interface{}{
+				"root": map[string]interface{}{
+					"nested": []interface{}{
+						map[string]interface{}{"name": "Bob"},
+						map[string]interface{}{"name": "Alice"},
+					},
+				},
+			},
+			expected: `
+[[root.nested]]
+name = 'Bob'
+[[root.nested]]
+name = 'Alice'
+`,
+		},
 	}
 
 	for _, e := range examples {
