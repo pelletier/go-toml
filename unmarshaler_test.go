@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
@@ -778,6 +779,20 @@ val1 = "test1"
 	err := toml.Unmarshal(configFile, cfg)
 	require.NoError(t, err)
 	require.Equal(t, "test2", cfg.Val2)
+}
+
+func TestIssue494(t *testing.T) {
+	data := `
+foo = 2021-04-08
+bar = 2021-04-08
+`
+	type s struct {
+		Foo time.Time `toml:"foo"`
+		Bar time.Time `toml:"bar"`
+	}
+	ss := new(s)
+	err := toml.Unmarshal([]byte(data), ss)
+	require.NoError(t, err)
 }
 
 func TestUnmarshalDecodeErrors(t *testing.T) {

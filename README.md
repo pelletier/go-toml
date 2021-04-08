@@ -23,6 +23,7 @@ Development branch. Use at your own risk.
 - [x] Original go-toml testgen tests pass.
 - [x] Track file position (line, column) for errors.
 - [ ] Strict mode.
+- [ ] Document Unmarshal / Decode
 
 ### Marshal
 

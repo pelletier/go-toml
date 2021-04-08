@@ -30,6 +30,9 @@ func NewDecoder(r io.Reader) *Decoder {
 }
 
 // Decode the whole content of r into v.
+//
+// When a TOML local date is decoded into a time.Time, its value is represented
+// in time.Local timezone.
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {
@@ -224,6 +227,13 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	if v.Kind() != reflect.Struct {
 		return false, nil
 	}
+
+	// Special case for time, becase we allow to unmarshal to it from
+	// different kind of AST nodes.
+	if v.Type() == timeType {
+		return false, nil
+	}
+
 	if v.Type().Implements(textUnmarshalerType) {
 		return true, v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 	}
@@ -313,7 +323,14 @@ func setDateTime(x target, v time.Time) error {
 	return x.set(reflect.ValueOf(v))
 }
 
+var timeType = reflect.TypeOf(time.Time{})
+
 func setDate(x target, v LocalDate) error {
+	if x.get().Type() == timeType {
+		cast := v.In(time.Local)
+		return setDateTime(x, cast)
+	}
+
 	return x.set(reflect.ValueOf(v))
 }
 
