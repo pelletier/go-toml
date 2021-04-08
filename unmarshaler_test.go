@@ -885,3 +885,19 @@ world'`,
 		})
 	}
 }
+
+func TestIssue287(t *testing.T) {
+	b := `y=[[{}]]`
+	v := map[string]interface{}{}
+	err := toml.Unmarshal([]byte(b), &v)
+	require.NoError(t, err)
+
+	expected := map[string]interface{}{
+		"y": []interface{}{
+			[]interface{}{
+				nil,
+			},
+		},
+	}
+	require.Equal(t, expected, v)
+}
