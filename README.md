@@ -31,6 +31,8 @@ Development branch. Use at your own risk.
 - [ ] Multiline strings
 - [ ] Multiline arrays
 - [ ] `inline` tag for tables
+- [ ] Optional indentation
+- [ ] Option to pick default quotes
 
 ### Document
 
