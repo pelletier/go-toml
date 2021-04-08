@@ -356,6 +356,11 @@ func (d *decoder) scopeTableTarget(append bool, t target, name string) (target, 
 	case reflect.Struct:
 		return scopeStruct(x, name)
 	case reflect.Map:
+		if x.IsNil() {
+			t.set(reflect.MakeMap(x.Type()))
+			x = t.get()
+		}
+
 		return scopeMap(x, name)
 	default:
 		panic(fmt.Errorf("can't scope on a %s", x.Kind()))
@@ -442,10 +447,6 @@ func (d *decoder) scopeArray(append bool, t target) (target, error) {
 }
 
 func scopeMap(v reflect.Value, name string) (target, bool, error) {
-	if v.IsNil() {
-		v.Set(reflect.MakeMap(v.Type()))
-	}
-
 	k := reflect.ValueOf(name)
 
 	keyType := v.Type().Key()

@@ -33,6 +33,9 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // When a TOML local date is decoded into a time.Time, its value is represented
 // in time.Local timezone.
+//
+// Empty tables decoded in an interface{} create an empty initialized
+// map[string]interface{}.
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {
@@ -111,6 +114,18 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			found = true
 		case ast.Table:
 			current, found, err = d.scopeWithKey(root, node.Key())
+			if err == nil {
+				// In case this table points to an interface,
+				// make sure it at least holds something that
+				// looks like a table. Otherwise the information
+				// of a table is lost, and marshal cannot do the
+				// round trip.
+				v := current.get()
+				if v.Kind() == reflect.Interface && v.IsNil() {
+					newElement := reflect.MakeMap(mapStringInterfaceType)
+					current.set(newElement)
+				}
+			}
 		case ast.ArrayTable:
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:

@@ -39,8 +39,6 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 
 	require.Equal(t, refDoc, doc)
 
-	//return
-
 	out, err := toml.Marshal(doc)
 	require.NoError(t, err)
 
@@ -134,13 +132,9 @@ func testGenTranslateDesc(input interface{}) interface{} {
 		}
 	}
 
-	var dest interface{}
-	if len(d) > 0 {
-		x := map[string]interface{}{}
-		for k, v := range d {
-			x[k] = testGenTranslateDesc(v)
-		}
-		dest = x
+	dest := map[string]interface{}{}
+	for k, v := range d {
+		dest[k] = testGenTranslateDesc(v)
 	}
 	return dest
 }

@@ -58,6 +58,7 @@ hello = 'world'`,
 				},
 			},
 			expected: `
+[this]
 [this.is]
 a = 'test'`,
 		},
@@ -164,6 +165,7 @@ K2 = 'v2'
 				},
 			},
 			expected: `
+[root]
 [[root.nested]]
 name = 'Bob'
 [[root.nested]]

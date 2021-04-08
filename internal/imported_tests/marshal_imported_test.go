@@ -80,6 +80,7 @@ name = 'Second'
 one = 'one'
 two = 'two'
 
+[subdoc]
 [subdoc.second]
 name = 'Second'
 

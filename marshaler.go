@@ -87,6 +87,8 @@ func NewEncoder(w io.Writer) *Encoder {
 // 3. Nil interfaces and nil pointers are not supported.
 //
 // 4. Keys in key-values always have one part.
+//
+// 5. Intermediate tables are always printed.
 func (enc *Encoder) Encode(v interface{}) error {
 	var b []byte
 	var ctx encoderCtx
@@ -342,6 +344,10 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 		k := iter.Key().String()
 		v := iter.Value()
 
+		if isNil(v) {
+			continue
+		}
+
 		table, err := willConvertToTableOrArrayTable(v)
 		if err != nil {
 			return nil, err
@@ -412,6 +418,11 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 		}
 
 		f := v.Field(i)
+
+		if isNil(f) {
+			continue
+		}
+
 		willConvert, err := willConvertToTableOrArrayTable(f)
 		if err != nil {
 			return nil, err
@@ -467,7 +478,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		return b, nil
 	}
 
-	if t.hasKVs() && !ctx.skipTableHeader {
+	if !ctx.skipTableHeader {
 		b, err = enc.encodeTableHeader(b, ctx.parentKey)
 		if err != nil {
 			return nil, err
