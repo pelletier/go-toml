@@ -1,5 +1,8 @@
 package imported_tests
 
+// Those tests have been imported from v1, but adjust to match the new
+// defaults of v2.
+
 import (
 	"testing"
 	"time"
@@ -9,8 +12,6 @@ import (
 )
 
 func TestDocMarshal(t *testing.T) {
-	// Note: this test has been altered to match the new defaults of the
-	// encoder.
 	type testDoc struct {
 		Title       string            `toml:"title"`
 		BasicLists  testDocBasicLists `toml:"basic_lists"`
@@ -107,4 +108,59 @@ name = 'List.Second'
 	result, err := toml.Marshal(docData)
 	require.NoError(t, err)
 	require.Equal(t, marshalTestToml, string(result))
+}
+
+func TestBasicMarshalQuotedKey(t *testing.T) {
+	result, err := toml.Marshal(quotedKeyMarshalTestData)
+	require.NoError(t, err)
+
+	expected := `'Z.string-àéù' = 'Hello'
+'Yfloat-𝟘' = 3.5
+['Xsubdoc-àéù']
+String2 = 'One'
+
+[['W.sublist-𝟘']]
+String2 = 'Two'
+[['W.sublist-𝟘']]
+String2 = 'Three'
+
+`
+
+	require.Equal(t, string(expected), string(result))
+
+}
+
+func TestEmptyMarshal(t *testing.T) {
+	type emptyMarshalTestStruct struct {
+		Title      string                  `toml:"title"`
+		Bool       bool                    `toml:"bool"`
+		Int        int                     `toml:"int"`
+		String     string                  `toml:"string"`
+		StringList []string                `toml:"stringlist"`
+		Ptr        *basicMarshalTestStruct `toml:"ptr"`
+		Map        map[string]string       `toml:"map"`
+	}
+
+	doc := emptyMarshalTestStruct{
+		Title:      "Placeholder",
+		Bool:       false,
+		Int:        0,
+		String:     "",
+		StringList: []string{},
+		Ptr:        nil,
+		Map:        map[string]string{},
+	}
+	result, err := toml.Marshal(doc)
+	require.NoError(t, err)
+
+	expected := `title = 'Placeholder'
+bool = false
+int = 0
+string = ''
+stringlist = []
+[map]
+
+`
+
+	require.Equal(t, string(expected), string(result))
 }

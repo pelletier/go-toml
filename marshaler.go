@@ -546,6 +546,10 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 	}
 
 	if t.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			// An empty slice should be a kv = [].
+			return false, nil
+		}
 		for i := 0; i < v.Len(); i++ {
 			t, err := willConvertToTable(v.Index(i))
 			if err != nil {
