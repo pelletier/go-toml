@@ -38,6 +38,15 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	refDoc := testgenBuildRefDoc(jsonRef)
 
 	require.Equal(t, refDoc, doc)
+
+	out, err := toml.Marshal(doc)
+	require.NoError(t, err)
+
+	doc2 := map[string]interface{}{}
+	err = toml.Unmarshal(out, &doc2)
+	require.NoError(t, err)
+
+	require.Equal(t, refDoc, doc2)
 }
 
 type testGenDescNode struct {
@@ -121,13 +130,9 @@ func testGenTranslateDesc(input interface{}) interface{} {
 		}
 	}
 
-	var dest interface{}
-	if len(d) > 0 {
-		x := map[string]interface{}{}
-		for k, v := range d {
-			x[k] = testGenTranslateDesc(v)
-		}
-		dest = x
+	dest := map[string]interface{}{}
+	for k, v := range d {
+		dest[k] = testGenTranslateDesc(v)
 	}
 	return dest
 }
