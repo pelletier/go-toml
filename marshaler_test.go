@@ -1,6 +1,8 @@
 package toml_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -191,4 +193,23 @@ func equalStringsIgnoreNewlines(t *testing.T, expected string, actual string) {
 	t.Helper()
 	cutset := "\n"
 	assert.Equal(t, strings.Trim(expected, cutset), strings.Trim(actual, cutset))
+}
+
+func TestIssue436(t *testing.T) {
+	data := []byte(`{"a": [ { "b": { "c": "d" } } ]}`)
+
+	var v interface{}
+	err := json.Unmarshal(data, &v)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	err = toml.NewEncoder(&buf).Encode(v)
+	require.NoError(t, err)
+
+	expected := `
+[[a]]
+[a.b]
+c = 'd'
+`
+	equalStringsIgnoreNewlines(t, expected, buf.String())
 }
