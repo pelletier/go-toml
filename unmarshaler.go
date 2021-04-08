@@ -114,7 +114,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			found = true
 		case ast.Table:
 			current, found, err = d.scopeWithKey(root, node.Key())
-			if err == nil {
+			if err == nil && found {
 				// In case this table points to an interface,
 				// make sure it at least holds something that
 				// looks like a table. Otherwise the information
