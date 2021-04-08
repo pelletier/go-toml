@@ -21,4 +21,8 @@ jobs:
         uses: actions/setup-go@master
         with:
           go-version: ${{ matrix.go }}
-      - run: go test -race ./...
+      - name: Run unit tests
+        run: go test -race ./...
+      - name: Run benchmark tests
+        run: go test -race ./...
+        working-directory: benchmark
