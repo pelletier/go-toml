@@ -42,8 +42,6 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	out, err := toml.Marshal(doc)
 	require.NoError(t, err)
 
-	t.Log("==== out >\n", string(out))
-
 	doc2 := map[string]interface{}{}
 	err = toml.Unmarshal(out, &doc2)
 	require.NoError(t, err)
