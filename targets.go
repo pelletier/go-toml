@@ -159,6 +159,14 @@ func ensureValueIndexable(t target) error {
 var sliceInterfaceType = reflect.TypeOf([]interface{}{})
 var mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 
+func ensureMapIfInterface(x target) {
+	v := x.get()
+	if v.Kind() == reflect.Interface && v.IsNil() {
+		newElement := reflect.MakeMap(mapStringInterfaceType)
+		x.set(newElement)
+	}
+}
+
 func setString(t target, v string) error {
 	f := t.get()
 

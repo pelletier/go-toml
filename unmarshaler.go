@@ -120,11 +120,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 				// looks like a table. Otherwise the information
 				// of a table is lost, and marshal cannot do the
 				// round trip.
-				v := current.get()
-				if v.Kind() == reflect.Interface && v.IsNil() {
-					newElement := reflect.MakeMap(mapStringInterfaceType)
-					current.set(newElement)
-				}
+				ensureMapIfInterface(current)
 			}
 		case ast.ArrayTable:
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
@@ -380,6 +376,8 @@ func unmarshalFloat(x target, node ast.Node) error {
 
 func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
 	assertNode(ast.InlineTable, node)
+
+	ensureMapIfInterface(x)
 
 	it := node.Children()
 	for it.Next() {
