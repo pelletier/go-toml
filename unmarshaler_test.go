@@ -297,6 +297,17 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "standard empty table",
+			input: `[A]`,
+			gen: func() test {
+				var v map[string]interface{}
+				return test{
+					target:   &v,
+					expected: &map[string]interface{}{`A`: map[string]interface{}{}},
+				}
+			},
+		},
+		{
 			desc:  "inline table",
 			input: `Name = {First = "hello", Last = "world"}`,
 			gen: func() test {
@@ -313,6 +324,17 @@ B = "data"`,
 						First: "hello",
 						Last:  "world",
 					}},
+				}
+			},
+		},
+		{
+			desc:  "inline empty table",
+			input: `A = {}`,
+			gen: func() test {
+				var v map[string]interface{}
+				return test{
+					target:   &v,
+					expected: &map[string]interface{}{`A`: map[string]interface{}{}},
 				}
 			},
 		},
@@ -713,6 +735,7 @@ type Integer484 struct {
 func (i Integer484) MarshalText() ([]byte, error) {
 	return []byte(strconv.Itoa(i.Value)), nil
 }
+
 func (i *Integer484) UnmarshalText(data []byte) error {
 	conv, err := strconv.Atoi(string(data))
 	if err != nil {
