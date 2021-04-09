@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // Marshal serializes a Go value as a TOML document.
@@ -222,51 +221,37 @@ func (enc *Encoder) encodeLiteralString(b []byte, v string) []byte {
 
 func (enc *Encoder) encodeQuotedString(b []byte, v string) []byte {
 	const stringQuote = '"'
+	const hextable = "0123456789ABCDEF"
 
 	b = append(b, stringQuote)
 
-	for _, r := range v {
+	for _, r := range []byte(v) {
 		switch r {
 		case '\\':
 			b = append(b, `\\`...)
-			continue
 		case '"':
 			b = append(b, `\"`...)
-			continue
 		case '\b':
 			b = append(b, `\b`...)
-			continue
 		case '\f':
 			b = append(b, `\f`...)
-			continue
 		case '\n':
 			b = append(b, `\n`...)
-			continue
 		case '\r':
 			b = append(b, `\r`...)
-			continue
 		case '\t':
 			b = append(b, `\t`...)
-			continue
-		}
-		if r == 0x20 || r == 0x09 || r == 0x21 || (r >= 0x23 && r <= 0x5B) || (r >= 0x5D && r <= 0x7E) {
-			b = append(b, byte(r))
-		} else if (r >= 0x80 && r <= 0xD7FF) || (r >= 0xE000 && r <= 0x10FFFF) {
-			l := utf8.RuneLen(r)
-			buf := make([]byte, l)
-			utf8.EncodeRune(buf, r)
-			b = append(b, buf...)
-		} else {
-			var h []byte
-			if r > 0xFFFF {
-				h = []byte(fmt.Sprintf("%08x", r))
-
-			} else {
-				h = []byte(fmt.Sprintf("%04x", r))
+		default:
+			switch {
+			case r >= 0x0 && r <= 0x8, r >= 0xA && r <= 0x1F, r == 0x7F:
+				b = append(b, `\u00`...)
+				b = append(b, hextable[r>>4])
+				b = append(b, hextable[r&0x0f])
+			default:
+				b = append(b, r)
 			}
-			b = append(b, `\u`...)
-			b = append(b, h...)
 		}
+		// U+0000 to U+0008, U+000A to U+001F, U+007F
 	}
 
 	b = append(b, stringQuote)

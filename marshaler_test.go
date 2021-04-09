@@ -174,6 +174,48 @@ name = 'Bob'
 name = 'Alice'
 `,
 		},
+		{
+			desc: "string escapes",
+			v: map[string]interface{}{
+				"a": `'"\`,
+			},
+			expected: `a = "'\"\\"`,
+		},
+		{
+			desc: "string utf8 low",
+			v: map[string]interface{}{
+				"a": "'Ę",
+			},
+			expected: `a = "'Ę"`,
+		},
+		{
+			desc: "string utf8 low 2",
+			v: map[string]interface{}{
+				"a": "'\u10A85",
+			},
+			expected: "a = \"'\u10A85\"",
+		},
+		{
+			desc: "string utf8 low 2",
+			v: map[string]interface{}{
+				"a": "'\u10A85",
+			},
+			expected: "a = \"'\u10A85\"",
+		},
+		{
+			desc: "emoji",
+			v: map[string]interface{}{
+				"a": "'😀",
+			},
+			expected: "a = \"'😀\"",
+		},
+		{
+			desc: "control char",
+			v: map[string]interface{}{
+				"a": "'\u001A",
+			},
+			expected: `a = "'\u001A"`,
+		},
 	}
 
 	for _, e := range examples {
