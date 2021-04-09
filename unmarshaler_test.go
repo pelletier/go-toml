@@ -918,7 +918,7 @@ func TestIssue287(t *testing.T) {
 	expected := map[string]interface{}{
 		"y": []interface{}{
 			[]interface{}{
-				nil,
+				map[string]interface{}{},
 			},
 		},
 	}
