@@ -382,12 +382,6 @@ func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
 	assertNode(ast.InlineTable, node)
 
 	it := node.Children()
-
-	// Handle the case of an empty inline table
-	if !it.Next() {
-		return x.set(reflect.MakeMap(mapStringInterfaceType))
-	}
-
 	for it.Next() {
 		n := it.Node()
 		err := d.unmarshalKeyValue(x, n)
