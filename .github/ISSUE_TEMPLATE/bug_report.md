@@ -1,6 +1,12 @@
 ---
 name: Bug report
 about: Create a report to help us improve
+---
+
+:bangbang: | Main development focus is on the upcoming [go-toml v2](https://github.com/pelletier/go-toml/discussions/506).
+:---: | :---
+
+As a result, v1.x bugs will likely not see a fix on a v1.x version. However, reporting the bug is the best way to ensure that it will be fixed in v2.
 
 ---
 
@@ -14,7 +20,7 @@ Steps to reproduce the behavior. Including TOML files.
 A clear and concise description of what you expected to happen, if other than "should work".
 
 **Versions**
- - go-toml: version (git sha)
+ - go-toml: version (or git sha)
  - go: version
  - operating system: e.g. macOS, Windows, Linux
 
