@@ -216,6 +216,24 @@ name = 'Alice'
 			},
 			expected: `a = "'\u001A"`,
 		},
+		{
+			desc: "multi-line string",
+			v: map[string]interface{}{
+				"a": "hello\nworld",
+			},
+			expected: `a = "hello\nworld"`,
+		},
+		{
+			desc: "multi-line forced",
+			v: struct {
+				A string `multiline:"true"`
+			}{
+				A: "hello\nworld",
+			},
+			expected: `A = """
+hello
+world"""`,
+		},
 	}
 
 	for _, e := range examples {

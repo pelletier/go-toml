@@ -45,6 +45,12 @@ type encoderCtx struct {
 
 	// Set to true to skip the first table header in an array table.
 	skipTableHeader bool
+
+	options valueOptions
+}
+
+type valueOptions struct {
+	multiline bool
 }
 
 func (ctx *encoderCtx) shiftKey() {
@@ -88,6 +94,18 @@ func NewEncoder(w io.Writer) *Encoder {
 // 4. Keys in key-values always have one part.
 //
 // 5. Intermediate tables are always printed.
+//
+// By default, strings are encoded as literal string, unless they contain either
+// a newline character or a single quote. In that case they are emited as quoted
+// strings.
+//
+// When encoding structs, fields are encoded in order of definition, with their
+// exact name. The following struct tags are available:
+//
+//   `toml:"foo"`: changes the name of the key to use for the field to foo.
+//
+//   `multiline:"true"`: when the field contains a string, it will be emitted as
+//   a quoted multi-line TOML string.
 func (enc *Encoder) Encode(v interface{}) error {
 	var b []byte
 	var ctx encoderCtx
@@ -130,7 +148,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	var err error
 	switch v.Kind() {
 	case reflect.String:
-		b, err = enc.encodeString(b, v.String())
+		b, err = enc.encodeString(b, v.String(), ctx.options)
 	case reflect.Float32:
 		b = strconv.AppendFloat(b, v.Float(), 'f', -1, 32)
 	case reflect.Float64:
@@ -164,7 +182,7 @@ func isNil(v reflect.Value) bool {
 	}
 }
 
-func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
+func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v reflect.Value) ([]byte, error) {
 	var err error
 
 	if !ctx.hasKey {
@@ -187,6 +205,7 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte,
 	subctx := ctx
 	subctx.insideKv = true
 	subctx.shiftKey()
+	subctx.options = options
 
 	b, err = enc.encode(b, subctx, v)
 	if err != nil {
@@ -198,9 +217,9 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, v reflect.Value) ([]byte,
 
 const literalQuote = '\''
 
-func (enc *Encoder) encodeString(b []byte, v string) ([]byte, error) {
+func (enc *Encoder) encodeString(b []byte, v string, options valueOptions) ([]byte, error) {
 	if needsQuoting(v) {
-		b = enc.encodeQuotedString(b, v)
+		b = enc.encodeQuotedString(options.multiline, b, v)
 	} else {
 		b = enc.encodeLiteralString(b, v)
 	}
@@ -219,11 +238,17 @@ func (enc *Encoder) encodeLiteralString(b []byte, v string) []byte {
 	return b
 }
 
-func (enc *Encoder) encodeQuotedString(b []byte, v string) []byte {
-	const stringQuote = '"'
+func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byte {
 	const hextable = "0123456789ABCDEF"
+	stringQuote := `"`
+	if multiline {
+		stringQuote = `"""`
+	}
 
-	b = append(b, stringQuote)
+	b = append(b, stringQuote...)
+	if multiline {
+		b = append(b, '\n')
+	}
 
 	for _, r := range []byte(v) {
 		switch r {
@@ -236,7 +261,11 @@ func (enc *Encoder) encodeQuotedString(b []byte, v string) []byte {
 		case '\f':
 			b = append(b, `\f`...)
 		case '\n':
-			b = append(b, `\n`...)
+			if multiline {
+				b = append(b, r)
+			} else {
+				b = append(b, `\n`...)
+			}
 		case '\r':
 			b = append(b, `\r`...)
 		case '\t':
@@ -254,7 +283,7 @@ func (enc *Encoder) encodeQuotedString(b []byte, v string) []byte {
 		// U+0000 to U+0008, U+000A to U+001F, U+007F
 	}
 
-	b = append(b, stringQuote)
+	b = append(b, stringQuote...)
 	return b
 }
 
@@ -307,7 +336,7 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	}
 
 	if cannotUseLiteral {
-		b = enc.encodeQuotedString(b, k)
+		b = enc.encodeQuotedString(false, b, k)
 	} else if needsQuotation {
 		b = enc.encodeLiteralString(b, k)
 	} else {
@@ -339,9 +368,9 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 		}
 
 		if table {
-			t.pushTable(k, v)
+			t.pushTable(k, v, valueOptions{})
 		} else {
-			t.pushKV(k, v)
+			t.pushKV(k, v, valueOptions{})
 		}
 	}
 
@@ -358,8 +387,9 @@ func sortEntriesByKey(e []entry) {
 }
 
 type entry struct {
-	Key   string
-	Value reflect.Value
+	Key     string
+	Value   reflect.Value
+	Options valueOptions
 }
 
 type table struct {
@@ -367,12 +397,12 @@ type table struct {
 	tables []entry
 }
 
-func (t *table) pushKV(k string, v reflect.Value) {
-	t.kvs = append(t.kvs, entry{Key: k, Value: v})
+func (t *table) pushKV(k string, v reflect.Value, options valueOptions) {
+	t.kvs = append(t.kvs, entry{Key: k, Value: v, Options: options})
 }
 
-func (t *table) pushTable(k string, v reflect.Value) {
-	t.tables = append(t.tables, entry{Key: k, Value: v})
+func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
+	t.tables = append(t.tables, entry{Key: k, Value: v, Options: options})
 }
 
 func (t *table) hasKVs() bool {
@@ -413,10 +443,17 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			return nil, err
 		}
 
+		options := valueOptions{}
+
+		ml, ok := fieldType.Tag.Lookup("multiline")
+		if ok {
+			options.multiline = ml == "true"
+		}
+
 		if willConvert {
-			t.pushTable(k, f)
+			t.pushTable(k, f, options)
 		} else {
-			t.pushKV(k, f)
+			t.pushKV(k, f, options)
 		}
 	}
 
@@ -439,7 +476,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 				b = append(b, `, `...)
 			}
 			ctx.setKey(kv.Key)
-			b, err = enc.encodeKv(b, ctx, kv.Value)
+			b, err = enc.encodeKv(b, ctx, kv.Options, kv.Value)
 			if err != nil {
 				return nil, err
 			}
@@ -473,7 +510,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 
 	for _, kv := range t.kvs {
 		ctx.setKey(kv.Key)
-		b, err = enc.encodeKv(b, ctx, kv.Value)
+		b, err = enc.encodeKv(b, ctx, kv.Options, kv.Value)
 		if err != nil {
 			return nil, err
 		}

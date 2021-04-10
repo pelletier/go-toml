@@ -28,7 +28,7 @@ Development branch. Use at your own risk.
 ### Marshal
 
 - [x] Minimal implementation
-- [ ] Multiline strings
+- [x] Multiline strings
 - [ ] Multiline arrays
 - [ ] `inline` tag for tables
 - [ ] Optional indentation
