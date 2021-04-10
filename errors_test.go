@@ -2,13 +2,17 @@ package toml
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:funlen
 func TestDecodeError(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc     string
 		doc      [3]string
@@ -103,7 +107,7 @@ should not be seen4`},
 		},
 		{
 			desc: "last line of more than 10",
-			doc: [3]string{`should not be seen 
+			doc: [3]string{`should not be seen
 should not be seen
 should not be seen
 should not be seen
@@ -125,7 +129,8 @@ before `, "highlighted", ``},
 		},
 		{
 			desc: "handle empty lines in the before/after blocks",
-			doc: [3]string{`line1
+			doc: [3]string{
+				`line1
 
 line 2
 before `, "highlighted", ` after
@@ -134,21 +139,22 @@ line 3
 line 4
 line 5`,
 			},
-			expected: `
-1| line1
-2| 
-3| line 2
-4| before highlighted after
- |        ~~~~~~~~~~~ 
-5| line 3
-6| 
-7| line 4
-`,
+			expected: "" +
+				"1| line1\n" +
+				"2| \n" +
+				"3| line 2\n" +
+				"4| before highlighted after\n" +
+				" |        ~~~~~~~~~~~ \n" +
+				"5| line 3\n" +
+				"6| \n" +
+				"7| line 4\n",
 		},
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
 			b := bytes.Buffer{}
 			b.Write([]byte(e.doc[0]))
 			start := b.Len()
@@ -162,7 +168,14 @@ line 5`,
 				highlight: hl,
 				message:   e.msg,
 			})
-			derr := err.(*DecodeError)
+
+			var derr *DecodeError
+			if !errors.As(err, &derr) {
+				t.Errorf("error not in expected format")
+
+				return
+			}
+
 			assert.Equal(t, strings.Trim(e.expected, "\n"), derr.String())
 		})
 	}
