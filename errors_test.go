@@ -139,15 +139,14 @@ line 3
 line 4
 line 5`,
 			},
-			expected: "" +
-				"1| line1\n" +
-				"2| \n" +
-				"3| line 2\n" +
-				"4| before highlighted after\n" +
-				" |        ~~~~~~~~~~~ \n" +
-				"5| line 3\n" +
-				"6| \n" +
-				"7| line 4\n",
+			expected: `1| line1
+2|
+3| line 2
+4| before highlighted after
+ |        ~~~~~~~~~~~
+5| line 3
+6|
+7| line 4`,
 		},
 	}
 

@@ -83,8 +83,13 @@ func wrapDecodeError(document []byte, de *decodeError) error {
 	for i := len(before) - 1; i > 0; i-- {
 		line := errLine - i
 		buf.WriteString(formatLineNumber(line, lineColumnWidth))
-		buf.WriteString("| ")
-		buf.Write(before[i])
+		buf.WriteString("|")
+
+		if len(before[i]) > 0 {
+			buf.WriteString(" ")
+			buf.Write(before[i])
+		}
+
 		buf.WriteRune('\n')
 	}
 
@@ -110,15 +115,22 @@ func wrapDecodeError(document []byte, de *decodeError) error {
 	}
 
 	buf.WriteString(strings.Repeat("~", len(de.highlight)))
-	buf.WriteString(" ")
-	buf.WriteString(errMessage)
+
+	if len(errMessage) > 0 {
+		buf.WriteString(" ")
+		buf.WriteString(errMessage)
+	}
 
 	for i := 1; i < len(after); i++ {
 		buf.WriteRune('\n')
 		line := errLine + i
 		buf.WriteString(formatLineNumber(line, lineColumnWidth))
-		buf.WriteString("| ")
-		buf.Write(after[i])
+		buf.WriteString("|")
+
+		if len(after[i]) > 0 {
+			buf.WriteString(" ")
+			buf.Write(after[i])
+		}
 	}
 
 	return &DecodeError{
