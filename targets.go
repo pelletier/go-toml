@@ -24,7 +24,7 @@ type target interface {
 	// Store a float64 at the target
 	setFloat64(v float64) error
 
-	// Stores any  value at the target
+	// Stores any value at the target
 	set(v reflect.Value) error
 }
 

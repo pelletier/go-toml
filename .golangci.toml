@@ -45,7 +45,7 @@ enable = [
     "gosec",
     "gosimple",
     "govet",
-    "ifshort",
+    # "ifshort",
     "importas",
     "ineffassign",
     "lll",
