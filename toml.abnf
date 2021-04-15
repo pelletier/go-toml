@@ -59,6 +59,7 @@ val = string / boolean / array / inline-table / date-time / float / integer
 ;; String
 
 string = ml-basic-string / basic-string / ml-literal-string / literal-string
+
 ;; Basic String
 
 basic-string = quotation-mark *basic-char quotation-mark

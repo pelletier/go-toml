@@ -132,6 +132,7 @@ func TestUnmarshal_Floats(t *testing.T) {
 			desc:  "nan",
 			input: `nan`,
 			testFn: func(t *testing.T, v float64) {
+				t.Helper()
 				assert.True(t, math.IsNaN(v))
 			},
 		},
@@ -139,6 +140,7 @@ func TestUnmarshal_Floats(t *testing.T) {
 			desc:  "nan negative",
 			input: `-nan`,
 			testFn: func(t *testing.T, v float64) {
+				t.Helper()
 				assert.True(t, math.IsNaN(v))
 			},
 		},
@@ -146,6 +148,7 @@ func TestUnmarshal_Floats(t *testing.T) {
 			desc:  "nan positive",
 			input: `+nan`,
 			testFn: func(t *testing.T, v float64) {
+				t.Helper()
 				assert.True(t, math.IsNaN(v))
 			},
 		},
@@ -759,8 +762,10 @@ func TestIssue484(t *testing.T) {
 	}, cfg)
 }
 
-type Map458 map[string]interface{}
-type Slice458 []interface{}
+type (
+	Map458   map[string]interface{}
+	Slice458 []interface{}
+)
 
 func (m Map458) A(s string) Slice458 {
 	return m[s].([]interface{})
@@ -779,7 +784,8 @@ version = "0.1.0"`)
 		map[string]interface{}{
 			"dependencies": []interface{}{"regex"},
 			"name":         "decode",
-			"version":      "0.1.0"},
+			"version":      "0.1.0",
+		},
 	}
 	assert.Equal(t, expected, a)
 }
@@ -790,7 +796,7 @@ func TestIssue252(t *testing.T) {
 		Val2 string `toml:"val2"`
 	}
 
-	var configFile = []byte(
+	configFile := []byte(
 		`
 val1 = "test1"
 `)
@@ -940,7 +946,7 @@ func TestIssue508(t *testing.T) {
 		head
 	}
 
-	var b = []byte(`title = "This is a title"`)
+	b := []byte(`title = "This is a title"`)
 
 	t1 := text{}
 	err := toml.Unmarshal(b, &t1)

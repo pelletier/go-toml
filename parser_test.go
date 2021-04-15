@@ -155,12 +155,14 @@ func TestParser_AST_Numbers(t *testing.T) {
 	}
 }
 
-type astRoot []astNode
-type astNode struct {
-	Kind     ast.Kind
-	Data     []byte
-	Children []astNode
-}
+type (
+	astRoot []astNode
+	astNode struct {
+		Kind     ast.Kind
+		Data     []byte
+		Children []astNode
+	}
+)
 
 func compareAST(t *testing.T, expected astRoot, actual *ast.Root) {
 	it := actual.Iterator()
@@ -168,6 +170,7 @@ func compareAST(t *testing.T, expected astRoot, actual *ast.Root) {
 }
 
 func compareNode(t *testing.T, e astNode, n ast.Node) {
+	t.Helper()
 	require.Equal(t, e.Kind, n.Kind)
 	require.Equal(t, e.Data, n.Data)
 
@@ -175,6 +178,7 @@ func compareNode(t *testing.T, e astNode, n ast.Node) {
 }
 
 func compareIterator(t *testing.T, expected []astNode, actual ast.Iterator) {
+	t.Helper()
 	idx := 0
 
 	for actual.Next() {
