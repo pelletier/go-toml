@@ -23,6 +23,7 @@
 //
 // Because they lack location information, these types do not represent unique
 // moments or intervals of time. Use time.Time for that purpose.
+
 package toml
 
 import (
