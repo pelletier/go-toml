@@ -10,6 +10,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
+	"github.com/pelletier/go-toml/v2/internal/unsafe"
 )
 
 func Unmarshal(data []byte, v interface{}) error {
@@ -21,12 +22,26 @@ func Unmarshal(data []byte, v interface{}) error {
 
 // Decoder reads and decode a TOML document from an input stream.
 type Decoder struct {
+	// input
 	r io.Reader
+
+	// global settings
+	strict bool
 }
 
 // NewDecoder creates a new Decoder that will read from r.
 func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{r: r}
+}
+
+// SetStrict toggles decoding in stict mode.
+//
+// When the decoder is in strict mode, it will record fields from the document
+// that could not be set on the target value. In that case, the decoder returns
+// a StrictMissingError that can be used to retrieve the individual errors as
+// well as generate a human readable description of the missing fields.
+func (d *Decoder) SetStrict(strict bool) {
+	d.strict = strict
 }
 
 // Decode the whole content of r into v.
@@ -43,7 +58,9 @@ func (d *Decoder) Decode(v interface{}) error {
 	}
 	p := parser{}
 	p.Reset(b)
-	dec := decoder{}
+	dec := decoder{
+		strict: d.strict,
+	}
 	return dec.FromParser(&p, v)
 }
 
@@ -53,6 +70,10 @@ type decoder struct {
 
 	// Tracks keys that have been seen, with which type.
 	seen tracker.Seen
+
+	// Strict mode
+	strict        bool
+	strictMissing []decodeError
 }
 
 func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
@@ -78,8 +99,31 @@ func (d *decoder) FromParser(p *parser, v interface{}) error {
 		if ok {
 			err = wrapDecodeError(p.data, de)
 		}
+	} else if d.strict && len(d.strictMissing) > 0 {
+		missing := &StrictMissingError{
+			Errors: make([]DecodeError, 0, len(d.strictMissing)),
+		}
+		for _, derr := range d.strictMissing {
+			missing.Errors = append(missing.Errors, *wrapDecodeError(p.data, &derr))
+		}
+		err = missing
 	}
+
 	return err
+}
+
+func keyLocation(node ast.Node) []byte {
+	k := node.Key()
+	hasOne := k.Next()
+	if !hasOne {
+		panic("should not be called with empty key")
+	}
+	start := k.Node().Data
+	end := k.Node().Data
+	for k.Next() {
+		end = k.Node().Data
+	}
+	return unsafe.BytesRange(start, end)
 }
 
 func (d *decoder) fromParser(p *parser, v interface{}) error {
@@ -224,6 +268,13 @@ func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
 
 	// A struct in the path was not found. Skip this value.
 	if !found {
+		// In strict mode, made a record of the location that failed.
+		if d.strict {
+			d.strictMissing = append(d.strictMissing, decodeError{
+				highlight: keyLocation(node),
+				message:   "missing field",
+			})
+		}
 		return nil
 	}
 

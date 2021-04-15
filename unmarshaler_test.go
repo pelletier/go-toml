@@ -1,8 +1,10 @@
 package toml_test
 
 import (
+	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -988,4 +990,32 @@ func TestIssue508(t *testing.T) {
 	err := toml.Unmarshal(b, &t1)
 	require.NoError(t, err)
 	require.Equal(t, "This is a title", t1.head.Title)
+}
+
+func ExampleDecoder_SetStrict() {
+	type S struct {
+		Key1 string
+		Key3 string
+	}
+	doc := `
+key1 = "value1"
+key2 = "value2"
+key3 = "value3"
+`
+	r := strings.NewReader(doc)
+	d := toml.NewDecoder(r)
+	d.SetStrict(true)
+	s := S{}
+	err := d.Decode(&s)
+
+	fmt.Println(err.Error())
+	// Output: strict mode: fields in the document are missing in the target struct
+
+	details := err.(*toml.StrictMissingError)
+	fmt.Println(details.String())
+	// Ouput:
+	// 2| key1 = "value1"
+	// 3| key2 = "value2"
+	//  | ~~~~ missing field
+	// 4| key3 = "value3"
 }
