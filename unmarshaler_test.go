@@ -931,3 +931,19 @@ func TestIssue287(t *testing.T) {
 	}
 	require.Equal(t, expected, v)
 }
+
+func TestIssue508(t *testing.T) {
+	type head struct {
+		Title string `toml:"title"`
+	}
+	type text struct {
+		head
+	}
+
+	var b = []byte(`title = "This is a title"`)
+
+	t1 := text{}
+	err := toml.Unmarshal(b, &t1)
+	require.NoError(t, err)
+	require.Equal(t, "This is a title", t1.head.Title)
+}

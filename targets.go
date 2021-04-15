@@ -516,11 +516,10 @@ func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 				l := len(path)
 				path = append(path, i)
 				f := t.Field(i)
-				if f.PkgPath != "" {
-					// only consider exported fields
-				} else if f.Anonymous {
+				if f.Anonymous {
 					walk(v.Field(i))
-				} else {
+				} else if f.PkgPath == "" {
+					// only consider exported fields
 					fieldName, ok := f.Tag.Lookup("toml")
 					if !ok {
 						fieldName = f.Name
