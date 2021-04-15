@@ -818,6 +818,13 @@ bar = 2021-04-08
 	require.NoError(t, err)
 }
 
+func TestIssue507(t *testing.T) {
+	data := []byte{'0', '=', '\n', '0', 'a', 'm', 'e'}
+	m := map[string]interface{}{}
+	err := toml.Unmarshal(data, &m)
+	require.Error(t, err)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
