@@ -992,6 +992,53 @@ func TestIssue508(t *testing.T) {
 	require.Equal(t, "This is a title", t1.head.Title)
 }
 
+func TestDecoderStrict(t *testing.T) {
+	examples := []struct {
+		desc     string
+		input    string
+		expected string
+		target   interface{}
+	}{
+		{
+			desc: "multiple missing root keys",
+			input: `
+key1 = "value1"
+key2 = "missing2"
+key3 = "missing3"
+key4 = "value4"
+`,
+			expected: `
+2| key1 = "value1"
+3| key2 = "missing2"
+ | ~~~~ missing field
+4| key3 = "missing3"
+5| key4 = "value4"
+---
+2| key1 = "value1"
+3| key2 = "missing2"
+4| key3 = "missing3"
+ | ~~~~ missing field
+5| key4 = "value4"
+`,
+			target: &struct {
+				Key1 string
+				Key4 string
+			}{},
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			r := strings.NewReader(e.input)
+			d := toml.NewDecoder(r)
+			d.SetStrict(true)
+			err := d.Decode(e.target)
+			details := err.(*toml.StrictMissingError)
+			equalStringsIgnoreNewlines(t, e.expected, details.String())
+		})
+	}
+}
+
 func ExampleDecoder_SetStrict() {
 	type S struct {
 		Key1 string

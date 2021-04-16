@@ -42,7 +42,7 @@ func (s *StrictMissingError) String() string {
 	var buf strings.Builder
 	for i, e := range s.Errors {
 		if i > 0 {
-			buf.WriteRune('\n')
+			buf.WriteString("\n---\n")
 		}
 		buf.WriteString(e.String())
 	}
