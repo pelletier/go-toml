@@ -55,10 +55,5 @@ func BytesRange(start []byte, end []byte) []byte {
 		panic(fmt.Errorf("range length is larger than capacity"))
 	}
 
-	var data []byte
-	p := (*reflect.SliceHeader)(unsafe.Pointer(&data))
-	p.Data = startp.Data
-	p.Cap = startp.Cap
-	p.Len = l
-	return data
+	return start[:l]
 }
