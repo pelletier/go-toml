@@ -709,6 +709,42 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "windows line endings",
+			input: "A = 1\r\n\r\nB = 2",
+			gen: func() test {
+				doc := map[string]interface{}{}
+				return test{
+					target: &doc,
+					expected: &map[string]interface{}{
+						"A": int64(1),
+						"B": int64(2),
+					},
+				}
+			},
+		},
+		{
+			desc:  "dangling CR",
+			input: "A = 1\r",
+			gen: func() test {
+				doc := map[string]interface{}{}
+				return test{
+					target: &doc,
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "missing NL after CR",
+			input: "A = 1\rB = 2",
+			gen: func() test {
+				doc := map[string]interface{}{}
+				return test{
+					target: &doc,
+					err:    true,
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
