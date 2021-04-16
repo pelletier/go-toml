@@ -1025,6 +1025,39 @@ key4 = "value4"
 				Key4 string
 			}{},
 		},
+		{
+			desc:  "multi-part key",
+			input: `a.short.key="foo"`,
+			expected: `
+1| a.short.key="foo"
+ | ~~~~~~~~~~~ missing field
+`,
+		},
+		{
+			desc: "missing table",
+			input: `
+[foo]
+bar = 42
+`,
+			expected: `
+2| [foo]
+ |  ~~~ missing table
+3| bar = 42
+`,
+		},
+
+		{
+			desc: "missing array table",
+			input: `
+[[foo]]
+bar = 42
+`,
+			expected: `
+2| [[foo]]
+ |   ~~~ missing table
+3| bar = 42
+`,
+		},
 	}
 
 	for _, e := range examples {
@@ -1032,7 +1065,11 @@ key4 = "value4"
 			r := strings.NewReader(e.input)
 			d := toml.NewDecoder(r)
 			d.SetStrict(true)
-			err := d.Decode(e.target)
+			x := e.target
+			if x == nil {
+				x = &struct{}{}
+			}
+			err := d.Decode(x)
 			details := err.(*toml.StrictMissingError)
 			equalStringsIgnoreNewlines(t, e.expected, details.String())
 		})

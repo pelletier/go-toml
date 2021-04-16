@@ -178,6 +178,12 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 
 		if !found {
 			skipUntilTable = true
+			if d.strict {
+				d.strictMissing = append(d.strictMissing, decodeError{
+					highlight: keyLocation(node),
+					message:   "missing table",
+				})
+			}
 		}
 	}
 
