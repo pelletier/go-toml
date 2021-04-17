@@ -59,7 +59,9 @@ func (d *Decoder) Decode(v interface{}) error {
 	p := parser{}
 	p.Reset(b)
 	dec := decoder{
-		strict: d.strict,
+		strict: strict{
+			Enabled: d.strict,
+		},
 	}
 	return dec.FromParser(&p, v)
 }
@@ -69,11 +71,13 @@ type decoder struct {
 	arrayIndexes map[reflect.Value]int
 
 	// Tracks keys that have been seen, with which type.
-	seen tracker.Seen
+	seen tracker.SeenTracker
+
+	// Tracks the current key being processed.
+	key tracker.KeyTracker
 
 	// Strict mode
-	strict        bool
-	strictMissing []decodeError
+	strict strict
 }
 
 func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
@@ -99,14 +103,9 @@ func (d *decoder) FromParser(p *parser, v interface{}) error {
 		if ok {
 			err = wrapDecodeError(p.data, de)
 		}
-	} else if d.strict && len(d.strictMissing) > 0 {
-		missing := &StrictMissingError{
-			Errors: make([]DecodeError, 0, len(d.strictMissing)),
-		}
-		for _, derr := range d.strictMissing {
-			missing.Errors = append(missing.Errors, *wrapDecodeError(p.data, &derr))
-		}
-		err = missing
+	}
+	if err == nil {
+		err = d.strict.Error()
 	}
 
 	return err
@@ -157,6 +156,9 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			err = d.unmarshalKeyValue(current, node)
 			found = true
 		case ast.Table:
+			if d.strict {
+				d.key.UpdateTable(node)
+			}
 			current, found, err = d.scopeWithKey(root, node.Key())
 			if err == nil && found {
 				// In case this table points to an interface,
@@ -167,6 +169,9 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 				ensureMapIfInterface(current)
 			}
 		case ast.ArrayTable:
+			if d.strict {
+				d.key.UpdateArrayTable(node)
+			}
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
 			panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
@@ -178,12 +183,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 
 		if !found {
 			skipUntilTable = true
-			if d.strict {
-				d.strictMissing = append(d.strictMissing, decodeError{
-					highlight: keyLocation(node),
-					message:   "missing table",
-				})
-			}
+			d.strict.MissingTable(node)
 		}
 	}
 
@@ -267,6 +267,11 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
 	assertNode(ast.KeyValue, node)
 
+	if d.strict {
+		d.key.Push(node)
+		defer d.key.Pop(node)
+	}
+
 	x, found, err := d.scopeWithKey(x, node.Key())
 	if err != nil {
 		return err
@@ -274,13 +279,7 @@ func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
 
 	// A struct in the path was not found. Skip this value.
 	if !found {
-		// In strict mode, made a record of the location that failed.
-		if d.strict {
-			d.strictMissing = append(d.strictMissing, decodeError{
-				highlight: keyLocation(node),
-				message:   "missing field",
-			})
-		}
+		d.strict.MissingField(node)
 		return nil
 	}
 
