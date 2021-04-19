@@ -131,9 +131,8 @@ var errUnsupportedValue = errors.New("unsupported encode value kind")
 
 //nolint:cyclop
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	//nolint:gocritic
+	//nolint:gocritic,godox
 	switch i := v.Interface().(type) {
-	//nolint:godox
 	case time.Time: // TODO: add TextMarshaler
 		b = i.AppendFormat(b, time.RFC3339)
 
@@ -323,6 +322,7 @@ func (enc *Encoder) encodeTableHeader(b []byte, key []string) ([]byte, error) {
 	b = append(b, '[')
 
 	var err error
+
 	b, err = enc.encodeKey(b, key[0])
 	if err != nil {
 		return nil, err
@@ -330,6 +330,7 @@ func (enc *Encoder) encodeTableHeader(b []byte, key []string) ([]byte, error) {
 
 	for _, k := range key[1:] {
 		b = append(b, '.')
+
 		b, err = enc.encodeKey(b, k)
 		if err != nil {
 			return nil, err
@@ -534,6 +535,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		}
 
 		b = append(b, "}\n"...)
+
 		return b, nil
 	}
 
@@ -571,9 +573,9 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 }
 
 var errNilInterface = errors.New("nil interface not supported")
-var errNilPointer = errors.New("nil pointer not supported")
 
 func willConvertToTable(v reflect.Value) (bool, error) {
+	//nolint:gocritic,godox
 	switch v.Interface().(type) {
 	case time.Time: // TODO: add TextMarshaler
 		return false, nil
@@ -587,11 +589,13 @@ func willConvertToTable(v reflect.Value) (bool, error) {
 		if v.IsNil() {
 			return false, errNilInterface
 		}
+
 		return willConvertToTable(v.Elem())
 	case reflect.Ptr:
 		if v.IsNil() {
 			return false, nil
 		}
+
 		return willConvertToTable(v.Elem())
 	default:
 		return false, nil
@@ -605,6 +609,7 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 		if v.IsNil() {
 			return false, errNilInterface
 		}
+
 		return willConvertToTableOrArrayTable(v.Elem())
 	}
 
@@ -613,15 +618,18 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 			// An empty slice should be a kv = [].
 			return false, nil
 		}
+
 		for i := 0; i < v.Len(); i++ {
 			t, err := willConvertToTable(v.Index(i))
 			if err != nil {
 				return false, err
 			}
+
 			if !t {
 				return false, nil
 			}
 		}
+
 		return true, nil
 	}
 
@@ -631,6 +639,7 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	if v.Len() == 0 {
 		b = append(b, "[]"...)
+
 		return b, nil
 	}
 
@@ -658,25 +667,30 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 	var err error
 	scratch := make([]byte, 0, 64)
 	scratch = append(scratch, "[["...)
+
 	for i, k := range ctx.parentKey {
 		if i > 0 {
 			scratch = append(scratch, '.')
 		}
+
 		scratch, err = enc.encodeKey(scratch, k)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	scratch = append(scratch, "]]\n"...)
 	ctx.skipTableHeader = true
 
 	for i := 0; i < v.Len(); i++ {
 		b = append(b, scratch...)
+
 		b, err = enc.encode(b, ctx, v.Index(i))
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	return b, nil
 }
 
@@ -685,10 +699,12 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 
 	var err error
 	first := true
+
 	for i := 0; i < v.Len(); i++ {
 		if !first {
 			b = append(b, ", "...)
 		}
+
 		first = false
 
 		b, err = enc.encode(b, ctx, v.Index(i))
@@ -698,5 +714,6 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 	}
 
 	b = append(b, ']')
+
 	return b, nil
 }
