@@ -96,7 +96,7 @@ func NewEncoder(w io.Writer) *Encoder {
 // 5. Intermediate tables are always printed.
 //
 // By default, strings are encoded as literal string, unless they contain either
-// a newline character or a single quote. In that case they are emited as quoted
+// a newline character or a single quote. In that case they are emitted as quoted
 // strings.
 //
 // When encoding structs, fields are encoded in order of definition, with their
@@ -107,25 +107,39 @@ func NewEncoder(w io.Writer) *Encoder {
 //   `multiline:"true"`: when the field contains a string, it will be emitted as
 //   a quoted multi-line TOML string.
 func (enc *Encoder) Encode(v interface{}) error {
-	var b []byte
-	var ctx encoderCtx
+	var (
+		b   []byte
+		ctx encoderCtx
+	)
+
 	b, err := enc.encode(b, ctx, reflect.ValueOf(v))
 	if err != nil {
-		return err
+		return fmt.Errorf("Encode: %w", err)
 	}
+
 	_, err = enc.w.Write(b)
-	return err
+	if err != nil {
+		return fmt.Errorf("Encode: %w", err)
+	}
+
+	return nil
 }
 
+var errUnsupportedValue = errors.New("unsupported encode value kind")
+
+//nolint:cyclop
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
+	//nolint:gocritic
 	switch i := v.Interface().(type) {
+	//nolint:godox
 	case time.Time: // TODO: add TextMarshaler
 		b = i.AppendFormat(b, time.RFC3339)
+
 		return b, nil
 	}
 
-	// containers
 	switch v.Kind() {
+	// containers
 	case reflect.Map:
 		return enc.encodeMap(b, ctx, v)
 	case reflect.Struct:
@@ -136,19 +150,18 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 		if v.IsNil() {
 			return nil, errNilInterface
 		}
+
 		return enc.encode(b, ctx, v.Elem())
 	case reflect.Ptr:
 		if v.IsNil() {
 			return enc.encode(b, ctx, reflect.Zero(v.Type().Elem()))
 		}
+
 		return enc.encode(b, ctx, v.Elem())
-	}
 
 	// values
-	var err error
-	switch v.Kind() {
 	case reflect.String:
-		b, err = enc.encodeString(b, v.String(), ctx.options)
+		b = enc.encodeString(b, v.String(), ctx.options)
 	case reflect.Float32:
 		b = strconv.AppendFloat(b, v.Float(), 'f', -1, 32)
 	case reflect.Float64:
@@ -164,10 +177,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Int:
 		b = strconv.AppendInt(b, v.Int(), 10)
 	default:
-		err = fmt.Errorf("unsupported encode value kind: %s", v.Kind())
-	}
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encode(type %s): %w", v.Kind(), errUnsupportedValue)
 	}
 
 	return b, nil
@@ -217,13 +227,12 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 
 const literalQuote = '\''
 
-func (enc *Encoder) encodeString(b []byte, v string, options valueOptions) ([]byte, error) {
+func (enc *Encoder) encodeString(b []byte, v string, options valueOptions) []byte {
 	if needsQuoting(v) {
-		b = enc.encodeQuotedString(options.multiline, b, v)
-	} else {
-		b = enc.encodeLiteralString(b, v)
+		return enc.encodeQuotedString(options.multiline, b, v)
 	}
-	return b, nil
+
+	return enc.encodeLiteralString(b, v)
 }
 
 func needsQuoting(v string) bool {
