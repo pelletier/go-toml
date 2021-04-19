@@ -490,11 +490,13 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 	return enc.encodeTable(b, ctx, t)
 }
 
+//nolint:funlen,cyclop
 func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
 	ctx.shiftKey()
 
+	//nolint:nestif
 	if ctx.insideKv {
 		b = append(b, '{')
 
@@ -505,7 +507,9 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 			} else {
 				b = append(b, `, `...)
 			}
+
 			ctx.setKey(kv.Key)
+
 			b, err = enc.encodeKv(b, ctx, kv.Options, kv.Value)
 			if err != nil {
 				return nil, err
@@ -518,11 +522,14 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 			} else {
 				b = append(b, `, `...)
 			}
+
 			ctx.setKey(table.Key)
+
 			b, err = enc.encode(b, ctx, table.Value)
 			if err != nil {
 				return nil, err
 			}
+
 			b = append(b, '\n')
 		}
 
@@ -540,19 +547,23 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 
 	for _, kv := range t.kvs {
 		ctx.setKey(kv.Key)
+
 		b, err = enc.encodeKv(b, ctx, kv.Options, kv.Value)
 		if err != nil {
 			return nil, err
 		}
+
 		b = append(b, '\n')
 	}
 
 	for _, table := range t.tables {
 		ctx.setKey(table.Key)
+
 		b, err = enc.encode(b, ctx, table.Value)
 		if err != nil {
 			return nil, err
 		}
+
 		b = append(b, '\n')
 	}
 
