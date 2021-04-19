@@ -4,6 +4,9 @@ golangci-lint-version =  "1.39.0"
 [linters-settings.wsl]
 allow-assign-and-anything = true
 
+[linters-settings.exhaustive]
+default-signifies-exhaustive = true
+
 [linters]
 disable-all = true
 enable = [
