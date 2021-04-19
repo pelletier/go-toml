@@ -87,14 +87,14 @@ also = 'that'
 a = 'test'`,
 		},
 		{
-			desc: "simple string slice",
+			desc: "simple string array",
 			v: map[string][]string{
-				"slice": {"one", "two", "three"},
+				"array": {"one", "two", "three"},
 			},
-			expected: `slice = ['one', 'two', 'three']`,
+			expected: `array = ['one', 'two', 'three']`,
 		},
 		{
-			desc:     "empty string slice",
+			desc:     "empty string array",
 			v:        map[string][]string{},
 			expected: ``,
 		},
@@ -104,21 +104,21 @@ a = 'test'`,
 			expected: ``,
 		},
 		{
-			desc: "nested string slices",
+			desc: "nested string arrays",
 			v: map[string][][]string{
-				"slice": {{"one", "two"}, {"three"}},
+				"array": {{"one", "two"}, {"three"}},
 			},
-			expected: `slice = [['one', 'two'], ['three']]`,
+			expected: `array = [['one', 'two'], ['three']]`,
 		},
 		{
-			desc: "mixed strings and nested string slices",
+			desc: "mixed strings and nested string arrays",
 			v: map[string][]interface{}{
-				"slice": {"a string", []string{"one", "two"}, "last"},
+				"array": {"a string", []string{"one", "two"}, "last"},
 			},
-			expected: `slice = ['a string', ['one', 'two'], 'last']`,
+			expected: `array = ['a string', ['one', 'two'], 'last']`,
 		},
 		{
-			desc: "slice of maps",
+			desc: "array of maps",
 			v: map[string][]map[string]string{
 				"top": {
 					{"map1.1": "v1.1"},
@@ -171,7 +171,7 @@ K2 = 'v2'
 `,
 		},
 		{
-			desc: "structs in slice with interfaces",
+			desc: "structs in array with interfaces",
 			v: map[string]interface{}{
 				"root": map[string]interface{}{
 					"nested": []interface{}{
