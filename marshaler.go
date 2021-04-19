@@ -438,10 +438,6 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 	t.tables = append(t.tables, entry{Key: k, Value: v, Options: options})
 }
 
-func (t *table) hasKVs() bool {
-	return len(t.kvs) > 0
-}
-
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	t := table{}
 
