@@ -11,7 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:funlen
 func TestMarshal(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc     string
 		v        interface{}
@@ -65,6 +68,7 @@ hello = 'world'`,
 a = 'test'`,
 		},
 		{
+			//nolint:godox
 			// TODO: this test is flaky because output changes depending on
 			//   the map iteration order.
 			desc: "map in map in map and string with values",
@@ -83,25 +87,35 @@ also = 'that'
 a = 'test'`,
 		},
 		{
-			desc: "simple string array",
+			desc: "simple string slice",
 			v: map[string][]string{
-				"array": {"one", "two", "three"},
+				"slice": {"one", "two", "three"},
 			},
-			expected: `array = ['one', 'two', 'three']`,
+			expected: `slice = ['one', 'two', 'three']`,
 		},
 		{
-			desc: "nested string arrays",
+			desc:     "empty string slice",
+			v:        map[string][]string{},
+			expected: ``,
+		},
+		{
+			desc:     "map",
+			v:        map[string][]string{},
+			expected: ``,
+		},
+		{
+			desc: "nested string slices",
 			v: map[string][][]string{
-				"array": {{"one", "two"}, {"three"}},
+				"slice": {{"one", "two"}, {"three"}},
 			},
-			expected: `array = [['one', 'two'], ['three']]`,
+			expected: `slice = [['one', 'two'], ['three']]`,
 		},
 		{
-			desc: "mixed strings and nested string arrays",
+			desc: "mixed strings and nested string slices",
 			v: map[string][]interface{}{
-				"array": {"a string", []string{"one", "two"}, "last"},
+				"slice": {"a string", []string{"one", "two"}, "last"},
 			},
-			expected: `array = ['a string', ['one', 'two'], 'last']`,
+			expected: `slice = ['a string', ['one', 'two'], 'last']`,
 		},
 		{
 			desc: "slice of maps",
@@ -237,7 +251,10 @@ world"""`,
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			b, err := toml.Marshal(e.v)
 			if e.err {
 				require.Error(t, err)
@@ -256,6 +273,8 @@ func equalStringsIgnoreNewlines(t *testing.T, expected string, actual string) {
 }
 
 func TestIssue436(t *testing.T) {
+	t.Parallel()
+
 	data := []byte(`{"a": [ { "b": { "c": "d" } } ]}`)
 
 	var v interface{}
