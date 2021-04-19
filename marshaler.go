@@ -18,10 +18,12 @@ import (
 func Marshal(v interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := NewEncoder(&buf)
+
 	err := enc.Encode(v)
 	if err != nil {
 		return nil, err
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -239,17 +241,19 @@ func needsQuoting(v string) bool {
 	return strings.ContainsAny(v, "'\b\f\n\r\t")
 }
 
-// caller should have checked that the string does not contain new lines or '
+// caller should have checked that the string does not contain new lines or ' .
 func (enc *Encoder) encodeLiteralString(b []byte, v string) []byte {
 	b = append(b, literalQuote)
 	b = append(b, v...)
 	b = append(b, literalQuote)
+
 	return b
 }
 
+//nolint:cyclop
 func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byte {
-	const hextable = "0123456789ABCDEF"
 	stringQuote := `"`
+
 	if multiline {
 		stringQuote = `"""`
 	}
@@ -258,6 +262,16 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 	if multiline {
 		b = append(b, '\n')
 	}
+
+	const (
+		hextable = "0123456789ABCDEF"
+		// U+0000 to U+0008, U+000A to U+001F, U+007F
+		nul = 0x0
+		bs  = 0x8
+		lf  = 0xa
+		us  = 0x1f
+		del = 0x7f
+	)
 
 	for _, r := range []byte(v) {
 		switch r {
@@ -281,7 +295,7 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 			b = append(b, `\t`...)
 		default:
 			switch {
-			case r >= 0x0 && r <= 0x8, r >= 0xA && r <= 0x1F, r == 0x7F:
+			case r >= nul && r <= bs, r >= lf && r <= us, r == del:
 				b = append(b, `\u00`...)
 				b = append(b, hextable[r>>4])
 				b = append(b, hextable[r&0x0f])
@@ -289,10 +303,10 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 				b = append(b, r)
 			}
 		}
-		// U+0000 to U+0008, U+000A to U+001F, U+007F
 	}
 
 	b = append(b, stringQuote...)
+
 	return b
 }
 
