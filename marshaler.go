@@ -439,8 +439,9 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 }
 
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	t := table{}
+	var t table
 
+	//nolint:godox
 	// TODO: cache this?
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
@@ -472,7 +473,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			return nil, err
 		}
 
-		options := valueOptions{}
+		var options valueOptions
 
 		ml, ok := fieldType.Tag.Lookup("multiline")
 		if ok {
