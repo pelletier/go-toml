@@ -310,7 +310,7 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 	return b
 }
 
-// called should have checked that the string is in A-Z / a-z / 0-9 / - / _
+// called should have checked that the string is in A-Z / a-z / 0-9 / - / _ .
 func (enc *Encoder) encodeUnquotedKey(b []byte, v string) []byte {
 	return append(b, v...)
 }
@@ -341,6 +341,9 @@ func (enc *Encoder) encodeTableHeader(b []byte, key []string) ([]byte, error) {
 	return b, nil
 }
 
+var errTomlNoMultiline = errors.New("TOML does not support multiline keys")
+
+//nolint:cyclop
 func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	needsQuotation := false
 	cannotUseLiteral := false
@@ -349,32 +352,39 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' {
 			continue
 		}
+
 		if c == '\n' {
-			return nil, fmt.Errorf("TOML does not support multiline keys")
+			return nil, errTomlNoMultiline
 		}
+
 		if c == literalQuote {
 			cannotUseLiteral = true
 		}
+
 		needsQuotation = true
 	}
 
-	if cannotUseLiteral {
-		b = enc.encodeQuotedString(false, b, k)
-	} else if needsQuotation {
-		b = enc.encodeLiteralString(b, k)
-	} else {
-		b = enc.encodeUnquotedKey(b, k)
+	switch {
+	case cannotUseLiteral:
+		return enc.encodeQuotedString(false, b, k), nil
+	case needsQuotation:
+		return enc.encodeLiteralString(b, k), nil
+	default:
+		return enc.encodeUnquotedKey(b, k), nil
 	}
-
-	return b, nil
 }
+
+var errNotSupportedAsMapKey = errors.New("type not supported as map key")
 
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	if v.Type().Key().Kind() != reflect.String {
-		return nil, fmt.Errorf("type '%s' not supported as map key", v.Type().Key().Kind())
+		return nil, fmt.Errorf("encodeMap '%s': %w", v.Type().Key().Kind(), errNotSupportedAsMapKey)
 	}
 
-	t := table{}
+	var (
+		t                 table
+		emptyValueOptions valueOptions
+	)
 
 	iter := v.MapRange()
 	for iter.Next() {
@@ -391,9 +401,9 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 		}
 
 		if table {
-			t.pushTable(k, v, valueOptions{})
+			t.pushTable(k, v, emptyValueOptions)
 		} else {
-			t.pushKV(k, v, valueOptions{})
+			t.pushKV(k, v, emptyValueOptions)
 		}
 	}
 
