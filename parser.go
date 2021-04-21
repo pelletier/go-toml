@@ -354,7 +354,6 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 
 		if first {
 			p.builder.AttachChild(parent, kv)
-			first = false
 		} else {
 			p.builder.Chain(child, kv)
 		}
@@ -369,7 +368,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 
 var errArrayCanNotStartWithComma = errors.New("array cannot start with comma")
 
-//nolint:funlen
+//nolint:funlen,cyclop
 func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
@@ -428,7 +427,6 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		if first {
 			p.builder.AttachChild(parent, valueRef)
-			first = false
 		} else {
 			p.builder.Chain(lastChild, valueRef)
 		}
@@ -493,7 +491,7 @@ func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 
 var errInvalidEscapeChar = errors.New("invalid escaped character")
 
-//nolint:funlen,gocognit
+//nolint:funlen,gocognit,cyclop
 func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
@@ -655,7 +653,7 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen,cyclop
 func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
@@ -813,7 +811,7 @@ func digitsToInt(b []byte) int {
 
 var errTimezoneButNoTimeComponent = errors.New("possible DateTime cannot have a timezone but no time component")
 
-//nolint:gocognit
+//nolint:gocognit,cyclop
 func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
