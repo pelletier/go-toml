@@ -136,7 +136,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 
 var (
 	errParseLocalDateTimeWrongLength = errors.New(
-		"local datetimes are expected to have the format YYYY-MM-DDTHH:MM:SS[.NNNNNN]",
+		"local datetimes are expected to have the format YYYY-MM-DDTHH:MM:SS[.NNNNNNNNN]",
 	)
 	errParseLocalDateTimeWrongSeparator = errors.New("datetime separator is expected to be T or a space")
 )
@@ -144,8 +144,8 @@ var (
 func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	var dt LocalDateTime
 
-	const localDateTimeByteLen = 11
-	if len(b) < localDateTimeByteLen {
+	const localDateTimeByteMinLen = 11
+	if len(b) < localDateTimeByteMinLen {
 		return dt, nil, errParseLocalDateTimeWrongLength
 	}
 
@@ -207,16 +207,39 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, err
 	}
 
-	if len(b) >= 15 && b[8] == '.' {
-		t.Nanosecond, err = parseDecimalDigits(b[9:15])
-		if err != nil {
-			return t, nil, err
+	if len(b) >= 9 && b[8] == '.' {
+		frac := 0
+		digits := 0
+
+		for i, c := range b[9:] {
+			if !isDigit(c) {
+				if i == 0 {
+					return t, nil, newDecodeError(b[i:i+1], "need at least one digit after fraction point")
+				}
+
+				break
+			}
+			if i >= 9 {
+				return t, nil, newDecodeError(b[i:i+1], "maximum precision for date time is nanosecond")
+			}
+
+			frac *= 10
+			frac += int(c - '0')
+			digits++
 		}
 
-		return t, b[15:], nil
+		t.Nanosecond = frac * nanosecPower(digits)
+
+		return t, b[9+digits:], nil
 	}
 
 	return t, b[8:], nil
+}
+
+var nspow = []int{0, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1e0}
+
+func nanosecPower(n int) int {
+	return nspow[n]
 }
 
 var (

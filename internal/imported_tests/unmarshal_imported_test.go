@@ -1430,211 +1430,210 @@ func TestUnmarshalPreservesUnexportedFields(t *testing.T) {
 	})
 }
 
-//
-//func TestUnmarshalLocalDate(t *testing.T) {
-//	t.Run("ToLocalDate", func(t *testing.T) {
-//		type dateStruct struct {
-//			Date toml.LocalDate
-//		}
-//
-//		doc := `date = 1979-05-27`
-//
-//		var obj dateStruct
-//
-//		err := toml.Unmarshal([]byte(doc), &obj)
-//
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//
-//		if obj.Date.Year != 1979 {
-//			t.Errorf("expected year 1979, got %d", obj.Date.Year)
-//		}
-//		if obj.Date.Month != 5 {
-//			t.Errorf("expected month 5, got %d", obj.Date.Month)
-//		}
-//		if obj.Date.Day != 27 {
-//			t.Errorf("expected day 27, got %d", obj.Date.Day)
-//		}
-//	})
-//
-//	t.Run("ToLocalDate", func(t *testing.T) {
-//		type dateStruct struct {
-//			Date time.Time
-//		}
-//
-//		doc := `date = 1979-05-27`
-//
-//		var obj dateStruct
-//
-//		err := toml.Unmarshal([]byte(doc), &obj)
-//
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//
-//		if obj.Date.Year() != 1979 {
-//			t.Errorf("expected year 1979, got %d", obj.Date.Year())
-//		}
-//		if obj.Date.Month() != 5 {
-//			t.Errorf("expected month 5, got %d", obj.Date.Month())
-//		}
-//		if obj.Date.Day() != 27 {
-//			t.Errorf("expected day 27, got %d", obj.Date.Day())
-//		}
-//	})
-//}
-//
-//func TestUnmarshalLocalDateTime(t *testing.T) {
-//	examples := []struct {
-//		name string
-//		in   string
-//		out  toml.LocalDateTime
-//	}{
-//		{
-//			name: "normal",
-//			in:   "1979-05-27T07:32:00",
-//			out: toml.LocalDateTime{
-//				Date: toml.LocalDate{
-//					Year:  1979,
-//					Month: 5,
-//					Day:   27,
-//				},
-//				Time: toml.LocalTime{
-//					Hour:       7,
-//					Minute:     32,
-//					Second:     0,
-//					Nanosecond: 0,
-//				},
-//			}},
-//		{
-//			name: "with nanoseconds",
-//			in:   "1979-05-27T00:32:00.999999",
-//			out: toml.LocalDateTime{
-//				Date: toml.LocalDate{
-//					Year:  1979,
-//					Month: 5,
-//					Day:   27,
-//				},
-//				Time: toml.LocalTime{
-//					Hour:       0,
-//					Minute:     32,
-//					Second:     0,
-//					Nanosecond: 999999000,
-//				},
-//			},
-//		},
-//	}
-//
-//	for i, example := range examples {
-//		doc := fmt.Sprintf(`date = %s`, example.in)
-//
-//		t.Run(fmt.Sprintf("ToLocalDateTime_%d_%s", i, example.name), func(t *testing.T) {
-//			type dateStruct struct {
-//				Date toml.LocalDateTime
-//			}
-//
-//			var obj dateStruct
-//
-//			err := toml.Unmarshal([]byte(doc), &obj)
-//
-//			if err != nil {
-//				t.Fatal(err)
-//			}
-//
-//			if obj.Date != example.out {
-//				t.Errorf("expected '%s', got '%s'", example.out, obj.Date)
-//			}
-//		})
-//
-//		t.Run(fmt.Sprintf("ToTime_%d_%s", i, example.name), func(t *testing.T) {
-//			type dateStruct struct {
-//				Date time.Time
-//			}
-//
-//			var obj dateStruct
-//
-//			err := toml.Unmarshal([]byte(doc), &obj)
-//
-//			if err != nil {
-//				t.Fatal(err)
-//			}
-//
-//			if obj.Date.Year() != example.out.Date.Year {
-//				t.Errorf("expected year %d, got %d", example.out.Date.Year, obj.Date.Year())
-//			}
-//			if obj.Date.Month() != example.out.Date.Month {
-//				t.Errorf("expected month %d, got %d", example.out.Date.Month, obj.Date.Month())
-//			}
-//			if obj.Date.Day() != example.out.Date.Day {
-//				t.Errorf("expected day %d, got %d", example.out.Date.Day, obj.Date.Day())
-//			}
-//			if obj.Date.Hour() != example.out.Time.Hour {
-//				t.Errorf("expected hour %d, got %d", example.out.Time.Hour, obj.Date.Hour())
-//			}
-//			if obj.Date.Minute() != example.out.Time.Minute {
-//				t.Errorf("expected minute %d, got %d", example.out.Time.Minute, obj.Date.Minute())
-//			}
-//			if obj.Date.Second() != example.out.Time.Second {
-//				t.Errorf("expected second %d, got %d", example.out.Time.Second, obj.Date.Second())
-//			}
-//			if obj.Date.Nanosecond() != example.out.Time.Nanosecond {
-//				t.Errorf("expected nanoseconds %d, got %d", example.out.Time.Nanosecond, obj.Date.Nanosecond())
-//			}
-//		})
-//	}
-//}
-//
-//func TestUnmarshalLocalTime(t *testing.T) {
-//	examples := []struct {
-//		name string
-//		in   string
-//		out  toml.LocalTime
-//	}{
-//		{
-//			name: "normal",
-//			in:   "07:32:00",
-//			out: toml.LocalTime{
-//				Hour:       7,
-//				Minute:     32,
-//				Second:     0,
-//				Nanosecond: 0,
-//			},
-//		},
-//		{
-//			name: "with nanoseconds",
-//			in:   "00:32:00.999999",
-//			out: toml.LocalTime{
-//				Hour:       0,
-//				Minute:     32,
-//				Second:     0,
-//				Nanosecond: 999999000,
-//			},
-//		},
-//	}
-//
-//	for i, example := range examples {
-//		doc := fmt.Sprintf(`Time = %s`, example.in)
-//
-//		t.Run(fmt.Sprintf("ToLocalTime_%d_%s", i, example.name), func(t *testing.T) {
-//			type dateStruct struct {
-//				Time toml.LocalTime
-//			}
-//
-//			var obj dateStruct
-//
-//			err := toml.Unmarshal([]byte(doc), &obj)
-//
-//			if err != nil {
-//				t.Fatal(err)
-//			}
-//
-//			if obj.Time != example.out {
-//				t.Errorf("expected '%s', got '%s'", example.out, obj.Time)
-//			}
-//		})
-//	}
-//}
+func TestUnmarshalLocalDate(t *testing.T) {
+	t.Run("ToLocalDate", func(t *testing.T) {
+		type dateStruct struct {
+			Date toml.LocalDate
+		}
+
+		doc := `date = 1979-05-27`
+
+		var obj dateStruct
+
+		err := toml.Unmarshal([]byte(doc), &obj)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if obj.Date.Year != 1979 {
+			t.Errorf("expected year 1979, got %d", obj.Date.Year)
+		}
+		if obj.Date.Month != 5 {
+			t.Errorf("expected month 5, got %d", obj.Date.Month)
+		}
+		if obj.Date.Day != 27 {
+			t.Errorf("expected day 27, got %d", obj.Date.Day)
+		}
+	})
+
+	t.Run("ToLocalDate", func(t *testing.T) {
+		type dateStruct struct {
+			Date time.Time
+		}
+
+		doc := `date = 1979-05-27`
+
+		var obj dateStruct
+
+		err := toml.Unmarshal([]byte(doc), &obj)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if obj.Date.Year() != 1979 {
+			t.Errorf("expected year 1979, got %d", obj.Date.Year())
+		}
+		if obj.Date.Month() != 5 {
+			t.Errorf("expected month 5, got %d", obj.Date.Month())
+		}
+		if obj.Date.Day() != 27 {
+			t.Errorf("expected day 27, got %d", obj.Date.Day())
+		}
+	})
+}
+
+func TestUnmarshalLocalDateTime(t *testing.T) {
+	examples := []struct {
+		name string
+		in   string
+		out  toml.LocalDateTime
+	}{
+		{
+			name: "normal",
+			in:   "1979-05-27T07:32:00",
+			out: toml.LocalDateTime{
+				Date: toml.LocalDate{
+					Year:  1979,
+					Month: 5,
+					Day:   27,
+				},
+				Time: toml.LocalTime{
+					Hour:       7,
+					Minute:     32,
+					Second:     0,
+					Nanosecond: 0,
+				},
+			}},
+		{
+			name: "with nanoseconds",
+			in:   "1979-05-27T00:32:00.999999",
+			out: toml.LocalDateTime{
+				Date: toml.LocalDate{
+					Year:  1979,
+					Month: 5,
+					Day:   27,
+				},
+				Time: toml.LocalTime{
+					Hour:       0,
+					Minute:     32,
+					Second:     0,
+					Nanosecond: 999999000,
+				},
+			},
+		},
+	}
+
+	for i, example := range examples {
+		doc := fmt.Sprintf(`date = %s`, example.in)
+
+		t.Run(fmt.Sprintf("ToLocalDateTime_%d_%s", i, example.name), func(t *testing.T) {
+			type dateStruct struct {
+				Date toml.LocalDateTime
+			}
+
+			var obj dateStruct
+
+			err := toml.Unmarshal([]byte(doc), &obj)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if obj.Date != example.out {
+				t.Errorf("expected '%s', got '%s'", example.out, obj.Date)
+			}
+		})
+
+		t.Run(fmt.Sprintf("ToTime_%d_%s", i, example.name), func(t *testing.T) {
+			type dateStruct struct {
+				Date time.Time
+			}
+
+			var obj dateStruct
+
+			err := toml.Unmarshal([]byte(doc), &obj)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if obj.Date.Year() != example.out.Date.Year {
+				t.Errorf("expected year %d, got %d", example.out.Date.Year, obj.Date.Year())
+			}
+			if obj.Date.Month() != example.out.Date.Month {
+				t.Errorf("expected month %d, got %d", example.out.Date.Month, obj.Date.Month())
+			}
+			if obj.Date.Day() != example.out.Date.Day {
+				t.Errorf("expected day %d, got %d", example.out.Date.Day, obj.Date.Day())
+			}
+			if obj.Date.Hour() != example.out.Time.Hour {
+				t.Errorf("expected hour %d, got %d", example.out.Time.Hour, obj.Date.Hour())
+			}
+			if obj.Date.Minute() != example.out.Time.Minute {
+				t.Errorf("expected minute %d, got %d", example.out.Time.Minute, obj.Date.Minute())
+			}
+			if obj.Date.Second() != example.out.Time.Second {
+				t.Errorf("expected second %d, got %d", example.out.Time.Second, obj.Date.Second())
+			}
+			if obj.Date.Nanosecond() != example.out.Time.Nanosecond {
+				t.Errorf("expected nanoseconds %d, got %d", example.out.Time.Nanosecond, obj.Date.Nanosecond())
+			}
+		})
+	}
+}
+
+func TestUnmarshalLocalTime(t *testing.T) {
+	examples := []struct {
+		name string
+		in   string
+		out  toml.LocalTime
+	}{
+		{
+			name: "normal",
+			in:   "07:32:00",
+			out: toml.LocalTime{
+				Hour:       7,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 0,
+			},
+		},
+		{
+			name: "with nanoseconds",
+			in:   "00:32:00.999999",
+			out: toml.LocalTime{
+				Hour:       0,
+				Minute:     32,
+				Second:     0,
+				Nanosecond: 999999000,
+			},
+		},
+	}
+
+	for i, example := range examples {
+		doc := fmt.Sprintf(`Time = %s`, example.in)
+
+		t.Run(fmt.Sprintf("ToLocalTime_%d_%s", i, example.name), func(t *testing.T) {
+			type dateStruct struct {
+				Time toml.LocalTime
+			}
+
+			var obj dateStruct
+
+			err := toml.Unmarshal([]byte(doc), &obj)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if obj.Time != example.out {
+				t.Errorf("expected '%s', got '%s'", example.out, obj.Time)
+			}
+		})
+	}
+}
 
 // test case for issue #339
 func TestUnmarshalSameInnerField(t *testing.T) {

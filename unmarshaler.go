@@ -286,7 +286,7 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 		return false, nil
 	}
 
-	// Special case for time, becase we allow to unmarshal to it from
+	// Special case for time, because we allow to unmarshal to it from
 	// different kind of AST nodes.
 	if v.Type() == timeType {
 		return false, nil
@@ -374,6 +374,10 @@ func unmarshalDateTime(x target, node ast.Node) error {
 }
 
 func setLocalDateTime(x target, v LocalDateTime) error {
+	if x.get().Type() == timeType {
+		cast := v.In(time.Local)
+		return setDateTime(x, cast)
+	}
 	return x.set(reflect.ValueOf(v))
 }
 

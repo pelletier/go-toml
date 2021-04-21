@@ -960,6 +960,73 @@ world'`,
 	}
 }
 
+func TestLocalDateTime(t *testing.T) {
+	t.Parallel()
+
+	examples := []struct {
+		desc  string
+		input string
+	}{
+		{
+			desc:  "9 digits",
+			input: "2006-01-02T15:04:05.123456789",
+		},
+		{
+			desc:  "8 digits",
+			input: "2006-01-02T15:04:05.12345678",
+		},
+		{
+			desc:  "7 digits",
+			input: "2006-01-02T15:04:05.1234567",
+		},
+		{
+			desc:  "6 digits",
+			input: "2006-01-02T15:04:05.123456",
+		},
+		{
+			desc:  "5 digits",
+			input: "2006-01-02T15:04:05.12345",
+		},
+		{
+			desc:  "4 digits",
+			input: "2006-01-02T15:04:05.1234",
+		},
+		{
+			desc:  "3 digits",
+			input: "2006-01-02T15:04:05.123",
+		},
+		{
+			desc:  "2 digits",
+			input: "2006-01-02T15:04:05.12",
+		},
+		{
+			desc:  "1 digit",
+			input: "2006-01-02T15:04:05.1",
+		},
+		{
+			desc:  "0 digit",
+			input: "2006-01-02T15:04:05",
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+			t.Log("input:", e.input)
+			doc := `a = ` + e.input
+			m := map[string]toml.LocalDateTime{}
+			err := toml.Unmarshal([]byte(doc), &m)
+			require.NoError(t, err)
+			actual := m["a"]
+			golang, err := time.Parse("2006-01-02T15:04:05.999999999", e.input)
+			require.NoError(t, err)
+			expected := toml.LocalDateTimeOf(golang)
+			require.Equal(t, expected, actual)
+		})
+	}
+}
+
 func TestIssue287(t *testing.T) {
 	b := `y=[[{}]]`
 	v := map[string]interface{}{}
