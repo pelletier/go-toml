@@ -448,6 +448,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	rest, err := expect(']', b)
+
 	return parent, rest, err
 }
 
@@ -455,6 +456,7 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 	for len(b) > 0 {
 		var err error
 		b = p.parseWhitespace(b)
+
 		if len(b) > 0 && b[0] == '#' {
 			_, b, err = scanComment(b)
 			if err != nil {
@@ -581,6 +583,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 8
 			default:
@@ -711,6 +714,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 4
 			case 'U':
@@ -718,6 +722,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 8
 			default:
@@ -812,10 +817,12 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 
 func digitsToInt(b []byte) int {
 	x := 0
+
 	for _, d := range b {
 		x *= 10
 		x += int(d - '0')
 	}
+
 	return x
 }
 
@@ -937,6 +944,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 					Data: b[:i+3],
 				}), b[i+3:], nil
 			}
+
 			return ast.Reference{}, nil, errUnexpectedCharI
 		}
 
@@ -947,6 +955,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 					Data: b[:i+3],
 				}), b[i+3:], nil
 			}
+
 			return ast.Reference{}, nil, errUnexpectedCharN
 		}
 
