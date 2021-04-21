@@ -224,6 +224,7 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 				break
 			}
 
+			//nolint:gomnd
 			if i >= 9 {
 				return t, nil, newDecodeError(b[i:i+1], "maximum precision for date time is nanosecond")
 			}
