@@ -161,18 +161,12 @@ func TestParser_AST_Numbers(t *testing.T) {
 }
 
 type (
-	astRoot []astNode
 	astNode struct {
 		Kind     ast.Kind
 		Data     []byte
 		Children []astNode
 	}
 )
-
-func compareAST(t *testing.T, expected astRoot, actual *ast.Root) {
-	it := actual.Iterator()
-	compareIterator(t, expected, it)
-}
 
 func compareNode(t *testing.T, e astNode, n ast.Node) {
 	t.Helper()
@@ -202,54 +196,6 @@ func compareIterator(t *testing.T, expected []astNode, actual ast.Iterator) {
 	if idx < len(expected) {
 		t.Fatal("missing children in actual", "idx =", idx, "expected =", len(expected))
 	}
-}
-
-func (r astRoot) toOrig() *ast.Root {
-	builder := &ast.Builder{}
-
-	var last ast.Reference
-
-	for i, n := range r {
-		ref := builder.Push(ast.Node{
-			Kind: n.Kind,
-			Data: n.Data,
-		})
-
-		if i > 0 {
-			builder.Chain(last, ref)
-		}
-		last = ref
-
-		if len(n.Children) > 0 {
-			c := childrenToOrig(builder, n.Children)
-			builder.AttachChild(ref, c)
-		}
-	}
-
-	return builder.Tree()
-}
-
-func childrenToOrig(b *ast.Builder, nodes []astNode) ast.Reference {
-	var first ast.Reference
-	var last ast.Reference
-	for i, n := range nodes {
-		ref := b.Push(ast.Node{
-			Kind: n.Kind,
-			Data: n.Data,
-		})
-		if i == 0 {
-			first = ref
-		} else {
-			b.Chain(last, ref)
-		}
-		last = ref
-
-		if len(n.Children) > 0 {
-			c := childrenToOrig(b, n.Children)
-			b.AttachChild(ref, c)
-		}
-	}
-	return first
 }
 
 //nolint:funlen
