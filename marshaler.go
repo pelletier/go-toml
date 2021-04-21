@@ -29,47 +29,11 @@ func Marshal(v interface{}) ([]byte, error) {
 
 // Encoder writes a TOML document to an output stream.
 type Encoder struct {
+	// output
 	w io.Writer
-}
 
-type encoderCtx struct {
-	// Current top-level key.
-	parentKey []string
-
-	// Key that should be used for a KV.
-	key string
-	// Extra flag to account for the empty string
-	hasKey bool
-
-	// Set to true to indicate that the encoder is inside a KV, so that all
-	// tables need to be inlined.
-	insideKv bool
-
-	// Set to true to skip the first table header in an array table.
-	skipTableHeader bool
-
-	options valueOptions
-}
-
-type valueOptions struct {
-	multiline bool
-}
-
-func (ctx *encoderCtx) shiftKey() {
-	if ctx.hasKey {
-		ctx.parentKey = append(ctx.parentKey, ctx.key)
-		ctx.clearKey()
-	}
-}
-
-func (ctx *encoderCtx) setKey(k string) {
-	ctx.key = k
-	ctx.hasKey = true
-}
-
-func (ctx *encoderCtx) clearKey() {
-	ctx.key = ""
-	ctx.hasKey = false
+	// global settings
+	tablesInline bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -77,6 +41,11 @@ func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
 		w: w,
 	}
+}
+
+// SetTablesInline forces the encoder to emit all tables inline.
+func (e *Encoder) SetTablesInline(inline bool) {
+	e.tablesInline = inline
 }
 
 // Encode writes a TOML representation of v to the stream.
@@ -114,6 +83,8 @@ func (enc *Encoder) Encode(v interface{}) error {
 		ctx encoderCtx
 	)
 
+	ctx.inline = enc.tablesInline
+
 	b, err := enc.encode(b, ctx, reflect.ValueOf(v))
 	if err != nil {
 		return fmt.Errorf("Encode: %w", err)
@@ -125,6 +96,53 @@ func (enc *Encoder) Encode(v interface{}) error {
 	}
 
 	return nil
+}
+
+type valueOptions struct {
+	multiline bool
+}
+
+type encoderCtx struct {
+	// Current top-level key.
+	parentKey []string
+
+	// Key that should be used for a KV.
+	key string
+	// Extra flag to account for the empty string
+	hasKey bool
+
+	// Set to true to indicate that the encoder is inside a KV, so that all
+	// tables need to be inlined.
+	insideKv bool
+
+	// Set to true to skip the first table header in an array table.
+	skipTableHeader bool
+
+	// Should the next table be encoded as inline
+	inline bool
+
+	options valueOptions
+}
+
+func (ctx *encoderCtx) shiftKey() {
+	if ctx.hasKey {
+		ctx.parentKey = append(ctx.parentKey, ctx.key)
+		ctx.clearKey()
+	}
+}
+
+func (ctx *encoderCtx) setKey(k string) {
+	ctx.key = k
+	ctx.hasKey = true
+}
+
+func (ctx *encoderCtx) clearKey() {
+	ctx.key = ""
+	ctx.hasKey = false
+}
+
+func (ctx *encoderCtx) isRoot() bool {
+	return len(ctx.parentKey) == 0 && !ctx.hasKey
 }
 
 var errUnsupportedValue = errors.New("unsupported encode value kind")
@@ -396,7 +414,7 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 			continue
 		}
 
-		table, err := willConvertToTableOrArrayTable(v)
+		table, err := willConvertToTableOrArrayTable(ctx, v)
 		if err != nil {
 			return nil, err
 		}
@@ -469,7 +487,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			continue
 		}
 
-		willConvert, err := willConvertToTableOrArrayTable(f)
+		willConvert, err := willConvertToTableOrArrayTable(ctx, f)
 		if err != nil {
 			return nil, err
 		}
@@ -496,8 +514,8 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 
 	ctx.shiftKey()
 
-	if ctx.insideKv {
-		return enc.encodeTableInsideKV(b, ctx, t)
+	if ctx.insideKv || (ctx.inline && !ctx.isRoot()) {
+		return enc.encodeTableInline(b, ctx, t)
 	}
 
 	if !ctx.skipTableHeader {
@@ -533,7 +551,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	return b, nil
 }
 
-func (enc *Encoder) encodeTableInsideKV(b []byte, ctx encoderCtx, t table) ([]byte, error) {
+func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
 	b = append(b, '{')
@@ -571,14 +589,14 @@ func (enc *Encoder) encodeTableInsideKV(b []byte, ctx encoderCtx, t table) ([]by
 		b = append(b, '\n')
 	}
 
-	b = append(b, "}\n"...)
+	b = append(b, "}"...)
 
 	return b, nil
 }
 
 var errNilInterface = errors.New("nil interface not supported")
 
-func willConvertToTable(v reflect.Value) (bool, error) {
+func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
 	//nolint:gocritic,godox
 	switch v.Interface().(type) {
 	case time.Time: // TODO: add TextMarshaler
@@ -588,25 +606,25 @@ func willConvertToTable(v reflect.Value) (bool, error) {
 	t := v.Type()
 	switch t.Kind() {
 	case reflect.Map, reflect.Struct:
-		return true, nil
+		return !ctx.inline, nil
 	case reflect.Interface:
 		if v.IsNil() {
 			return false, errNilInterface
 		}
 
-		return willConvertToTable(v.Elem())
+		return willConvertToTable(ctx, v.Elem())
 	case reflect.Ptr:
 		if v.IsNil() {
 			return false, nil
 		}
 
-		return willConvertToTable(v.Elem())
+		return willConvertToTable(ctx, v.Elem())
 	default:
 		return false, nil
 	}
 }
 
-func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
+func willConvertToTableOrArrayTable(ctx encoderCtx, v reflect.Value) (bool, error) {
 	t := v.Type()
 
 	if t.Kind() == reflect.Interface {
@@ -614,7 +632,7 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 			return false, errNilInterface
 		}
 
-		return willConvertToTableOrArrayTable(v.Elem())
+		return willConvertToTableOrArrayTable(ctx, v.Elem())
 	}
 
 	if t.Kind() == reflect.Slice {
@@ -624,7 +642,7 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 		}
 
 		for i := 0; i < v.Len(); i++ {
-			t, err := willConvertToTable(v.Index(i))
+			t, err := willConvertToTable(ctx, v.Index(i))
 			if err != nil {
 				return false, err
 			}
@@ -637,7 +655,7 @@ func willConvertToTableOrArrayTable(v reflect.Value) (bool, error) {
 		return true, nil
 	}
 
-	return willConvertToTable(v)
+	return willConvertToTable(ctx, v)
 }
 
 func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
@@ -647,7 +665,7 @@ func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]by
 		return b, nil
 	}
 
-	allTables, err := willConvertToTableOrArrayTable(v)
+	allTables, err := willConvertToTableOrArrayTable(ctx, v)
 	if err != nil {
 		return nil, err
 	}
