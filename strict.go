@@ -49,6 +49,7 @@ func (s *strict) MissingTable(node ast.Node) {
 	s.missing = append(s.missing, decodeError{
 		highlight: keyLocation(node),
 		message:   "missing table",
+		key:       s.key.Key(),
 	})
 }
 
@@ -59,11 +60,12 @@ func (s *strict) MissingField(node ast.Node) {
 	s.missing = append(s.missing, decodeError{
 		highlight: keyLocation(node),
 		message:   "missing field",
+		key:       s.key.Key(),
 	})
 }
 
 func (s *strict) Error(doc []byte) error {
-	if !s.Enabled {
+	if !s.Enabled || len(s.missing) == 0 {
 		return nil
 	}
 

@@ -1,13 +1,13 @@
 package tracker
 
-import "github.com/pelletier/go-toml/v2/internal/ast"
-
-type Key []string
+import (
+	"github.com/pelletier/go-toml/v2/internal/ast"
+)
 
 // KeyTracker is a tracker that keeps track of the current Key as the AST is
 // walked.
 type KeyTracker struct {
-	k Key
+	k []string
 }
 
 // UpdateTable sets the state of the tracker with the AST table node.
@@ -39,8 +39,8 @@ func (t *KeyTracker) Pop(node ast.Node) {
 }
 
 // Key returns the current key
-func (t *KeyTracker) Key() Key {
-	k := make(Key, len(t.k))
+func (t *KeyTracker) Key() []string {
+	k := make([]string, len(t.k))
 	copy(k, t.k)
 	return k
 }

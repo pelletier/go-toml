@@ -18,6 +18,7 @@ type DecodeError struct {
 	message string
 	line    int
 	column  int
+	key     Key
 
 	human string
 }
@@ -49,11 +50,14 @@ func (s *StrictMissingError) String() string {
 	return buf.String()
 }
 
+type Key []string
+
 // internal version of DecodeError that is used as the base to create a
 // DecodeError with full context.
 type decodeError struct {
 	highlight []byte
 	message   string
+	key       Key // optional
 }
 
 func (de *decodeError) Error() string {
@@ -81,6 +85,11 @@ func (e *DecodeError) String() string {
 // occurred in the document. Positions are 1-indexed.
 func (e *DecodeError) Position() (row int, column int) {
 	return e.line, e.column
+}
+
+// Key that was being processed when the error occured.
+func (e *DecodeError) Key() Key {
+	return e.key
 }
 
 // decodeErrorFromHighlight creates a DecodeError referencing to a highlighted
@@ -164,6 +173,7 @@ func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 		message: errMessage,
 		line:    errLine,
 		column:  errColumn,
+		key:     de.key,
 		human:   buf.String(),
 	}
 }
