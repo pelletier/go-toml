@@ -73,9 +73,6 @@ type decoder struct {
 	// Tracks keys that have been seen, with which type.
 	seen tracker.SeenTracker
 
-	// Tracks the current key being processed.
-	key tracker.KeyTracker
-
 	// Strict mode
 	strict strict
 }
@@ -105,7 +102,7 @@ func (d *decoder) FromParser(p *parser, v interface{}) error {
 		}
 	}
 	if err == nil {
-		err = d.strict.Error()
+		err = d.strict.Error(p.data)
 	}
 
 	return err
@@ -156,9 +153,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			err = d.unmarshalKeyValue(current, node)
 			found = true
 		case ast.Table:
-			if d.strict {
-				d.key.UpdateTable(node)
-			}
+			d.strict.EnterTable(node)
 			current, found, err = d.scopeWithKey(root, node.Key())
 			if err == nil && found {
 				// In case this table points to an interface,
@@ -169,9 +164,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 				ensureMapIfInterface(current)
 			}
 		case ast.ArrayTable:
-			if d.strict {
-				d.key.UpdateArrayTable(node)
-			}
+			d.strict.EnterArrayTable(node)
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
 			panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
@@ -267,10 +260,8 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
 	assertNode(ast.KeyValue, node)
 
-	if d.strict {
-		d.key.Push(node)
-		defer d.key.Pop(node)
-	}
+	d.strict.EnterKeyValue(node)
+	defer d.strict.ExitKeyValue(node)
 
 	x, found, err := d.scopeWithKey(x, node.Key())
 	if err != nil {
