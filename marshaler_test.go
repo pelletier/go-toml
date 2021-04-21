@@ -68,9 +68,6 @@ hello = 'world'`,
 a = 'test'`,
 		},
 		{
-			//nolint:godox
-			// TODO: this test is flaky because output changes depending on
-			//   the map iteration order.
 			desc: "map in map in map and string with values",
 			v: map[string]interface{}{
 				"this": map[string]interface{}{
@@ -248,6 +245,25 @@ name = 'Alice'
 hello
 world"""`,
 		},
+		{
+			desc: "inline field",
+			v: struct {
+				A map[string]string `inline:"true"`
+				B map[string]string
+			}{
+				A: map[string]string{
+					"isinline": "yes",
+				},
+				B: map[string]string{
+					"isinline": "no",
+				},
+			},
+			expected: `
+A = {isinline = 'yes'}
+[B]
+isinline = 'no'
+`,
+		},
 	}
 
 	for _, e := range examples {
@@ -258,10 +274,34 @@ world"""`,
 			b, err := toml.Marshal(e.v)
 			if e.err {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				equalStringsIgnoreNewlines(t, e.expected, string(b))
+				return
 			}
+
+			require.NoError(t, err)
+			equalStringsIgnoreNewlines(t, e.expected, string(b))
+
+			// make sure the output is always valid TOML
+			defaultMap := map[string]interface{}{}
+			err = toml.Unmarshal(b, &defaultMap)
+			require.NoError(t, err)
+
+			// checks that the TablesInline mode generates valid,
+			// equivalent TOML
+			t.Run("tables inline", func(t *testing.T) {
+				var buf bytes.Buffer
+
+				enc := toml.NewEncoder(&buf)
+				enc.SetTablesInline(true)
+
+				err := enc.Encode(e.v)
+				require.NoError(t, err)
+
+				inlineMap := map[string]interface{}{}
+				err = toml.Unmarshal(buf.Bytes(), &inlineMap)
+				require.NoError(t, err)
+
+				require.Equal(t, defaultMap, inlineMap)
+			})
 		})
 	}
 }
