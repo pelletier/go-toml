@@ -208,16 +208,19 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	// keyval-sep = ws %x3D ws ; =
 
 	b = p.parseWhitespace(b)
+
 	b, err = expect('=', b)
 	if err != nil {
 		return ast.Reference{}, nil, err
 	}
+
 	b = p.parseWhitespace(b)
 
 	valRef, b, err := p.parseVal(b)
 	if err != nil {
 		return ref, b, err
 	}
+
 	p.builder.Chain(valRef, key)
 	p.builder.AttachChild(ref, valRef)
 
@@ -311,6 +314,7 @@ func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return v[1 : len(v)-1], rest, nil
 }
 
@@ -347,6 +351,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		var kv ast.Reference
+
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
 			return parent, nil, err
@@ -363,6 +368,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	rest, err := expect('}', b)
+
 	return parent, rest, err
 }
 
@@ -408,6 +414,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 				return parent, nil, errArrayCanNotStartWithComma
 			}
 			b = b[1:]
+
 			b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
 				return parent, nil, err
@@ -420,6 +427,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		var valueRef ast.Reference
+
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
 			return parent, nil, err
@@ -565,6 +573,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 4
 			case 'U':
