@@ -175,6 +175,7 @@ var errParseLocalTimeWrongLength = errors.New("times are expected to have the fo
 // []byte that is didn't need. This is to allow parseDateTime to parse those
 // remaining bytes as a timezone.
 func parseLocalTime(b []byte) (LocalTime, []byte, error) {
+	var nspow = [10]int{0, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1e0}
 	var t LocalTime
 
 	const localTimeByteLen = 8
@@ -228,18 +229,12 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 			digits++
 		}
 
-		t.Nanosecond = frac * nanosecPower(digits)
+		t.Nanosecond = frac * nspow[digits]
 
 		return t, b[9+digits:], nil
 	}
 
 	return t, b[8:], nil
-}
-
-var nspow = []int{0, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1e0}
-
-func nanosecPower(n int) int {
-	return nspow[n]
 }
 
 var (
