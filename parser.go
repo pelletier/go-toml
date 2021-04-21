@@ -91,7 +91,6 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
 	// expression =/ ws table ws [ comment ]
-
 	var ref ast.Reference
 
 	b = p.parseWhitespace(b)
@@ -145,7 +144,6 @@ func (p *parser) parseArrayTable(b []byte) (ast.Reference, []byte, error) {
 	// array-table = array-table-open key array-table-close
 	// array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	// array-table-close = ws %x5D.5D  ; ]] Double right square bracket
-
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.ArrayTable,
 	})
@@ -175,7 +173,6 @@ func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
 	// std-table = std-table-open key std-table-close
 	// std-table-open  = %x5B ws     ; [ Left square bracket
 	// std-table-close = ws %x5D     ; ] Right square bracket
-
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.Table,
 	})
@@ -199,7 +196,6 @@ func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
 
 func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	// keyval = key keyval-sep val
-
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.KeyValue,
 	})
@@ -324,7 +320,6 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	// inline-table-close = ws %x7D     ; }
 	// inline-table-sep   = ws %x2C ws  ; , Comma
 	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
-
 	parent := p.builder.Push(ast.Node{
 		Kind: ast.InlineTable,
 	})
@@ -383,7 +378,6 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	// array-values =/ ws-comment-newline val ws-comment-newline [ array-sep ]
 	// array-sep = %x2C  ; , Comma
 	// ws-comment-newline = *( wschar / [ comment ] newline )
-
 	b = b[1:]
 
 	parent := p.builder.Push(ast.Node{
@@ -511,7 +505,6 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// mlb-quotes = 1*2quotation-mark
 	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
-
 	token, rest, err := scanMultilineBasicString(b)
 	if err != nil {
 		return nil, nil, err
@@ -603,7 +596,6 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	// dotted-key = simple-key 1*( dot-sep simple-key )
 	//
 	// dot-sep   = ws %x2E ws  ; . Period
-
 	key, b, err := p.parseSimpleKey(b)
 	if err != nil {
 		return ast.Reference{}, nil, err
@@ -645,7 +637,6 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	// simple-key = quoted-key / unquoted-key
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// quoted-key = basic-string / literal-string
-
 	if len(b) == 0 {
 		//nolint:godox
 		return nil, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
@@ -680,7 +671,6 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 	// escape-seq-char =/ %x74         ; t    tab             U+0009
 	// escape-seq-char =/ %x75 4HEXDIG ; uXXXX                U+XXXX
 	// escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
-
 	token, rest, err := scanBasicString(b)
 	if err != nil {
 		return nil, nil, err
@@ -755,7 +745,6 @@ func (p *parser) parseWhitespace(b []byte) []byte {
 	// ws = *wschar
 	// wschar =  %x20  ; Space
 	// wschar =/ %x09  ; Horizontal tab
-
 	_, rest := scanWhitespace(b)
 
 	return rest
@@ -828,7 +817,6 @@ var errTimezoneButNoTimeComponent = errors.New("possible DateTime cannot have a 
 func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
-
 	hasTime := false
 	hasTz := false
 	seenSpace := false
