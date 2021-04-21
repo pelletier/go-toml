@@ -1,8 +1,10 @@
 package toml_test
 
 import (
+	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -988,4 +990,116 @@ func TestIssue508(t *testing.T) {
 	err := toml.Unmarshal(b, &t1)
 	require.NoError(t, err)
 	require.Equal(t, "This is a title", t1.head.Title)
+}
+
+func TestDecoderStrict(t *testing.T) {
+	examples := []struct {
+		desc     string
+		input    string
+		expected string
+		target   interface{}
+	}{
+		{
+			desc: "multiple missing root keys",
+			input: `
+key1 = "value1"
+key2 = "missing2"
+key3 = "missing3"
+key4 = "value4"
+`,
+			expected: `
+2| key1 = "value1"
+3| key2 = "missing2"
+ | ~~~~ missing field
+4| key3 = "missing3"
+5| key4 = "value4"
+---
+2| key1 = "value1"
+3| key2 = "missing2"
+4| key3 = "missing3"
+ | ~~~~ missing field
+5| key4 = "value4"
+`,
+			target: &struct {
+				Key1 string
+				Key4 string
+			}{},
+		},
+		{
+			desc:  "multi-part key",
+			input: `a.short.key="foo"`,
+			expected: `
+1| a.short.key="foo"
+ | ~~~~~~~~~~~ missing field
+`,
+		},
+		{
+			desc: "missing table",
+			input: `
+[foo]
+bar = 42
+`,
+			expected: `
+2| [foo]
+ |  ~~~ missing table
+3| bar = 42
+`,
+		},
+
+		{
+			desc: "missing array table",
+			input: `
+[[foo]]
+bar = 42
+`,
+			expected: `
+2| [[foo]]
+ |   ~~~ missing table
+3| bar = 42
+`,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			r := strings.NewReader(e.input)
+			d := toml.NewDecoder(r)
+			d.SetStrict(true)
+			x := e.target
+			if x == nil {
+				x = &struct{}{}
+			}
+			err := d.Decode(x)
+			details := err.(*toml.StrictMissingError)
+			equalStringsIgnoreNewlines(t, e.expected, details.String())
+		})
+	}
+}
+
+func ExampleDecoder_SetStrict() {
+	type S struct {
+		Key1 string
+		Key3 string
+	}
+	doc := `
+key1 = "value1"
+key2 = "value2"
+key3 = "value3"
+`
+	r := strings.NewReader(doc)
+	d := toml.NewDecoder(r)
+	d.SetStrict(true)
+	s := S{}
+	err := d.Decode(&s)
+
+	fmt.Println(err.Error())
+	// Output: strict mode: fields in the document are missing in the target struct
+
+	details := err.(*toml.StrictMissingError)
+	fmt.Println(details.String())
+	// Ouput:
+	// 2| key1 = "value1"
+	// 3| key2 = "value2"
+	//  | ~~~~ missing field
+	// 4| key3 = "value3"
 }

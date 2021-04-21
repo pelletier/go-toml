@@ -18,15 +18,46 @@ type DecodeError struct {
 	message string
 	line    int
 	column  int
+	key     Key
 
 	human string
 }
+
+// StrictMissingError occurs in a TOML document that does not have a
+// corresponding field in the target value. It contains all the missing fields
+// in Errors.
+//
+// Emitted by Decoder when SetStrict(true) was called.
+type StrictMissingError struct {
+	// One error per field that could not be found.
+	Errors []DecodeError
+}
+
+// Error returns the cannonical string for this error.
+func (s *StrictMissingError) Error() string {
+	return "strict mode: fields in the document are missing in the target struct"
+}
+
+// String returns a human readable description of all errors.
+func (s *StrictMissingError) String() string {
+	var buf strings.Builder
+	for i, e := range s.Errors {
+		if i > 0 {
+			buf.WriteString("\n---\n")
+		}
+		buf.WriteString(e.String())
+	}
+	return buf.String()
+}
+
+type Key []string
 
 // internal version of DecodeError that is used as the base to create a
 // DecodeError with full context.
 type decodeError struct {
 	highlight []byte
 	message   string
+	key       Key // optional
 }
 
 func (de *decodeError) Error() string {
@@ -56,6 +87,11 @@ func (e *DecodeError) Position() (row int, column int) {
 	return e.line, e.column
 }
 
+// Key that was being processed when the error occured.
+func (e *DecodeError) Key() Key {
+	return e.key
+}
+
 // decodeErrorFromHighlight creates a DecodeError referencing to a highlighted
 // range of bytes from document.
 //
@@ -64,7 +100,7 @@ func (e *DecodeError) Position() (row int, column int) {
 // The function copies all bytes used in DecodeError, so that document and
 // highlight can be freely deallocated.
 //nolint:funlen
-func wrapDecodeError(document []byte, de *decodeError) error {
+func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 	if de == nil {
 		return nil
 	}
@@ -137,6 +173,7 @@ func wrapDecodeError(document []byte, de *decodeError) error {
 		message: errMessage,
 		line:    errLine,
 		column:  errColumn,
+		key:     de.key,
 		human:   buf.String(),
 	}
 }

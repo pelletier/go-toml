@@ -7,6 +7,7 @@ package imported_tests
 // marked as skipped until we figure out if that's something we want in v2.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -1955,66 +1956,80 @@ String2="2"`
 	assert.Error(t, err)
 }
 
+func decoder(doc string) *toml.Decoder {
+	return toml.NewDecoder(bytes.NewReader([]byte(doc)))
+}
+
+func strictDecoder(doc string) *toml.Decoder {
+	d := decoder(doc)
+	d.SetStrict(true)
+	return d
+}
+
 func TestDecoderStrict(t *testing.T) {
-	t.Skip()
-	//	input := `
-	//[decoded]
-	//  key = ""
-	//
-	//[undecoded]
-	//  key = ""
-	//
-	//  [undecoded.inner]
-	//	key = ""
-	//
-	//  [[undecoded.array]]
-	//	key = ""
-	//
-	//  [[undecoded.array]]
-	//	key = ""
-	//
-	//`
-	//	var doc struct {
-	//		Decoded struct {
-	//			Key string
-	//		}
-	//	}
-	//
-	//	expected := `undecoded keys: ["undecoded.array.0.key" "undecoded.array.1.key" "undecoded.inner.key" "undecoded.key"]`
-	//
-	//	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
-	//	if err == nil {
-	//		t.Error("expected error, got none")
-	//	} else if err.Error() != expected {
-	//		t.Errorf("expect err: %s, got: %s", expected, err.Error())
-	//	}
-	//
-	//	if err := NewDecoder(bytes.NewReader([]byte(input))).Decode(&doc); err != nil {
-	//		t.Errorf("unexpected err: %s", err)
-	//	}
-	//
-	//	var m map[string]interface{}
-	//	if err := NewDecoder(bytes.NewReader([]byte(input))).Decode(&m); err != nil {
-	//		t.Errorf("unexpected err: %s", err)
-	//	}
+	input := `
+	[decoded]
+	 key = ""
+	
+	[undecoded]
+	 key = ""
+	
+	 [undecoded.inner]
+		key = ""
+	
+	 [[undecoded.array]]
+		key = ""
+	
+	 [[undecoded.array]]
+		key = ""
+	
+	`
+	var doc struct {
+		Decoded struct {
+			Key string
+		}
+	}
+
+	err := strictDecoder(input).Decode(&doc)
+	require.Error(t, err)
+	require.IsType(t, &toml.StrictMissingError{}, err)
+	se := err.(*toml.StrictMissingError)
+
+	keys := []toml.Key{}
+
+	for _, e := range se.Errors {
+		keys = append(keys, e.Key())
+	}
+
+	expectedKeys := []toml.Key{
+		{"undecoded"},
+		{"undecoded", "inner"},
+		{"undecoded", "array"},
+		{"undecoded", "array"},
+	}
+
+	require.Equal(t, expectedKeys, keys)
+
+	err = decoder(input).Decode(&doc)
+	require.NoError(t, err)
+
+	var m map[string]interface{}
+	err = decoder(input).Decode(&m)
 }
 
 func TestDecoderStrictValid(t *testing.T) {
-	t.Skip()
-	//	input := `
-	//[decoded]
-	//  key = ""
-	//`
-	//	var doc struct {
-	//		Decoded struct {
-	//			Key string
-	//		}
-	//	}
-	//
-	//	err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
-	//	if err != nil {
-	//		t.Fatal("unexpected error:", err)
-	//	}
+	input := `
+	[decoded]
+	 key = ""
+	`
+	var doc struct {
+		Decoded struct {
+			Key string
+		}
+	}
+
+	err := strictDecoder(input).Decode(&doc)
+	require.NoError(t, err)
 }
 
 type docUnmarshalTOML struct {

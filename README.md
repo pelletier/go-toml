@@ -22,7 +22,7 @@ Development branch. Use at your own risk.
 - [x] Abstract AST.
 - [x] Original go-toml testgen tests pass.
 - [x] Track file position (line, column) for errors.
-- [ ] Strict mode.
+- [x] Strict mode.
 - [ ] Document Unmarshal / Decode
 
 ### Marshal
