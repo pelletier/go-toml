@@ -7,7 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:funlen
 func TestParser_AST_Numbers(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc  string
 		input string
@@ -132,7 +135,9 @@ func TestParser_AST_Numbers(t *testing.T) {
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
 			p := parser{}
 			p.Reset([]byte(`A = ` + e.input))
 			p.NextExpression()
@@ -247,7 +252,10 @@ func childrenToOrig(b *ast.Builder, nodes []astNode) ast.Reference {
 	return first
 }
 
+//nolint:funlen
 func TestParser_AST(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc  string
 		input string
@@ -384,7 +392,9 @@ func TestParser_AST(t *testing.T) {
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
 			p := parser{}
 			p.Reset([]byte(e.input))
 			p.NextExpression()
