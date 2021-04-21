@@ -492,21 +492,25 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			return nil, err
 		}
 
-		var options valueOptions
-
-		ml, ok := fieldType.Tag.Lookup("multiline")
-		if ok {
-			options.multiline = ml == "true"
+		options := valueOptions{
+			multiline: fieldBoolTag(fieldType, "multiline"),
 		}
 
-		if willConvert {
-			t.pushTable(k, f, options)
-		} else {
+		inline := fieldBoolTag(fieldType, "inline")
+
+		if inline || !willConvert {
 			t.pushKV(k, f, options)
+		} else {
+			t.pushTable(k, f, options)
 		}
 	}
 
 	return enc.encodeTable(b, ctx, t)
+}
+
+func fieldBoolTag(field reflect.StructField, tag string) bool {
+	x, ok := field.Tag.Lookup(tag)
+	return ok && x == "true"
 }
 
 func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {

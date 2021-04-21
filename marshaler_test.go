@@ -68,9 +68,6 @@ hello = 'world'`,
 a = 'test'`,
 		},
 		{
-			//nolint:godox
-			// TODO: this test is flaky because output changes depending on
-			//   the map iteration order.
 			desc: "map in map in map and string with values",
 			v: map[string]interface{}{
 				"this": map[string]interface{}{
@@ -247,6 +244,25 @@ name = 'Alice'
 			expected: `A = """
 hello
 world"""`,
+		},
+		{
+			desc: "inline field",
+			v: struct {
+				A map[string]string `inline:"true"`
+				B map[string]string
+			}{
+				A: map[string]string{
+					"isinline": "yes",
+				},
+				B: map[string]string{
+					"isinline": "no",
+				},
+			},
+			expected: `
+A = {isinline = 'yes'}
+[B]
+isinline = 'no'
+`,
 		},
 	}
 
