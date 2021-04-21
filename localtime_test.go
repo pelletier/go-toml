@@ -293,9 +293,9 @@ func TestDateTimeToString(t *testing.T) {
 		dateTime  LocalDateTime
 		roundTrip bool // ParseLocalDateTime(str).String() == str?
 	}{
-		{"2016-03-22T13:26:33", LocalDateTime{LocalDate{2016, 03, 22}, LocalTime{13, 26, 33, 0}}, true},
-		{"2016-03-22T13:26:33.000000600", LocalDateTime{LocalDate{2016, 03, 22}, LocalTime{13, 26, 33, 600}}, true},
-		{"2016-03-22t13:26:33", LocalDateTime{LocalDate{2016, 03, 22}, LocalTime{13, 26, 33, 0}}, false},
+		{"2016-03-22T13:26:33", LocalDateTime{LocalDate{2016, 0o3, 22}, LocalTime{13, 26, 33, 0}}, true},
+		{"2016-03-22T13:26:33.000000600", LocalDateTime{LocalDate{2016, 0o3, 22}, LocalTime{13, 26, 33, 600}}, true},
+		{"2016-03-22t13:26:33", LocalDateTime{LocalDate{2016, 0o3, 22}, LocalTime{13, 26, 33, 0}}, false},
 	} {
 		gotDateTime, err := ParseLocalDateTime(test.str)
 		if err != nil {
@@ -338,10 +338,14 @@ func TestDateTimeOf(t *testing.T) {
 		time time.Time
 		want LocalDateTime
 	}{
-		{time.Date(2014, 8, 20, 15, 8, 43, 1, time.Local),
-			LocalDateTime{LocalDate{2014, 8, 20}, LocalTime{15, 8, 43, 1}}},
-		{time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC),
-			LocalDateTime{LocalDate{1, 1, 1}, LocalTime{0, 0, 0, 0}}},
+		{
+			time.Date(2014, 8, 20, 15, 8, 43, 1, time.Local),
+			LocalDateTime{LocalDate{2014, 8, 20}, LocalTime{15, 8, 43, 1}},
+		},
+		{
+			time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC),
+			LocalDateTime{LocalDate{1, 1, 1}, LocalTime{0, 0, 0, 0}},
+		},
 	} {
 		if got := LocalDateTimeOf(test.time); got != test.want {
 			t.Errorf("LocalDateTimeOf(%v) = %+v, want %+v", test.time, got, test.want)
@@ -449,9 +453,11 @@ func TestMarshalJSON(t *testing.T) {
 func TestUnmarshalJSON(t *testing.T) {
 	t.Parallel()
 
-	var d LocalDate
-	var tm LocalTime
-	var dt LocalDateTime
+	var (
+		d  LocalDate
+		tm LocalTime
+		dt LocalDateTime
+	)
 
 	for _, test := range []struct {
 		data string
@@ -471,7 +477,8 @@ func TestUnmarshalJSON(t *testing.T) {
 		}
 	}
 
-	for _, bad := range []string{"", `""`, `"bad"`, `"1987-04-15x"`,
+	for _, bad := range []string{
+		"", `""`, `"bad"`, `"1987-04-15x"`,
 		`19870415`,     // a JSON number
 		`11987-04-15x`, // not a JSON string
 
