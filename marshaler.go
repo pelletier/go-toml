@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"encoding"
 	"errors"
 	"fmt"
 	"io"
@@ -165,14 +166,27 @@ func (ctx *encoderCtx) isRoot() bool {
 }
 
 var errUnsupportedValue = errors.New("unsupported encode value kind")
+var errTextMarshalerCannotBeAtRoot = errors.New("type implementing TextMarshaler cannot be at root")
 
 //nolint:cyclop
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	//nolint:gocritic,godox
-	switch i := v.Interface().(type) {
-	case time.Time: // TODO: add TextMarshaler
-		b = i.AppendFormat(b, time.RFC3339)
 
+	if v.Type() == timeType {
+		i := v.Interface().(time.Time)
+		b = i.AppendFormat(b, time.RFC3339)
+		return b, nil
+	}
+	if v.Type().Implements(textMarshalerType) {
+		if ctx.isRoot() {
+			return nil, errTextMarshalerCannotBeAtRoot
+		}
+
+		text, err := v.Interface().(encoding.TextMarshaler).MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		b = enc.encodeString(b, string(text), ctx.options)
 		return b, nil
 	}
 
@@ -620,10 +634,10 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 
 var errNilInterface = errors.New("nil interface not supported")
 
+var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+
 func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
-	//nolint:gocritic,godox
-	switch v.Interface().(type) {
-	case time.Time: // TODO: add TextMarshaler
+	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
 		return false, nil
 	}
 
