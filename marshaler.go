@@ -184,7 +184,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 		return b, nil
 	}
 
-	if v.Type().Implements(textMarshalerType) {
+	if v.Type().Implements(textMarshalerType()) {
 		if ctx.isRoot() {
 			return nil, errTextMarshalerCannotBeAtRoot
 		}
@@ -643,13 +643,14 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	return b, nil
 }
 
-var (
-	errNilInterface   = errors.New("nil interface not supported")
-	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
-)
+var errNilInterface = errors.New("nil interface not supported")
+
+func textMarshalerType() reflect.Type {
+	return reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+}
 
 func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
-	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
+	if v.Type() == timeType || v.Type().Implements(textMarshalerType()) {
 		return false, nil
 	}
 
