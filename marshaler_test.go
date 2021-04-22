@@ -407,3 +407,32 @@ c = 'd'
 `
 	equalStringsIgnoreNewlines(t, expected, buf.String())
 }
+
+func TestIssue424(t *testing.T) {
+	type Message1 struct {
+		Text string
+	}
+
+	type Message2 struct {
+		Text string `multiline:"true"`
+	}
+
+	msg1 := Message1{"Hello\\World"}
+	msg2 := Message2{"Hello\\World"}
+
+	toml1, err := toml.Marshal(msg1)
+	require.NoError(t, err)
+
+	toml2, err := toml.Marshal(msg2)
+	require.NoError(t, err)
+
+	msg1parsed := Message1{}
+	err = toml.Unmarshal(toml1, &msg1parsed)
+	require.NoError(t, err)
+	require.Equal(t, msg1, msg1parsed)
+
+	msg2parsed := Message2{}
+	err = toml.Unmarshal(toml2, &msg2parsed)
+	require.NoError(t, err)
+	require.Equal(t, msg2, msg2parsed)
+}
