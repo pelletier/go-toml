@@ -320,6 +320,8 @@ A = [
 			require.NoError(t, err)
 
 			testWithAllFlags(t, func(t *testing.T, flags int) {
+				t.Helper()
+
 				var buf bytes.Buffer
 				enc := toml.NewEncoder(&buf)
 				setFlags(enc, flags)
@@ -409,6 +411,8 @@ c = 'd'
 }
 
 func TestIssue424(t *testing.T) {
+	t.Parallel()
+
 	type Message1 struct {
 		Text string
 	}
