@@ -293,9 +293,9 @@ func TestDateTimeToString(t *testing.T) {
 		dateTime  LocalDateTime
 		roundTrip bool // ParseLocalDateTime(str).String() == str?
 	}{
-		{"2016-03-22T13:26:33", LocalDateTime{LocalDate{2016, 0o3, 22}, LocalTime{13, 26, 33, 0}}, true},
-		{"2016-03-22T13:26:33.000000600", LocalDateTime{LocalDate{2016, 0o3, 22}, LocalTime{13, 26, 33, 600}}, true},
-		{"2016-03-22t13:26:33", LocalDateTime{LocalDate{2016, 0o3, 22}, LocalTime{13, 26, 33, 0}}, false},
+		{"2016-03-22T13:26:33", LocalDateTime{LocalDate{2016, 3, 22}, LocalTime{13, 26, 33, 0}}, true},
+		{"2016-03-22T13:26:33.000000600", LocalDateTime{LocalDate{2016, 3, 22}, LocalTime{13, 26, 33, 600}}, true},
+		{"2016-03-22t13:26:33", LocalDateTime{LocalDate{2016, 3, 22}, LocalTime{13, 26, 33, 0}}, false},
 	} {
 		gotDateTime, err := ParseLocalDateTime(test.str)
 		if err != nil {
