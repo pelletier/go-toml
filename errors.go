@@ -33,7 +33,7 @@ type StrictMissingError struct {
 	Errors []DecodeError
 }
 
-// Error returns the cannonical string for this error.
+// Error returns the canonical string for this error.
 func (s *StrictMissingError) Error() string {
 	return "strict mode: fields in the document are missing in the target struct"
 }
@@ -41,12 +41,15 @@ func (s *StrictMissingError) Error() string {
 // String returns a human readable description of all errors.
 func (s *StrictMissingError) String() string {
 	var buf strings.Builder
+
 	for i, e := range s.Errors {
 		if i > 0 {
 			buf.WriteString("\n---\n")
 		}
+
 		buf.WriteString(e.String())
 	}
+
 	return buf.String()
 }
 
@@ -87,7 +90,7 @@ func (e *DecodeError) Position() (row int, column int) {
 	return e.line, e.column
 }
 
-// Key that was being processed when the error occured.
+// Key that was being processed when the error occurred.
 func (e *DecodeError) Key() Key {
 	return e.key
 }

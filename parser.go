@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -26,6 +27,7 @@ func (p *parser) Reset(b []byte) {
 	p.first = true
 }
 
+//nolint:cyclop
 func (p *parser) NextExpression() bool {
 	if len(p.left) == 0 || p.err != nil {
 		return false
@@ -69,22 +71,26 @@ func (p *parser) Error() error {
 	return p.err
 }
 
+var errUnexpectedByte = errors.New("expected newline but got something else")
+
 func (p *parser) parseNewline(b []byte) ([]byte, error) {
 	if b[0] == '\n' {
 		return b[1:], nil
 	}
+
 	if b[0] == '\r' {
 		_, rest, err := scanWindowsNewline(b)
+
 		return rest, err
 	}
-	return nil, fmt.Errorf("expected newline but got %#U", b[0])
+
+	return nil, fmt.Errorf("parseNewline: %w - %#U", errUnexpectedByte, b[0])
 }
 
 func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
-	//expression =  ws [ comment ]
-	//expression =/ ws keyval ws [ comment ]
-	//expression =/ ws table ws [ comment ]
-
+	// expression =  ws [ comment ]
+	// expression =/ ws keyval ws [ comment ]
+	// expression =/ ws table ws [ comment ]
 	var ref ast.Reference
 
 	b = p.parseWhitespace(b)
@@ -95,8 +101,10 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 
 	if b[0] == '#' {
 		_, rest, err := scanComment(b)
+
 		return ref, rest, err
 	}
+
 	if b[0] == '\n' || b[0] == '\r' {
 		return ref, b, nil
 	}
@@ -107,6 +115,7 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	} else {
 		ref, b, err = p.parseKeyval(b)
 	}
+
 	if err != nil {
 		return ref, nil, err
 	}
@@ -115,6 +124,7 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 
 	if len(b) > 0 && b[0] == '#' {
 		_, rest, err := scanComment(b)
+
 		return ref, rest, err
 	}
 
@@ -122,49 +132,54 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 }
 
 func (p *parser) parseTable(b []byte) (ast.Reference, []byte, error) {
-	//table = std-table / array-table
+	// table = std-table / array-table
 	if len(b) > 1 && b[1] == '[' {
 		return p.parseArrayTable(b)
 	}
+
 	return p.parseStdTable(b)
 }
 
 func (p *parser) parseArrayTable(b []byte) (ast.Reference, []byte, error) {
-	//array-table = array-table-open key array-table-close
-	//array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
-	//array-table-close = ws %x5D.5D  ; ]] Double right square bracket
-
+	// array-table = array-table-open key array-table-close
+	// array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
+	// array-table-close = ws %x5D.5D  ; ]] Double right square bracket
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.ArrayTable,
 	})
 
 	b = b[2:]
 	b = p.parseWhitespace(b)
+
 	k, b, err := p.parseKey(b)
 	if err != nil {
 		return ref, nil, err
 	}
+
 	p.builder.AttachChild(ref, k)
 	b = p.parseWhitespace(b)
+
 	b, err = expect(']', b)
 	if err != nil {
 		return ref, nil, err
 	}
+
 	b, err = expect(']', b)
+
 	return ref, b, err
 }
 
 func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
-	//std-table = std-table-open key std-table-close
-	//std-table-open  = %x5B ws     ; [ Left square bracket
-	//std-table-close = ws %x5D     ; ] Right square bracket
-
+	// std-table = std-table-open key std-table-close
+	// std-table-open  = %x5B ws     ; [ Left square bracket
+	// std-table-close = ws %x5D     ; ] Right square bracket
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.Table,
 	})
 
 	b = b[1:]
 	b = p.parseWhitespace(b)
+
 	key, b, err := p.parseKey(b)
 	if err != nil {
 		return ref, nil, err
@@ -180,8 +195,7 @@ func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
 }
 
 func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
-	//keyval = key keyval-sep val
-
+	// keyval = key keyval-sep val
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.KeyValue,
 	})
@@ -191,31 +205,41 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 		return ast.Reference{}, nil, err
 	}
 
-	//keyval-sep = ws %x3D ws ; =
+	// keyval-sep = ws %x3D ws ; =
 
 	b = p.parseWhitespace(b)
+
 	b, err = expect('=', b)
 	if err != nil {
 		return ast.Reference{}, nil, err
 	}
+
 	b = p.parseWhitespace(b)
 
 	valRef, b, err := p.parseVal(b)
 	if err != nil {
 		return ref, b, err
 	}
+
 	p.builder.Chain(valRef, key)
 	p.builder.AttachChild(ref, valRef)
 
 	return ref, b, err
 }
 
+var (
+	errExpectedValNotEOF = errors.New("expected value, not eof")
+	errExpectedTrue      = errors.New("expected 'true'")
+	errExpectedFalse     = errors.New("expected 'false'")
+)
+
+//nolint:cyclop,funlen
 func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 	var ref ast.Reference
 
 	if len(b) == 0 {
-		return ref, nil, fmt.Errorf("expected value, not eof")
+		return ref, nil, errExpectedValNotEOF
 	}
 
 	var err error
@@ -229,12 +253,14 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		} else {
 			v, b, err = p.parseBasicString(b)
 		}
+
 		if err == nil {
 			ref = p.builder.Push(ast.Node{
 				Kind: ast.String,
 				Data: v,
 			})
 		}
+
 		return ref, b, err
 	case '\'':
 		var v []byte
@@ -243,30 +269,36 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		} else {
 			v, b, err = p.parseLiteralString(b)
 		}
+
 		if err == nil {
 			ref = p.builder.Push(ast.Node{
 				Kind: ast.String,
 				Data: v,
 			})
 		}
+
 		return ref, b, err
 	case 't':
 		if !scanFollowsTrue(b) {
-			return ref, nil, fmt.Errorf("expected 'true'")
+			return ref, nil, errExpectedTrue
 		}
+
 		ref = p.builder.Push(ast.Node{
 			Kind: ast.Bool,
 			Data: b[:4],
 		})
+
 		return ref, b[4:], nil
 	case 'f':
 		if !scanFollowsFalse(b) {
-			return ast.Reference{}, nil, fmt.Errorf("expected 'false'")
+			return ast.Reference{}, nil, errExpectedFalse
 		}
+
 		ref = p.builder.Push(ast.Node{
 			Kind: ast.Bool,
 			Data: b[:5],
 		})
+
 		return ref, b[5:], nil
 	case '[':
 		return p.parseValArray(b)
@@ -282,26 +314,28 @@ func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return v[1 : len(v)-1], rest, nil
 }
 
 func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
-	//inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
-	//inline-table-open  = %x7B ws     ; {
-	//inline-table-close = ws %x7D     ; }
-	//inline-table-sep   = ws %x2C ws  ; , Comma
-	//inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
-
+	// inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
+	// inline-table-open  = %x7B ws     ; {
+	// inline-table-close = ws %x7D     ; }
+	// inline-table-sep   = ws %x2C ws  ; , Comma
+	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 	parent := p.builder.Push(ast.Node{
 		Kind: ast.InlineTable,
 	})
 
 	first := true
+
 	var child ast.Reference
 
 	b = b[1:]
 
 	var err error
+
 	for len(b) > 0 {
 		b = p.parseWhitespace(b)
 		if b[0] == '}' {
@@ -315,7 +349,9 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 			}
 			b = p.parseWhitespace(b)
 		}
+
 		var kv ast.Reference
+
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
 			return parent, nil, err
@@ -323,7 +359,6 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 
 		if first {
 			p.builder.AttachChild(parent, kv)
-			first = false
 		} else {
 			p.builder.Chain(child, kv)
 		}
@@ -333,18 +368,21 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	rest, err := expect('}', b)
+
 	return parent, rest, err
 }
 
-func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
-	//array = array-open [ array-values ] ws-comment-newline array-close
-	//array-open =  %x5B ; [
-	//array-close = %x5D ; ]
-	//array-values =  ws-comment-newline val ws-comment-newline array-sep array-values
-	//array-values =/ ws-comment-newline val ws-comment-newline [ array-sep ]
-	//array-sep = %x2C  ; , Comma
-	//ws-comment-newline = *( wschar / [ comment ] newline )
+var errArrayCanNotStartWithComma = errors.New("array cannot start with comma")
 
+//nolint:funlen,cyclop
+func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
+	// array = array-open [ array-values ] ws-comment-newline array-close
+	// array-open =  %x5B ; [
+	// array-close = %x5D ; ]
+	// array-values =  ws-comment-newline val ws-comment-newline array-sep array-values
+	// array-values =/ ws-comment-newline val ws-comment-newline [ array-sep ]
+	// array-sep = %x2C  ; , Comma
+	// ws-comment-newline = *( wschar / [ comment ] newline )
 	b = b[1:]
 
 	parent := p.builder.Push(ast.Node{
@@ -352,6 +390,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	})
 
 	first := true
+
 	var lastChild ast.Reference
 
 	var err error
@@ -362,17 +401,20 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		if len(b) == 0 {
+			//nolint:godox
 			return parent, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
 		}
 
 		if b[0] == ']' {
 			break
 		}
+
 		if b[0] == ',' {
 			if first {
-				return parent, nil, fmt.Errorf("array cannot start with comma")
+				return parent, nil, errArrayCanNotStartWithComma
 			}
 			b = b[1:]
+
 			b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
 				return parent, nil, err
@@ -385,6 +427,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		var valueRef ast.Reference
+
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
 			return parent, nil, err
@@ -392,7 +435,6 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		if first {
 			p.builder.AttachChild(parent, valueRef)
-			first = false
 		} else {
 			p.builder.Chain(lastChild, valueRef)
 		}
@@ -406,6 +448,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	rest, err := expect(']', b)
+
 	return parent, rest, err
 }
 
@@ -413,15 +456,18 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 	for len(b) > 0 {
 		var err error
 		b = p.parseWhitespace(b)
+
 		if len(b) > 0 && b[0] == '#' {
 			_, b, err = scanComment(b)
 			if err != nil {
 				return nil, err
 			}
 		}
+
 		if len(b) == 0 {
 			break
 		}
+
 		if b[0] == '\n' || b[0] == '\r' {
 			b, err = p.parseNewline(b)
 			if err != nil {
@@ -431,6 +477,7 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 			break
 		}
 	}
+
 	return b, nil
 }
 
@@ -448,25 +495,29 @@ func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	} else if token[i] == '\r' && token[i+1] == '\n' {
 		i += 2
 	}
+
 	return token[i : len(token)-3], rest, err
 }
 
-func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
-	//ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
-	//ml-basic-string-delim
-	//ml-basic-string-delim = 3quotation-mark
-	//ml-basic-body = *mlb-content *( mlb-quotes 1*mlb-content ) [ mlb-quotes ]
-	//
-	//mlb-content = mlb-char / newline / mlb-escaped-nl
-	//mlb-char = mlb-unescaped / escaped
-	//mlb-quotes = 1*2quotation-mark
-	//mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
-	//mlb-escaped-nl = escape ws newline *( wschar / newline )
+var errInvalidEscapeChar = errors.New("invalid escaped character")
 
+//nolint:funlen,gocognit,cyclop
+func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
+	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
+	// ml-basic-string-delim
+	// ml-basic-string-delim = 3quotation-mark
+	// ml-basic-body = *mlb-content *( mlb-quotes 1*mlb-content ) [ mlb-quotes ]
+	//
+	// mlb-content = mlb-char / newline / mlb-escaped-nl
+	// mlb-char = mlb-unescaped / escaped
+	// mlb-quotes = 1*2quotation-mark
+	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
+	// mlb-escaped-nl = escape ws newline *( wschar / newline )
 	token, rest, err := scanMultilineBasicString(b)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var builder bytes.Buffer
 
 	i := 3
@@ -482,6 +533,8 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// escapes are balanced.
 	for ; i < len(token)-3; i++ {
 		c := token[i]
+
+		//nolint:nestif
 		if c == '\\' {
 			// When the last non-whitespace character on a line is an unescaped \,
 			// it will be trimmed along with all whitespace (including newlines) up
@@ -492,15 +545,18 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 					c := token[i]
 					if !(c == '\n' || c == '\r' || c == ' ' || c == '\t') {
 						i--
+
 						break
 					}
 				}
+
 				continue
 			}
 
 			// handle escaping
 			i++
 			c = token[i]
+
 			switch c {
 			case '"', '\\':
 				builder.WriteByte(c)
@@ -519,6 +575,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 4
 			case 'U':
@@ -526,10 +583,11 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 8
 			default:
-				return nil, nil, fmt.Errorf("invalid escaped character: %#U", c)
+				return nil, nil, fmt.Errorf("parseMultilineBasicString: %w - %#U", errInvalidEscapeChar, c)
 			}
 		} else {
 			builder.WriteByte(c)
@@ -540,15 +598,14 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 }
 
 func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
-	//key = simple-key / dotted-key
-	//simple-key = quoted-key / unquoted-key
+	// key = simple-key / dotted-key
+	// simple-key = quoted-key / unquoted-key
 	//
-	//unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
-	//quoted-key = basic-string / literal-string
-	//dotted-key = simple-key 1*( dot-sep simple-key )
+	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
+	// quoted-key = basic-string / literal-string
+	// dotted-key = simple-key 1*( dot-sep simple-key )
 	//
-	//dot-sep   = ws %x2E ws  ; . Period
-
+	// dot-sep   = ws %x2E ws  ; . Period
 	key, b, err := p.parseSimpleKey(b)
 	if err != nil {
 		return ast.Reference{}, nil, err
@@ -566,11 +623,14 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 			if err != nil {
 				return ref, nil, err
 			}
+
 			b = p.parseWhitespace(b)
+
 			key, b, err = p.parseSimpleKey(b)
 			if err != nil {
 				return ref, nil, err
 			}
+
 			p.builder.PushAndChain(ast.Node{
 				Kind: ast.Key,
 				Data: key,
@@ -584,46 +644,48 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 }
 
 func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
-	//simple-key = quoted-key / unquoted-key
-	//unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
-	//quoted-key = basic-string / literal-string
-
+	// simple-key = quoted-key / unquoted-key
+	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
+	// quoted-key = basic-string / literal-string
 	if len(b) == 0 {
+		//nolint:godox
 		return nil, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
 	}
 
-	if b[0] == '\'' {
-		key, rest, err = p.parseLiteralString(b)
-	} else if b[0] == '"' {
-		key, rest, err = p.parseBasicString(b)
-	} else if isUnquotedKeyChar(b[0]) {
-		key, rest, err = scanUnquotedKey(b)
-	} else {
-		err = unexpectedCharacter{b: b} // TODO: should contain expected characters
+	switch {
+	case b[0] == '\'':
+		return p.parseLiteralString(b)
+	case b[0] == '"':
+		return p.parseBasicString(b)
+	case isUnquotedKeyChar(b[0]):
+		return scanUnquotedKey(b)
+	default:
+		//nolint:godox
+		return nil, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
 	}
-	return
 }
 
+//nolint:funlen,cyclop
 func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
-	//basic-string = quotation-mark *basic-char quotation-mark
-	//quotation-mark = %x22            ; "
-	//basic-char = basic-unescaped / escaped
-	//basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
-	//escaped = escape escape-seq-char
-	//escape-seq-char =  %x22         ; "    quotation mark  U+0022
-	//escape-seq-char =/ %x5C         ; \    reverse solidus U+005C
-	//escape-seq-char =/ %x62         ; b    backspace       U+0008
-	//escape-seq-char =/ %x66         ; f    form feed       U+000C
-	//escape-seq-char =/ %x6E         ; n    line feed       U+000A
-	//escape-seq-char =/ %x72         ; r    carriage return U+000D
-	//escape-seq-char =/ %x74         ; t    tab             U+0009
-	//escape-seq-char =/ %x75 4HEXDIG ; uXXXX                U+XXXX
-	//escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
-
+	// basic-string = quotation-mark *basic-char quotation-mark
+	// quotation-mark = %x22            ; "
+	// basic-char = basic-unescaped / escaped
+	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
+	// escaped = escape escape-seq-char
+	// escape-seq-char =  %x22         ; "    quotation mark  U+0022
+	// escape-seq-char =/ %x5C         ; \    reverse solidus U+005C
+	// escape-seq-char =/ %x62         ; b    backspace       U+0008
+	// escape-seq-char =/ %x66         ; f    form feed       U+000C
+	// escape-seq-char =/ %x6E         ; n    line feed       U+000A
+	// escape-seq-char =/ %x72         ; r    carriage return U+000D
+	// escape-seq-char =/ %x74         ; t    tab             U+0009
+	// escape-seq-char =/ %x75 4HEXDIG ; uXXXX                U+XXXX
+	// escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
 	token, rest, err := scanBasicString(b)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var builder bytes.Buffer
 
 	// The scanner ensures that the token starts and ends with quotes and that
@@ -633,6 +695,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 		if c == '\\' {
 			i++
 			c = token[i]
+
 			switch c {
 			case '"', '\\':
 				builder.WriteByte(c)
@@ -651,6 +714,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 4
 			case 'U':
@@ -658,10 +722,11 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 				if err != nil {
 					return nil, nil, err
 				}
+
 				builder.WriteString(x)
 				i += 8
 			default:
-				return nil, nil, fmt.Errorf("invalid escaped character: %#U", c)
+				return nil, nil, fmt.Errorf("parseBasicString: %w - %#U", errInvalidEscapeChar, c)
 			}
 		} else {
 			builder.WriteByte(c)
@@ -671,41 +736,54 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 	return builder.Bytes(), rest, nil
 }
 
+var errUnicodePointNeedsRightCountChar = errors.New("unicode point needs right number of hex characters")
+
 func hexToString(b []byte, length int) (string, error) {
 	if len(b) < length {
-		return "", fmt.Errorf("unicode point needs %d hex characters", length)
+		return "", fmt.Errorf("hexToString: %w - %d", errUnicodePointNeedsRightCountChar, length)
 	}
+
+	//nolint:godox
 	// TODO: slow
 	intcode, err := strconv.ParseInt(string(b[:length]), 16, 32)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("hexToString: %w", err)
 	}
+
 	return string(rune(intcode)), nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {
-	//ws = *wschar
-	//wschar =  %x20  ; Space
-	//wschar =/ %x09  ; Horizontal tab
-
+	// ws = *wschar
+	// wschar =  %x20  ; Space
+	// wschar =/ %x09  ; Horizontal tab
 	_, rest := scanWhitespace(b)
+
 	return rest
 }
 
+var (
+	errExpectedInf = errors.New("expected 'inf'")
+	errExpectedNan = errors.New("expected 'nan'")
+)
+
+//nolint:cyclop
 func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, error) {
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
-			return ast.Reference{}, nil, fmt.Errorf("expected 'inf'")
+			return ast.Reference{}, nil, errExpectedInf
 		}
+
 		return p.builder.Push(ast.Node{
 			Kind: ast.Float,
 			Data: b[:3],
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
-			return ast.Reference{}, nil, fmt.Errorf("expected 'nan'")
+			return ast.Reference{}, nil, errExpectedNan
 		}
+
 		return p.builder.Push(ast.Node{
 			Kind: ast.Float,
 			Data: b[:3],
@@ -714,60 +792,73 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		return p.scanIntOrFloat(b)
 	}
 
+	//nolint:gomnd
 	if len(b) < 3 {
 		return p.scanIntOrFloat(b)
 	}
+
 	s := 5
 	if len(b) < s {
 		s = len(b)
 	}
+
 	for idx, c := range b[:s] {
 		if isDigit(c) {
 			continue
 		}
+
 		if idx == 2 && c == ':' || (idx == 4 && c == '-') {
 			return p.scanDateTime(b)
 		}
 	}
+
 	return p.scanIntOrFloat(b)
 }
 
 func digitsToInt(b []byte) int {
 	x := 0
+
 	for _, d := range b {
 		x *= 10
 		x += int(d - '0')
 	}
+
 	return x
 }
 
+var errTimezoneButNoTimeComponent = errors.New("possible DateTime cannot have a timezone but no time component")
+
+//nolint:gocognit,cyclop
 func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
-
 	hasTime := false
 	hasTz := false
 	seenSpace := false
 
 	i := 0
+byteLoop:
 	for ; i < len(b); i++ {
 		c := b[i]
-		if isDigit(c) || c == '-' {
-		} else if c == 'T' || c == ':' || c == '.' {
+
+		switch {
+		case isDigit(c) || c == '-':
+		case c == 'T' || c == ':' || c == '.':
 			hasTime = true
-			continue
-		} else if c == '+' || c == '-' || c == 'Z' {
+
+			continue byteLoop
+		case c == '+' || c == '-' || c == 'Z':
 			hasTz = true
-		} else if c == ' ' {
+		case c == ' ':
 			if !seenSpace && i+1 < len(b) && isDigit(b[i+1]) {
 				i += 2
 				seenSpace = true
 				hasTime = true
 			} else {
-				break
+				break byteLoop
 			}
-		} else {
-			break
+		default:
+			break byteLoop
 		}
 	}
 
@@ -781,7 +872,7 @@ func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 		}
 	} else {
 		if hasTz {
-			return ast.Reference{}, nil, fmt.Errorf("possible DateTime cannot have a timezone but no time component")
+			return ast.Reference{}, nil, errTimezoneButNoTimeComponent
 		}
 		kind = ast.LocalDate
 	}
@@ -792,11 +883,19 @@ func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	}), b[i:], nil
 }
 
+var (
+	errUnexpectedCharI    = fmt.Errorf("unexpected character i while scanning for a number")
+	errUnexpectedCharN    = fmt.Errorf("unexpected character n while scanning for a number")
+	errExpectedIntOrFloat = fmt.Errorf("expected integer or float")
+)
+
+//nolint:funlen,gocognit,cyclop
 func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 	i := 0
 
 	if len(b) > 2 && b[0] == '0' && b[1] != '.' {
 		var isValidRune validRuneFn
+
 		switch b[1] {
 		case 'x':
 			isValidRune = isValidHexRune
@@ -834,6 +933,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 
 		if c == '.' || c == 'e' || c == 'E' {
 			isFloat = true
+
 			continue
 		}
 
@@ -844,8 +944,10 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 					Data: b[:i+3],
 				}), b[i+3:], nil
 			}
-			return ast.Reference{}, nil, fmt.Errorf("unexpected character i while scanning for a number")
+
+			return ast.Reference{}, nil, errUnexpectedCharI
 		}
+
 		if c == 'n' {
 			if scanFollowsNan(b[i:]) {
 				return p.builder.Push(ast.Node{
@@ -853,14 +955,15 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 					Data: b[:i+3],
 				}), b[i+3:], nil
 			}
-			return ast.Reference{}, nil, fmt.Errorf("unexpected character n while scanning for a number")
+
+			return ast.Reference{}, nil, errUnexpectedCharN
 		}
 
 		break
 	}
 
 	if i == 0 {
-		return ast.Reference{}, b, fmt.Errorf("expected integer or float")
+		return ast.Reference{}, b, errExpectedIntOrFloat
 	}
 
 	kind := ast.Integer
@@ -900,9 +1003,11 @@ func expect(x byte, b []byte) ([]byte, error) {
 	if len(b) == 0 {
 		return nil, newDecodeError(b[:0], "expecting %#U", x)
 	}
+
 	if b[0] != x {
 		return nil, newDecodeError(b[0:1], "expected character %U", x)
 	}
+
 	return b[1:], nil
 }
 
@@ -914,7 +1019,7 @@ type unexpectedCharacter struct {
 func (u unexpectedCharacter) Error() string {
 	if len(u.b) == 0 {
 		return fmt.Sprintf("expected %#U, not EOF", u.r)
-
 	}
+
 	return fmt.Sprintf("expected %#U, not %#U", u.r, u.b[0])
 }

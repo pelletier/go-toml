@@ -21,7 +21,7 @@ enable = [
     "errcheck",
     "errorlint",
     "exhaustive",
-    "exhaustivestruct",
+    # "exhaustivestruct",
     "exportloopref",
     "forbidigo",
     "forcetypeassert",
