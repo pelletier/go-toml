@@ -4,6 +4,7 @@ package imported_tests
 // defaults of v2.
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -163,4 +164,35 @@ stringlist = []
 `
 
 	require.Equal(t, string(expected), string(result))
+}
+
+type textMarshaler struct {
+	FirstName string
+	LastName  string
+}
+
+func (m textMarshaler) MarshalText() ([]byte, error) {
+	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
+	return []byte(fullName), nil
+}
+
+func TestTextMarshaler(t *testing.T) {
+	type wrap struct {
+		TM textMarshaler
+	}
+
+	m := textMarshaler{FirstName: "Sally", LastName: "Fields"}
+
+	t.Run("at root", func(t *testing.T) {
+		_, err := toml.Marshal(m)
+		// in v2 we do not allow TextMarshaler at root
+		require.Error(t, err)
+	})
+
+	t.Run("leaf", func(t *testing.T) {
+		res, err := toml.Marshal(wrap{m})
+		require.NoError(t, err)
+
+		require.Equal(t, "TM = 'Sally Fields'\n", string(res))
+	})
 }

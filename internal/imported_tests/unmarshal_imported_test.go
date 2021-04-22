@@ -612,16 +612,6 @@ func (x *IntOrString) MarshalTOML() ([]byte, error) {
 	return []byte(s), nil
 }
 
-type textMarshaler struct {
-	FirstName string
-	LastName  string
-}
-
-func (m textMarshaler) MarshalText() ([]byte, error) {
-	fullName := fmt.Sprintf("%s %s", m.FirstName, m.LastName)
-	return []byte(fullName), nil
-}
-
 func TestUnmarshalTextMarshaler(t *testing.T) {
 	var nested = struct {
 		Friends textMarshaler `toml:"friends"`
