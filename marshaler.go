@@ -33,7 +33,8 @@ type Encoder struct {
 	w io.Writer
 
 	// global settings
-	tablesInline bool
+	tablesInline    bool
+	arraysMultiline bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -44,8 +45,20 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 // SetTablesInline forces the encoder to emit all tables inline.
+//
+// This behavior can be controled on an individual struct field basis with the
+// `inline="true"` tag.
 func (e *Encoder) SetTablesInline(inline bool) {
 	e.tablesInline = inline
+}
+
+// SetArraysMultiline forces the encoder to emit all arrays with one element per
+// line.
+//
+// This behavior can be controled on an individual struct field basis with the
+// `multiline="true"` tag.
+func (e *Encoder) SetArraysMultiline(multiline bool) {
+	e.arraysMultiline = multiline
 }
 
 // Encode writes a TOML representation of v to the stream.

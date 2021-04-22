@@ -3,6 +3,7 @@ package toml_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -285,13 +286,10 @@ isinline = 'no'
 			err = toml.Unmarshal(b, &defaultMap)
 			require.NoError(t, err)
 
-			// checks that the TablesInline mode generates valid,
-			// equivalent TOML
-			t.Run("tables inline", func(t *testing.T) {
+			testWithAllFlags(t, func(t *testing.T, flags int) {
 				var buf bytes.Buffer
-
 				enc := toml.NewEncoder(&buf)
-				enc.SetTablesInline(true)
+				setFlags(enc, flags)
 
 				err := enc.Encode(e.v)
 				require.NoError(t, err)
@@ -302,6 +300,50 @@ isinline = 'no'
 
 				require.Equal(t, defaultMap, inlineMap)
 			})
+		})
+	}
+}
+
+type flagsSetters []struct {
+	name string
+	f    func(enc *toml.Encoder, flag bool)
+}
+
+var allFlags = flagsSetters{
+	{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
+	{"tables-inline", (*toml.Encoder).SetTablesInline},
+}
+
+func setFlags(enc *toml.Encoder, flags int) {
+	for i := 0; i < len(allFlags); i++ {
+		enabled := flags&1 > 0
+		allFlags[i].f(enc, enabled)
+	}
+}
+
+func testWithAllFlags(t *testing.T, testfn func(t *testing.T, flags int)) {
+	t.Helper()
+	testWithFlags(t, 0, allFlags, testfn)
+}
+
+func testWithFlags(t *testing.T, flags int, setters flagsSetters, testfn func(t *testing.T, flags int)) {
+	t.Helper()
+
+	if len(setters) == 0 {
+		testfn(t, flags)
+		return
+	}
+
+	s := setters[0]
+
+	for _, enabled := range []bool{false, true} {
+		name := fmt.Sprintf("%s=%t", s.name, enabled)
+		newFlags := flags << 1
+		if enabled {
+			newFlags++
+		}
+		t.Run(name, func(t *testing.T) {
+			testWithFlags(t, newFlags, setters[1:], testfn)
 		})
 	}
 }
