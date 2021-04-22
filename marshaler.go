@@ -35,12 +35,14 @@ type Encoder struct {
 	// global settings
 	tablesInline    bool
 	arraysMultiline bool
+	indentSymbol    string
 }
 
 // NewEncoder returns a new Encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		w: w,
+		w:            w,
+		indentSymbol: "  ",
 	}
 }
 
@@ -134,6 +136,10 @@ type encoderCtx struct {
 	// Should the next table be encoded as inline
 	inline bool
 
+	// Indentation level
+	indent int
+
+	// Options coming from struct tags
 	options valueOptions
 }
 
@@ -557,6 +563,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	for _, table := range t.tables {
 		ctx.setKey(table.Key)
 
+		ctx.options = table.Options
 		b, err = enc.encode(b, ctx, table.Value)
 		if err != nil {
 			return nil, err
@@ -734,25 +741,52 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 }
 
 func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
+	multiline := ctx.options.multiline || enc.arraysMultiline
+	separator := ", "
+
 	b = append(b, '[')
+
+	subCtx := ctx
+	subCtx.options = valueOptions{}
+
+	if multiline {
+		separator = ",\n"
+		b = append(b, '\n')
+		subCtx.indent++
+	}
 
 	var err error
 	first := true
 
 	for i := 0; i < v.Len(); i++ {
-		if !first {
-			b = append(b, ", "...)
+		if first {
+			first = false
+		} else {
+			b = append(b, separator...)
 		}
 
-		first = false
+		if multiline {
+			b = enc.indent(subCtx.indent, b)
+		}
 
-		b, err = enc.encode(b, ctx, v.Index(i))
+		b, err = enc.encode(b, subCtx, v.Index(i))
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	if multiline {
+		b = append(b, '\n')
+		b = enc.indent(ctx.indent, b)
+	}
 	b = append(b, ']')
 
 	return b, nil
+}
+
+func (enc *Encoder) indent(level int, b []byte) []byte {
+	for i := 0; i < level; i++ {
+		b = append(b, enc.indentSymbol...)
+	}
+	return b
 }

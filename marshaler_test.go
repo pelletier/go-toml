@@ -265,6 +265,39 @@ A = {isinline = 'yes'}
 isinline = 'no'
 `,
 		},
+		{
+			desc: "mutiline array int",
+			v: struct {
+				A []int `multiline:"true"`
+				B []int
+			}{
+				A: []int{1, 2, 3, 4},
+				B: []int{1, 2, 3, 4},
+			},
+			expected: `
+A = [
+  1,
+  2,
+  3,
+  4
+]
+B = [1, 2, 3, 4]
+`,
+		},
+		{
+			desc: "mutiline array in array",
+			v: struct {
+				A [][]int `multiline:"true"`
+			}{
+				A: [][]int{{1, 2}, {3, 4}},
+			},
+			expected: `
+A = [
+  [1, 2],
+  [3, 4]
+]
+`,
+		},
 	}
 
 	for _, e := range examples {
