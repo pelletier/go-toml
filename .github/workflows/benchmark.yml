@@ -19,6 +19,7 @@ jobs:
         with:
           go-version: "~1.16"
       - uses: WillAbides/benchdiff-action@main
+        working-directory: benchmark
         with:
           benchdiff_version: 0.7.0
           status_sha: ${{ github.sha }}
