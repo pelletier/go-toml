@@ -27,7 +27,7 @@ enable = [
     "forcetypeassert",
     "funlen",
     "gci",
-    "gochecknoglobals",
+    # "gochecknoglobals",
     "gochecknoinits",
     "gocognit",
     "goconst",
