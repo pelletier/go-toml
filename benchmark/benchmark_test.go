@@ -5,44 +5,21 @@ import (
 	"testing"
 	"time"
 
-	tomlbs "github.com/BurntSushi/toml"
-	tomlv1 "github.com/pelletier/go-toml-v1"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 )
 
-type runner struct {
-	name      string
-	unmarshal func([]byte, interface{}) error
-}
-
-var runners = []runner{
-	{"v2", toml.Unmarshal},
-	{"v1", tomlv1.Unmarshal},
-	{"bs", tomlbs.Unmarshal},
-}
-
-func bench(b *testing.B, f func(r runner, b *testing.B)) {
-	for _, r := range runners {
-		b.Run(r.name, func(b *testing.B) {
-			f(r, b)
-		})
-	}
-}
-
 func BenchmarkUnmarshalSimple(b *testing.B) {
-	bench(b, func(r runner, b *testing.B) {
-		d := struct {
-			A string
-		}{}
-		doc := []byte(`A = "hello"`)
-		for i := 0; i < b.N; i++ {
-			err := r.unmarshal(doc, &d)
-			if err != nil {
-				panic(err)
-			}
+	d := struct {
+		A string
+	}{}
+	doc := []byte(`A = "hello"`)
+	for i := 0; i < b.N; i++ {
+		err := toml.Unmarshal(doc, &d)
+		if err != nil {
+			panic(err)
 		}
-	})
+	}
 }
 
 type benchmarkDoc struct {
@@ -152,22 +129,20 @@ type benchmarkDoc struct {
 }
 
 func BenchmarkReferenceFile(b *testing.B) {
-	bench(b, func(r runner, b *testing.B) {
-		bytes, err := ioutil.ReadFile("benchmark.toml")
+	bytes, err := ioutil.ReadFile("benchmark.toml")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.SetBytes(int64(len(bytes)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d := benchmarkDoc{}
+		err := toml.Unmarshal(bytes, &d)
 		if err != nil {
-			b.Fatal(err)
+			panic(err)
 		}
-		b.SetBytes(int64(len(bytes)))
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			d := benchmarkDoc{}
-			err := r.unmarshal(bytes, &d)
-			if err != nil {
-				panic(err)
-			}
-		}
-	})
+	}
 }
 
 func TestReferenceFile(t *testing.T) {

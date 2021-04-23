@@ -19,14 +19,13 @@ jobs:
         with:
           go-version: "~1.16"
       - uses: WillAbides/benchdiff-action@main
-        working-directory: benchmark
         with:
           benchdiff_version: 0.7.0
           status_sha: ${{ github.sha }}
           status_name: bench-result
           status_on_degraded: neutral
           benchdiff_args: |
-            --packages ./benchmark
+            --packages ./...
             --cpu=1,2
             --count=10
             --warmup-count=1
