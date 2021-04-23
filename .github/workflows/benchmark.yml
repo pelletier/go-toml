@@ -26,7 +26,7 @@ jobs:
           status_name: bench-result
           status_on_degraded: neutral
           benchdiff_args: |
-            --packages ./...
+            --packages ./benchmark
             --cpu=1,2
             --count=10
             --warmup-count=1
