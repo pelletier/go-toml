@@ -37,6 +37,7 @@ type Encoder struct {
 	tablesInline    bool
 	arraysMultiline bool
 	indentSymbol    string
+	indentTables    bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -62,6 +63,18 @@ func (enc *Encoder) SetTablesInline(inline bool) {
 // `multiline="true"` tag.
 func (enc *Encoder) SetArraysMultiline(multiline bool) {
 	enc.arraysMultiline = multiline
+}
+
+// SetIndentSymbol defines the string that should be used for indentation. The
+// provided string is repeated for each indentation level. Defaults to two
+// spaces.
+func (enc *Encoder) SetIndentSymbol(s string) {
+	enc.indentSymbol = s
+}
+
+// SetIndentTables forces the encoder to intent tables and array tables.
+func (enc *Encoder) SetIndentTables(indent bool) {
+	enc.indentTables = indent
 }
 
 // Encode writes a TOML representation of v to the stream.
@@ -257,6 +270,8 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 		return b, nil
 	}
 
+	b = enc.indent(ctx.indent, b)
+
 	b, err = enc.encodeKey(b, ctx.key)
 	if err != nil {
 		return nil, err
@@ -367,21 +382,23 @@ func (enc *Encoder) encodeUnquotedKey(b []byte, v string) []byte {
 	return append(b, v...)
 }
 
-func (enc *Encoder) encodeTableHeader(b []byte, key []string) ([]byte, error) {
-	if len(key) == 0 {
+func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) {
+	if len(ctx.parentKey) == 0 {
 		return b, nil
 	}
+
+	b = enc.indent(ctx.indent, b)
 
 	b = append(b, '[')
 
 	var err error
 
-	b, err = enc.encodeKey(b, key[0])
+	b, err = enc.encodeKey(b, ctx.parentKey[0])
 	if err != nil {
 		return nil, err
 	}
 
-	for _, k := range key[1:] {
+	for _, k := range ctx.parentKey[1:] {
 		b = append(b, '.')
 
 		b, err = enc.encodeKey(b, k)
@@ -559,9 +576,12 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	}
 
 	if !ctx.skipTableHeader {
-		b, err = enc.encodeTableHeader(b, ctx.parentKey)
+		b, err = enc.encodeTableHeader(ctx, b)
 		if err != nil {
 			return nil, err
+		}
+		if enc.indentTables && len(ctx.parentKey) > 0 {
+			ctx.indent++
 		}
 	}
 	ctx.skipTableHeader = false
