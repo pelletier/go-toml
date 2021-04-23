@@ -166,22 +166,15 @@ func (ctx *encoderCtx) isRoot() bool {
 }
 
 var (
-	errInterfaceNotTime            = errors.New("timeType but interface not time")
 	errUnsupportedValue            = errors.New("unsupported encode value kind")
 	errTextMarshalerCannotBeAtRoot = errors.New("type implementing TextMarshaler cannot be at root")
 )
 
 //nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	if v.Type() == timeType {
-		i, ok := v.Interface().(time.Time)
-		if !ok {
-			return nil, errInterfaceNotTime
-		}
-
-		b = i.AppendFormat(b, time.RFC3339)
-
-		return b, nil
+	i, ok := v.Interface().(time.Time)
+	if ok {
+		return i.AppendFormat(b, time.RFC3339), nil
 	}
 
 	if v.Type().Implements(textMarshalerType) {
