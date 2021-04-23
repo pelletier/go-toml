@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,20 +33,12 @@ func TestUnmarshalDatasetCode(t *testing.T) {
 	for _, tc := range bench_inputs {
 		buf := fixture(t, tc.name)
 		t.Run(tc.name, func(t *testing.T) {
-			for _, r := range runners {
-				if r.name == "bs" && tc.name == "canada" {
-					t.Skip("skipping: burntsushi can't handle mixed arrays")
-				}
+			var v interface{}
+			check(t, toml.Unmarshal(buf, &v))
 
-				t.Run(r.name, func(t *testing.T) {
-					var v interface{}
-					check(t, r.unmarshal(buf, &v))
-
-					b, err := json.Marshal(v)
-					check(t, err)
-					require.Equal(t, len(b), tc.jsonLen)
-				})
-			}
+			b, err := json.Marshal(v)
+			check(t, err)
+			require.Equal(t, len(b), tc.jsonLen)
 		})
 	}
 }
@@ -54,19 +47,13 @@ func BenchmarkUnmarshalDataset(b *testing.B) {
 	for _, tc := range bench_inputs {
 		buf := fixture(b, tc.name)
 		b.Run(tc.name, func(b *testing.B) {
-			bench(b, func(r runner, b *testing.B) {
-				if r.name == "bs" && tc.name == "canada" {
-					b.Skip("skipping: burntsushi can't handle mixed arrays")
-				}
-
-				b.SetBytes(int64(len(buf)))
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					var v interface{}
-					check(b, r.unmarshal(buf, &v))
-				}
-			})
+			b.SetBytes(int64(len(buf)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				var v interface{}
+				check(b, toml.Unmarshal(buf, &v))
+			}
 		})
 	}
 }
