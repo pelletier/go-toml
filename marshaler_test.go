@@ -345,7 +345,6 @@ type flagsSetters []struct {
 	f    func(enc *toml.Encoder, flag bool)
 }
 
-//nolint:gochecknoglobals
 var allFlags = flagsSetters{
 	{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
 	{"tables-inline", (*toml.Encoder).SetTablesInline},

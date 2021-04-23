@@ -637,8 +637,7 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 }
 
 var (
-	errNilInterface = errors.New("nil interface not supported")
-	//nolint:gochecknoglobals
+	errNilInterface   = errors.New("nil interface not supported")
 	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 )
 
