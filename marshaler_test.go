@@ -348,6 +348,7 @@ type flagsSetters []struct {
 var allFlags = flagsSetters{
 	{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
 	{"tables-inline", (*toml.Encoder).SetTablesInline},
+	{"indent-tables", (*toml.Encoder).SetIndentTables},
 }
 
 func setFlags(enc *toml.Encoder, flags int) {
@@ -391,6 +392,66 @@ func equalStringsIgnoreNewlines(t *testing.T, expected string, actual string) {
 	t.Helper()
 	cutset := "\n"
 	assert.Equal(t, strings.Trim(expected, cutset), strings.Trim(actual, cutset))
+}
+
+func TestMarshalIndentTables(t *testing.T) {
+	examples := []struct {
+		desc     string
+		v        interface{}
+		expected string
+	}{
+		{
+			desc: "one kv",
+			v: map[string]interface{}{
+				"foo": "bar",
+			},
+			expected: `foo = 'bar'`,
+		},
+		{
+			desc: "one level table",
+			v: map[string]map[string]string{
+				"foo": {
+					"one": "value1",
+					"two": "value2",
+				},
+			},
+			expected: `
+[foo]
+  one = 'value1'
+  two = 'value2'
+`,
+		},
+		{
+			desc: "two levels table",
+			v: map[string]interface{}{
+				"root": "value0",
+				"level1": map[string]interface{}{
+					"one": "value1",
+					"level2": map[string]interface{}{
+						"two": "value2",
+					},
+				},
+			},
+			expected: `
+root = 'value0'
+[level1]
+  one = 'value1'
+  [level1.level2]
+    two = 'value2'
+`,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			var buf strings.Builder
+			enc := toml.NewEncoder(&buf)
+			enc.SetIndentTables(true)
+			err := enc.Encode(e.v)
+			require.NoError(t, err)
+			equalStringsIgnoreNewlines(t, e.expected, buf.String())
+		})
+	}
 }
 
 func TestIssue436(t *testing.T) {
