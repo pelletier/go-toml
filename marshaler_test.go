@@ -308,6 +308,7 @@ A = [
 			b, err := toml.Marshal(e.v)
 			if e.err {
 				require.Error(t, err)
+
 				return
 			}
 
@@ -320,6 +321,8 @@ A = [
 			require.NoError(t, err)
 
 			testWithAllFlags(t, func(t *testing.T, flags int) {
+				t.Helper()
+
 				var buf bytes.Buffer
 				enc := toml.NewEncoder(&buf)
 				setFlags(enc, flags)
@@ -364,6 +367,7 @@ func testWithFlags(t *testing.T, flags int, setters flagsSetters, testfn func(t 
 
 	if len(setters) == 0 {
 		testfn(t, flags)
+
 		return
 	}
 
@@ -372,9 +376,11 @@ func testWithFlags(t *testing.T, flags int, setters flagsSetters, testfn func(t 
 	for _, enabled := range []bool{false, true} {
 		name := fmt.Sprintf("%s=%t", s.name, enabled)
 		newFlags := flags << 1
+
 		if enabled {
 			newFlags++
 		}
+
 		t.Run(name, func(t *testing.T) {
 			testWithFlags(t, newFlags, setters[1:], testfn)
 		})
@@ -409,6 +415,8 @@ c = 'd'
 }
 
 func TestIssue424(t *testing.T) {
+	t.Parallel()
+
 	type Message1 struct {
 		Text string
 	}

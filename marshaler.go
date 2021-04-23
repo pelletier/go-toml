@@ -49,19 +49,19 @@ func NewEncoder(w io.Writer) *Encoder {
 
 // SetTablesInline forces the encoder to emit all tables inline.
 //
-// This behavior can be controled on an individual struct field basis with the
+// This behavior can be controlled on an individual struct field basis with the
 // `inline="true"` tag.
-func (e *Encoder) SetTablesInline(inline bool) {
-	e.tablesInline = inline
+func (enc *Encoder) SetTablesInline(inline bool) {
+	enc.tablesInline = inline
 }
 
 // SetArraysMultiline forces the encoder to emit all arrays with one element per
 // line.
 //
-// This behavior can be controled on an individual struct field basis with the
+// This behavior can be controlled on an individual struct field basis with the
 // `multiline="true"` tag.
-func (e *Encoder) SetArraysMultiline(multiline bool) {
-	e.arraysMultiline = multiline
+func (enc *Encoder) SetArraysMultiline(multiline bool) {
+	enc.arraysMultiline = multiline
 }
 
 // Encode writes a TOML representation of v to the stream.
@@ -165,18 +165,18 @@ func (ctx *encoderCtx) isRoot() bool {
 	return len(ctx.parentKey) == 0 && !ctx.hasKey
 }
 
-var errUnsupportedValue = errors.New("unsupported encode value kind")
-var errTextMarshalerCannotBeAtRoot = errors.New("type implementing TextMarshaler cannot be at root")
+var (
+	errUnsupportedValue            = errors.New("unsupported encode value kind")
+	errTextMarshalerCannotBeAtRoot = errors.New("type implementing TextMarshaler cannot be at root")
+)
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	//nolint:gocritic,godox
-
-	if v.Type() == timeType {
-		i := v.Interface().(time.Time)
-		b = i.AppendFormat(b, time.RFC3339)
-		return b, nil
+	i, ok := v.Interface().(time.Time)
+	if ok {
+		return i.AppendFormat(b, time.RFC3339), nil
 	}
+
 	if v.Type().Implements(textMarshalerType) {
 		if ctx.isRoot() {
 			return nil, errTextMarshalerCannotBeAtRoot
@@ -184,9 +184,11 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 
 		text, err := v.Interface().(encoding.TextMarshaler).MarshalText()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("encode: %w", err)
 		}
+
 		b = enc.encodeString(b, string(text), ctx.options)
+
 		return b, nil
 	}
 
@@ -543,6 +545,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 
 func fieldBoolTag(field reflect.StructField, tag string) bool {
 	x, ok := field.Tag.Lookup(tag)
+
 	return ok && x == "true"
 }
 
@@ -578,6 +581,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		ctx.setKey(table.Key)
 
 		ctx.options = table.Options
+
 		b, err = enc.encode(b, ctx, table.Value)
 		if err != nil {
 			return nil, err
@@ -632,9 +636,10 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	return b, nil
 }
 
-var errNilInterface = errors.New("nil interface not supported")
-
-var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+var (
+	errNilInterface   = errors.New("nil interface not supported")
+	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+)
 
 func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
 	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
@@ -765,7 +770,9 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 
 	if multiline {
 		separator = ",\n"
+
 		b = append(b, '\n')
+
 		subCtx.indent++
 	}
 
@@ -793,6 +800,7 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 		b = append(b, '\n')
 		b = enc.indent(ctx.indent, b)
 	}
+
 	b = append(b, ']')
 
 	return b, nil
@@ -802,5 +810,6 @@ func (enc *Encoder) indent(level int, b []byte) []byte {
 	for i := 0; i < level; i++ {
 		b = append(b, enc.indentSymbol...)
 	}
+
 	return b
 }
