@@ -345,23 +345,21 @@ type flagsSetters []struct {
 	f    func(enc *toml.Encoder, flag bool)
 }
 
-func allFlags() flagsSetters {
-	return flagsSetters{
-		{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
-		{"tables-inline", (*toml.Encoder).SetTablesInline},
-	}
+var allFlags = flagsSetters{
+	{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
+	{"tables-inline", (*toml.Encoder).SetTablesInline},
 }
 
 func setFlags(enc *toml.Encoder, flags int) {
-	for i := 0; i < len(allFlags()); i++ {
+	for i := 0; i < len(allFlags); i++ {
 		enabled := flags&1 > 0
-		allFlags()[i].f(enc, enabled)
+		allFlags[i].f(enc, enabled)
 	}
 }
 
 func testWithAllFlags(t *testing.T, testfn func(t *testing.T, flags int)) {
 	t.Helper()
-	testWithFlags(t, 0, allFlags(), testfn)
+	testWithFlags(t, 0, allFlags, testfn)
 }
 
 func testWithFlags(t *testing.T, flags int, setters flagsSetters, testfn func(t *testing.T, flags int)) {
