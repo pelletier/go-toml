@@ -31,7 +31,7 @@ jobs:
             --warmup-count=1
             --warmup-time=10ms
             --tolerance=10
-            --base-ref v2
+            --base-ref origin/v2
             --debug
             --benchmem
             --geomean
