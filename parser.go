@@ -55,11 +55,11 @@ func (p *parser) NextExpression() bool {
 			return false
 		}
 
+		p.first = false
+
 		if p.ref.Valid() {
 			return true
 		}
-
-		p.first = false
 	}
 }
 
@@ -70,8 +70,6 @@ func (p *parser) Expression() ast.Node {
 func (p *parser) Error() error {
 	return p.err
 }
-
-var errUnexpectedByte = errors.New("expected newline but got something else")
 
 func (p *parser) parseNewline(b []byte) ([]byte, error) {
 	if b[0] == '\n' {
@@ -84,7 +82,7 @@ func (p *parser) parseNewline(b []byte) ([]byte, error) {
 		return rest, err
 	}
 
-	return nil, fmt.Errorf("parseNewline: %w - %#U", errUnexpectedByte, b[0])
+	return nil, newDecodeError(b[0:1], "expected newline but got %#U", b[0])
 }
 
 func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {

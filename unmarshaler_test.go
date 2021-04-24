@@ -747,6 +747,17 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "no newline (#526)",
+			input: `a = 1z = 2`,
+			gen: func() test {
+				m := map[string]interface{}{}
+				return test{
+					target: &m,
+					err:    true,
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
