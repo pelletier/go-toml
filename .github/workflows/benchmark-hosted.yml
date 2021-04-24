@@ -1,0 +1,39 @@
+name: benchmark-hosted
+on:
+  push:
+    branches:
+      - v2
+  pull_request:
+    branches:
+      - v2
+
+runs-on: self-hosted
+jobs:
+  base:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+      - name: Setup go
+        uses: actions/setup-go@master
+        with:
+          go-version: "~1.16"
+      - uses: WillAbides/benchdiff-action@main
+        with:
+          benchdiff_version: 0.7.0
+          status_sha: ${{ github.sha }}
+          status_name: bench-result
+          status_on_degraded: neutral
+          benchdiff_args: |
+            --packages ./...
+            --cpu=1,2
+            --count=10
+            --warmup-count=1
+            --warmup-time=10ms
+            --tolerance=10
+            --base-ref origin/v2
+            --debug
+            --benchmem
+            --geomean
+            --sort=name
