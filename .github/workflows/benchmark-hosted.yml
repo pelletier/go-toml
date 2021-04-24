@@ -7,10 +7,9 @@ on:
     branches:
       - v2
 
-runs-on: self-hosted
 jobs:
   base:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@master
         with:
