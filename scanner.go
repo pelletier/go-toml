@@ -72,11 +72,8 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	// mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
 	// mll-quotes = 1*2apostrophe
 	for i := 3; i < len(b); i++ {
-		switch b[i] {
-		case '\'':
-			if scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
-				return b[:i+3], b[i+3:], nil
-			}
+		if b[i] == '\'' && scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
+			return b[:i+3], b[i+3:], nil
 		}
 	}
 
