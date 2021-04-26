@@ -6,6 +6,7 @@ import (
 
 func scanFollows(b []byte, pattern string) bool {
 	n := len(pattern)
+
 	return len(b) >= n && string(b[:n]) == pattern
 }
 
@@ -40,6 +41,7 @@ func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
 			return b[:i], b[i:], nil
 		}
 	}
+
 	return b, b[len(b):], nil
 }
 
@@ -59,6 +61,7 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 			return nil, nil, newDecodeError(b[i:i+1], "literal strings cannot have new lines")
 		}
 	}
+
 	return nil, nil, newDecodeError(b[len(b):], "unterminated literal string")
 }
 
@@ -120,7 +123,6 @@ func scanComment(b []byte) ([]byte, []byte) {
 	// non-eol = %x09 / %x20-7F / non-ascii
 	//
 	// comment = comment-start-symbol *non-eol
-
 	for i := 1; i < len(b); i++ {
 		if b[i] == '\n' {
 			return b[:i], b[i:]
