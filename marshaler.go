@@ -566,6 +566,7 @@ func fieldBoolTag(field reflect.StructField, tag string) bool {
 	return ok && x == "true"
 }
 
+//nolint:cyclop
 func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
@@ -580,6 +581,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		if err != nil {
 			return nil, err
 		}
+
 		if enc.indentTables && len(ctx.parentKey) > 0 {
 			ctx.indent++
 		}
