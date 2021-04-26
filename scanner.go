@@ -121,8 +121,7 @@ func scanComment(b []byte) ([]byte, []byte) {
 	// comment = comment-start-symbol *non-eol
 
 	for i := 1; i < len(b); i++ {
-		switch b[i] {
-		case '\n':
+		if b[i] == '\n' {
 			return b[:i], b[i:]
 		}
 	}
