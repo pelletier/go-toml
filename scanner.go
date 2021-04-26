@@ -111,6 +111,7 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 	return b, b[len(b):]
 }
 
+//nolint:unparam
 func scanComment(b []byte) ([]byte, []byte) {
 	// ;; Comment
 	//
