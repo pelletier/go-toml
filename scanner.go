@@ -111,7 +111,7 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 	return b, b[len(b):]
 }
 
-func scanComment(b []byte) ([]byte, []byte, error) {
+func scanComment(b []byte) ([]byte, []byte) {
 	// ;; Comment
 	//
 	// comment-start-symbol = %x23 ; #
@@ -123,11 +123,11 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 	for i := 1; i < len(b); i++ {
 		switch b[i] {
 		case '\n':
-			return b[:i], b[i:], nil
+			return b[:i], b[i:]
 		}
 	}
 
-	return b, nil, nil
+	return b, nil
 }
 
 var errBasicLineNotTerminatedByQuote = errors.New(`basic string not terminated by "`)
