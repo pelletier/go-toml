@@ -212,8 +212,10 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 // When encountering slices, it should always use its last element, and error
 // if the slice does not have any.
 func (d *decoder) scopeWithKey(x target, key ast.Iterator) (target, bool, error) {
-	var err error
-	found := true
+	var (
+		err   error
+		found bool
+	)
 
 	for key.Next() {
 		n := key.Node()
@@ -227,15 +229,17 @@ func (d *decoder) scopeWithKey(x target, key ast.Iterator) (target, bool, error)
 	return x, true, nil
 }
 
+//nolint:cyclop
 // scopeWithArrayTable performs target scoping when unmarshaling an
 // ast.ArrayTable node.
 //
 // It is the same as scopeWithKey, but when scoping the last part of the key
 // it creates a new element in the array instead of using the last one.
 func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool, error) {
-	var err error
-
-	found := true
+	var (
+		err   error
+		found bool
+	)
 
 	for key.Next() {
 		n := key.Node()
@@ -281,6 +285,7 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 		x, err = scopeSlice(true, x)
 	case reflect.Array:
 		x, err = d.scopeArray(true, x)
+	default:
 	}
 
 	return x, found, err
