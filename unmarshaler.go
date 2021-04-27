@@ -2,6 +2,7 @@ package toml
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -55,7 +56,7 @@ func (d *Decoder) SetStrict(strict bool) {
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {
-		return err
+		return fmt.Errorf("Decode: %w", err)
 	}
 
 	p := parser{}
@@ -99,15 +100,13 @@ func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
 
 func (d *decoder) FromParser(p *parser, v interface{}) error {
 	err := d.fromParser(p, v)
-	if err != nil {
-		de, ok := err.(*decodeError)
-		if ok {
-			err = wrapDecodeError(p.data, de)
-		}
+	if err == nil {
+		return d.strict.Error(p.data)
 	}
 
-	if err == nil {
-		err = d.strict.Error(p.data)
+	var e *decodeError
+	if errors.As(err, &e) {
+		return wrapDecodeError(p.data, e)
 	}
 
 	return err
@@ -131,14 +130,20 @@ func keyLocation(node ast.Node) []byte {
 	return unsafe.BytesRange(start, end)
 }
 
+var (
+	errFromParserExpectingPointer       = errors.New("expecting a pointer as target")
+	errFromParserExpectingNonNilPointer = errors.New("expecting non nil pointer as target")
+)
+
+//nolint:funlen,cyclop
 func (d *decoder) fromParser(p *parser, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
-		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
+		return fmt.Errorf("fromParser: %w, not %s", errFromParserExpectingPointer, r.Kind())
 	}
 
 	if r.IsNil() {
-		return fmt.Errorf("target pointer must be non-nil")
+		return errFromParserExpectingNonNilPointer
 	}
 
 	var (
@@ -157,7 +162,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 
 		err := d.seen.CheckExpression(node)
 		if err != nil {
-			return err
+			return fmt.Errorf("fromParser: %w", err)
 		}
 
 		var found bool
@@ -181,7 +186,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			d.strict.EnterArrayTable(node)
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
-			panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
+			panic(fmt.Sprintf("fromParser: this should not be a top level node type: %s", node.Kind))
 		}
 
 		if err != nil {
@@ -327,6 +332,7 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	return false, nil
 }
 
+//nolint:cyclop
 func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 	v := x.get()
 
@@ -368,7 +374,7 @@ func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 	case ast.LocalDate:
 		return unmarshalLocalDate(x, node)
 	default:
-		panic(fmt.Errorf("unhandled unmarshalValue kind %s", node.Kind))
+		panic(fmt.Sprintf("unmarshalValue: unhandled unmarshalValue kind %s", node.Kind))
 	}
 }
 
@@ -523,6 +529,6 @@ func (d *decoder) unmarshalArray(x target, node ast.Node) error {
 
 func assertNode(expected ast.Kind, node ast.Node) {
 	if node.Kind != expected {
-		panic(fmt.Errorf("expected node of kind %s, not %s", expected, node.Kind))
+		panic(fmt.Sprintf("expected node of kind %s, not %s", expected, node.Kind))
 	}
 }
