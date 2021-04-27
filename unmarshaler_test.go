@@ -1238,7 +1238,6 @@ key3 = "value3"
 	err := d.Decode(&s)
 
 	fmt.Println(err.Error())
-	// Output: strict mode: fields in the document are missing in the target struct
 
 	var details *toml.StrictMissingError
 	if !errors.As(err, &details) {
@@ -1246,8 +1245,8 @@ key3 = "value3"
 	}
 
 	fmt.Println(details.String())
-	//nolint:misspell
-	// Ouput:
+	// Output:
+	// strict mode: fields in the document are missing in the target struct
 	// 2| key1 = "value1"
 	// 3| key2 = "value2"
 	//  | ~~~~ missing field
