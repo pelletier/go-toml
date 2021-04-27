@@ -98,7 +98,7 @@ func scanWindowsNewline(b []byte) ([]byte, []byte, error) {
 		return nil, nil, errWindowsNewLineCRLF
 	}
 
-	return b[:2], b[2:], nil
+	return b[:lenLF], b[lenLF:], nil
 }
 
 func scanWhitespace(b []byte) ([]byte, []byte) {
