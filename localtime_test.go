@@ -56,6 +56,7 @@ func TestDates(t *testing.T) {
 		if got := test.date.String(); got != test.wantStr {
 			t.Errorf("%#v.String() = %q, want %q", test.date, got, test.wantStr)
 		}
+
 		if got := test.date.In(test.loc); !got.Equal(test.wantTime) {
 			t.Errorf("%#v.In(%v) = %v, want %v", test.date, test.loc, got, test.wantTime)
 		}
@@ -109,6 +110,7 @@ func TestParseDate(t *testing.T) {
 		if got != test.want {
 			t.Errorf("ParseLocalDate(%q) = %+v, want %+v", test.str, got, test.want)
 		}
+
 		if err != nil && test.want != (emptyDate) {
 			t.Errorf("Unexpected error %v from ParseLocalDate(%q)", err, test.str)
 		}
@@ -170,6 +172,7 @@ func TestDateArithmetic(t *testing.T) {
 		if got := test.start.AddDays(test.days); got != test.end {
 			t.Errorf("[%s] %#v.AddDays(%v) = %#v, want %#v", test.desc, test.start, test.days, got, test.end)
 		}
+
 		if got := test.end.DaysSince(test.start); got != test.days {
 			t.Errorf("[%s] %#v.Sub(%#v) = %v, want %v", test.desc, test.end, test.start, got, test.days)
 		}
@@ -231,9 +234,11 @@ func TestTimeToString(t *testing.T) {
 
 			continue
 		}
+
 		if gotTime != test.time {
 			t.Errorf("ParseLocalTime(%q) = %+v, want %+v", test.str, gotTime, test.time)
 		}
+
 		if test.roundTrip {
 			gotStr := test.time.String()
 			if gotStr != test.str {
@@ -303,9 +308,11 @@ func TestDateTimeToString(t *testing.T) {
 
 			continue
 		}
+
 		if gotDateTime != test.dateTime {
 			t.Errorf("ParseLocalDateTime(%q) = %+v, want %+v", test.str, gotDateTime, test.dateTime)
 		}
+
 		if test.roundTrip {
 			gotStr := test.dateTime.String()
 			if gotStr != test.str {
@@ -444,6 +451,7 @@ func TestMarshalJSON(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if got := string(bgot); got != test.want {
 			t.Errorf("%#v: got %s, want %s", test.value, got, test.want)
 		}
@@ -472,6 +480,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		if err := json.Unmarshal([]byte(test.data), test.ptr); err != nil {
 			t.Fatalf("%s: %v", test.data, err)
 		}
+
 		if !cmpEqual(test.ptr, test.want) {
 			t.Errorf("%s: got %#v, want %#v", test.data, test.ptr, test.want)
 		}
@@ -486,9 +495,11 @@ func TestUnmarshalJSON(t *testing.T) {
 		if json.Unmarshal([]byte(bad), &d) == nil {
 			t.Errorf("%q, LocalDate: got nil, want error", bad)
 		}
+
 		if json.Unmarshal([]byte(bad), &tm) == nil {
 			t.Errorf("%q, LocalTime: got nil, want error", bad)
 		}
+
 		if json.Unmarshal([]byte(bad), &dt) == nil {
 			t.Errorf("%q, LocalDateTime: got nil, want error", bad)
 		}

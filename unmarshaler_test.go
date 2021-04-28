@@ -838,6 +838,7 @@ func (i *Integer484) UnmarshalText(data []byte) error {
 		return fmt.Errorf("UnmarshalText: %w", err)
 	}
 	i.Value = conv
+
 	return nil
 }
 

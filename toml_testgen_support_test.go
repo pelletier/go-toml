@@ -30,6 +30,7 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	t.Logf("Input TOML:\n%s", input)
 
 	doc := map[string]interface{}{}
+
 	err := toml.Unmarshal([]byte(input), &doc)
 	if err != nil {
 		t.Fatalf("failed parsing toml: %s", err)
@@ -56,6 +57,7 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 
 func testgenBuildRefDoc(jsonRef string) map[string]interface{} {
 	descTree := map[string]interface{}{}
+
 	err := json.Unmarshal([]byte(jsonRef), &descTree)
 	if err != nil {
 		panic(fmt.Sprintf("reference doc should be valid JSON: %s", err))
@@ -65,6 +67,7 @@ func testgenBuildRefDoc(jsonRef string) map[string]interface{} {
 	if doc == nil {
 		return map[string]interface{}{}
 	}
+
 	return doc.(map[string]interface{})
 }
 
@@ -76,6 +79,7 @@ func testGenTranslateDesc(input interface{}) interface{} {
 		for i, v := range a {
 			xs[i] = testGenTranslateDesc(v)
 		}
+
 		return xs
 	}
 
@@ -96,6 +100,7 @@ func testGenTranslateDesc(input interface{}) interface{} {
 			dvalue, ok = d["value"]
 			if ok {
 				var okdt bool
+
 				dtype, okdt = dtypeiface.(string)
 				if !okdt {
 					panic(fmt.Sprintf("dtypeiface should be valid string: %v", dtypeiface))
