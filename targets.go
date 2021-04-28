@@ -204,108 +204,224 @@ func ensureValueIndexable(t target) error {
 var sliceInterfaceType = reflect.TypeOf([]interface{}{})
 var mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 
-func ensureMapIfInterface(x target) {
+func ensureMapIfInterface(x target) error {
 	v := x.get()
+
 	if v.Kind() == reflect.Interface && v.IsNil() {
 		newElement := reflect.MakeMap(mapStringInterfaceType)
-		x.set(newElement)
+
+		err := x.set(newElement)
+		if err != nil {
+			return fmt.Errorf("ensureMapIfInterface: %w", err)
+		}
 	}
+
+	return nil
 }
+
+var errSetStringCanNotAssignString = errors.New("cannot assign string")
 
 func setString(t target, v string) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.String:
-		return t.setString(v)
+		err := t.setString(v)
+		if err != nil {
+			return fmt.Errorf("setString: %w", err)
+		}
+
+		return nil
 	case reflect.Interface:
-		return t.set(reflect.ValueOf(v))
+		err := t.set(reflect.ValueOf(v))
+		if err != nil {
+			return fmt.Errorf("setString: %w", err)
+		}
+
+		return nil
 	default:
-		return fmt.Errorf("cannot assign string to a %s", f.Kind())
+		return fmt.Errorf("setString: %w to a %s", errSetStringCanNotAssignString, f.Kind())
 	}
 }
+
+var errSetBoolCanNotAssignBool = errors.New("cannot assign bool")
 
 func setBool(t target, v bool) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Bool:
-		return t.setBool(v)
+		err := t.setBool(v)
+		if err != nil {
+			return fmt.Errorf("setBool: %w", err)
+		}
+
+		return nil
 	case reflect.Interface:
-		return t.set(reflect.ValueOf(v))
+		err := t.set(reflect.ValueOf(v))
+		if err != nil {
+			return fmt.Errorf("setBool: %w", err)
+		}
+
+		return nil
 	default:
-		return fmt.Errorf("cannot assign bool to a %s", f.String())
+		return fmt.Errorf("setBool: %w to a %s", errSetBoolCanNotAssignBool, f.String())
 	}
 }
 
-const maxInt = int64(^uint(0) >> 1)
-const minInt = -maxInt - 1
+const (
+	maxInt = int64(^uint(0) >> 1)
+	minInt = -maxInt - 1
+)
 
+var (
+	errSetInt64InInt32     = errors.New("does not fit in an int32")
+	errSetInt64InInt16     = errors.New("does not fit in an int16")
+	errSetInt64InInt8      = errors.New("does not fit in an int8")
+	errSetInt64InInt       = errors.New("does not fit in an int")
+	errSetInt64InUint64    = errors.New("negative integer does not fit in an uint64")
+	errSetInt64InUint32    = errors.New("negative integer does not fit in an uint32")
+	errSetInt64InUint32Max = errors.New("integer does not fit in an uint32")
+	errSetInt64InUint16    = errors.New("negative integer does not fit in an uint16")
+	errSetInt64InUint16Max = errors.New("integer does not fit in an uint16")
+	errSetInt64InUint8     = errors.New("negative integer does not fit in an uint8")
+	errSetInt64InUint8Max  = errors.New("integer does not fit in an uint8")
+	errSetInt64InUint      = errors.New("negative integer does not fit in an uint")
+	errSetInt64Unknown     = errors.New("does not fit in an uint")
+)
+
+//nolint:funlen,gocognit,cyclop
 func setInt64(t target, v int64) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Int64:
-		return t.setInt64(v)
+		err := t.setInt64(v)
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Int32:
 		if v < math.MinInt32 || v > math.MaxInt32 {
-			return fmt.Errorf("integer %d does not fit in an int32", v)
+			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt32)
 		}
-		return t.set(reflect.ValueOf(int32(v)))
+
+		err := t.set(reflect.ValueOf(int32(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Int16:
 		if v < math.MinInt16 || v > math.MaxInt16 {
-			return fmt.Errorf("integer %d does not fit in an int16", v)
+			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt16)
 		}
-		return t.set(reflect.ValueOf(int16(v)))
+
+		err := t.set(reflect.ValueOf(int16(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Int8:
 		if v < math.MinInt8 || v > math.MaxInt8 {
-			return fmt.Errorf("integer %d does not fit in an int8", v)
+			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt8)
 		}
-		return t.set(reflect.ValueOf(int8(v)))
+
+		err := t.set(reflect.ValueOf(int8(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Int:
 		if v < minInt || v > maxInt {
-			return fmt.Errorf("integer %d does not fit in an int", v)
+			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt)
 		}
-		return t.set(reflect.ValueOf(int(v)))
 
+		err := t.set(reflect.ValueOf(int(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Uint64:
 		if v < 0 {
-			return fmt.Errorf("negative integer %d cannot be stored in an uint64", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint64)
 		}
-		return t.set(reflect.ValueOf(uint64(v)))
+
+		err := t.set(reflect.ValueOf(uint64(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Uint32:
 		if v < 0 {
-			return fmt.Errorf("negative integer %d cannot be stored in an uint32", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint32)
 		}
+
 		if v > math.MaxUint32 {
-			return fmt.Errorf("integer %d cannot be stored in an uint32", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint32Max)
 		}
-		return t.set(reflect.ValueOf(uint32(v)))
+
+		err := t.set(reflect.ValueOf(uint32(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Uint16:
 		if v < 0 {
-			return fmt.Errorf("negative integer %d cannot be stored in an uint16", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint16)
 		}
+
 		if v > math.MaxUint16 {
-			return fmt.Errorf("integer %d cannot be stored in an uint16", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint16Max)
 		}
-		return t.set(reflect.ValueOf(uint16(v)))
+
+		err := t.set(reflect.ValueOf(uint16(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Uint8:
 		if v < 0 {
-			return fmt.Errorf("negative integer %d cannot be stored in an uint8", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint8)
 		}
+
 		if v > math.MaxUint8 {
-			return fmt.Errorf("integer %d cannot be stored in an uint8", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint8Max)
 		}
-		return t.set(reflect.ValueOf(uint8(v)))
+
+		err := t.set(reflect.ValueOf(uint8(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Uint:
 		if v < 0 {
-			return fmt.Errorf("negative integer %d cannot be stored in an uint", v)
+			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint)
 		}
-		return t.set(reflect.ValueOf(uint(v)))
+
+		err := t.set(reflect.ValueOf(uint(v)))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	case reflect.Interface:
-		return t.set(reflect.ValueOf(v))
+		err := t.set(reflect.ValueOf(v))
+		if err != nil {
+			return fmt.Errorf("setInt64: %w", err)
+		}
+
+		return nil
 	default:
-		return fmt.Errorf("cannot assign int64 to a %s", f.String())
+		return fmt.Errorf("setInt64: %s, %w", f.String(), errSetInt64Unknown)
 	}
 }
 
