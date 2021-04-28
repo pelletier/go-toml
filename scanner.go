@@ -1,9 +1,12 @@
 package toml
 
-import "fmt"
+import (
+	"errors"
+)
 
 func scanFollows(b []byte, pattern string) bool {
 	n := len(pattern)
+
 	return len(b) >= n && string(b[:n]) == pattern
 }
 
@@ -38,6 +41,7 @@ func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
 			return b[:i], b[i:], nil
 		}
 	}
+
 	return b, b[len(b):], nil
 }
 
@@ -57,38 +61,44 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 			return nil, nil, newDecodeError(b[i:i+1], "literal strings cannot have new lines")
 		}
 	}
+
 	return nil, nil, newDecodeError(b[len(b):], "unterminated literal string")
 }
 
 func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
-	//ml-literal-string = ml-literal-string-delim [ newline ] ml-literal-body
-	//ml-literal-string-delim
-	//ml-literal-string-delim = 3apostrophe
-	//ml-literal-body = *mll-content *( mll-quotes 1*mll-content ) [ mll-quotes ]
+	// ml-literal-string = ml-literal-string-delim [ newline ] ml-literal-body
+	// ml-literal-string-delim
+	// ml-literal-string-delim = 3apostrophe
+	// ml-literal-body = *mll-content *( mll-quotes 1*mll-content ) [ mll-quotes ]
 	//
-	//mll-content = mll-char / newline
-	//mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
-	//mll-quotes = 1*2apostrophe
+	// mll-content = mll-char / newline
+	// mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
+	// mll-quotes = 1*2apostrophe
 	for i := 3; i < len(b); i++ {
-		switch b[i] {
-		case '\'':
-			if scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
-				return b[:i+3], b[i+3:], nil
-			}
+		if b[i] == '\'' && scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
+			return b[:i+3], b[i+3:], nil
 		}
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], `multiline literal string not terminated by '''`)
 }
 
+var (
+	errWindowsNewLineMissing = errors.New(`windows new line missing \n`)
+	errWindowsNewLineCRLF    = errors.New(`windows new line should be \r\n`)
+)
+
 func scanWindowsNewline(b []byte) ([]byte, []byte, error) {
-	if len(b) < 2 {
-		return nil, nil, fmt.Errorf(`windows new line missing \n`)
+	const lenLF = 2
+	if len(b) < lenLF {
+		return nil, nil, errWindowsNewLineMissing
 	}
+
 	if b[1] != '\n' {
-		return nil, nil, fmt.Errorf(`windows new line should be \r\n`)
+		return nil, nil, errWindowsNewLineCRLF
 	}
-	return b[:2], b[2:], nil
+
+	return b[:lenLF], b[lenLF:], nil
 }
 
 func scanWhitespace(b []byte) ([]byte, []byte) {
@@ -100,27 +110,31 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 			return b[:i], b[i:]
 		}
 	}
+
 	return b, b[len(b):]
 }
 
-func scanComment(b []byte) ([]byte, []byte, error) {
-	//;; Comment
+//nolint:unparam
+func scanComment(b []byte) ([]byte, []byte) {
+	// ;; Comment
 	//
-	//comment-start-symbol = %x23 ; #
-	//non-ascii = %x80-D7FF / %xE000-10FFFF
-	//non-eol = %x09 / %x20-7F / non-ascii
+	// comment-start-symbol = %x23 ; #
+	// non-ascii = %x80-D7FF / %xE000-10FFFF
+	// non-eol = %x09 / %x20-7F / non-ascii
 	//
-	//comment = comment-start-symbol *non-eol
-
+	// comment = comment-start-symbol *non-eol
 	for i := 1; i < len(b); i++ {
-		switch b[i] {
-		case '\n':
-			return b[:i], b[i:], nil
+		if b[i] == '\n' {
+			return b[:i], b[i:]
 		}
 	}
-	return b, nil, nil
+
+	return b, nil
 }
 
+var errBasicLineNotTerminatedByQuote = errors.New(`basic string not terminated by "`)
+
+//nolint:godox
 // TODO perform validation on the string?
 func scanBasicString(b []byte) ([]byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
@@ -142,22 +156,22 @@ func scanBasicString(b []byte) ([]byte, []byte, error) {
 		}
 	}
 
-	return nil, nil, fmt.Errorf(`basic string not terminated by "`)
+	return nil, nil, errBasicLineNotTerminatedByQuote
 }
 
+//nolint:godox
 // TODO perform validation on the string?
 func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
-	//ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
-	//ml-basic-string-delim
-	//ml-basic-string-delim = 3quotation-mark
-	//ml-basic-body = *mlb-content *( mlb-quotes 1*mlb-content ) [ mlb-quotes ]
+	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
+	// ml-basic-string-delim
+	// ml-basic-string-delim = 3quotation-mark
+	// ml-basic-body = *mlb-content *( mlb-quotes 1*mlb-content ) [ mlb-quotes ]
 	//
-	//mlb-content = mlb-char / newline / mlb-escaped-nl
-	//mlb-char = mlb-unescaped / escaped
-	//mlb-quotes = 1*2quotation-mark
-	//mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
-	//mlb-escaped-nl = escape ws newline *( wschar / newline )
-
+	// mlb-content = mlb-char / newline / mlb-escaped-nl
+	// mlb-char = mlb-unescaped / escaped
+	// mlb-quotes = 1*2quotation-mark
+	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
+	// mlb-escaped-nl = escape ws newline *( wschar / newline )
 	for i := 3; i < len(b); i++ {
 		switch b[i] {
 		case '"':

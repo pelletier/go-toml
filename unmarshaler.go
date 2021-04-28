@@ -2,6 +2,7 @@ package toml
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,7 @@ func Unmarshal(data []byte, v interface{}) error {
 	p := parser{}
 	p.Reset(data)
 	d := decoder{}
+
 	return d.FromParser(&p, v)
 }
 
@@ -54,8 +56,9 @@ func (d *Decoder) SetStrict(strict bool) {
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {
-		return err
+		return fmt.Errorf("Decode: %w", err)
 	}
+
 	p := parser{}
 	p.Reset(b)
 	dec := decoder{
@@ -63,6 +66,7 @@ func (d *Decoder) Decode(v interface{}) error {
 			Enabled: d.strict,
 		},
 	}
+
 	return dec.FromParser(&p, v)
 }
 
@@ -90,19 +94,19 @@ func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
 		idx++
 		d.arrayIndexes[v] = idx
 	}
+
 	return idx
 }
 
 func (d *decoder) FromParser(p *parser, v interface{}) error {
 	err := d.fromParser(p, v)
-	if err != nil {
-		de, ok := err.(*decodeError)
-		if ok {
-			err = wrapDecodeError(p.data, de)
-		}
-	}
 	if err == nil {
-		err = d.strict.Error(p.data)
+		return d.strict.Error(p.data)
+	}
+
+	var e *decodeError
+	if errors.As(err, &e) {
+		return wrapDecodeError(p.data, e)
 	}
 
 	return err
@@ -110,29 +114,43 @@ func (d *decoder) FromParser(p *parser, v interface{}) error {
 
 func keyLocation(node ast.Node) []byte {
 	k := node.Key()
+
 	hasOne := k.Next()
 	if !hasOne {
 		panic("should not be called with empty key")
 	}
+
 	start := k.Node().Data
 	end := k.Node().Data
+
 	for k.Next() {
 		end = k.Node().Data
 	}
+
 	return unsafe.BytesRange(start, end)
 }
 
+var (
+	errFromParserExpectingPointer       = errors.New("expecting a pointer as target")
+	errFromParserExpectingNonNilPointer = errors.New("expecting non nil pointer as target")
+)
+
+//nolint:funlen,cyclop
 func (d *decoder) fromParser(p *parser, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
-		return fmt.Errorf("need to target a pointer, not %s", r.Kind())
-	}
-	if r.IsNil() {
-		return fmt.Errorf("target pointer must be non-nil")
+		return fmt.Errorf("fromParser: %w, not %s", errFromParserExpectingPointer, r.Kind())
 	}
 
-	var skipUntilTable bool
-	var root target = valueTarget(r.Elem())
+	if r.IsNil() {
+		return errFromParserExpectingNonNilPointer
+	}
+
+	var (
+		skipUntilTable bool
+		root           target = valueTarget(r.Elem())
+	)
+
 	current := root
 
 	for p.NextExpression() {
@@ -144,10 +162,11 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 
 		err := d.seen.CheckExpression(node)
 		if err != nil {
-			return err
+			return fmt.Errorf("fromParser: %w", err)
 		}
 
 		var found bool
+
 		switch node.Kind {
 		case ast.KeyValue:
 			err = d.unmarshalKeyValue(current, node)
@@ -167,7 +186,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			d.strict.EnterArrayTable(node)
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
-			panic(fmt.Errorf("this should not be a top level node type: %s", node.Kind))
+			panic(fmt.Sprintf("fromParser: this should not be a top level node type: %s", node.Kind))
 		}
 
 		if err != nil {
@@ -176,6 +195,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 
 		if !found {
 			skipUntilTable = true
+
 			d.strict.MissingTable(node)
 		}
 	}
@@ -192,38 +212,49 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 // When encountering slices, it should always use its last element, and error
 // if the slice does not have any.
 func (d *decoder) scopeWithKey(x target, key ast.Iterator) (target, bool, error) {
-	var err error
-	found := true
+	var (
+		err   error
+		found bool
+	)
 
 	for key.Next() {
 		n := key.Node()
+
 		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 		if err != nil || !found {
 			return nil, found, err
 		}
 	}
+
 	return x, true, nil
 }
 
+//nolint:cyclop
 // scopeWithArrayTable performs target scoping when unmarshaling an
 // ast.ArrayTable node.
 //
 // It is the same as scopeWithKey, but when scoping the last part of the key
 // it creates a new element in the array instead of using the last one.
 func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool, error) {
-	var err error
-	found := true
+	var (
+		err   error
+		found bool
+	)
+
 	for key.Next() {
 		n := key.Node()
 		if !n.Next().Valid() { // want to stop at one before last
 			break
 		}
+
 		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 		if err != nil || !found {
 			return nil, found, err
 		}
 	}
+
 	n := key.Node()
+
 	x, found, err = d.scopeTableTarget(false, x, string(n.Data))
 	if err != nil || !found {
 		return x, found, err
@@ -236,6 +267,7 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 		if err != nil {
 			return x, false, err
 		}
+
 		v = x.get()
 	}
 
@@ -244,6 +276,7 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 		if err != nil {
 			return x, found, err
 		}
+
 		v = x.get()
 	}
 
@@ -252,6 +285,7 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 		x, err = scopeSlice(true, x)
 	case reflect.Array:
 		x, err = d.scopeArray(true, x)
+	default:
 	}
 
 	return x, found, err
@@ -295,22 +329,28 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	if v.Type().Implements(textUnmarshalerType) {
 		return true, v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 	}
+
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		return true, v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 	}
+
 	return false, nil
 }
 
+//nolint:cyclop
 func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 	v := x.get()
+
 	if v.Kind() == reflect.Ptr {
 		if !v.Elem().IsValid() {
 			err := x.set(reflect.New(v.Type().Elem()))
 			if err != nil {
 				return err
 			}
+
 			v = x.get()
 		}
+
 		return d.unmarshalValue(valueTarget(v.Elem()), node)
 	}
 
@@ -339,37 +379,44 @@ func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 	case ast.LocalDate:
 		return unmarshalLocalDate(x, node)
 	default:
-		panic(fmt.Errorf("unhandled unmarshalValue kind %s", node.Kind))
+		panic(fmt.Sprintf("unmarshalValue: unhandled unmarshalValue kind %s", node.Kind))
 	}
 }
 
 func unmarshalLocalDate(x target, node ast.Node) error {
 	assertNode(ast.LocalDate, node)
+
 	v, err := parseLocalDate(node.Data)
 	if err != nil {
 		return err
 	}
+
 	return setDate(x, v)
 }
 
 func unmarshalLocalDateTime(x target, node ast.Node) error {
 	assertNode(ast.LocalDateTime, node)
+
 	v, rest, err := parseLocalDateTime(node.Data)
 	if err != nil {
 		return err
 	}
+
 	if len(rest) > 0 {
 		return newDecodeError(rest, "extra characters at the end of a local date time")
 	}
+
 	return setLocalDateTime(x, v)
 }
 
 func unmarshalDateTime(x target, node ast.Node) error {
 	assertNode(ast.DateTime, node)
+
 	v, err := parseDateTime(node.Data)
 	if err != nil {
 		return err
 	}
+
 	return setDateTime(x, v)
 }
 
@@ -378,6 +425,7 @@ func setLocalDateTime(x target, v LocalDateTime) error {
 		cast := v.In(time.Local)
 		return setDateTime(x, cast)
 	}
+
 	return x.set(reflect.ValueOf(v))
 }
 
@@ -398,21 +446,25 @@ func setDate(x target, v LocalDate) error {
 
 func unmarshalString(x target, node ast.Node) error {
 	assertNode(ast.String, node)
+
 	return setString(x, string(node.Data))
 }
 
 func unmarshalBool(x target, node ast.Node) error {
 	assertNode(ast.Bool, node)
 	v := node.Data[0] == 't'
+
 	return setBool(x, v)
 }
 
 func unmarshalInteger(x target, node ast.Node) error {
 	assertNode(ast.Integer, node)
+
 	v, err := parseInteger(node.Data)
 	if err != nil {
 		return err
 	}
+
 	return setInt64(x, v)
 }
 
@@ -422,6 +474,7 @@ func unmarshalFloat(x target, node ast.Node) error {
 	if err != nil {
 		return err
 	}
+
 	return setFloat64(x, v)
 }
 
@@ -433,11 +486,13 @@ func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
 	it := node.Children()
 	for it.Next() {
 		n := it.Node()
+
 		err := d.unmarshalKeyValue(x, n)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -449,30 +504,36 @@ func (d *decoder) unmarshalArray(x target, node ast.Node) error {
 		return err
 	}
 
-	it := node.Children()
 	idx := 0
+
+	it := node.Children()
 	for it.Next() {
 		n := it.Node()
+
 		v, err := elementAt(x, idx)
 		if err != nil {
 			return err
 		}
+
 		if v == nil {
 			// when we go out of bound for an array just stop processing it to
 			// mimic encoding/json
 			break
 		}
+
 		err = d.unmarshalValue(v, n)
 		if err != nil {
 			return err
 		}
+
 		idx++
 	}
+
 	return nil
 }
 
 func assertNode(expected ast.Kind, node ast.Node) {
 	if node.Kind != expected {
-		panic(fmt.Errorf("expected node of kind %s, not %s", expected, node.Kind))
+		panic(fmt.Sprintf("expected node of kind %s, not %s", expected, node.Kind))
 	}
 }

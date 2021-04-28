@@ -1,6 +1,7 @@
 package toml_test
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 )
 
 func TestUnmarshal_Integers(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc     string
 		input    string
@@ -62,7 +65,10 @@ func TestUnmarshal_Integers(t *testing.T) {
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			require.NoError(t, err)
@@ -71,7 +77,10 @@ func TestUnmarshal_Integers(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestUnmarshal_Floats(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc     string
 		input    string
@@ -161,7 +170,10 @@ func TestUnmarshal_Floats(t *testing.T) {
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			require.NoError(t, err)
@@ -174,7 +186,10 @@ func TestUnmarshal_Floats(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	type test struct {
 		target   interface{}
 		expected interface{}
@@ -193,6 +208,7 @@ func TestUnmarshal(t *testing.T) {
 				type doc struct {
 					A string
 				}
+
 				return test{
 					target:   &doc{},
 					expected: &doc{A: "foo"},
@@ -205,6 +221,7 @@ func TestUnmarshal(t *testing.T) {
 					fruit . flavor = "banana"`,
 			gen: func() test {
 				m := map[string]interface{}{}
+
 				return test{
 					target: &m,
 					expected: &map[string]interface{}{
@@ -222,6 +239,7 @@ func TestUnmarshal(t *testing.T) {
 					"\"b\"" = 2`,
 			gen: func() test {
 				m := map[string]interface{}{}
+
 				return test{
 					target: &m,
 					expected: &map[string]interface{}{
@@ -239,6 +257,7 @@ func TestUnmarshal(t *testing.T) {
 				type doc struct {
 					A string
 				}
+
 				return test{
 					target:   &doc{},
 					expected: &doc{A: "Test"},
@@ -252,6 +271,7 @@ func TestUnmarshal(t *testing.T) {
 				type doc struct {
 					A bool
 				}
+
 				return test{
 					target:   &doc{},
 					expected: &doc{A: true},
@@ -265,6 +285,7 @@ func TestUnmarshal(t *testing.T) {
 				type doc struct {
 					A bool
 				}
+
 				return test{
 					target:   &doc{A: true},
 					expected: &doc{A: false},
@@ -278,6 +299,7 @@ func TestUnmarshal(t *testing.T) {
 				type doc struct {
 					A []string
 				}
+
 				return test{
 					target:   &doc{},
 					expected: &doc{A: []string{"foo", "bar"}},
@@ -295,6 +317,7 @@ B = "data"`,
 				type doc struct {
 					A A
 				}
+
 				return test{
 					target:   &doc{},
 					expected: &doc{A: A{B: "data"}},
@@ -306,6 +329,7 @@ B = "data"`,
 			input: `[A]`,
 			gen: func() test {
 				var v map[string]interface{}
+
 				return test{
 					target:   &v,
 					expected: &map[string]interface{}{`A`: map[string]interface{}{}},
@@ -323,6 +347,7 @@ B = "data"`,
 				type doc struct {
 					Name name
 				}
+
 				return test{
 					target: &doc{},
 					expected: &doc{Name: name{
@@ -337,6 +362,7 @@ B = "data"`,
 			input: `A = {}`,
 			gen: func() test {
 				var v map[string]interface{}
+
 				return test{
 					target:   &v,
 					expected: &map[string]interface{}{`A`: map[string]interface{}{}},
@@ -354,6 +380,7 @@ B = "data"`,
 				type doc struct {
 					Names []name
 				}
+
 				return test{
 					target: &doc{},
 					expected: &doc{
@@ -376,6 +403,7 @@ B = "data"`,
 			input: `A = "foo"`,
 			gen: func() test {
 				doc := map[string]interface{}{}
+
 				return test{
 					target: &doc,
 					expected: &map[string]interface{}{
@@ -390,6 +418,7 @@ B = "data"`,
 					B = 42`,
 			gen: func() test {
 				doc := map[string]interface{}{}
+
 				return test{
 					target: &doc,
 					expected: &map[string]interface{}{
@@ -404,6 +433,7 @@ B = "data"`,
 			input: `A = ["foo", "bar"]`,
 			gen: func() test {
 				doc := map[string]interface{}{}
+
 				return test{
 					target: &doc,
 					expected: &map[string]interface{}{
@@ -417,6 +447,7 @@ B = "data"`,
 			input: `A = "foo"`,
 			gen: func() test {
 				doc := map[string]string{}
+
 				return test{
 					target: &doc,
 					expected: &map[string]string{
@@ -430,6 +461,7 @@ B = "data"`,
 			input: `A = 42.0`,
 			gen: func() test {
 				doc := map[string]string{}
+
 				return test{
 					target: &doc,
 					err:    true,
@@ -447,6 +479,7 @@ B = "data"`,
 				type Doc struct {
 					First []First
 				}
+
 				return test{
 					target: &Doc{},
 					expected: &Doc{
@@ -464,13 +497,13 @@ B = "data"`,
 			input: `[[Products]]
 					Name = "Hammer"
 					Sku = 738594937
-					
+
 					[[Products]]  # empty table within the array
-					
+
 					[[Products]]
 					Name = "Nail"
 					Sku = 284758393
-					
+
 					Color = "gray"`,
 			gen: func() test {
 				type Product struct {
@@ -481,6 +514,7 @@ B = "data"`,
 				type Doc struct {
 					Products []Product
 				}
+
 				return test{
 					target: &Doc{},
 					expected: &Doc{
@@ -498,13 +532,13 @@ B = "data"`,
 			input: `[[Products]]
 					Name = "Hammer"
 					Sku = 738594937
-					
+
 					[[Products]]  # empty table within the array
-					
+
 					[[Products]]
 					Name = "Nail"
 					Sku = 284758393
-					
+
 					Color = "gray"`,
 			gen: func() test {
 				return test{
@@ -654,6 +688,7 @@ B = "data"`,
 					A *[]*string
 				}
 				hello := "Hello"
+
 				return test{
 					target: &doc{},
 					expected: &doc{
@@ -673,6 +708,7 @@ B = "data"`,
 				type doc struct {
 					A interface{}
 				}
+
 				return test{
 					target: &doc{
 						A: inner{
@@ -700,6 +736,7 @@ B = "data"`,
 				type doc struct {
 					A [4]inner
 				}
+
 				return test{
 					target: &doc{},
 					expected: &doc{
@@ -716,6 +753,7 @@ B = "data"`,
 			input: "A = 1\r\n\r\nB = 2",
 			gen: func() test {
 				doc := map[string]interface{}{}
+
 				return test{
 					target: &doc,
 					expected: &map[string]interface{}{
@@ -730,6 +768,7 @@ B = "data"`,
 			input: "A = 1\r",
 			gen: func() test {
 				doc := map[string]interface{}{}
+
 				return test{
 					target: &doc,
 					err:    true,
@@ -741,6 +780,7 @@ B = "data"`,
 			input: "A = 1\rB = 2",
 			gen: func() test {
 				doc := map[string]interface{}{}
+
 				return test{
 					target: &doc,
 					err:    true,
@@ -752,6 +792,7 @@ B = "data"`,
 			input: `a = 1z = 2`,
 			gen: func() test {
 				m := map[string]interface{}{}
+
 				return test{
 					target: &m,
 					err:    true,
@@ -761,7 +802,10 @@ B = "data"`,
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			if e.skip {
 				t.Skip()
 			}
@@ -791,7 +835,7 @@ func (i Integer484) MarshalText() ([]byte, error) {
 func (i *Integer484) UnmarshalText(data []byte) error {
 	conv, err := strconv.Atoi(string(data))
 	if err != nil {
-		return err
+		return fmt.Errorf("UnmarshalText: %w", err)
 	}
 	i.Value = conv
 	return nil
@@ -803,6 +847,7 @@ type Config484 struct {
 
 func TestIssue484(t *testing.T) {
 	raw := []byte(`integers = ["1","2","3","100"]`)
+
 	var cfg Config484
 	err := toml.Unmarshal(raw, &cfg)
 	require.NoError(t, err)
@@ -864,6 +909,7 @@ func TestIssue494(t *testing.T) {
 foo = 2021-04-08
 bar = 2021-04-08
 `
+
 	type s struct {
 		Foo time.Time `toml:"foo"`
 		Bar time.Time `toml:"bar"`
@@ -880,7 +926,10 @@ func TestIssue507(t *testing.T) {
 	require.Error(t, err)
 }
 
+//nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc string
 		data string
@@ -955,14 +1004,19 @@ world'`,
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			m := map[string]interface{}{}
 			err := toml.Unmarshal([]byte(e.data), &m)
 			require.Error(t, err)
-			de, ok := err.(*toml.DecodeError)
-			if !ok {
+
+			var de *toml.DecodeError
+			if !errors.As(err, &de) {
 				t.Fatalf("err should have been a *toml.DecodeError, but got %s (%T)", err, err)
 			}
+
 			if e.msg != "" {
 				t.Log("\n" + de.String())
 				require.Equal(t, e.msg, de.Error())
@@ -971,6 +1025,7 @@ world'`,
 	}
 }
 
+//nolint:funlen
 func TestLocalDateTime(t *testing.T) {
 	t.Parallel()
 
@@ -1058,6 +1113,7 @@ func TestIssue508(t *testing.T) {
 	type head struct {
 		Title string `toml:"title"`
 	}
+
 	type text struct {
 		head
 	}
@@ -1070,7 +1126,10 @@ func TestIssue508(t *testing.T) {
 	require.Equal(t, "This is a title", t1.head.Title)
 }
 
+//nolint:funlen
 func TestDecoderStrict(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc     string
 		input    string
@@ -1139,7 +1198,10 @@ bar = 42
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			r := strings.NewReader(e.input)
 			d := toml.NewDecoder(r)
 			d.SetStrict(true)
@@ -1148,8 +1210,13 @@ bar = 42
 				x = &struct{}{}
 			}
 			err := d.Decode(x)
-			details := err.(*toml.StrictMissingError)
-			equalStringsIgnoreNewlines(t, e.expected, details.String())
+
+			var tsm *toml.StrictMissingError
+			if errors.As(err, &tsm) {
+				equalStringsIgnoreNewlines(t, e.expected, tsm.String())
+			} else {
+				t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
+			}
 		})
 	}
 }
@@ -1171,11 +1238,15 @@ key3 = "value3"
 	err := d.Decode(&s)
 
 	fmt.Println(err.Error())
-	// Output: strict mode: fields in the document are missing in the target struct
 
-	details := err.(*toml.StrictMissingError)
+	var details *toml.StrictMissingError
+	if !errors.As(err, &details) {
+		panic(fmt.Sprintf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err))
+	}
+
 	fmt.Println(details.String())
-	// Ouput:
+	// Output:
+	// strict mode: fields in the document are missing in the target struct
 	// 2| key1 = "value1"
 	// 3| key2 = "value2"
 	//  | ~~~~ missing field

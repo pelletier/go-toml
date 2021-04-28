@@ -394,7 +394,10 @@ func equalStringsIgnoreNewlines(t *testing.T, expected string, actual string) {
 	assert.Equal(t, strings.Trim(expected, cutset), strings.Trim(actual, cutset))
 }
 
+//nolint:funlen
 func TestMarshalIndentTables(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc     string
 		v        interface{}
@@ -443,7 +446,10 @@ root = 'value0'
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			var buf strings.Builder
 			enc := toml.NewEncoder(&buf)
 			enc.SetIndentTables(true)
