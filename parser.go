@@ -370,7 +370,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	return parent, rest, err
 }
 
-var errArrayCanNotStartWithComma = errors.New("array cannot start with comma")
+var errArrayCannotStartWithComma = errors.New("array cannot start with comma")
 
 //nolint:funlen,cyclop
 func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
@@ -409,7 +409,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		if b[0] == ',' {
 			if first {
-				return parent, nil, errArrayCanNotStartWithComma
+				return parent, nil, errArrayCannotStartWithComma
 			}
 			b = b[1:]
 

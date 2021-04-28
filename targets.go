@@ -155,7 +155,7 @@ func (t mapTarget) setFloat64(v float64) error {
 
 var (
 	errValIndexExpectingSlice  = errors.New("expecting a slice")
-	errValIndexCanNotInitSlice = errors.New("cannot initialize a slice")
+	errValIndexCannotInitSlice = errors.New("cannot initialize a slice")
 )
 
 //nolint:cyclop
@@ -203,7 +203,7 @@ func ensureValueIndexable(t target) error {
 	case reflect.Array:
 		// arrays are always initialized.
 	default:
-		return fmt.Errorf("ensureValueIndexable: %w with %s", errValIndexCanNotInitSlice, f.Kind())
+		return fmt.Errorf("ensureValueIndexable: %w with %s", errValIndexCannotInitSlice, f.Kind())
 	}
 
 	return nil
@@ -229,7 +229,7 @@ func ensureMapIfInterface(x target) error {
 	return nil
 }
 
-var errSetStringCanNotAssignString = errors.New("cannot assign string")
+var errSetStringCannotAssignString = errors.New("cannot assign string")
 
 func setString(t target, v string) error {
 	f := t.get()
@@ -250,11 +250,11 @@ func setString(t target, v string) error {
 
 		return nil
 	default:
-		return fmt.Errorf("setString: %w to a %s", errSetStringCanNotAssignString, f.Kind())
+		return fmt.Errorf("setString: %w to a %s", errSetStringCannotAssignString, f.Kind())
 	}
 }
 
-var errSetBoolCanNotAssignBool = errors.New("cannot assign bool")
+var errSetBoolCannotAssignBool = errors.New("cannot assign bool")
 
 func setBool(t target, v bool) error {
 	f := t.get()
@@ -275,7 +275,7 @@ func setBool(t target, v bool) error {
 
 		return nil
 	default:
-		return fmt.Errorf("setBool: %w to a %s", errSetBoolCanNotAssignBool, f.String())
+		return fmt.Errorf("setBool: %w to a %s", errSetBoolCannotAssignBool, f.String())
 	}
 }
 
