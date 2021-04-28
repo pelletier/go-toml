@@ -49,16 +49,16 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	require.Equal(t, refDoc, doc2)
 }
 
-type testGenDescNode struct {
-	Type  string
-	Value interface{}
-}
+// type testGenDescNode struct {
+// 	Type  string
+// 	Value interface{}
+// }
 
 func testgenBuildRefDoc(jsonRef string) map[string]interface{} {
 	descTree := map[string]interface{}{}
 	err := json.Unmarshal([]byte(jsonRef), &descTree)
 	if err != nil {
-		panic(fmt.Errorf("reference doc should be valid JSON: %s", err))
+		panic(fmt.Sprintf("reference doc should be valid JSON: %s", err))
 	}
 
 	doc := testGenTranslateDesc(descTree)
@@ -68,6 +68,7 @@ func testgenBuildRefDoc(jsonRef string) map[string]interface{} {
 	return doc.(map[string]interface{})
 }
 
+//nolint:funlen,gocognit,cyclop
 func testGenTranslateDesc(input interface{}) interface{} {
 	a, ok := input.([]interface{})
 	if ok {
@@ -78,45 +79,64 @@ func testGenTranslateDesc(input interface{}) interface{} {
 		return xs
 	}
 
-	d := input.(map[string]interface{})
+	d, ok := input.(map[string]interface{})
+	if !ok {
+		panic(fmt.Sprintf("input should be valid map[string]: %v", input))
+	}
 
-	var dtype string
-	var dvalue interface{}
+	var (
+		dtype  string
+		dvalue interface{}
+	)
 
+	//nolint:nestif
 	if len(d) == 2 {
 		dtypeiface, ok := d["type"]
 		if ok {
 			dvalue, ok = d["value"]
 			if ok {
-				dtype = dtypeiface.(string)
+				var okdt bool
+				dtype, okdt = dtypeiface.(string)
+				if !okdt {
+					panic(fmt.Sprintf("dtypeiface should be valid string: %v", dtypeiface))
+				}
+
 				switch dtype {
 				case "string":
 					return dvalue.(string)
 				case "float":
 					v, err := strconv.ParseFloat(dvalue.(string), 64)
 					if err != nil {
-						panic(fmt.Errorf("invalid float '%s': %s", dvalue, err))
+						panic(fmt.Sprintf("invalid float '%s': %s", dvalue, err))
 					}
+
 					return v
 				case "integer":
 					v, err := strconv.ParseInt(dvalue.(string), 10, 64)
 					if err != nil {
-						panic(fmt.Errorf("invalid int '%s': %s", dvalue, err))
+						panic(fmt.Sprintf("invalid int '%s': %s", dvalue, err))
 					}
+
 					return v
 				case "bool":
 					return dvalue.(string) == "true"
 				case "datetime":
 					dt, err := time.Parse("2006-01-02T15:04:05Z", dvalue.(string))
 					if err != nil {
-						panic(fmt.Errorf("invalid datetime '%s': %s", dvalue, err))
+						panic(fmt.Sprintf("invalid datetime '%s': %s", dvalue, err))
 					}
+
 					return dt
 				case "array":
 					if dvalue == nil {
 						return nil
 					}
-					a := dvalue.([]interface{})
+
+					a, oka := dvalue.([]interface{})
+					if !oka {
+						panic(fmt.Sprintf("a should be valid []interface{}: %v", a))
+					}
+
 					xs := make([]interface{}, len(a))
 
 					for i, v := range a {
@@ -125,7 +145,8 @@ func testGenTranslateDesc(input interface{}) interface{} {
 
 					return xs
 				}
-				panic(fmt.Errorf("unknown type: %s", dtype))
+
+				panic(fmt.Sprintf("unknown type: %s", dtype))
 			}
 		}
 	}
@@ -134,5 +155,6 @@ func testGenTranslateDesc(input interface{}) interface{} {
 	for k, v := range d {
 		dest[k] = testGenTranslateDesc(v)
 	}
+
 	return dest
 }
