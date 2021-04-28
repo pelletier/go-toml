@@ -523,38 +523,38 @@ func elementAt(t target, idx int) (target, error) {
 }
 
 //nolint:cyclop
-func (d *decoder) scopeTableTarget(append bool, t target, name string) (target, bool, error) {
+func (d *decoder) scopeTableTarget(shldAppend bool, t target, name string) (target, bool, error) {
 	x := t.get()
 
 	switch x.Kind() {
 	// Kinds that need to recurse
 
 	case reflect.Interface:
-		t, err := scopeInterface(append, t)
+		t, err := scopeInterface(shldAppend, t)
 		if err != nil {
 			return t, false, err
 		}
-		return d.scopeTableTarget(append, t, name)
+		return d.scopeTableTarget(shldAppend, t, name)
 	case reflect.Ptr:
 		t, err := scopePtr(t)
 		if err != nil {
 			return t, false, err
 		}
-		return d.scopeTableTarget(append, t, name)
+		return d.scopeTableTarget(shldAppend, t, name)
 	case reflect.Slice:
-		t, err := scopeSlice(append, t)
+		t, err := scopeSlice(shldAppend, t)
 		if err != nil {
 			return t, false, err
 		}
-		append = false
-		return d.scopeTableTarget(append, t, name)
+		shldAppend = false
+		return d.scopeTableTarget(shldAppend, t, name)
 	case reflect.Array:
-		t, err := d.scopeArray(append, t)
+		t, err := d.scopeArray(shldAppend, t)
 		if err != nil {
 			return t, false, err
 		}
-		append = false
-		return d.scopeTableTarget(append, t, name)
+		shldAppend = false
+		return d.scopeTableTarget(shldAppend, t, name)
 
 	// Terminal kinds
 
@@ -572,8 +572,8 @@ func (d *decoder) scopeTableTarget(append bool, t target, name string) (target, 
 	}
 }
 
-func scopeInterface(append bool, t target) (target, error) {
-	err := initInterface(append, t)
+func scopeInterface(shldAppend bool, t target) (target, error) {
+	err := initInterface(shldAppend, t)
 	if err != nil {
 		return t, err
 	}
@@ -599,7 +599,7 @@ func initPtr(t target) error {
 // initInterface makes sure that the interface pointed at by the target is not
 // nil.
 // Returns the target to the initialized value of the target.
-func initInterface(append bool, t target) error {
+func initInterface(shldAppend bool, t target) error {
 	x := t.get()
 
 	if x.Kind() != reflect.Interface {
@@ -611,7 +611,7 @@ func initInterface(append bool, t target) error {
 	}
 
 	var newElement reflect.Value
-	if append {
+	if shldAppend {
 		newElement = reflect.MakeSlice(sliceInterfaceType, 0, 0)
 	} else {
 		newElement = reflect.MakeMap(mapStringInterfaceType)
@@ -624,10 +624,10 @@ func initInterface(append bool, t target) error {
 	return nil
 }
 
-func scopeSlice(append bool, t target) (target, error) {
+func scopeSlice(shldAppend bool, t target) (target, error) {
 	v := t.get()
 
-	if append {
+	if shldAppend {
 		newElem := reflect.New(v.Type().Elem())
 		newSlice := reflect.Append(v, newElem.Elem())
 		err := t.set(newSlice)
@@ -639,10 +639,10 @@ func scopeSlice(append bool, t target) (target, error) {
 	return valueTarget(v.Index(v.Len() - 1)), nil
 }
 
-func (d *decoder) scopeArray(append bool, t target) (target, error) {
+func (d *decoder) scopeArray(shldAppend bool, t target) (target, error) {
 	v := t.get()
 
-	idx := d.arrayIndex(append, v)
+	idx := d.arrayIndex(shldAppend, v)
 
 	if idx >= v.Len() {
 		return nil, fmt.Errorf("not enough space in the array")
