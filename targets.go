@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -146,6 +147,12 @@ func (t mapTarget) setFloat64(v float64) error {
 	return t.set(reflect.ValueOf(v))
 }
 
+var (
+	errValIndexExpectingSlice  = errors.New("expecting a slice")
+	errValIndexCanNotInitSlice = errors.New("cannot initialize a slice")
+)
+
+//nolint:cyclop
 // makes sure that the value pointed at by t is indexable (Slice, Array), or
 // dereferences to an indexable (Ptr, Interface).
 func ensureValueIndexable(t target) error {
@@ -154,30 +161,43 @@ func ensureValueIndexable(t target) error {
 	switch f.Type().Kind() {
 	case reflect.Slice:
 		if f.IsNil() {
-			return t.set(reflect.MakeSlice(f.Type(), 0, 0))
+			err := t.set(reflect.MakeSlice(f.Type(), 0, 0))
+			if err != nil {
+				return fmt.Errorf("ensureValueIndexable: %w", err)
+			}
+
+			return nil
 		}
 	case reflect.Interface:
 		if f.IsNil() || f.Elem().Type() != sliceInterfaceType {
-			return t.set(reflect.MakeSlice(sliceInterfaceType, 0, 0))
+			err := t.set(reflect.MakeSlice(sliceInterfaceType, 0, 0))
+			if err != nil {
+				return fmt.Errorf("ensureValueIndexable: %w", err)
+			}
+
+			return nil
 		}
+
 		if f.Elem().Type().Kind() != reflect.Slice {
-			return fmt.Errorf("interface is pointing to a %s, not a slice", f.Kind())
+			return fmt.Errorf("ensureValueIndexable: %w, not a %s", errValIndexExpectingSlice, f.Kind())
 		}
 	case reflect.Ptr:
 		if f.IsNil() {
 			ptr := reflect.New(f.Type().Elem())
 			err := t.set(ptr)
 			if err != nil {
-				return err
+				return fmt.Errorf("ensureValueIndexable: %w", err)
 			}
+
 			f = t.get()
 		}
 		return ensureValueIndexable(valueTarget(f.Elem()))
 	case reflect.Array:
 		// arrays are always initialized.
 	default:
-		return fmt.Errorf("cannot initialize a slice in %s", f.Kind())
+		return fmt.Errorf("ensureValueIndexable: %w with %s", errValIndexCanNotInitSlice, f.Kind())
 	}
+
 	return nil
 }
 
