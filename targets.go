@@ -71,23 +71,48 @@ func (t interfaceTarget) get() reflect.Value {
 }
 
 func (t interfaceTarget) set(v reflect.Value) error {
-	return t.x.set(v)
+	err := t.x.set(v)
+	if err != nil {
+		return fmt.Errorf("interfaceTarget set: %w", err)
+	}
+
+	return nil
 }
 
 func (t interfaceTarget) setString(v string) error {
-	return t.x.setString(v)
+	err := t.x.setString(v)
+	if err != nil {
+		return fmt.Errorf("interfaceTarget setString: %w", err)
+	}
+
+	return nil
 }
 
 func (t interfaceTarget) setBool(v bool) error {
-	return t.x.setBool(v)
+	err := t.x.setBool(v)
+	if err != nil {
+		return fmt.Errorf("interfaceTarget setBool: %w", err)
+	}
+
+	return nil
 }
 
 func (t interfaceTarget) setInt64(v int64) error {
-	return t.x.setInt64(v)
+	err := t.x.setInt64(v)
+	if err != nil {
+		return fmt.Errorf("interfaceTarget setInt64: %w", err)
+	}
+
+	return nil
 }
 
 func (t interfaceTarget) setFloat64(v float64) error {
-	return t.x.setFloat64(v)
+	err := t.x.setFloat64(v)
+	if err != nil {
+		return fmt.Errorf("interfaceTarget setFloat64: %w", err)
+	}
+
+	return nil
 }
 
 // mapTarget targets a specific key of a map.
