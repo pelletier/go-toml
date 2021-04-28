@@ -81,7 +81,7 @@ type decoder struct {
 	strict strict
 }
 
-func (d *decoder) arrayIndex(shldAppend bool, v reflect.Value) int {
+func (d *decoder) arrayIndex(shouldAppend bool, v reflect.Value) int {
 	if d.arrayIndexes == nil {
 		d.arrayIndexes = make(map[reflect.Value]int, 1)
 	}
@@ -90,7 +90,7 @@ func (d *decoder) arrayIndex(shldAppend bool, v reflect.Value) int {
 
 	if !ok {
 		d.arrayIndexes[v] = 0
-	} else if shldAppend {
+	} else if shouldAppend {
 		idx++
 		d.arrayIndexes[v] = idx
 	}
