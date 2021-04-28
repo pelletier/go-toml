@@ -39,26 +39,31 @@ func (t valueTarget) get() reflect.Value {
 
 func (t valueTarget) set(v reflect.Value) error {
 	reflect.Value(t).Set(v)
+
 	return nil
 }
 
 func (t valueTarget) setString(v string) error {
 	t.get().SetString(v)
+
 	return nil
 }
 
 func (t valueTarget) setBool(v bool) error {
 	t.get().SetBool(v)
+
 	return nil
 }
 
 func (t valueTarget) setInt64(v int64) error {
 	t.get().SetInt(v)
+
 	return nil
 }
 
 func (t valueTarget) setFloat64(v float64) error {
 	t.get().SetFloat(v)
+
 	return nil
 }
 
@@ -128,6 +133,7 @@ func (t mapTarget) get() reflect.Value {
 
 func (t mapTarget) set(v reflect.Value) error {
 	t.v.SetMapIndex(t.k, v)
+
 	return nil
 }
 
@@ -184,6 +190,7 @@ func ensureValueIndexable(t target) error {
 	case reflect.Ptr:
 		if f.IsNil() {
 			ptr := reflect.New(f.Type().Elem())
+
 			err := t.set(ptr)
 			if err != nil {
 				return fmt.Errorf("ensureValueIndexable: %w", err)
@@ -191,6 +198,7 @@ func ensureValueIndexable(t target) error {
 
 			f = t.get()
 		}
+
 		return ensureValueIndexable(valueTarget(f.Elem()))
 	case reflect.Array:
 		// arrays are always initialized.
@@ -201,8 +209,10 @@ func ensureValueIndexable(t target) error {
 	return nil
 }
 
-var sliceInterfaceType = reflect.TypeOf([]interface{}{})
-var mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
+var (
+	sliceInterfaceType     = reflect.TypeOf([]interface{}{})
+	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
+)
 
 func ensureMapIfInterface(x target) error {
 	v := x.get()
@@ -528,47 +538,53 @@ func (d *decoder) scopeTableTarget(shldAppend bool, t target, name string) (targ
 
 	switch x.Kind() {
 	// Kinds that need to recurse
-
 	case reflect.Interface:
 		t, err := scopeInterface(shldAppend, t)
 		if err != nil {
-			return t, false, err
+			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
 		}
+
 		return d.scopeTableTarget(shldAppend, t, name)
 	case reflect.Ptr:
 		t, err := scopePtr(t)
 		if err != nil {
-			return t, false, err
+			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
 		}
+
 		return d.scopeTableTarget(shldAppend, t, name)
 	case reflect.Slice:
 		t, err := scopeSlice(shldAppend, t)
 		if err != nil {
-			return t, false, err
+			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
 		}
 		shldAppend = false
+
 		return d.scopeTableTarget(shldAppend, t, name)
 	case reflect.Array:
 		t, err := d.scopeArray(shldAppend, t)
 		if err != nil {
-			return t, false, err
+			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
 		}
 		shldAppend = false
+
 		return d.scopeTableTarget(shldAppend, t, name)
 
 	// Terminal kinds
-
 	case reflect.Struct:
 		return scopeStruct(x, name)
 	case reflect.Map:
 		if x.IsNil() {
-			t.set(reflect.MakeMap(x.Type()))
+			err := t.set(reflect.MakeMap(x.Type()))
+			if err != nil {
+				return t, false, fmt.Errorf("scopeTableTarget: %w", err)
+			}
+
 			x = t.get()
 		}
 
 		return scopeMap(x, name)
 	default:
-		panic(fmt.Errorf("can't scope on a %s", x.Kind()))
+		panic(fmt.Sprintf("can't scope on a %s", x.Kind()))
 	}
 }
 
@@ -577,6 +593,7 @@ func scopeInterface(shldAppend bool, t target) (target, error) {
 	if err != nil {
 		return t, err
 	}
+
 	return interfaceTarget{t}, nil
 }
 
@@ -585,6 +602,7 @@ func scopePtr(t target) (target, error) {
 	if err != nil {
 		return t, err
 	}
+
 	return valueTarget(t.get().Elem()), nil
 }
 
@@ -593,7 +611,13 @@ func initPtr(t target) error {
 	if !x.IsNil() {
 		return nil
 	}
-	return t.set(reflect.New(x.Type().Elem()))
+
+	err := t.set(reflect.New(x.Type().Elem()))
+	if err != nil {
+		return fmt.Errorf("initPtr: %w", err)
+	}
+
+	return nil
 }
 
 // initInterface makes sure that the interface pointed at by the target is not
@@ -616,9 +640,10 @@ func initInterface(shldAppend bool, t target) error {
 	} else {
 		newElement = reflect.MakeMap(mapStringInterfaceType)
 	}
+
 	err := t.set(newElement)
 	if err != nil {
-		return err
+		return fmt.Errorf("initInterface: %w", err)
 	}
 
 	return nil
@@ -630,14 +655,19 @@ func scopeSlice(shldAppend bool, t target) (target, error) {
 	if shldAppend {
 		newElem := reflect.New(v.Type().Elem())
 		newSlice := reflect.Append(v, newElem.Elem())
+
 		err := t.set(newSlice)
 		if err != nil {
-			return t, err
+			return t, fmt.Errorf("scopeSlice: %w", err)
 		}
+
 		v = t.get()
 	}
+
 	return valueTarget(v.Index(v.Len() - 1)), nil
 }
+
+var errScopeArrayNotEnoughSpace = errors.New("not enough space in the array")
 
 func (d *decoder) scopeArray(shldAppend bool, t target) (target, error) {
 	v := t.get()
@@ -645,11 +675,13 @@ func (d *decoder) scopeArray(shldAppend bool, t target) (target, error) {
 	idx := d.arrayIndex(shldAppend, v)
 
 	if idx >= v.Len() {
-		return nil, fmt.Errorf("not enough space in the array")
+		return nil, errScopeArrayNotEnoughSpace
 	}
 
 	return valueTarget(v.Index(idx)), nil
 }
+
+var errScopeMapCannotConvertStringToKey = errors.New("cannot convert string into map key type")
 
 func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	k := reflect.ValueOf(name)
@@ -657,8 +689,9 @@ func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	keyType := v.Type().Key()
 	if !k.Type().AssignableTo(keyType) {
 		if !k.Type().ConvertibleTo(keyType) {
-			return nil, false, fmt.Errorf("cannot convert string into map key type %s", keyType)
+			return nil, false, fmt.Errorf("scopeMap: %w %s", errScopeMapCannotConvertStringToKey, keyType)
 		}
+
 		k = k.Convert(keyType)
 	}
 
@@ -684,6 +717,7 @@ func (c *fieldPathsCache) get(t reflect.Type) (fieldPathsMap, bool) {
 	c.l.RLock()
 	paths, ok := c.m[t]
 	c.l.RUnlock()
+
 	return paths, ok
 }
 
@@ -699,13 +733,14 @@ var globalFieldPathsCache = fieldPathsCache{
 }
 
 func scopeStruct(v reflect.Value, name string) (target, bool, error) {
+	//nolint:godox
 	// TODO: cache this, and reduce allocations
-
 	fieldPaths, ok := globalFieldPathsCache.get(v.Type())
 	if !ok {
 		fieldPaths = map[string][]int{}
 
 		path := make([]int, 0, 16)
+
 		var walk func(reflect.Value)
 		walk = func(v reflect.Value) {
 			t := v.Type()
@@ -713,6 +748,7 @@ func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 				l := len(path)
 				path = append(path, i)
 				f := t.Field(i)
+
 				if f.Anonymous {
 					walk(v.Field(i))
 				} else if f.PkgPath == "" {
@@ -742,6 +778,7 @@ func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 	if !ok {
 		path, ok = fieldPaths[strings.ToLower(name)]
 	}
+
 	if !ok {
 		return nil, false, nil
 	}
