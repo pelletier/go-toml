@@ -290,7 +290,7 @@ var (
 	errSetInt64Unknown     = errors.New("does not fit in an uint")
 )
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit,cyclop,gocyclo
 func setInt64(t target, v int64) error {
 	f := t.get()
 
@@ -425,24 +425,51 @@ func setInt64(t target, v int64) error {
 	}
 }
 
+var (
+	errSetFloat64InFloat32Max = errors.New("does not fit in an float32")
+	errSetFloat64Unknown      = errors.New("does not fit in an float32")
+)
+
 func setFloat64(t target, v float64) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Float64:
-		return t.setFloat64(v)
+		err := t.setFloat64(v)
+		if err != nil {
+			return fmt.Errorf("setFloat64: %w", err)
+		}
+
+		return nil
 	case reflect.Float32:
 		if v > math.MaxFloat32 {
-			return fmt.Errorf("float %f cannot be stored in a float32", v)
+			return fmt.Errorf("setFloat64: %f %w", v, errSetFloat64InFloat32Max)
 		}
-		return t.set(reflect.ValueOf(float32(v)))
+
+		err := t.set(reflect.ValueOf(float32(v)))
+		if err != nil {
+			return fmt.Errorf("setFloat64: %w", err)
+		}
+
+		return nil
 	case reflect.Interface:
-		return t.set(reflect.ValueOf(v))
+		err := t.set(reflect.ValueOf(v))
+		if err != nil {
+			return fmt.Errorf("setFloat64: %w", err)
+		}
+
+		return nil
 	default:
-		return fmt.Errorf("cannot assign float64 to a %s", f.String())
+		return fmt.Errorf("setFloat64: %s %w", f.String(), errSetFloat64Unknown)
 	}
 }
 
+var (
+	errElementAtCannotOn        = errors.New("cannot elementAt")
+	errElementAtCannotOnUnknown = errors.New("cannot elementAt")
+)
+
+//nolint:cyclop
 // Returns the element at idx of the value pointed at by target, or an error if
 // t does not point to an indexable.
 // If the target points to an Array and idx is out of bounds, it returns
@@ -452,41 +479,50 @@ func elementAt(t target, idx int) (target, error) {
 
 	switch f.Kind() {
 	case reflect.Slice:
+		//nolint:godox
 		// TODO: use the idx function argument and avoid alloc if possible.
 		idx := f.Len()
+
 		err := t.set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("elementAt: %w", err)
 		}
+
 		return valueTarget(t.get().Index(idx)), nil
 	case reflect.Array:
 		if idx >= f.Len() {
 			return nil, nil
 		}
+
 		return valueTarget(f.Index(idx)), nil
 	case reflect.Interface:
 		if f.IsNil() {
 			panic("interface should have been initialized")
 		}
+
 		ifaceElem := f.Elem()
 		if ifaceElem.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("cannot elementAt on a %s", f.Kind())
+			return nil, fmt.Errorf("elementAt: %w on a %s", errElementAtCannotOn, f.Kind())
 		}
+
 		idx := ifaceElem.Len()
 		newElem := reflect.New(ifaceElem.Type().Elem()).Elem()
 		newSlice := reflect.Append(ifaceElem, newElem)
+
 		err := t.set(newSlice)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("elementAt: %w", err)
 		}
+
 		return valueTarget(t.get().Elem().Index(idx)), nil
 	case reflect.Ptr:
 		return elementAt(valueTarget(f.Elem()), idx)
 	default:
-		return nil, fmt.Errorf("cannot elementAt on a %s", f.Kind())
+		return nil, fmt.Errorf("elementAt: %w on a %s", errElementAtCannotOnUnknown, f.Kind())
 	}
 }
 
+//nolint:cyclop
 func (d *decoder) scopeTableTarget(append bool, t target, name string) (target, bool, error) {
 	x := t.get()
 
