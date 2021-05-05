@@ -1,7 +1,6 @@
 package toml
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -37,7 +36,8 @@ func TestStructTarget_Ensure(t *testing.T) {
 
 				s, ok := v.Interface().([]string)
 				if !ok {
-					panic(fmt.Sprintf("interface %v should be castable into []string", s))
+					t.Errorf("interface %v should be castable into []string", s)
+					return
 				}
 
 				assert.Equal(t, []string{"foo"}, s)
