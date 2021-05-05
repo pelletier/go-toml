@@ -50,11 +50,6 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	require.Equal(t, refDoc, doc2)
 }
 
-// type testGenDescNode struct {
-// 	Type  string
-// 	Value interface{}
-// }
-
 func testgenBuildRefDoc(jsonRef string) map[string]interface{} {
 	descTree := map[string]interface{}{}
 
