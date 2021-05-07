@@ -255,150 +255,108 @@ func parseFloat(b []byte) (float64, error) {
 		return math.NaN(), nil
 	}
 
-	tok := string(b)
-
-	err := numberContainsInvalidUnderscore(tok)
+	cleaned, err := checkAndRemoveUnderscores(b)
 	if err != nil {
 		return 0, err
 	}
 
-	cleanedVal := cleanupNumberToken(tok)
-	if cleanedVal[0] == '.' {
-		return 0, errParseFloatStartDot
+	if cleaned[0] == '.' {
+		return 0, newDecodeError(b, "float cannot start with a dot")
 	}
 
-	if cleanedVal[len(cleanedVal)-1] == '.' {
-		return 0, errParseFloatEndDot
+	if cleaned[len(cleaned)-1] == '.' {
+		return 0, newDecodeError(b, "float cannot end with a dot")
 	}
 
-	f, err := strconv.ParseFloat(cleanedVal, 64)
+	f, err := strconv.ParseFloat(string(cleaned), 64)
 	if err != nil {
-		return 0, fmt.Errorf("coudn't ParseFloat %w", err)
+		return 0, newDecodeError(b, "coudn't parse float: %w", err)
 	}
 
 	return f, nil
 }
 
 func parseIntHex(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-
-	err := hexNumberContainsInvalidUnderscore(cleanedVal)
+	cleaned, err := checkAndRemoveUnderscores(b[2:])
 	if err != nil {
 		return 0, err
 	}
 
-	i, err := strconv.ParseInt(cleanedVal[2:], 16, 64)
+	i, err := strconv.ParseInt(string(cleaned), 16, 64)
 	if err != nil {
-		return 0, fmt.Errorf("coudn't ParseIntHex %w", err)
+		return 0, newDecodeError(b, "couldn't parse hexadecimal number: %w", err)
 	}
 
 	return i, nil
 }
 
 func parseIntOct(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-
-	err := numberContainsInvalidUnderscore(cleanedVal)
+	cleaned, err := checkAndRemoveUnderscores(b[2:])
 	if err != nil {
 		return 0, err
 	}
 
-	i, err := strconv.ParseInt(cleanedVal[2:], 8, 64)
+	i, err := strconv.ParseInt(string(cleaned), 8, 64)
 	if err != nil {
-		return 0, fmt.Errorf("coudn't ParseIntOct %w", err)
+		return 0, newDecodeError(b, "couldn't parse octal number: %w", err)
 	}
 
 	return i, nil
 }
 
 func parseIntBin(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-
-	err := numberContainsInvalidUnderscore(cleanedVal)
+	cleaned, err := checkAndRemoveUnderscores(b[2:])
 	if err != nil {
 		return 0, err
 	}
 
-	i, err := strconv.ParseInt(cleanedVal[2:], 2, 64)
+	i, err := strconv.ParseInt(string(cleaned), 2, 64)
 	if err != nil {
-		return 0, fmt.Errorf("coudn't ParseIntBin %w", err)
+		return 0, newDecodeError(b, "couldn't parse binary number: %w", err)
 	}
 
 	return i, nil
 }
 
 func parseIntDec(b []byte) (int64, error) {
-	tok := string(b)
-	cleanedVal := cleanupNumberToken(tok)
-
-	err := numberContainsInvalidUnderscore(cleanedVal)
+	cleaned, err := checkAndRemoveUnderscores(b)
 	if err != nil {
 		return 0, err
 	}
 
-	i, err := strconv.ParseInt(cleanedVal, 10, 64)
+	i, err := strconv.ParseInt(string(cleaned), 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("coudn't parseIntDec %w", err)
+		return 0, newDecodeError(b, "couldn't parse decimal number: %w", err)
 	}
 
 	return i, nil
 }
 
-func numberContainsInvalidUnderscore(value string) error {
-	// For large numbers, you may use underscores between digits to enhance
-	// readability. Each underscore must be surrounded by at least one digit on
-	// each side.
-	hasBefore := false
-
-	for idx, r := range value {
-		if r == '_' {
-			if !hasBefore || idx+1 >= len(value) {
-				// can't end with an underscore
-				return errInvalidUnderscore
-			}
-		}
-		hasBefore = isDigitRune(r)
+func checkAndRemoveUnderscores(b []byte) ([]byte, error) {
+	if len(b) == 0 {
+		return b, nil
 	}
 
-	return nil
-}
-
-func hexNumberContainsInvalidUnderscore(value string) error {
-	hasBefore := false
-
-	for idx, r := range value {
-		if r == '_' {
-			if !hasBefore || idx+1 >= len(value) {
-				// can't end with an underscore
-				return errInvalidUnderscoreHex
-			}
-		}
-		hasBefore = isHexDigit(r)
+	if b[0] == '_' {
+		return nil, newDecodeError(b[0:1], "number cannot start with underscore")
 	}
 
-	return nil
+	if b[len(b)-1] == '_' {
+		return nil, newDecodeError(b[len(b)-1:], "number cannot end with underscore")
+	}
+
+	cleaned := make([]byte, 0, len(b))
+	before := false
+	for i, c := range b {
+		if c == '_' {
+			if !before {
+				return nil, newDecodeError(b[i-1:i+1], "number must have at least one digit between underscores")
+			}
+			before = false
+		} else {
+			before = true
+			cleaned = append(cleaned, c)
+		}
+	}
+	return cleaned, nil
 }
-
-func cleanupNumberToken(value string) string {
-	cleanedVal := strings.ReplaceAll(value, "_", "")
-
-	return cleanedVal
-}
-
-func isHexDigit(r rune) bool {
-	return isDigitRune(r) ||
-		(r >= 'a' && r <= 'f') ||
-		(r >= 'A' && r <= 'F')
-}
-
-func isDigitRune(r rune) bool {
-	return r >= '0' && r <= '9'
-}
-
-var (
-	errInvalidUnderscore    = errors.New("invalid use of _ in number")
-	errInvalidUnderscoreHex = errors.New("invalid use of _ in hex number")
-)

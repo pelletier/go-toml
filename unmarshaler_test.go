@@ -58,6 +58,21 @@ func TestUnmarshal_Integers(t *testing.T) {
 			input:    `0b11010110`,
 			expected: 0b11010110,
 		},
+		{
+			desc:  "double underscore",
+			input: "12__3",
+			err:   true,
+		},
+		{
+			desc:  "starts with underscore",
+			input: "_1",
+			err:   true,
+		},
+		{
+			desc:  "ends with underscore",
+			input: "1_",
+			err:   true,
+		},
 	}
 
 	type doc struct {
@@ -71,8 +86,12 @@ func TestUnmarshal_Integers(t *testing.T) {
 
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
-			require.NoError(t, err)
-			assert.Equal(t, e.expected, doc.A)
+			if e.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, e.expected, doc.A)
+			}
 		})
 	}
 }
