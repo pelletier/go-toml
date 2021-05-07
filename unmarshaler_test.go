@@ -1049,7 +1049,7 @@ world'`,
 
 			if e.msg != "" {
 				t.Log("\n" + de.String())
-				require.Equal(t, e.msg, de.Error())
+				require.Equal(t, "toml: "+e.msg, de.Error())
 			}
 		})
 	}

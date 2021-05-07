@@ -1,11 +1,8 @@
 package toml
 
 import (
-	"errors"
-	"fmt"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -59,14 +56,12 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 	return date, nil
 }
 
-var errNotDigit = errors.New("not a digit")
-
 func parseDecimalDigits(b []byte) (int, error) {
 	v := 0
 
-	for _, c := range b {
+	for i, c := range b {
 		if !isDigit(c) {
-			return 0, fmt.Errorf("%s: %w", b, errNotDigit)
+			return 0, newDecodeError(b[i:i+1], "should be a digit (0-9)")
 		}
 
 		v *= 10
@@ -76,13 +71,14 @@ func parseDecimalDigits(b []byte) (int, error) {
 	return v, nil
 }
 
-var errParseDateTimeMissingInfo = errors.New("date-time missing timezone information")
-
 func parseDateTime(b []byte) (time.Time, error) {
 	// offset-date-time = full-date time-delim full-time
 	// full-time      = partial-time time-offset
 	// time-offset    = "Z" / time-numoffset
 	// time-numoffset = ( "+" / "-" ) time-hour ":" time-minute
+
+	originalBytes := b
+
 	dt, b, err := parseLocalDateTime(b)
 	if err != nil {
 		return time.Time{}, err
@@ -91,7 +87,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 	var zone *time.Location
 
 	if len(b) == 0 {
-		return time.Time{}, errParseDateTimeMissingInfo
+		return time.Time{}, newDecodeError(originalBytes, "date-time is missing timezone")
 	}
 
 	if b[0] == 'Z' {
@@ -134,19 +130,12 @@ func parseDateTime(b []byte) (time.Time, error) {
 	return t, nil
 }
 
-var (
-	errParseLocalDateTimeWrongLength = errors.New(
-		"local datetimes are expected to have the format YYYY-MM-DDTHH:MM:SS[.NNNNNNNNN]",
-	)
-	errParseLocalDateTimeWrongSeparator = errors.New("datetime separator is expected to be T or a space")
-)
-
 func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	var dt LocalDateTime
 
 	const localDateTimeByteMinLen = 11
 	if len(b) < localDateTimeByteMinLen {
-		return dt, nil, errParseLocalDateTimeWrongLength
+		return dt, nil, newDecodeError(b, "local datetimes are expected to have the format YYYY-MM-DDTHH:MM:SS[.NNNNNNNNN]")
 	}
 
 	date, err := parseLocalDate(b[:10])
@@ -157,7 +146,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 
 	sep := b[10]
 	if sep != 'T' && sep != ' ' {
-		return dt, nil, errParseLocalDateTimeWrongSeparator
+		return dt, nil, newDecodeError(b[10:11], "datetime separator is expected to be T or a space")
 	}
 
 	t, rest, err := parseLocalTime(b[11:])
@@ -168,8 +157,6 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 
 	return dt, rest, nil
 }
-
-var errParseLocalTimeWrongLength = errors.New("times are expected to have the format HH:MM:SS[.NNNNNN]")
 
 // parseLocalTime is a bit different because it also returns the remaining
 // []byte that is didn't need. This is to allow parseDateTime to parse those
@@ -183,7 +170,7 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 	const localTimeByteLen = 8
 	if len(b) < localTimeByteLen {
-		return t, nil, errParseLocalTimeWrongLength
+		return t, nil, newDecodeError(b, "times are expected to have the format HH:MM:SS[.NNNNNN]")
 	}
 
 	var err error
@@ -241,11 +228,6 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 	return t, b[8:], nil
 }
-
-var (
-	errParseFloatStartDot = errors.New("float cannot start with a dot")
-	errParseFloatEndDot   = errors.New("float cannot end with a dot")
-)
 
 //nolint:cyclop
 func parseFloat(b []byte) (float64, error) {

@@ -56,7 +56,7 @@ func (d *Decoder) SetStrict(strict bool) {
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {
-		return fmt.Errorf("Decode: %w", err)
+		return fmt.Errorf("toml: %w", err)
 	}
 
 	p := parser{}
@@ -130,20 +130,15 @@ func keyLocation(node ast.Node) []byte {
 	return unsafe.BytesRange(start, end)
 }
 
-var (
-	errFromParserExpectingPointer       = errors.New("expecting a pointer as target")
-	errFromParserExpectingNonNilPointer = errors.New("expecting non nil pointer as target")
-)
-
 //nolint:funlen,cyclop
 func (d *decoder) fromParser(p *parser, v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
-		return fmt.Errorf("fromParser: %w, not %s", errFromParserExpectingPointer, r.Kind())
+		return fmt.Errorf("toml: decoding can only be performed into a pointer, not %s", r.Kind())
 	}
 
 	if r.IsNil() {
-		return errFromParserExpectingNonNilPointer
+		return fmt.Errorf("toml: decoding pointer target cannot be nil")
 	}
 
 	var (
@@ -162,7 +157,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 
 		err := d.seen.CheckExpression(node)
 		if err != nil {
-			return fmt.Errorf("fromParser: %w", err)
+			return err
 		}
 
 		var found bool
