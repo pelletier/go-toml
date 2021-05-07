@@ -838,6 +838,7 @@ func (i *Integer484) UnmarshalText(data []byte) error {
 		return fmt.Errorf("UnmarshalText: %w", err)
 	}
 	i.Value = conv
+
 	return nil
 }
 
@@ -846,6 +847,8 @@ type Config484 struct {
 }
 
 func TestIssue484(t *testing.T) {
+	t.Parallel()
+
 	raw := []byte(`integers = ["1","2","3","100"]`)
 
 	var cfg Config484
@@ -866,6 +869,8 @@ func (m Map458) A(s string) Slice458 {
 }
 
 func TestIssue458(t *testing.T) {
+	t.Parallel()
+
 	s := []byte(`[[package]]
 dependencies = ["regex"]
 name = "decode"
@@ -885,6 +890,8 @@ version = "0.1.0"`)
 }
 
 func TestIssue252(t *testing.T) {
+	t.Parallel()
+
 	type config struct {
 		Val1 string `toml:"val1"`
 		Val2 string `toml:"val2"`
@@ -905,6 +912,8 @@ val1 = "test1"
 }
 
 func TestIssue494(t *testing.T) {
+	t.Parallel()
+
 	data := `
 foo = 2021-04-08
 bar = 2021-04-08
@@ -920,6 +929,8 @@ bar = 2021-04-08
 }
 
 func TestIssue507(t *testing.T) {
+	t.Parallel()
+
 	data := []byte{'0', '=', '\n', '0', 'a', 'm', 'e'}
 	m := map[string]interface{}{}
 	err := toml.Unmarshal(data, &m)
@@ -1094,6 +1105,8 @@ func TestLocalDateTime(t *testing.T) {
 }
 
 func TestIssue287(t *testing.T) {
+	t.Parallel()
+
 	b := `y=[[{}]]`
 	v := map[string]interface{}{}
 	err := toml.Unmarshal([]byte(b), &v)
@@ -1110,6 +1123,8 @@ func TestIssue287(t *testing.T) {
 }
 
 func TestIssue508(t *testing.T) {
+	t.Parallel()
+
 	type head struct {
 		Title string `toml:"title"`
 	}

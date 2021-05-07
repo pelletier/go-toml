@@ -6,26 +6,36 @@ import (
 )
 
 func TestInvalidDatetimeMalformedNoLeads(t *testing.T) {
+	t.Parallel()
+
 	input := `no-leads = 1987-7-05T17:45:00Z`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidDatetimeMalformedNoSecs(t *testing.T) {
+	t.Parallel()
+
 	input := `no-secs = 1987-07-05T17:45Z`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidDatetimeMalformedNoT(t *testing.T) {
+	t.Parallel()
+
 	input := `no-t = 1987-07-0517:45:00Z`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidDatetimeMalformedWithMilli(t *testing.T) {
+	t.Parallel()
+
 	input := `with-milli = 1987-07-5T17:45:00.12Z`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidDuplicateKeyTable(t *testing.T) {
+	t.Parallel()
+
 	input := `[fruit]
 type = "apple"
 
@@ -35,71 +45,97 @@ apple = "yes"`
 }
 
 func TestInvalidDuplicateKeys(t *testing.T) {
+	t.Parallel()
+
 	input := `dupe = false
 dupe = true`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidDuplicateTables(t *testing.T) {
+	t.Parallel()
+
 	input := `[a]
 [a]`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidEmptyImplicitTable(t *testing.T) {
+	t.Parallel()
+
 	input := `[naughty..naughty]`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidEmptyTable(t *testing.T) {
+	t.Parallel()
+
 	input := `[]`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidFloatNoLeadingZero(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = .12345
 neganswer = -.12345`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidFloatNoTrailingDigits(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = 1.
 neganswer = -1.`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeyEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := ` = 1`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeyHash(t *testing.T) {
+	t.Parallel()
+
 	input := `a# = 1`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeyNewline(t *testing.T) {
+	t.Parallel()
+
 	input := `a
 = 1`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeyOpenBracket(t *testing.T) {
+	t.Parallel()
+
 	input := `[abc = 1`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeySingleOpenBracket(t *testing.T) {
+	t.Parallel()
+
 	input := `[`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeySpace(t *testing.T) {
+	t.Parallel()
+
 	input := `a b = 1`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidKeyStartBracket(t *testing.T) {
+	t.Parallel()
+
 	input := `[a]
 [xyz = 5
 [b]`
@@ -107,31 +143,43 @@ func TestInvalidKeyStartBracket(t *testing.T) {
 }
 
 func TestInvalidKeyTwoEquals(t *testing.T) {
+	t.Parallel()
+
 	input := `key= = 1`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidStringBadByteEscape(t *testing.T) {
+	t.Parallel()
+
 	input := `naughty = "\xAg"`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidStringBadEscape(t *testing.T) {
+	t.Parallel()
+
 	input := `invalid-escape = "This string has a bad \a escape character."`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidStringByteEscapes(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = "\x33"`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidStringNoClose(t *testing.T) {
+	t.Parallel()
+
 	input := `no-ending-quote = "One time, at band camp`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableArrayImplicit(t *testing.T) {
+	t.Parallel()
+
 	input := "# This test is a bit tricky. It should fail because the first use of\n" +
 		"# `[[albums.songs]]` without first declaring `albums` implies that `albums`\n" +
 		"# must be a table. The alternative would be quite weird. Namely, it wouldn't\n" +
@@ -150,46 +198,62 @@ func TestInvalidTableArrayImplicit(t *testing.T) {
 }
 
 func TestInvalidTableArrayMalformedBracket(t *testing.T) {
+	t.Parallel()
+
 	input := `[[albums]
 name = "Born to Run"`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableArrayMalformedEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := `[[]]
 name = "Born to Run"`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := `[]`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableNestedBracketsClose(t *testing.T) {
+	t.Parallel()
+
 	input := `[a]b]
 zyx = 42`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableNestedBracketsOpen(t *testing.T) {
+	t.Parallel()
+
 	input := `[a[b]
 zyx = 42`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableWhitespace(t *testing.T) {
+	t.Parallel()
+
 	input := `[invalid key]`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTableWithPound(t *testing.T) {
+	t.Parallel()
+
 	input := `[key#group]
 answer = 42`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTextAfterArrayEntries(t *testing.T) {
+	t.Parallel()
+
 	input := `array = [
   "Is there life after an array separator?", No
   "Entry"
@@ -198,21 +262,29 @@ func TestInvalidTextAfterArrayEntries(t *testing.T) {
 }
 
 func TestInvalidTextAfterInteger(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = 42 the ultimate answer?`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTextAfterString(t *testing.T) {
+	t.Parallel()
+
 	input := `string = "Is there life after strings?" No.`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTextAfterTable(t *testing.T) {
+	t.Parallel()
+
 	input := `[error] this shouldn't be here`
 	testgenInvalid(t, input)
 }
 
 func TestInvalidTextBeforeArraySeparator(t *testing.T) {
+	t.Parallel()
+
 	input := `array = [
   "Is there life before an array separator?" No,
   "Entry"
@@ -221,6 +293,8 @@ func TestInvalidTextBeforeArraySeparator(t *testing.T) {
 }
 
 func TestInvalidTextInArray(t *testing.T) {
+	t.Parallel()
+
 	input := `array = [
   "Entry 1",
   I don't belong,
@@ -230,6 +304,8 @@ func TestInvalidTextInArray(t *testing.T) {
 }
 
 func TestValidArrayEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := `thevoid = [[[[[]]]]]`
 	jsonRef := `{
     "thevoid": { "type": "array", "value": [
@@ -246,6 +322,8 @@ func TestValidArrayEmpty(t *testing.T) {
 }
 
 func TestValidArrayNospaces(t *testing.T) {
+	t.Parallel()
+
 	input := `ints = [1,2,3]`
 	jsonRef := `{
     "ints": {
@@ -261,6 +339,8 @@ func TestValidArrayNospaces(t *testing.T) {
 }
 
 func TestValidArraysHetergeneous(t *testing.T) {
+	t.Parallel()
+
 	input := `mixed = [[1, 2], ["a", "b"], [1.1, 2.1]]`
 	jsonRef := `{
     "mixed": {
@@ -285,6 +365,8 @@ func TestValidArraysHetergeneous(t *testing.T) {
 }
 
 func TestValidArraysNested(t *testing.T) {
+	t.Parallel()
+
 	input := `nest = [["a"], ["b"]]`
 	jsonRef := `{
     "nest": {
@@ -303,6 +385,8 @@ func TestValidArraysNested(t *testing.T) {
 }
 
 func TestValidArrays(t *testing.T) {
+	t.Parallel()
+
 	input := `ints = [1, 2, 3]
 floats = [1.1, 2.1, 3.1]
 strings = ["a", "b", "c"]
@@ -349,6 +433,8 @@ dates = [
 }
 
 func TestValidBool(t *testing.T) {
+	t.Parallel()
+
 	input := `t = true
 f = false`
 	jsonRef := `{
@@ -359,6 +445,8 @@ f = false`
 }
 
 func TestValidCommentsEverywhere(t *testing.T) {
+	t.Parallel()
+
 	input := `# Top comment.
   # Top comment.
 # Top comment.
@@ -368,7 +456,7 @@ func TestValidCommentsEverywhere(t *testing.T) {
 [group] # Comment
 answer = 42 # Comment
 # no-extraneous-keys-please = 999
-# Inbetween comment.
+# In between comment.
 more = [ # Comment
   # What about multiple # comments?
   # Can you handle it?
@@ -399,6 +487,8 @@ more = [ # Comment
 }
 
 func TestValidDatetime(t *testing.T) {
+	t.Parallel()
+
 	input := `bestdayever = 1987-07-05T17:45:00Z`
 	jsonRef := `{
     "bestdayever": {"type": "datetime", "value": "1987-07-05T17:45:00Z"}
@@ -407,12 +497,16 @@ func TestValidDatetime(t *testing.T) {
 }
 
 func TestValidEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := ``
 	jsonRef := `{}`
 	testgenValid(t, input, jsonRef)
 }
 
 func TestValidExample(t *testing.T) {
+	t.Parallel()
+
 	input := `best-day-ever = 1987-07-05T17:45:00Z
 
 [numtheory]
@@ -436,6 +530,8 @@ perfection = [6, 28, 496]`
 }
 
 func TestValidFloat(t *testing.T) {
+	t.Parallel()
+
 	input := `pi = 3.14
 negpi = -3.14`
 	jsonRef := `{
@@ -446,6 +542,8 @@ negpi = -3.14`
 }
 
 func TestValidImplicitAndExplicitAfter(t *testing.T) {
+	t.Parallel()
+
 	input := `[a.b.c]
 answer = 42
 
@@ -465,6 +563,8 @@ better = 43`
 }
 
 func TestValidImplicitAndExplicitBefore(t *testing.T) {
+	t.Parallel()
+
 	input := `[a]
 better = 43
 
@@ -484,6 +584,8 @@ answer = 42`
 }
 
 func TestValidImplicitGroups(t *testing.T) {
+	t.Parallel()
+
 	input := `[a.b.c]
 answer = 42`
 	jsonRef := `{
@@ -499,6 +601,8 @@ answer = 42`
 }
 
 func TestValidInteger(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = 42
 neganswer = -42`
 	jsonRef := `{
@@ -509,6 +613,8 @@ neganswer = -42`
 }
 
 func TestValidKeyEqualsNospace(t *testing.T) {
+	t.Parallel()
+
 	input := `answer=42`
 	jsonRef := `{
     "answer": {"type": "integer", "value": "42"}
@@ -517,6 +623,8 @@ func TestValidKeyEqualsNospace(t *testing.T) {
 }
 
 func TestValidKeySpace(t *testing.T) {
+	t.Parallel()
+
 	input := `"a b" = 1`
 	jsonRef := `{
     "a b": {"type": "integer", "value": "1"}
@@ -525,6 +633,8 @@ func TestValidKeySpace(t *testing.T) {
 }
 
 func TestValidKeySpecialChars(t *testing.T) {
+	t.Parallel()
+
 	input := "\"~!@$^&*()_+-`1234567890[]|/?><.,;:'\" = 1\n"
 	jsonRef := "{\n" +
 		"    \"~!@$^&*()_+-`1234567890[]|/?><.,;:'\": {\n" +
@@ -535,6 +645,8 @@ func TestValidKeySpecialChars(t *testing.T) {
 }
 
 func TestValidLongFloat(t *testing.T) {
+	t.Parallel()
+
 	input := `longpi = 3.141592653589793
 neglongpi = -3.141592653589793`
 	jsonRef := `{
@@ -545,6 +657,8 @@ neglongpi = -3.141592653589793`
 }
 
 func TestValidLongInteger(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = 9223372036854775807
 neganswer = -9223372036854775808`
 	jsonRef := `{
@@ -555,6 +669,8 @@ neganswer = -9223372036854775808`
 }
 
 func TestValidMultilineString(t *testing.T) {
+	t.Parallel()
+
 	input := `multiline_empty_one = """"""
 multiline_empty_two = """
 """
@@ -612,6 +728,8 @@ equivalent_three = """\
 }
 
 func TestValidRawMultilineString(t *testing.T) {
+	t.Parallel()
+
 	input := `oneline = '''This string has a ' quote character.'''
 firstnl = '''
 This string has a ' quote character.'''
@@ -639,6 +757,8 @@ in it.'''`
 }
 
 func TestValidRawString(t *testing.T) {
+	t.Parallel()
+
 	input := `backspace = 'This string has a \b backspace character.'
 tab = 'This string has a \t tab character.'
 newline = 'This string has a \n new line character.'
@@ -680,6 +800,8 @@ backslash = 'This string has a \\ backslash character.'`
 }
 
 func TestValidStringEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = ""`
 	jsonRef := `{
     "answer": {
@@ -691,6 +813,8 @@ func TestValidStringEmpty(t *testing.T) {
 }
 
 func TestValidStringEscapes(t *testing.T) {
+	t.Parallel()
+
 	input := `backspace = "This string has a \b backspace character."
 tab = "This string has a \t tab character."
 newline = "This string has a \n new line character."
@@ -752,6 +876,8 @@ notunicode4 = "This string does not have a unicode \\\u0075 escape."`
 }
 
 func TestValidStringSimple(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = "You are not drinking enough whisky."`
 	jsonRef := `{
     "answer": {
@@ -763,6 +889,8 @@ func TestValidStringSimple(t *testing.T) {
 }
 
 func TestValidStringWithPound(t *testing.T) {
+	t.Parallel()
+
 	input := `pound = "We see no # comments here."
 poundcomment = "But there are # some comments here." # Did I # mess you up?`
 	jsonRef := `{
@@ -776,6 +904,8 @@ poundcomment = "But there are # some comments here." # Did I # mess you up?`
 }
 
 func TestValidTableArrayImplicit(t *testing.T) {
+	t.Parallel()
+
 	input := `[[albums.songs]]
 name = "Glory Days"`
 	jsonRef := `{
@@ -789,6 +919,8 @@ name = "Glory Days"`
 }
 
 func TestValidTableArrayMany(t *testing.T) {
+	t.Parallel()
+
 	input := `[[people]]
 first_name = "Bruce"
 last_name = "Springsteen"
@@ -820,6 +952,8 @@ last_name = "Seger"`
 }
 
 func TestValidTableArrayNest(t *testing.T) {
+	t.Parallel()
+
 	input := `[[albums]]
 name = "Born to Run"
 
@@ -831,7 +965,7 @@ name = "Born to Run"
 
 [[albums]]
 name = "Born in the USA"
-  
+
   [[albums.songs]]
   name = "Glory Days"
 
@@ -859,6 +993,8 @@ name = "Born in the USA"
 }
 
 func TestValidTableArrayOne(t *testing.T) {
+	t.Parallel()
+
 	input := `[[people]]
 first_name = "Bruce"
 last_name = "Springsteen"`
@@ -874,6 +1010,8 @@ last_name = "Springsteen"`
 }
 
 func TestValidTableEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := `[a]`
 	jsonRef := `{
     "a": {}
@@ -882,6 +1020,8 @@ func TestValidTableEmpty(t *testing.T) {
 }
 
 func TestValidTableSubEmpty(t *testing.T) {
+	t.Parallel()
+
 	input := `[a]
 [a.b]`
 	jsonRef := `{
@@ -891,6 +1031,8 @@ func TestValidTableSubEmpty(t *testing.T) {
 }
 
 func TestValidTableWhitespace(t *testing.T) {
+	t.Parallel()
+
 	input := `["valid key"]`
 	jsonRef := `{
     "valid key": {}
@@ -899,6 +1041,8 @@ func TestValidTableWhitespace(t *testing.T) {
 }
 
 func TestValidTableWithPound(t *testing.T) {
+	t.Parallel()
+
 	input := `["key#group"]
 answer = 42`
 	jsonRef := `{
@@ -910,6 +1054,8 @@ answer = 42`
 }
 
 func TestValidUnicodeEscape(t *testing.T) {
+	t.Parallel()
+
 	input := `answer4 = "\u03B4"
 answer8 = "\U000003B4"`
 	jsonRef := `{
@@ -920,6 +1066,8 @@ answer8 = "\U000003B4"`
 }
 
 func TestValidUnicodeLiteral(t *testing.T) {
+	t.Parallel()
+
 	input := `answer = "δ"`
 	jsonRef := `{
     "answer": {"type": "string", "value": "δ"}

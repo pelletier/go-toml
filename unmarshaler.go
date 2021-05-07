@@ -81,7 +81,7 @@ type decoder struct {
 	strict strict
 }
 
-func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
+func (d *decoder) arrayIndex(shouldAppend bool, v reflect.Value) int {
 	if d.arrayIndexes == nil {
 		d.arrayIndexes = make(map[reflect.Value]int, 1)
 	}
@@ -90,7 +90,7 @@ func (d *decoder) arrayIndex(append bool, v reflect.Value) int {
 
 	if !ok {
 		d.arrayIndexes[v] = 0
-	} else if append {
+	} else if shouldAppend {
 		idx++
 		d.arrayIndexes[v] = idx
 	}
@@ -173,6 +173,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			found = true
 		case ast.Table:
 			d.strict.EnterTable(node)
+
 			current, found, err = d.scopeWithKey(root, node.Key())
 			if err == nil && found {
 				// In case this table points to an interface,
@@ -180,7 +181,10 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 				// looks like a table. Otherwise the information
 				// of a table is lost, and marshal cannot do the
 				// round trip.
-				ensureMapIfInterface(current)
+				err := ensureMapIfInterface(current)
+				if err != nil {
+					panic(fmt.Sprintf("ensureMapIfInterface: %s", err))
+				}
 			}
 		case ast.ArrayTable:
 			d.strict.EnterArrayTable(node)
@@ -305,6 +309,7 @@ func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
 	// A struct in the path was not found. Skip this value.
 	if !found {
 		d.strict.MissingField(node)
+
 		return nil
 	}
 
@@ -327,11 +332,21 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	}
 
 	if v.Type().Implements(textUnmarshalerType) {
-		return true, v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
+		err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
+		if err != nil {
+			return false, fmt.Errorf("tryTextUnmarshaler: %w", err)
+		}
+
+		return true, nil
 	}
 
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
-		return true, v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
+		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
+		if err != nil {
+			return false, fmt.Errorf("tryTextUnmarshaler: %w", err)
+		}
+
+		return true, nil
 	}
 
 	return false, nil
@@ -345,7 +360,7 @@ func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 		if !v.Elem().IsValid() {
 			err := x.set(reflect.New(v.Type().Elem()))
 			if err != nil {
-				return err
+				return fmt.Errorf("unmarshalValue: %w", err)
 			}
 
 			v = x.get()
@@ -423,14 +438,25 @@ func unmarshalDateTime(x target, node ast.Node) error {
 func setLocalDateTime(x target, v LocalDateTime) error {
 	if x.get().Type() == timeType {
 		cast := v.In(time.Local)
+
 		return setDateTime(x, cast)
 	}
 
-	return x.set(reflect.ValueOf(v))
+	err := x.set(reflect.ValueOf(v))
+	if err != nil {
+		return fmt.Errorf("setLocalDateTime: %w", err)
+	}
+
+	return nil
 }
 
 func setDateTime(x target, v time.Time) error {
-	return x.set(reflect.ValueOf(v))
+	err := x.set(reflect.ValueOf(v))
+	if err != nil {
+		return fmt.Errorf("setDateTime: %w", err)
+	}
+
+	return nil
 }
 
 var timeType = reflect.TypeOf(time.Time{})
@@ -438,10 +464,16 @@ var timeType = reflect.TypeOf(time.Time{})
 func setDate(x target, v LocalDate) error {
 	if x.get().Type() == timeType {
 		cast := v.In(time.Local)
+
 		return setDateTime(x, cast)
 	}
 
-	return x.set(reflect.ValueOf(v))
+	err := x.set(reflect.ValueOf(v))
+	if err != nil {
+		return fmt.Errorf("setDate: %w", err)
+	}
+
+	return nil
 }
 
 func unmarshalString(x target, node ast.Node) error {
@@ -470,6 +502,7 @@ func unmarshalInteger(x target, node ast.Node) error {
 
 func unmarshalFloat(x target, node ast.Node) error {
 	assertNode(ast.Float, node)
+
 	v, err := parseFloat(node.Data)
 	if err != nil {
 		return err
@@ -481,7 +514,10 @@ func unmarshalFloat(x target, node ast.Node) error {
 func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
 	assertNode(ast.InlineTable, node)
 
-	ensureMapIfInterface(x)
+	err := ensureMapIfInterface(x)
+	if err != nil {
+		return fmt.Errorf("unmarshalInlineTable: %w", err)
+	}
 
 	it := node.Children()
 	for it.Next() {

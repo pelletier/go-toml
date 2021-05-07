@@ -9,6 +9,8 @@ import (
 )
 
 func TestStructTarget_Ensure(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc  string
 		input reflect.Value
@@ -31,14 +33,23 @@ func TestStructTarget_Ensure(t *testing.T) {
 			test: func(v reflect.Value, err error) {
 				assert.NoError(t, err)
 				require.False(t, v.IsNil())
-				s := v.Interface().([]string)
+
+				s, ok := v.Interface().([]string)
+				if !ok {
+					t.Errorf("interface %v should be castable into []string", s)
+					return
+				}
+
 				assert.Equal(t, []string{"foo"}, s)
 			},
 		},
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			d := decoder{}
 			target, _, err := d.scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
@@ -50,6 +61,8 @@ func TestStructTarget_Ensure(t *testing.T) {
 }
 
 func TestStructTarget_SetString(t *testing.T) {
+	t.Parallel()
+
 	str := "value"
 
 	examples := []struct {
@@ -86,7 +99,10 @@ func TestStructTarget_SetString(t *testing.T) {
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			d := decoder{}
 			target, _, err := d.scopeTableTarget(false, valueTarget(e.input), e.name)
 			require.NoError(t, err)
@@ -98,7 +114,11 @@ func TestStructTarget_SetString(t *testing.T) {
 }
 
 func TestPushNew(t *testing.T) {
+	t.Parallel()
+
 	t.Run("slice of strings", func(t *testing.T) {
+		t.Parallel()
+
 		type Doc struct {
 			A []string
 		}
@@ -120,6 +140,8 @@ func TestPushNew(t *testing.T) {
 	})
 
 	t.Run("slice of interfaces", func(t *testing.T) {
+		t.Parallel()
+
 		type Doc struct {
 			A []interface{}
 		}
@@ -142,6 +164,8 @@ func TestPushNew(t *testing.T) {
 }
 
 func TestScope_Struct(t *testing.T) {
+	t.Parallel()
+
 	examples := []struct {
 		desc  string
 		input reflect.Value
@@ -167,7 +191,10 @@ func TestScope_Struct(t *testing.T) {
 	}
 
 	for _, e := range examples {
+		e := e
 		t.Run(e.desc, func(t *testing.T) {
+			t.Parallel()
+
 			dec := decoder{}
 			x, found, err := dec.scopeTableTarget(false, valueTarget(e.input), e.name)
 			assert.Equal(t, e.found, found)
