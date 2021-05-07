@@ -571,7 +571,7 @@ func (d *decoder) scopeTableTarget(shouldAppend bool, t target, name string) (ta
 
 	// Terminal kinds
 	case reflect.Struct:
-		return scopeStruct(x, name)
+		return d.scopeStruct(x, name)
 	case reflect.Map:
 		if x.IsNil() {
 			err := t.set(reflect.MakeMap(x.Type()))
@@ -727,15 +727,22 @@ func (c *fieldPathsCache) set(t reflect.Type, m fieldPathsMap) {
 	c.l.Unlock()
 }
 
-var globalFieldPathsCache = fieldPathsCache{
-	m: map[reflect.Type]fieldPathsMap{},
-	l: sync.RWMutex{},
+// Initialize field paths cache.
+func (d *decoder) initFieldPathsCache() {
+	d.fieldPathsCache = fieldPathsCache{
+		m: map[reflect.Type]fieldPathsMap{},
+		l: sync.RWMutex{},
+	}
 }
 
-func scopeStruct(v reflect.Value, name string) (target, bool, error) {
+func (d *decoder) scopeStruct(v reflect.Value, name string) (target, bool, error) {
+	d.fieldPathsCacheOnce.Do(func() {
+		d.initFieldPathsCache()
+	})
+
 	//nolint:godox
 	// TODO: cache this, and reduce allocations
-	fieldPaths, ok := globalFieldPathsCache.get(v.Type())
+	fieldPaths, ok := d.fieldPathsCache.get(v.Type())
 	if !ok {
 		fieldPaths = map[string][]int{}
 
@@ -771,7 +778,7 @@ func scopeStruct(v reflect.Value, name string) (target, bool, error) {
 
 		walk(v)
 
-		globalFieldPathsCache.set(v.Type(), fieldPaths)
+		d.fieldPathsCache.set(v.Type(), fieldPaths)
 	}
 
 	path, ok := fieldPaths[name]

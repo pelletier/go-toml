@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
@@ -79,6 +80,9 @@ type decoder struct {
 
 	// Strict mode
 	strict strict
+
+	fieldPathsCache     fieldPathsCache
+	fieldPathsCacheOnce sync.Once
 }
 
 func (d *decoder) arrayIndex(shouldAppend bool, v reflect.Value) int {
