@@ -1,7 +1,6 @@
 package toml
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -14,19 +13,19 @@ type target interface {
 	get() reflect.Value
 
 	// Store a string at the target.
-	setString(v string) error
+	setString(v string)
 
 	// Store a boolean at the target
-	setBool(v bool) error
+	setBool(v bool)
 
 	// Store an int64 at the target
-	setInt64(v int64) error
+	setInt64(v int64)
 
 	// Store a float64 at the target
-	setFloat64(v float64) error
+	setFloat64(v float64)
 
 	// Stores any value at the target
-	set(v reflect.Value) error
+	set(v reflect.Value)
 }
 
 // valueTarget just contains a reflect.Value that can be set.
@@ -37,34 +36,24 @@ func (t valueTarget) get() reflect.Value {
 	return reflect.Value(t)
 }
 
-func (t valueTarget) set(v reflect.Value) error {
+func (t valueTarget) set(v reflect.Value) {
 	reflect.Value(t).Set(v)
-
-	return nil
 }
 
-func (t valueTarget) setString(v string) error {
+func (t valueTarget) setString(v string) {
 	t.get().SetString(v)
-
-	return nil
 }
 
-func (t valueTarget) setBool(v bool) error {
+func (t valueTarget) setBool(v bool) {
 	t.get().SetBool(v)
-
-	return nil
 }
 
-func (t valueTarget) setInt64(v int64) error {
+func (t valueTarget) setInt64(v int64) {
 	t.get().SetInt(v)
-
-	return nil
 }
 
-func (t valueTarget) setFloat64(v float64) error {
+func (t valueTarget) setFloat64(v float64) {
 	t.get().SetFloat(v)
-
-	return nil
 }
 
 // interfaceTarget wraps an other target to dereference on get.
@@ -76,49 +65,24 @@ func (t interfaceTarget) get() reflect.Value {
 	return t.x.get().Elem()
 }
 
-func (t interfaceTarget) set(v reflect.Value) error {
-	err := t.x.set(v)
-	if err != nil {
-		return fmt.Errorf("interfaceTarget set: %w", err)
-	}
-
-	return nil
+func (t interfaceTarget) set(v reflect.Value) {
+	t.x.set(v)
 }
 
-func (t interfaceTarget) setString(v string) error {
-	err := t.x.setString(v)
-	if err != nil {
-		return fmt.Errorf("interfaceTarget setString: %w", err)
-	}
-
-	return nil
+func (t interfaceTarget) setString(v string) {
+	t.x.setString(v)
 }
 
-func (t interfaceTarget) setBool(v bool) error {
-	err := t.x.setBool(v)
-	if err != nil {
-		return fmt.Errorf("interfaceTarget setBool: %w", err)
-	}
-
-	return nil
+func (t interfaceTarget) setBool(v bool) {
+	t.x.setBool(v)
 }
 
-func (t interfaceTarget) setInt64(v int64) error {
-	err := t.x.setInt64(v)
-	if err != nil {
-		return fmt.Errorf("interfaceTarget setInt64: %w", err)
-	}
-
-	return nil
+func (t interfaceTarget) setInt64(v int64) {
+	t.x.setInt64(v)
 }
 
-func (t interfaceTarget) setFloat64(v float64) error {
-	err := t.x.setFloat64(v)
-	if err != nil {
-		return fmt.Errorf("interfaceTarget setFloat64: %w", err)
-	}
-
-	return nil
+func (t interfaceTarget) setFloat64(v float64) {
+	t.x.setFloat64(v)
 }
 
 // mapTarget targets a specific key of a map.
@@ -131,32 +95,25 @@ func (t mapTarget) get() reflect.Value {
 	return t.v.MapIndex(t.k)
 }
 
-func (t mapTarget) set(v reflect.Value) error {
+func (t mapTarget) set(v reflect.Value) {
 	t.v.SetMapIndex(t.k, v)
-
-	return nil
 }
 
-func (t mapTarget) setString(v string) error {
-	return t.set(reflect.ValueOf(v))
+func (t mapTarget) setString(v string) {
+	t.set(reflect.ValueOf(v))
 }
 
-func (t mapTarget) setBool(v bool) error {
-	return t.set(reflect.ValueOf(v))
+func (t mapTarget) setBool(v bool) {
+	t.set(reflect.ValueOf(v))
 }
 
-func (t mapTarget) setInt64(v int64) error {
-	return t.set(reflect.ValueOf(v))
+func (t mapTarget) setInt64(v int64) {
+	t.set(reflect.ValueOf(v))
 }
 
-func (t mapTarget) setFloat64(v float64) error {
-	return t.set(reflect.ValueOf(v))
+func (t mapTarget) setFloat64(v float64) {
+	t.set(reflect.ValueOf(v))
 }
-
-var (
-	errValIndexExpectingSlice  = errors.New("expecting a slice")
-	errValIndexCannotInitSlice = errors.New("cannot initialize a slice")
-)
 
 //nolint:cyclop
 // makes sure that the value pointed at by t is indexable (Slice, Array), or
@@ -167,43 +124,20 @@ func ensureValueIndexable(t target) error {
 	switch f.Type().Kind() {
 	case reflect.Slice:
 		if f.IsNil() {
-			err := t.set(reflect.MakeSlice(f.Type(), 0, 0))
-			if err != nil {
-				return fmt.Errorf("ensureValueIndexable: %w", err)
-			}
-
+			t.set(reflect.MakeSlice(f.Type(), 0, 0))
 			return nil
 		}
 	case reflect.Interface:
 		if f.IsNil() || f.Elem().Type() != sliceInterfaceType {
-			err := t.set(reflect.MakeSlice(sliceInterfaceType, 0, 0))
-			if err != nil {
-				return fmt.Errorf("ensureValueIndexable: %w", err)
-			}
-
+			t.set(reflect.MakeSlice(sliceInterfaceType, 0, 0))
 			return nil
 		}
-
-		if f.Elem().Type().Kind() != reflect.Slice {
-			return fmt.Errorf("ensureValueIndexable: %w, not a %s", errValIndexExpectingSlice, f.Kind())
-		}
 	case reflect.Ptr:
-		if f.IsNil() {
-			ptr := reflect.New(f.Type().Elem())
-
-			err := t.set(ptr)
-			if err != nil {
-				return fmt.Errorf("ensureValueIndexable: %w", err)
-			}
-
-			f = t.get()
-		}
-
-		return ensureValueIndexable(valueTarget(f.Elem()))
+		panic("pointer should have already been dereferenced")
 	case reflect.Array:
 		// arrays are always initialized.
 	default:
-		return fmt.Errorf("ensureValueIndexable: %w with %s", errValIndexCannotInitSlice, f.Kind())
+		return fmt.Errorf("toml: cannot store array in a %s", f.Kind())
 	}
 
 	return nil
@@ -214,90 +148,49 @@ var (
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
 )
 
-func ensureMapIfInterface(x target) error {
+func ensureMapIfInterface(x target) {
 	v := x.get()
 
 	if v.Kind() == reflect.Interface && v.IsNil() {
 		newElement := reflect.MakeMap(mapStringInterfaceType)
 
-		err := x.set(newElement)
-		if err != nil {
-			return fmt.Errorf("ensureMapIfInterface: %w", err)
-		}
+		x.set(newElement)
 	}
-
-	return nil
 }
-
-var errSetStringCannotAssignString = errors.New("cannot assign string")
 
 func setString(t target, v string) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.String:
-		err := t.setString(v)
-		if err != nil {
-			return fmt.Errorf("setString: %w", err)
-		}
-
-		return nil
+		t.setString(v)
 	case reflect.Interface:
-		err := t.set(reflect.ValueOf(v))
-		if err != nil {
-			return fmt.Errorf("setString: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(v))
 	default:
-		return fmt.Errorf("setString: %w to a %s", errSetStringCannotAssignString, f.Kind())
+		return fmt.Errorf("toml: cannot assign string to a %s", f.Kind())
 	}
-}
 
-var errSetBoolCannotAssignBool = errors.New("cannot assign bool")
+	return nil
+}
 
 func setBool(t target, v bool) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Bool:
-		err := t.setBool(v)
-		if err != nil {
-			return fmt.Errorf("setBool: %w", err)
-		}
-
-		return nil
+		t.setBool(v)
 	case reflect.Interface:
-		err := t.set(reflect.ValueOf(v))
-		if err != nil {
-			return fmt.Errorf("setBool: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(v))
 	default:
-		return fmt.Errorf("setBool: %w to a %s", errSetBoolCannotAssignBool, f.String())
+		return fmt.Errorf("toml: cannot assign boolean to a %s", f.Kind())
 	}
+
+	return nil
 }
 
 const (
 	maxInt = int64(^uint(0) >> 1)
 	minInt = -maxInt - 1
-)
-
-var (
-	errSetInt64InInt32     = errors.New("does not fit in an int32")
-	errSetInt64InInt16     = errors.New("does not fit in an int16")
-	errSetInt64InInt8      = errors.New("does not fit in an int8")
-	errSetInt64InInt       = errors.New("does not fit in an int")
-	errSetInt64InUint64    = errors.New("negative integer does not fit in an uint64")
-	errSetInt64InUint32    = errors.New("negative integer does not fit in an uint32")
-	errSetInt64InUint32Max = errors.New("integer does not fit in an uint32")
-	errSetInt64InUint16    = errors.New("negative integer does not fit in an uint16")
-	errSetInt64InUint16Max = errors.New("integer does not fit in an uint16")
-	errSetInt64InUint8     = errors.New("negative integer does not fit in an uint8")
-	errSetInt64InUint8Max  = errors.New("integer does not fit in an uint8")
-	errSetInt64InUint      = errors.New("negative integer does not fit in an uint")
-	errSetInt64Unknown     = errors.New("does not fit in an uint")
 )
 
 //nolint:funlen,gocognit,cyclop,gocyclo
@@ -306,185 +199,98 @@ func setInt64(t target, v int64) error {
 
 	switch f.Kind() {
 	case reflect.Int64:
-		err := t.setInt64(v)
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.setInt64(v)
 	case reflect.Int32:
 		if v < math.MinInt32 || v > math.MaxInt32 {
-			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt32)
+			return fmt.Errorf("toml: number %d does not fit in an int32", v)
 		}
 
-		err := t.set(reflect.ValueOf(int32(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
+		t.set(reflect.ValueOf(int32(v)))
 		return nil
 	case reflect.Int16:
 		if v < math.MinInt16 || v > math.MaxInt16 {
-			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt16)
+			return fmt.Errorf("toml: number %d does not fit in an int16", v)
 		}
 
-		err := t.set(reflect.ValueOf(int16(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(int16(v)))
 	case reflect.Int8:
 		if v < math.MinInt8 || v > math.MaxInt8 {
-			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt8)
+			return fmt.Errorf("toml: number %d does not fit in an int8", v)
 		}
 
-		err := t.set(reflect.ValueOf(int8(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(int8(v)))
 	case reflect.Int:
 		if v < minInt || v > maxInt {
-			return fmt.Errorf("setInt64: integer %d %w", v, errSetInt64InInt)
+			return fmt.Errorf("toml: number %d does not fit in an int", v)
 		}
 
-		err := t.set(reflect.ValueOf(int(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(int(v)))
 	case reflect.Uint64:
 		if v < 0 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint64)
+			return fmt.Errorf("toml: negative number %d does not fit in an uint64", v)
 		}
 
-		err := t.set(reflect.ValueOf(uint64(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(uint64(v)))
 	case reflect.Uint32:
-		if v < 0 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint32)
+		if v < 0 || v > math.MaxUint32 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint32", v)
 		}
 
-		if v > math.MaxUint32 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint32Max)
-		}
-
-		err := t.set(reflect.ValueOf(uint32(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(uint32(v)))
 	case reflect.Uint16:
-		if v < 0 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint16)
+		if v < 0 || v > math.MaxUint16 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint16", v)
 		}
 
-		if v > math.MaxUint16 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint16Max)
-		}
-
-		err := t.set(reflect.ValueOf(uint16(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(uint16(v)))
 	case reflect.Uint8:
-		if v < 0 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint8)
+		if v < 0 || v > math.MaxUint8 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint8", v)
 		}
 
-		if v > math.MaxUint8 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint8Max)
-		}
-
-		err := t.set(reflect.ValueOf(uint8(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(uint8(v)))
 	case reflect.Uint:
 		if v < 0 {
-			return fmt.Errorf("setInt64: %d, %w", v, errSetInt64InUint)
+			return fmt.Errorf("toml: negative number %d does not fit in an uint", v)
 		}
 
-		err := t.set(reflect.ValueOf(uint(v)))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(uint(v)))
 	case reflect.Interface:
-		err := t.set(reflect.ValueOf(v))
-		if err != nil {
-			return fmt.Errorf("setInt64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(v))
 	default:
-		return fmt.Errorf("setInt64: %s, %w", f.String(), errSetInt64Unknown)
+		return fmt.Errorf("toml: integer cannot be assigned to %s", f.Kind())
 	}
-}
 
-var (
-	errSetFloat64InFloat32Max = errors.New("does not fit in an float32")
-	errSetFloat64Unknown      = errors.New("does not fit in an float32")
-)
+	return nil
+}
 
 func setFloat64(t target, v float64) error {
 	f := t.get()
 
 	switch f.Kind() {
 	case reflect.Float64:
-		err := t.setFloat64(v)
-		if err != nil {
-			return fmt.Errorf("setFloat64: %w", err)
-		}
-
-		return nil
+		t.setFloat64(v)
 	case reflect.Float32:
 		if v > math.MaxFloat32 {
-			return fmt.Errorf("setFloat64: %f %w", v, errSetFloat64InFloat32Max)
+			return fmt.Errorf("toml: number %f does not fit in a float32", v)
 		}
 
-		err := t.set(reflect.ValueOf(float32(v)))
-		if err != nil {
-			return fmt.Errorf("setFloat64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(float32(v)))
 	case reflect.Interface:
-		err := t.set(reflect.ValueOf(v))
-		if err != nil {
-			return fmt.Errorf("setFloat64: %w", err)
-		}
-
-		return nil
+		t.set(reflect.ValueOf(v))
 	default:
-		return fmt.Errorf("setFloat64: %s %w", f.String(), errSetFloat64Unknown)
+		return fmt.Errorf("toml: float cannot be assigned to %s", f.Kind())
 	}
-}
 
-var (
-	errElementAtCannotOn        = errors.New("cannot elementAt")
-	errElementAtCannotOnUnknown = errors.New("cannot elementAt")
-)
+	return nil
+}
 
 //nolint:cyclop
 // Returns the element at idx of the value pointed at by target, or an error if
 // t does not point to an indexable.
 // If the target points to an Array and idx is out of bounds, it returns
 // (nil, nil) as this is not a fatal error (the unmarshaler will skip).
-func elementAt(t target, idx int) (target, error) {
+func elementAt(t target, idx int) target {
 	f := t.get()
 
 	switch f.Kind() {
@@ -493,42 +299,30 @@ func elementAt(t target, idx int) (target, error) {
 		// TODO: use the idx function argument and avoid alloc if possible.
 		idx := f.Len()
 
-		err := t.set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
-		if err != nil {
-			return nil, fmt.Errorf("elementAt: %w", err)
-		}
+		t.set(reflect.Append(f, reflect.New(f.Type().Elem()).Elem()))
 
-		return valueTarget(t.get().Index(idx)), nil
+		return valueTarget(t.get().Index(idx))
 	case reflect.Array:
 		if idx >= f.Len() {
-			return nil, nil
+			return nil
 		}
 
-		return valueTarget(f.Index(idx)), nil
+		return valueTarget(f.Index(idx))
 	case reflect.Interface:
-		if f.IsNil() {
-			panic("interface should have been initialized")
-		}
+		// This function is called after ensureValueIndexable, so it's
+		// guaranteed that f contains an initialized slice.
 
 		ifaceElem := f.Elem()
-		if ifaceElem.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("elementAt: %w on a %s", errElementAtCannotOn, f.Kind())
-		}
-
 		idx := ifaceElem.Len()
 		newElem := reflect.New(ifaceElem.Type().Elem()).Elem()
 		newSlice := reflect.Append(ifaceElem, newElem)
 
-		err := t.set(newSlice)
-		if err != nil {
-			return nil, fmt.Errorf("elementAt: %w", err)
-		}
+		t.set(newSlice)
 
-		return valueTarget(t.get().Elem().Index(idx)), nil
-	case reflect.Ptr:
-		return elementAt(valueTarget(f.Elem()), idx)
+		return valueTarget(t.get().Elem().Index(idx))
 	default:
-		return nil, fmt.Errorf("elementAt: %w on a %s", errElementAtCannotOnUnknown, f.Kind())
+		// Why ensureValueIndexable let it go through?
+		panic(fmt.Errorf("elementAt received unhandled value type: %s", f.Kind()))
 	}
 }
 
@@ -539,31 +333,19 @@ func (d *decoder) scopeTableTarget(shouldAppend bool, t target, name string) (ta
 	switch x.Kind() {
 	// Kinds that need to recurse
 	case reflect.Interface:
-		t, err := scopeInterface(shouldAppend, t)
-		if err != nil {
-			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
-		}
-
+		t := scopeInterface(shouldAppend, t)
 		return d.scopeTableTarget(shouldAppend, t, name)
 	case reflect.Ptr:
-		t, err := scopePtr(t)
-		if err != nil {
-			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
-		}
-
+		t := scopePtr(t)
 		return d.scopeTableTarget(shouldAppend, t, name)
 	case reflect.Slice:
-		t, err := scopeSlice(shouldAppend, t)
-		if err != nil {
-			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
-		}
+		t := scopeSlice(shouldAppend, t)
 		shouldAppend = false
-
 		return d.scopeTableTarget(shouldAppend, t, name)
 	case reflect.Array:
 		t, err := d.scopeArray(shouldAppend, t)
 		if err != nil {
-			return t, false, fmt.Errorf("scopeTableTarget: %w", err)
+			return t, false, err
 		}
 		shouldAppend = false
 
@@ -574,11 +356,7 @@ func (d *decoder) scopeTableTarget(shouldAppend bool, t target, name string) (ta
 		return scopeStruct(x, name)
 	case reflect.Map:
 		if x.IsNil() {
-			err := t.set(reflect.MakeMap(x.Type()))
-			if err != nil {
-				return t, false, fmt.Errorf("scopeTableTarget: %w", err)
-			}
-
+			t.set(reflect.MakeMap(x.Type()))
 			x = t.get()
 		}
 
@@ -588,42 +366,29 @@ func (d *decoder) scopeTableTarget(shouldAppend bool, t target, name string) (ta
 	}
 }
 
-func scopeInterface(shouldAppend bool, t target) (target, error) {
-	err := initInterface(shouldAppend, t)
-	if err != nil {
-		return t, err
-	}
-
-	return interfaceTarget{t}, nil
+func scopeInterface(shouldAppend bool, t target) target {
+	initInterface(shouldAppend, t)
+	return interfaceTarget{t}
 }
 
-func scopePtr(t target) (target, error) {
-	err := initPtr(t)
-	if err != nil {
-		return t, err
-	}
-
-	return valueTarget(t.get().Elem()), nil
+func scopePtr(t target) target {
+	initPtr(t)
+	return valueTarget(t.get().Elem())
 }
 
-func initPtr(t target) error {
+func initPtr(t target) {
 	x := t.get()
 	if !x.IsNil() {
-		return nil
+		return
 	}
 
-	err := t.set(reflect.New(x.Type().Elem()))
-	if err != nil {
-		return fmt.Errorf("initPtr: %w", err)
-	}
-
-	return nil
+	t.set(reflect.New(x.Type().Elem()))
 }
 
 // initInterface makes sure that the interface pointed at by the target is not
 // nil.
 // Returns the target to the initialized value of the target.
-func initInterface(shouldAppend bool, t target) error {
+func initInterface(shouldAppend bool, t target) {
 	x := t.get()
 
 	if x.Kind() != reflect.Interface {
@@ -631,7 +396,7 @@ func initInterface(shouldAppend bool, t target) error {
 	}
 
 	if !x.IsNil() && (x.Elem().Type() == sliceInterfaceType || x.Elem().Type() == mapStringInterfaceType) {
-		return nil
+		return
 	}
 
 	var newElement reflect.Value
@@ -641,33 +406,23 @@ func initInterface(shouldAppend bool, t target) error {
 		newElement = reflect.MakeMap(mapStringInterfaceType)
 	}
 
-	err := t.set(newElement)
-	if err != nil {
-		return fmt.Errorf("initInterface: %w", err)
-	}
-
-	return nil
+	t.set(newElement)
 }
 
-func scopeSlice(shouldAppend bool, t target) (target, error) {
+func scopeSlice(shouldAppend bool, t target) target {
 	v := t.get()
 
 	if shouldAppend {
 		newElem := reflect.New(v.Type().Elem())
 		newSlice := reflect.Append(v, newElem.Elem())
 
-		err := t.set(newSlice)
-		if err != nil {
-			return t, fmt.Errorf("scopeSlice: %w", err)
-		}
+		t.set(newSlice)
 
 		v = t.get()
 	}
 
-	return valueTarget(v.Index(v.Len() - 1)), nil
+	return valueTarget(v.Index(v.Len() - 1))
 }
-
-var errScopeArrayNotEnoughSpace = errors.New("not enough space in the array")
 
 func (d *decoder) scopeArray(shouldAppend bool, t target) (target, error) {
 	v := t.get()
@@ -675,13 +430,11 @@ func (d *decoder) scopeArray(shouldAppend bool, t target) (target, error) {
 	idx := d.arrayIndex(shouldAppend, v)
 
 	if idx >= v.Len() {
-		return nil, errScopeArrayNotEnoughSpace
+		return nil, fmt.Errorf("toml: impossible to insert element beyond array's size: %d", v.Len())
 	}
 
 	return valueTarget(v.Index(idx)), nil
 }
-
-var errScopeMapCannotConvertStringToKey = errors.New("cannot convert string into map key type")
 
 func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	k := reflect.ValueOf(name)
@@ -689,7 +442,7 @@ func scopeMap(v reflect.Value, name string) (target, bool, error) {
 	keyType := v.Type().Key()
 	if !k.Type().AssignableTo(keyType) {
 		if !k.Type().ConvertibleTo(keyType) {
-			return nil, false, fmt.Errorf("scopeMap: %w %s", errScopeMapCannotConvertStringToKey, keyType)
+			return nil, false, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", k.Type(), keyType)
 		}
 
 		k = k.Convert(keyType)

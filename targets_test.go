@@ -128,14 +128,12 @@ func TestPushNew(t *testing.T) {
 		x, _, err := dec.scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
-		n, err := elementAt(x, 0)
-		require.NoError(t, err)
-		require.NoError(t, n.setString("hello"))
+		n := elementAt(x, 0)
+		n.setString("hello")
 		require.Equal(t, []string{"hello"}, d.A)
 
-		n, err = elementAt(x, 1)
-		require.NoError(t, err)
-		require.NoError(t, n.setString("world"))
+		n = elementAt(x, 1)
+		n.setString("world")
 		require.Equal(t, []string{"hello", "world"}, d.A)
 	})
 
@@ -151,13 +149,11 @@ func TestPushNew(t *testing.T) {
 		x, _, err := dec.scopeTableTarget(false, valueTarget(reflect.ValueOf(&d).Elem()), "A")
 		require.NoError(t, err)
 
-		n, err := elementAt(x, 0)
-		require.NoError(t, err)
+		n := elementAt(x, 0)
 		require.NoError(t, setString(n, "hello"))
 		require.Equal(t, []interface{}{"hello"}, d.A)
 
-		n, err = elementAt(x, 1)
-		require.NoError(t, err)
+		n = elementAt(x, 1)
 		require.NoError(t, setString(n, "world"))
 		require.Equal(t, []interface{}{"hello", "world"}, d.A)
 	})

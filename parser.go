@@ -2,7 +2,6 @@ package toml
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -225,19 +224,13 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	return ref, b, err
 }
 
-var (
-	errExpectedValNotEOF = errors.New("expected value, not eof")
-	errExpectedTrue      = errors.New("expected 'true'")
-	errExpectedFalse     = errors.New("expected 'false'")
-)
-
 //nolint:cyclop,funlen
 func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 	var ref ast.Reference
 
 	if len(b) == 0 {
-		return ref, nil, errExpectedValNotEOF
+		return ref, nil, newDecodeError(b, "expected value, not eof")
 	}
 
 	var err error
@@ -278,7 +271,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		return ref, b, err
 	case 't':
 		if !scanFollowsTrue(b) {
-			return ref, nil, errExpectedTrue
+			return ref, nil, newDecodeError(atmost(b, 4), "expected 'true'")
 		}
 
 		ref = p.builder.Push(ast.Node{
@@ -289,7 +282,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		return ref, b[4:], nil
 	case 'f':
 		if !scanFollowsFalse(b) {
-			return ast.Reference{}, nil, errExpectedFalse
+			return ref, nil, newDecodeError(atmost(b, 5), "expected 'false'")
 		}
 
 		ref = p.builder.Push(ast.Node{
@@ -305,6 +298,13 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 	default:
 		return p.parseIntOrFloatOrDateTime(b)
 	}
+}
+
+func atmost(b []byte, n int) []byte {
+	if n >= len(b) {
+		return b
+	}
+	return b[:n]
 }
 
 func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
@@ -370,8 +370,6 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	return parent, rest, err
 }
 
-var errArrayCannotStartWithComma = errors.New("array cannot start with comma")
-
 //nolint:funlen,cyclop
 func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
@@ -409,7 +407,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		if b[0] == ',' {
 			if first {
-				return parent, nil, errArrayCannotStartWithComma
+				return parent, nil, newDecodeError(b[0:1], "array cannot start with comma")
 			}
 			b = b[1:]
 
@@ -493,8 +491,6 @@ func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 
 	return token[i : len(token)-3], rest, err
 }
-
-var errInvalidEscapeChar = errors.New("invalid escaped character")
 
 //nolint:funlen,gocognit,cyclop
 func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
@@ -582,7 +578,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				builder.WriteString(x)
 				i += 8
 			default:
-				return nil, nil, fmt.Errorf("parseMultilineBasicString: %w - %#U", errInvalidEscapeChar, c)
+				return nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
 		} else {
 			builder.WriteByte(c)
@@ -721,7 +717,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 				builder.WriteString(x)
 				i += 8
 			default:
-				return nil, nil, fmt.Errorf("parseBasicString: %w - %#U", errInvalidEscapeChar, c)
+				return nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
 		} else {
 			builder.WriteByte(c)
@@ -731,18 +727,17 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 	return builder.Bytes(), rest, nil
 }
 
-var errUnicodePointNeedsRightCountChar = errors.New("unicode point needs right number of hex characters")
-
 func hexToString(b []byte, length int) (string, error) {
 	if len(b) < length {
-		return "", fmt.Errorf("hexToString: %w - %d", errUnicodePointNeedsRightCountChar, length)
+		return "", newDecodeError(b, "unicode point needs %d character, not %d", length, len(b))
 	}
+	b = b[:length]
 
 	//nolint:godox
 	// TODO: slow
-	intcode, err := strconv.ParseInt(string(b[:length]), 16, 32)
+	intcode, err := strconv.ParseInt(string(b), 16, 32)
 	if err != nil {
-		return "", fmt.Errorf("hexToString: %w", err)
+		return "", newDecodeError(b, "couldn't parse hexadecimal number: %w", err)
 	}
 
 	return string(rune(intcode)), nil
@@ -757,17 +752,12 @@ func (p *parser) parseWhitespace(b []byte) []byte {
 	return rest
 }
 
-var (
-	errExpectedInf = errors.New("expected 'inf'")
-	errExpectedNan = errors.New("expected 'nan'")
-)
-
 //nolint:cyclop
 func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, error) {
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
-			return ast.Reference{}, nil, errExpectedInf
+			return ast.Reference{}, nil, newDecodeError(atmost(b, 3), "expected 'inf'")
 		}
 
 		return p.builder.Push(ast.Node{
@@ -776,7 +766,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
-			return ast.Reference{}, nil, errExpectedNan
+			return ast.Reference{}, nil, newDecodeError(atmost(b, 3), "expected 'nan'")
 		}
 
 		return p.builder.Push(ast.Node{
@@ -820,8 +810,6 @@ func digitsToInt(b []byte) int {
 
 	return x
 }
-
-var errTimezoneButNoTimeComponent = errors.New("possible DateTime cannot have a timezone but no time component")
 
 //nolint:gocognit,cyclop
 func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
@@ -867,7 +855,7 @@ byteLoop:
 		}
 	} else {
 		if hasTz {
-			return ast.Reference{}, nil, errTimezoneButNoTimeComponent
+			return ast.Reference{}, nil, newDecodeError(b, "date-time has timezone but not time component")
 		}
 		kind = ast.LocalDate
 	}
@@ -877,12 +865,6 @@ byteLoop:
 		Data: b[:i],
 	}), b[i:], nil
 }
-
-var (
-	errUnexpectedCharI    = fmt.Errorf("unexpected character i while scanning for a number")
-	errUnexpectedCharN    = fmt.Errorf("unexpected character n while scanning for a number")
-	errExpectedIntOrFloat = fmt.Errorf("expected integer or float")
-)
 
 //nolint:funlen,gocognit,cyclop
 func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
@@ -940,7 +922,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return ast.Reference{}, nil, errUnexpectedCharI
+			return ast.Reference{}, nil, newDecodeError(b[i:i+1], "unexpected character 'i' while scanning for a number")
 		}
 
 		if c == 'n' {
@@ -951,14 +933,14 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return ast.Reference{}, nil, errUnexpectedCharN
+			return ast.Reference{}, nil, newDecodeError(b[i:i+1], "unexpected character 'n' while scanning for a number")
 		}
 
 		break
 	}
 
 	if i == 0 {
-		return ast.Reference{}, b, errExpectedIntOrFloat
+		return ast.Reference{}, b, newDecodeError(b, "incomplete number")
 	}
 
 	kind := ast.Integer

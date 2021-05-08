@@ -3,7 +3,6 @@ package toml
 import (
 	"bytes"
 	"encoding"
-	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -116,12 +115,12 @@ func (enc *Encoder) Encode(v interface{}) error {
 
 	b, err := enc.encode(b, ctx, reflect.ValueOf(v))
 	if err != nil {
-		return fmt.Errorf("Encode: %w", err)
+		return err
 	}
 
 	_, err = enc.w.Write(b)
 	if err != nil {
-		return fmt.Errorf("Encode: %w", err)
+		return fmt.Errorf("toml: cannot write: %w", err)
 	}
 
 	return nil
@@ -178,11 +177,6 @@ func (ctx *encoderCtx) isRoot() bool {
 	return len(ctx.parentKey) == 0 && !ctx.hasKey
 }
 
-var (
-	errUnsupportedValue            = errors.New("unsupported encode value kind")
-	errTextMarshalerCannotBeAtRoot = errors.New("type implementing TextMarshaler cannot be at root")
-)
-
 //nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	i, ok := v.Interface().(time.Time)
@@ -192,12 +186,12 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 
 	if v.Type().Implements(textMarshalerType) {
 		if ctx.isRoot() {
-			return nil, errTextMarshalerCannotBeAtRoot
+			return nil, fmt.Errorf("toml: type %s implementing the TextMarshaler interface cannot be a root element", v.Type())
 		}
 
 		text, err := v.Interface().(encoding.TextMarshaler).MarshalText()
 		if err != nil {
-			return nil, fmt.Errorf("encode: %w", err)
+			return nil, err
 		}
 
 		b = enc.encodeString(b, string(text), ctx.options)
@@ -215,7 +209,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 		return enc.encodeSlice(b, ctx, v)
 	case reflect.Interface:
 		if v.IsNil() {
-			return nil, errNilInterface
+			return nil, fmt.Errorf("toml: encoding a nil interface is not supported")
 		}
 
 		return enc.encode(b, ctx, v.Elem())
@@ -244,7 +238,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Int:
 		b = strconv.AppendInt(b, v.Int(), 10)
 	default:
-		return nil, fmt.Errorf("encode(type %s): %w", v.Kind(), errUnsupportedValue)
+		return nil, fmt.Errorf("toml: cannot encode value of type %s", v.Kind())
 	}
 
 	return b, nil
@@ -412,8 +406,6 @@ func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) 
 	return b, nil
 }
 
-var errTomlNoMultiline = errors.New("TOML does not support multiline keys")
-
 //nolint:cyclop
 func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	needsQuotation := false
@@ -425,7 +417,7 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 		}
 
 		if c == '\n' {
-			return nil, errTomlNoMultiline
+			return nil, fmt.Errorf("toml: new line characters in keys are not supported")
 		}
 
 		if c == literalQuote {
@@ -445,11 +437,9 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	}
 }
 
-var errNotSupportedAsMapKey = errors.New("type not supported as map key")
-
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	if v.Type().Key().Kind() != reflect.String {
-		return nil, fmt.Errorf("encodeMap '%s': %w", v.Type().Key().Kind(), errNotSupportedAsMapKey)
+		return nil, fmt.Errorf("toml: type %s is not supported as a map key", v.Type().Key().Kind())
 	}
 
 	var (
@@ -658,10 +648,7 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	return b, nil
 }
 
-var (
-	errNilInterface   = errors.New("nil interface not supported")
-	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
-)
+var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 
 func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
 	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
@@ -674,7 +661,7 @@ func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
 		return !ctx.inline, nil
 	case reflect.Interface:
 		if v.IsNil() {
-			return false, errNilInterface
+			return false, fmt.Errorf("toml: encoding a nil interface is not supported")
 		}
 
 		return willConvertToTable(ctx, v.Elem())
@@ -694,7 +681,7 @@ func willConvertToTableOrArrayTable(ctx encoderCtx, v reflect.Value) (bool, erro
 
 	if t.Kind() == reflect.Interface {
 		if v.IsNil() {
-			return false, errNilInterface
+			return false, fmt.Errorf("toml: encoding a nil interface is not supported")
 		}
 
 		return willConvertToTableOrArrayTable(ctx, v.Elem())

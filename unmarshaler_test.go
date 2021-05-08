@@ -39,6 +39,11 @@ func TestUnmarshal_Integers(t *testing.T) {
 			expected: 99,
 		},
 		{
+			desc:     "integer decimal underscore",
+			input:    `123_456`,
+			expected: 123456,
+		},
+		{
 			desc:     "integer hex uppercase",
 			input:    `0xDEADBEEF`,
 			expected: 0xDEADBEEF,
@@ -58,6 +63,21 @@ func TestUnmarshal_Integers(t *testing.T) {
 			input:    `0b11010110`,
 			expected: 0b11010110,
 		},
+		{
+			desc:  "double underscore",
+			input: "12__3",
+			err:   true,
+		},
+		{
+			desc:  "starts with underscore",
+			input: "_1",
+			err:   true,
+		},
+		{
+			desc:  "ends with underscore",
+			input: "1_",
+			err:   true,
+		},
 	}
 
 	type doc struct {
@@ -71,8 +91,12 @@ func TestUnmarshal_Integers(t *testing.T) {
 
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
-			require.NoError(t, err)
-			assert.Equal(t, e.expected, doc.A)
+			if e.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, e.expected, doc.A)
+			}
 		})
 	}
 }
@@ -799,6 +823,33 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "mismatch types int to string",
+			input: `A = 42`,
+			gen: func() test {
+				type S struct {
+					A string
+				}
+				return test{
+					target: &S{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "mismatch types array of int to interface with non-slice",
+			input: `A = [[42]]`,
+			skip:  true,
+			gen: func() test {
+				type S struct {
+					A *string
+				}
+				return test{
+					target:   &S{},
+					expected: &S{},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
@@ -815,6 +866,9 @@ B = "data"`,
 			}
 			err := toml.Unmarshal([]byte(e.input), test.target)
 			if test.err {
+				if err == nil {
+					t.Log("=>", test.target)
+				}
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
@@ -1030,7 +1084,7 @@ world'`,
 
 			if e.msg != "" {
 				t.Log("\n" + de.String())
-				require.Equal(t, e.msg, de.Error())
+				require.Equal(t, "toml: "+e.msg, de.Error())
 			}
 		})
 	}

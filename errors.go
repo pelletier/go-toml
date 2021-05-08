@@ -70,13 +70,13 @@ func (de *decodeError) Error() string {
 func newDecodeError(highlight []byte, format string, args ...interface{}) error {
 	return &decodeError{
 		highlight: highlight,
-		message:   fmt.Sprintf(format, args...),
+		message:   fmt.Errorf(format, args...).Error(),
 	}
 }
 
 // Error returns the error message contained in the DecodeError.
 func (e *DecodeError) Error() string {
-	return e.message
+	return "toml: " + e.message
 }
 
 // String returns the human-readable contextualized error. This string is multi-line.

@@ -123,10 +123,10 @@ func (s *SeenTracker) checkTable(node ast.Node) error {
 	i, found := s.current.Has(k)
 	if found {
 		if i.kind != tableKind {
-			return fmt.Errorf("key %s should be a table", k)
+			return fmt.Errorf("toml: key %s should be a table, not a %s", k, i.kind)
 		}
 		if i.explicit {
-			return fmt.Errorf("table %s already exists", k)
+			return fmt.Errorf("toml: table %s already exists", k)
 		}
 		i.explicit = true
 		s.current = i
@@ -162,7 +162,7 @@ func (s *SeenTracker) checkArrayTable(node ast.Node) error {
 	info, found := s.current.Has(k)
 	if found {
 		if info.kind != arrayTableKind {
-			return fmt.Errorf("key %s already exists but is not an array table", k)
+			return fmt.Errorf("toml: key %s already exists as a %s,  but should be an array table", info.kind, k)
 		}
 		info.Clear()
 	} else {
@@ -182,7 +182,7 @@ func (s *SeenTracker) checkKeyValue(context *info, node ast.Node) error {
 		child, found := context.Has(k)
 		if found {
 			if child.kind != tableKind {
-				return fmt.Errorf("expected %s to be a table, not a %s", k, child.kind)
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", k, child.kind)
 			}
 		} else {
 			child = context.CreateTable(k, false)

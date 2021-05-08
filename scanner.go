@@ -1,9 +1,5 @@
 package toml
 
-import (
-	"errors"
-)
-
 func scanFollows(b []byte, pattern string) bool {
 	n := len(pattern)
 
@@ -83,22 +79,17 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	return nil, nil, newDecodeError(b[len(b):], `multiline literal string not terminated by '''`)
 }
 
-var (
-	errWindowsNewLineMissing = errors.New(`windows new line missing \n`)
-	errWindowsNewLineCRLF    = errors.New(`windows new line should be \r\n`)
-)
-
 func scanWindowsNewline(b []byte) ([]byte, []byte, error) {
-	const lenLF = 2
-	if len(b) < lenLF {
-		return nil, nil, errWindowsNewLineMissing
+	const lenCRLF = 2
+	if len(b) < lenCRLF {
+		return nil, nil, newDecodeError(b, "windows new line expected")
 	}
 
 	if b[1] != '\n' {
-		return nil, nil, errWindowsNewLineCRLF
+		return nil, nil, newDecodeError(b, `windows new line should be \r\n`)
 	}
 
-	return b[:lenLF], b[lenLF:], nil
+	return b[:lenCRLF], b[lenCRLF:], nil
 }
 
 func scanWhitespace(b []byte) ([]byte, []byte) {
@@ -116,8 +107,6 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 
 //nolint:unparam
 func scanComment(b []byte) ([]byte, []byte) {
-	// ;; Comment
-	//
 	// comment-start-symbol = %x23 ; #
 	// non-ascii = %x80-D7FF / %xE000-10FFFF
 	// non-eol = %x09 / %x20-7F / non-ascii
@@ -132,10 +121,6 @@ func scanComment(b []byte) ([]byte, []byte) {
 	return b, nil
 }
 
-var errBasicLineNotTerminatedByQuote = errors.New(`basic string not terminated by "`)
-
-//nolint:godox
-// TODO perform validation on the string?
 func scanBasicString(b []byte) ([]byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
@@ -156,11 +141,9 @@ func scanBasicString(b []byte) ([]byte, []byte, error) {
 		}
 	}
 
-	return nil, nil, errBasicLineNotTerminatedByQuote
+	return nil, nil, newDecodeError(b[len(b):], `basic string not terminated by "`)
 }
 
-//nolint:godox
-// TODO perform validation on the string?
 func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim

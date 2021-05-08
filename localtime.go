@@ -53,7 +53,7 @@ func LocalDateOf(t time.Time) LocalDate {
 func ParseLocalDate(s string) (LocalDate, error) {
 	t, err := time.Parse("2006-01-02", s)
 	if err != nil {
-		return LocalDate{}, fmt.Errorf("ParseLocalDate: %w", err)
+		return LocalDate{}, err
 	}
 
 	return LocalDateOf(t), nil
@@ -166,7 +166,7 @@ func LocalTimeOf(t time.Time) LocalTime {
 func ParseLocalTime(s string) (LocalTime, error) {
 	t, err := time.Parse("15:04:05.999999999", s)
 	if err != nil {
-		return LocalTime{}, fmt.Errorf("ParseLocalTime: %w", err)
+		return LocalTime{}, err
 	}
 
 	return LocalTimeOf(t), nil
@@ -237,7 +237,7 @@ func ParseLocalDateTime(s string) (LocalDateTime, error) {
 	if err != nil {
 		t, err = time.Parse("2006-01-02t15:04:05.999999999", s)
 		if err != nil {
-			return LocalDateTime{}, fmt.Errorf("ParseLocalDateTime: %w", err)
+			return LocalDateTime{}, err
 		}
 	}
 
