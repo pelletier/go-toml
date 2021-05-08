@@ -1,0 +1,32 @@
+name: codacy
+on:
+  push:
+    branches:
+      - v2
+  pull_request:
+    branches:
+      - v2
+jobs:
+  analysis:
+    strategy:
+      matrix:
+        os: [ 'ubuntu-latest' ]
+        go: [ '1.16' ]
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.go }}/${{ matrix.os }}
+    steps:
+      - name: Setup go ${{ matrix.go }}
+        uses: actions/setup-go@master
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install gocover-cobertura
+        run: go get github.com/t-yuki/gocover-cobertura
+      - uses: actions/checkout@master
+      - name: Run tests with coverage
+        run: go test -coverprofile=coverage.txt -covermode atomic ./...
+      - name: Convert to Cobertura
+        run: gocover-cobertura < coverage.txt > cobertura.xml
+      - name: Send to Codacy
+        run: bash <(curl -Ls https://coverage.codacy.com/get.sh) report -l Go --force-language
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
