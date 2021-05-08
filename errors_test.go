@@ -3,6 +3,7 @@ package toml
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -178,4 +179,24 @@ line 5`,
 			assert.Equal(t, strings.Trim(e.expected, "\n"), derr.String())
 		})
 	}
+}
+
+func ExampleDecodeError() {
+	doc := `name = 123__456`
+
+	s := map[string]interface{}{}
+	err := Unmarshal([]byte(doc), &s)
+
+	fmt.Println(err)
+
+	de := err.(*DecodeError)
+	fmt.Println(de.String())
+
+	row, col := de.Position()
+	fmt.Println("error occured at row", row, "column", col)
+	// Output:
+	// toml: number must have at least one digit between underscores
+	// 1| name = 123__456
+	//  |           ~~ number must have at least one digit between underscores
+	// error occured at row 1 column 11
 }

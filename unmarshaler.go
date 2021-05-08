@@ -14,6 +14,9 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/unsafe"
 )
 
+// Unmarshal deserializes a TOML document into a Go value.
+//
+// It is a shortcut for Decoder.Decode() with the default options.
 func Unmarshal(data []byte, v interface{}) error {
 	p := parser{}
 	p.Reset(data)
@@ -48,11 +51,39 @@ func (d *Decoder) SetStrict(strict bool) {
 
 // Decode the whole content of r into v.
 //
-// When a TOML local date is decoded into a time.Time, its value is represented
-// in time.Local timezone.
+// By default, values in the document that don't exist in the target Go value
+// are ignored. See Decoder.SetStrict() to change this behavior.
+//
+// When a TOML local date, time, or date-time is decoded into a time.Time, its
+// value is represented in time.Local timezone. Otherwise the approriate Local*
+// structure is used.
 //
 // Empty tables decoded in an interface{} create an empty initialized
 // map[string]interface{}.
+//
+// Types implementing the encoding.TextUnmarshaler interface are decoded from a
+// TOML string.
+//
+// When decoding a number, go-toml will return an error if the number is out of
+// bounds for the target type (which includes negative numbers when decoding
+// into an unsigned int).
+//
+// Type mapping
+//
+// List of supported TOML types and their associated accepted Go types:
+//
+//   String           -> string
+//   Integer          -> uint*, int*, depending on size
+//   Float            -> float*, depending on size
+//   Boolean          -> bool
+//   Offset Date-Time -> time.Time
+//   Local Date-time  -> LocalDateTime, time.Time
+//   Local Date       -> LocalDate, time.Time
+//   Local Time       -> LocalTime, time.Time
+//   Array            -> slice and array, depending on elements types
+//   Table            -> map and struct
+//   Inline Table     -> same as Table
+//   Array of Tables  -> same as Array and Table
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {

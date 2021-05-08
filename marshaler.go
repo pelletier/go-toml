@@ -50,7 +50,9 @@ func NewEncoder(w io.Writer) *Encoder {
 // SetTablesInline forces the encoder to emit all tables inline.
 //
 // This behavior can be controlled on an individual struct field basis with the
-// `inline="true"` tag.
+// inline tag:
+//
+//   MyField `inline:"true"`
 func (enc *Encoder) SetTablesInline(inline bool) {
 	enc.tablesInline = inline
 }
@@ -58,8 +60,9 @@ func (enc *Encoder) SetTablesInline(inline bool) {
 // SetArraysMultiline forces the encoder to emit all arrays with one element per
 // line.
 //
-// This behavior can be controlled on an individual struct field basis with the
-// `multiline="true"` tag.
+// This behavior can be controlled on an individual struct field basis with the multiline tag:
+//
+//   MyField `multiline:"true"`
 func (enc *Encoder) SetArraysMultiline(multiline bool) {
 	enc.arraysMultiline = multiline
 }
@@ -80,31 +83,42 @@ func (enc *Encoder) SetIndentTables(indent bool) {
 //
 // If v cannot be represented to TOML it returns an error.
 //
-// Encoding rules:
+// Encoding rules
 //
-// 1. A top level slice containing only maps or structs is encoded as [[table
+// A top level slice containing only maps or structs is encoded as [[table
 // array]].
 //
-// 2. All slices not matching rule 1 are encoded as [array]. As a result, any
-// map or struct they contain is encoded as an {inline table}.
+// All slices not matching rule 1 are encoded as [array]. As a result, any map
+// or struct they contain is encoded as an {inline table}.
 //
-// 3. Nil interfaces and nil pointers are not supported.
+// Nil interfaces and nil pointers are not supported.
 //
-// 4. Keys in key-values always have one part.
+// Keys in key-values always have one part.
 //
-// 5. Intermediate tables are always printed.
+// Intermediate tables are always printed.
 //
 // By default, strings are encoded as literal string, unless they contain either
 // a newline character or a single quote. In that case they are emitted as quoted
 // strings.
 //
 // When encoding structs, fields are encoded in order of definition, with their
-// exact name. The following struct tags are available:
+// exact name.
 //
-//   `toml:"foo"`: changes the name of the key to use for the field to foo.
+// Struct tags
 //
-//   `multiline:"true"`: when the field contains a string, it will be emitted as
-//   a quoted multi-line TOML string.
+// The following struct tags are available to tweak encoding on a per-field
+// basis:
+//
+//   toml:"foo"
+//     Changes the name of the key to use for the field to foo.
+//
+//   multiline:"true"
+//     When the field contains a string, it will be emitted as a quoted
+//     multi-line TOML string.
+//
+//   inline:"true"
+//     When the field would normally be encoded as a table, it is instead
+//     encoded as an inline table.
 func (enc *Encoder) Encode(v interface{}) error {
 	var (
 		b   []byte
