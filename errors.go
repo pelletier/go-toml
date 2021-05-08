@@ -90,12 +90,13 @@ func (e *DecodeError) Position() (row int, column int) {
 	return e.line, e.column
 }
 
-// Key that was being processed when the error occurred.
+// Key that was being processed when the error occurred. The key is present only
+// if this DecodeError is part of a StrictMissingError.
 func (e *DecodeError) Key() Key {
 	return e.key
 }
 
-// decodeErrorFromHighlight creates a DecodeError referencing to a highlighted
+// decodeErrorFromHighlight creates a DecodeError referencing a highlighted
 // range of bytes from document.
 //
 // highlight needs to be a sub-slice of document, or this function panics.
