@@ -511,3 +511,28 @@ func TestIssue424(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, msg2, msg2parsed)
 }
+
+func ExampleMarshal() {
+	type MyConfig struct {
+		Version int
+		Name    string
+		Tags    []string
+	}
+
+	cfg := MyConfig{
+		Version: 2,
+		Name:    "go-toml",
+		Tags:    []string{"go", "toml"},
+	}
+
+	b, err := toml.Marshal(cfg)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(b))
+
+	// Output:
+	// Version = 2
+	// Name = 'go-toml'
+	// Tags = ['go', 'toml']
+}
