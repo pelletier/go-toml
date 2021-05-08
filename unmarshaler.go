@@ -176,16 +176,13 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 				// looks like a table. Otherwise the information
 				// of a table is lost, and marshal cannot do the
 				// round trip.
-				err := ensureMapIfInterface(current)
-				if err != nil {
-					panic(fmt.Sprintf("ensureMapIfInterface: %s", err))
-				}
+				ensureMapIfInterface(current)
 			}
 		case ast.ArrayTable:
 			d.strict.EnterArrayTable(node)
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
-			panic(fmt.Sprintf("fromParser: this should not be a top level node type: %s", node.Kind))
+			panic(fmt.Sprintf("this should not be a top level node type: %s", node.Kind))
 		}
 
 		if err != nil {
@@ -262,26 +259,18 @@ func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool,
 	v := x.get()
 
 	if v.Kind() == reflect.Ptr {
-		x, err = scopePtr(x)
-		if err != nil {
-			return x, false, err
-		}
-
+		x = scopePtr(x)
 		v = x.get()
 	}
 
 	if v.Kind() == reflect.Interface {
-		x, err = scopeInterface(true, x)
-		if err != nil {
-			return x, found, err
-		}
-
+		x = scopeInterface(true, x)
 		v = x.get()
 	}
 
 	switch v.Kind() {
 	case reflect.Slice:
-		x, err = scopeSlice(true, x)
+		x = scopeSlice(true, x)
 	case reflect.Array:
 		x, err = d.scopeArray(true, x)
 	default:
@@ -329,7 +318,7 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	if v.Type().Implements(textUnmarshalerType) {
 		err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, fmt.Errorf("tryTextUnmarshaler: %w", err)
+			return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
 		}
 
 		return true, nil
@@ -338,7 +327,7 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, fmt.Errorf("tryTextUnmarshaler: %w", err)
+			return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
 		}
 
 		return true, nil
@@ -353,11 +342,7 @@ func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 
 	if v.Kind() == reflect.Ptr {
 		if !v.Elem().IsValid() {
-			err := x.set(reflect.New(v.Type().Elem()))
-			if err != nil {
-				return fmt.Errorf("unmarshalValue: %w", err)
-			}
-
+			x.set(reflect.New(v.Type().Elem()))
 			v = x.get()
 		}
 
@@ -389,7 +374,7 @@ func (d *decoder) unmarshalValue(x target, node ast.Node) error {
 	case ast.LocalDate:
 		return unmarshalLocalDate(x, node)
 	default:
-		panic(fmt.Sprintf("unmarshalValue: unhandled unmarshalValue kind %s", node.Kind))
+		panic(fmt.Sprintf("unhandled node kind %s", node.Kind))
 	}
 }
 
@@ -401,7 +386,9 @@ func unmarshalLocalDate(x target, node ast.Node) error {
 		return err
 	}
 
-	return setDate(x, v)
+	setDate(x, v)
+
+	return nil
 }
 
 func unmarshalLocalDateTime(x target, node ast.Node) error {
@@ -416,7 +403,9 @@ func unmarshalLocalDateTime(x target, node ast.Node) error {
 		return newDecodeError(rest, "extra characters at the end of a local date time")
 	}
 
-	return setLocalDateTime(x, v)
+	setLocalDateTime(x, v)
+
+	return nil
 }
 
 func unmarshalDateTime(x target, node ast.Node) error {
@@ -427,48 +416,37 @@ func unmarshalDateTime(x target, node ast.Node) error {
 		return err
 	}
 
-	return setDateTime(x, v)
+	setDateTime(x, v)
+
+	return nil
 }
 
-func setLocalDateTime(x target, v LocalDateTime) error {
+func setLocalDateTime(x target, v LocalDateTime) {
 	if x.get().Type() == timeType {
 		cast := v.In(time.Local)
 
-		return setDateTime(x, cast)
+		setDateTime(x, cast)
+		return
 	}
 
-	err := x.set(reflect.ValueOf(v))
-	if err != nil {
-		return fmt.Errorf("setLocalDateTime: %w", err)
-	}
-
-	return nil
+	x.set(reflect.ValueOf(v))
 }
 
-func setDateTime(x target, v time.Time) error {
-	err := x.set(reflect.ValueOf(v))
-	if err != nil {
-		return fmt.Errorf("setDateTime: %w", err)
-	}
-
-	return nil
+func setDateTime(x target, v time.Time) {
+	x.set(reflect.ValueOf(v))
 }
 
 var timeType = reflect.TypeOf(time.Time{})
 
-func setDate(x target, v LocalDate) error {
+func setDate(x target, v LocalDate) {
 	if x.get().Type() == timeType {
 		cast := v.In(time.Local)
 
-		return setDateTime(x, cast)
+		setDateTime(x, cast)
+		return
 	}
 
-	err := x.set(reflect.ValueOf(v))
-	if err != nil {
-		return fmt.Errorf("setDate: %w", err)
-	}
-
-	return nil
+	x.set(reflect.ValueOf(v))
 }
 
 func unmarshalString(x target, node ast.Node) error {
@@ -509,10 +487,7 @@ func unmarshalFloat(x target, node ast.Node) error {
 func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
 	assertNode(ast.InlineTable, node)
 
-	err := ensureMapIfInterface(x)
-	if err != nil {
-		return fmt.Errorf("unmarshalInlineTable: %w", err)
-	}
+	ensureMapIfInterface(x)
 
 	it := node.Children()
 	for it.Next() {
@@ -541,10 +516,7 @@ func (d *decoder) unmarshalArray(x target, node ast.Node) error {
 	for it.Next() {
 		n := it.Node()
 
-		v, err := elementAt(x, idx)
-		if err != nil {
-			return err
-		}
+		v := elementAt(x, idx)
 
 		if v == nil {
 			// when we go out of bound for an array just stop processing it to

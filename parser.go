@@ -731,12 +731,13 @@ func hexToString(b []byte, length int) (string, error) {
 	if len(b) < length {
 		return "", newDecodeError(b, "unicode point needs %d character, not %d", length, len(b))
 	}
+	b = b[:length]
 
 	//nolint:godox
 	// TODO: slow
-	intcode, err := strconv.ParseInt(string(b[:length]), 16, 32)
+	intcode, err := strconv.ParseInt(string(b), 16, 32)
 	if err != nil {
-		return "", fmt.Errorf("hexToString: %w", err)
+		return "", newDecodeError(b, "couldn't parse hexadecimal number: %w", err)
 	}
 
 	return string(rune(intcode)), nil

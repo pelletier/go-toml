@@ -818,6 +818,33 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "mismatch types int to string",
+			input: `A = 42`,
+			gen: func() test {
+				type S struct {
+					A string
+				}
+				return test{
+					target: &S{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "mismatch types array of int to interface with non-slice",
+			input: `A = [[42]]`,
+			skip:  true,
+			gen: func() test {
+				type S struct {
+					A *string
+				}
+				return test{
+					target:   &S{},
+					expected: &S{},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
@@ -834,6 +861,9 @@ B = "data"`,
 			}
 			err := toml.Unmarshal([]byte(e.input), test.target)
 			if test.err {
+				if err == nil {
+					t.Log("=>", test.target)
+				}
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
