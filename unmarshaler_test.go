@@ -39,6 +39,11 @@ func TestUnmarshal_Integers(t *testing.T) {
 			expected: 99,
 		},
 		{
+			desc:     "integer decimal underscore",
+			input:    `123_456`,
+			expected: 123456,
+		},
+		{
 			desc:     "integer hex uppercase",
 			input:    `0xDEADBEEF`,
 			expected: 0xDEADBEEF,
