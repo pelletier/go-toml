@@ -94,12 +94,7 @@ func testGenTranslateDesc(input interface{}) interface{} {
 		if ok {
 			dvalue, ok = d["value"]
 			if ok {
-				var okdt bool
-
-				dtype, okdt = dtypeiface.(string)
-				if !okdt {
-					panic(fmt.Sprintf("dtypeiface should be valid string: %v", dtypeiface))
-				}
+				dtype = dtypeiface.(string)
 
 				switch dtype {
 				case "string":
@@ -132,10 +127,7 @@ func testGenTranslateDesc(input interface{}) interface{} {
 						return nil
 					}
 
-					a, oka := dvalue.([]interface{})
-					if !oka {
-						panic(fmt.Sprintf("a should be valid []interface{}: %v", a))
-					}
+					a := dvalue.([]interface{})
 
 					xs := make([]interface{}, len(a))
 
