@@ -327,30 +327,33 @@ func checkAndRemoveUnderscores(b []byte) ([]byte, error) {
 		return nil, newDecodeError(b[len(b)-1:], "number cannot end with underscore")
 	}
 
-	var cleaned []byte
-	before := false
+	// fast path
+	i := 0
+	for ; i < len(b); i++ {
+		if b[i] == '_' {
+			break
+		}
+	}
+	if i == len(b) {
+		return b, nil
+	}
 
-	for i, c := range b {
+	before := false
+	cleaned := make([]byte, i, len(b))
+	copy(cleaned, b)
+
+	for i++; i < len(b); i++ {
+		c := b[i]
 		if c == '_' {
 			if !before {
 				return nil, newDecodeError(b[i-1:i+1], "number must have at least one digit between underscores")
 			}
 			before = false
-
-			if cleaned == nil {
-				cleaned = make([]byte, i, len(b))
-				copy(cleaned, b)
-			}
 		} else {
 			before = true
-			if cleaned != nil {
-				cleaned = append(cleaned, c)
-			}
+			cleaned = append(cleaned, c)
 		}
 	}
 
-	if cleaned != nil {
-		return cleaned, nil
-	}
-	return b, nil
+	return cleaned, nil
 }
