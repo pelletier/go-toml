@@ -25,15 +25,6 @@ USAGE
 
 COMMANDS
 
-test [BRANCH]
-
-    Runs unit tests. Exit code is non-zero when tests fail.
-
-    ARGUMENTS
-
-        BRANCH  Optional. Defines which Git branch to use to run the tests
-                against. Defaults to HEAD.
-
 coverage [OPTIONS...] [BRANCH]
 
     Generates code coverage.
@@ -110,28 +101,7 @@ coverage() {
     cover "${1-HEAD}"
 }
 
-test() {
-    branch="${1-HEAD}"
-
-    if [ "${branch}" != "HEAD" ]; then
-	dir="$(mktemp -d)"
-	git worktree add "${dir}" "$branch"
-	pushd "${dir}"
-    fi
-    
-    go test -race ./...
-    res=$?
-
-    if [ "${branch}" != "HEAD" ]; then
-	popd
-	git worktree remove --force "$dir"
-    fi
-
-    exit $res
-}
-
 case "$1" in
-    test) shift; test $@;;
     coverage) shift; coverage $@;;
     *) usage "bad argument $1";;
 esac
