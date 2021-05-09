@@ -838,15 +838,14 @@ B = "data"`,
 		},
 		{
 			desc:  "mismatch types array of int to interface with non-slice",
-			input: `A = [[42]]`,
-			skip:  true,
+			input: `A = [42]`,
 			gen: func() test {
 				type S struct {
-					A *string
+					A string
 				}
 				return test{
-					target:   &S{},
-					expected: &S{},
+					target: &S{},
+					err:    true,
 				}
 			},
 		},
