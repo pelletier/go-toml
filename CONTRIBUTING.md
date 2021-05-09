@@ -1,74 +1,74 @@
-## Contributing
+# Contributing
 
 Thank you for your interest in go-toml! We appreciate you considering
 contributing to go-toml!
 
-The main goal is the project is to provide an easy-to-use TOML
-implementation for Go that gets the job done and gets out of your way –
-dealing with TOML is probably not the central piece of your project.
+The main goal is the project is to provide an easy-to-use and efficient TOML
+implementation for Go that gets the job done and gets out of your way – dealing
+with TOML is probably not the central piece of your project.
 
-As the single maintainer of go-toml, time is scarce. All help, big or
-small, is more than welcomed!
+As the single maintainer of go-toml, time is scarce. All help, big or small, is
+more than welcomed!
 
-### Ask questions
+## Ask questions
 
-Any question you may have, somebody else might have it too. Always feel
-free to ask them on the [issues tracker][issues-tracker].  We will try to
-answer them as clearly and quickly as possible, time permitting.
+Any question you may have, somebody else might have it too. Always feel free to
+ask them on the [discussion board][discussions]. We will try to answer them as
+clearly and quickly as possible, time permitting.
 
 Asking questions also helps us identify areas where the documentation needs
 improvement, or new features that weren't envisioned before. Sometimes, a
-seemingly innocent question leads to the fix of a bug. Don't hesitate and
-ask away!
+seemingly innocent question leads to the fix of a bug. Don't hesitate and ask
+away!
 
-### Improve the documentation
+[discussions]: https://github.com/pelletier/go-toml/discussions
 
-The best way to share your knowledge and experience with go-toml is to
-improve the documentation. Fix a typo, clarify an interface, add an
-example, anything goes!
+## Improve the documentation
 
-The documentation is present in the [README][readme] and thorough the
-source code. On release, it gets updated on [pkg.go.dev][pkg.go.dev]. To make a
-change to the documentation, create a pull request with your proposed
-changes. For simple changes like that, the easiest way to go is probably
-the "Fork this project and edit the file" button on Github, displayed at
-the top right of the file. Unless it's a trivial change (for example a
-typo), provide a little bit of context in your pull request description or
-commit message.
+The best way to share your knowledge and experience with go-toml is to improve
+the documentation. Fix a typo, clarify an interface, add an example, anything
+goes!
 
-### Report a bug
+The documentation is present in the [README][readme] and thorough the source
+code. On release, it gets updated on [pkg.go.dev][pkg.go.dev]. To make a change
+to the documentation, create a pull request with your proposed changes. For
+simple changes like that, the easiest way to go is probably the "Fork this
+project and edit the file" button on Github, displayed at the top right of the
+file. Unless it's a trivial change (for example a typo), provide a little bit of
+context in your pull request description or commit message.
 
-Found a bug! Sorry to hear that :(. Help us and other track them down and
-fix by reporting it. [File a new bug report][bug-report] on the [issues
-tracker][issues-tracker]. The template should provide enough guidance on
-what to include. When in doubt: add more details! By reducing ambiguity and
-providing more information, it decreases back and forth and saves everyone
-time.
+## Report a bug
 
-### Code changes
+Found a bug! Sorry to hear that :(. Help us and other track them down and fix by
+reporting it. [File a new bug report][bug-report] on the [issues
+tracker][issues-tracker]. The template should provide enough guidance on what to
+include. When in doubt: add more details! By reducing ambiguity and providing
+more information, it decreases back and forth and saves everyone time.
+
+## Code changes
 
 Want to contribute a patch? Very happy to hear that!
 
 First, some high-level rules:
 
-* A short proposal with some POC code is better than a lengthy piece of
-  text with no code. Code speaks louder than words.
-* No backward-incompatible patch will be accepted unless discussed.
-  Sometimes it's hard, and Go's lack of versioning by default does not
-  help, but we try not to break people's programs unless we absolutely have
+* A short proposal with some POC code is better than a lengthy piece of text
+  with no code. Code speaks louder than words. That being said, bigger changes
+  should probably start with a [discussion][discussions].
+* No backward-incompatible patch will be accepted unless discussed. Sometimes
+  it's hard, but we try not to break people's programs unless we absolutely have
   to.
-* If you are writing a new feature or extending an existing one, make sure
-  to write some documentation.
+* If you are writing a new feature or extending an existing one, make sure to
+  write some documentation.
 * Bug fixes need to be accompanied with regression tests.
 * New code needs to be tested.
-* Your commit messages need to explain why the change is needed, even if
-  already included in the PR description.
+* Your commit messages need to explain why the change is needed, even if already
+  included in the PR description.
 
-It does sound like a lot, but those best practices are here to save time
-overall and continuously improve the quality of the project, which is
-something everyone benefits from.
+It does sound like a lot, but those best practices are here to save time overall
+and continuously improve the quality of the project, which is something everyone
+benefits from.
 
-#### Get started
+### Get started
 
 The fairly standard code contribution process looks like that:
 
@@ -76,42 +76,90 @@ The fairly standard code contribution process looks like that:
 2. Make your changes, commit on any branch you like.
 3. [Open up a pull request][pull-request]
 4. Review, potential ask for changes.
-5. Merge. You're in!
+5. Merge.
 
 Feel free to ask for help! You can create draft pull requests to gather
 some early feedback!
 
-#### Run the tests
+### Run the tests
 
-You can run tests for go-toml using Go's test tool: `go test ./...`.
-When creating a pull requests, all tests will be ran on Linux on a few Go
-versions (Travis CI), and on Windows using the latest Go version
-(AppVeyor).
+You can run tests for go-toml using Go's test tool: `go test -race ./...`.
 
-#### Style
+During the pull request process, all tests will be ran on Linux, Windows, and
+MacOS on the last two versions of Go.
 
-Try to look around and follow the same format and structure as the rest of
-the code. We enforce using `go fmt` on the whole code base.
+However, given GitHub's new policy to _not_ run Actions on pull requests until a
+maintainer clicks on button, it is highly recommended that you run them locally
+as you make changes.
+
+### Check coverage
+
+We use `go tool cover` to compute test coverage. Most code editors have a way to
+run and display code coverage, but at the end of the day, we do this:
+
+```
+go test -covermode=atomic -coverprofile=coverage.out
+go tool cover -func=coverage.out
+```
+
+and verify that the overall percentage of tested code does not go down. This is
+a requirement. As a rule of thumb, all lines of code touched by your changes
+should be covered. On Unix you can use `./ci.sh coverage -d v2` to check if your
+code lowers the coverage.
+
+### Verify performance
+
+Go-toml aims to stay efficient. We rely on a set of scenarios executed with Go's
+builtin benchmark systems. Because of their noisy nature, containers provided by
+Github Actions cannot be reliably used for benchmarking. As a result, you are
+responsible for checking that your changes do not incur a performance penalty.
+You can run their following to execute benchmarks:
+
+```
+go test ./... -bench=. -count=10
+```
+
+Benchmark results should be compared against each other with
+[benchstat][benchstat]. Typical flow looks like this:
+
+1. On the `v2` branch, run `go test ./... -bench=. -count 10` and save output to
+   a file (for example `old.txt`).
+2. Make some code changes.
+3. Run `go test ....` again, and save the output to an other file (for example
+   `new.txt`).
+4. Run `benchstat old.txt new.txt` to check that time/op does not go up in any
+   test.
+   
+It is highly encouraged to add the benchstat results to your pull request
+description. Pull requests that lower performance will receive more scrutiny.
+
+[benchstat]: https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
+
+
+### Style
+
+Try to look around and follow the same format and structure as the rest of the
+code. We enforce using `go fmt` on the whole code base.
 
 ---
 
-### Maintainers-only
+## Maintainers-only
 
-#### Merge pull request
+### Merge pull request
 
 Checklist:
 
 * Passing CI.
 * Does not introduce backward-incompatible changes (unless discussed).
 * Has relevant doc changes.
-* Has relevant unit tests.
+* Benchstat does not show performance regression.
 
 1. Merge using "squash and merge".
 2. Make sure to edit the commit message to keep all the useful information
    nice and clean.
 3. Make sure the commit title is clear and contains the PR number (#123).
 
-#### New release
+### New release
 
 1. Go to [releases][releases]. Click on "X commits to master since this
    release".
