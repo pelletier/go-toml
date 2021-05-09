@@ -13,6 +13,8 @@ jobs:
     name: report
     steps:
       - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
       - name: Setup go
         uses: actions/setup-go@master
         with:
