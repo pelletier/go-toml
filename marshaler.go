@@ -127,6 +127,10 @@ func (enc *Encoder) Encode(v interface{}) error {
 
 	ctx.inline = enc.tablesInline
 
+	if v == nil {
+		return fmt.Errorf("toml: cannot encode a nil interface")
+	}
+
 	b, err := enc.encode(b, ctx, reflect.ValueOf(v))
 	if err != nil {
 		return err
@@ -193,9 +197,11 @@ func (ctx *encoderCtx) isRoot() bool {
 
 //nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	i, ok := v.Interface().(time.Time)
-	if ok {
-		return i.AppendFormat(b, time.RFC3339), nil
+	if v.Kind() == reflect.Interface && !v.IsZero() {
+		i, ok := v.Interface().(time.Time)
+		if ok {
+			return i.AppendFormat(b, time.RFC3339), nil
+		}
 	}
 
 	if v.Type().Implements(textMarshalerType) {

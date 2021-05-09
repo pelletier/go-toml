@@ -16,6 +16,8 @@ import (
 func TestMarshal(t *testing.T) {
 	t.Parallel()
 
+	someInt := 42
+
 	examples := []struct {
 		desc     string
 		v        interface{}
@@ -297,6 +299,45 @@ A = [
   [3, 4]
 ]
 `,
+		},
+		{
+			desc: "nil interface not supported at root",
+			v:    nil,
+			err:  true,
+		},
+		{
+			desc: "nil interface not supported in slice",
+			v: map[string]interface{}{
+				"a": []interface{}{"a", nil, 2},
+			},
+			err: true,
+		},
+		{
+			desc: "nil pointer in slice uses zero value",
+			v: struct {
+				A []*int
+			}{
+				A: []*int{nil},
+			},
+			expected: `A = [0]`,
+		},
+		{
+			desc: "nil pointer in slice uses zero value",
+			v: struct {
+				A []*int
+			}{
+				A: []*int{nil},
+			},
+			expected: `A = [0]`,
+		},
+		{
+			desc: "pointer in slice",
+			v: struct {
+				A []*int
+			}{
+				A: []*int{&someInt},
+			},
+			expected: `A = [42]`,
 		},
 	}
 
