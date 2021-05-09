@@ -113,7 +113,7 @@ Go-toml aims to stay efficient. We rely on a set of scenarios executed with Go's
 builtin benchmark systems. Because of their noisy nature, containers provided by
 Github Actions cannot be reliably used for benchmarking. As a result, you are
 responsible for checking that your changes do not incur a performance penalty.
-You can run ther following to execute benchmarks:
+You can run their following to execute benchmarks:
 
 ```
 go test ./... -bench=. -count=10
@@ -131,7 +131,7 @@ Benchmark results should be compared against each other with
    test.
    
 It is highly encouraged to add the benchstat results to your pull request
-description. Pull requests that lower performance will receive more scrutinity.
+description. Pull requests that lower performance will receive more scrutiny.
 
 [benchstat]: https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
 
