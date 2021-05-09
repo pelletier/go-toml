@@ -18,18 +18,4 @@ jobs:
         with:
           go-version: 1.16
       - name: Run tests with coverage
-        run: go test -covermode=atomic -coverprofile=coverage.out ./...
-      - name: Compute coverage by func
-        run: go tool cover -func=coverage.out -o coverage-funcs.txt
-      - name: Generate HTML report
-        run: go tool cover -html=coverage.out -o coverage.html
-      - name: Archive funcs coverage
-        uses: actions/upload-artifact@v2
-        with:
-          name: coverage-funcs
-          path: coverage-funcs.txt
-      - name: Archive report
-        uses: actions/upload-artifact@v2
-        with:
-          name: coverage.html
-          path: coverage.html
+        run: ./ci.sh coverage -d "${GITHUB_BASE_REF-HEAD}"
