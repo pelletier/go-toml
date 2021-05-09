@@ -460,6 +460,36 @@ root = 'value0'
 	}
 }
 
+type customTextMarshaler struct {
+	value int64
+}
+
+func (c *customTextMarshaler) MarshalText() ([]byte, error) {
+	if c.value == 1 {
+		return nil, fmt.Errorf("cannot represent 1 because this is a silly test")
+	}
+	return []byte(fmt.Sprintf("::%d", c.value)), nil
+}
+
+func TestMarshalTextMarshaler_NoRoot(t *testing.T) {
+	c := customTextMarshaler{}
+	_, err := toml.Marshal(&c)
+	require.Error(t, err)
+}
+
+func TestMarshalTextMarshaler_Error(t *testing.T) {
+	m := map[string]interface{}{"a": &customTextMarshaler{value: 1}}
+	_, err := toml.Marshal(m)
+	require.Error(t, err)
+}
+
+func TestMarshalTextMarshaler(t *testing.T) {
+	m := map[string]interface{}{"a": &customTextMarshaler{value: 2}}
+	r, err := toml.Marshal(m)
+	require.NoError(t, err)
+	equalStringsIgnoreNewlines(t, "a = '::2'", string(r))
+}
+
 func TestIssue436(t *testing.T) {
 	t.Parallel()
 
