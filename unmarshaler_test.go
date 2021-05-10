@@ -1518,21 +1518,35 @@ bar = 42
 		t.Run(e.desc, func(t *testing.T) {
 			t.Parallel()
 
-			r := strings.NewReader(e.input)
-			d := toml.NewDecoder(r)
-			d.SetStrict(true)
-			x := e.target
-			if x == nil {
-				x = &struct{}{}
-			}
-			err := d.Decode(x)
+			t.Run("strict", func(t *testing.T) {
+				r := strings.NewReader(e.input)
+				d := toml.NewDecoder(r)
+				d.SetStrict(true)
+				x := e.target
+				if x == nil {
+					x = &struct{}{}
+				}
+				err := d.Decode(x)
 
-			var tsm *toml.StrictMissingError
-			if errors.As(err, &tsm) {
-				equalStringsIgnoreNewlines(t, e.expected, tsm.String())
-			} else {
-				t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
-			}
+				var tsm *toml.StrictMissingError
+				if errors.As(err, &tsm) {
+					equalStringsIgnoreNewlines(t, e.expected, tsm.String())
+				} else {
+					t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
+				}
+			})
+
+			t.Run("default", func(t *testing.T) {
+				r := strings.NewReader(e.input)
+				d := toml.NewDecoder(r)
+				d.SetStrict(false)
+				x := e.target
+				if x == nil {
+					x = &struct{}{}
+				}
+				err := d.Decode(x)
+				require.NoError(t, err)
+			})
 		})
 	}
 }
