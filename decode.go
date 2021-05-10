@@ -63,8 +63,6 @@ func parseDateTime(b []byte) (time.Time, error) {
 	// time-offset    = "Z" / time-numoffset
 	// time-numoffset = ( "+" / "-" ) time-hour ":" time-minute
 
-	originalBytes := b
-
 	dt, b, err := parseLocalDateTime(b)
 	if err != nil {
 		return time.Time{}, err
@@ -73,7 +71,8 @@ func parseDateTime(b []byte) (time.Time, error) {
 	var zone *time.Location
 
 	if len(b) == 0 {
-		return time.Time{}, newDecodeError(originalBytes, "date-time is missing timezone")
+		// parser should have checked that when assigning the date time node
+		panic("date time should have a timezone")
 	}
 
 	if b[0] == 'Z' {
@@ -85,18 +84,15 @@ func parseDateTime(b []byte) (time.Time, error) {
 			return time.Time{}, newDecodeError(b, "invalid date-time timezone")
 		}
 		direction := 1
-		switch b[0] {
-		case '+':
-		case '-':
+		if b[0] == '-' {
 			direction = -1
-		default:
-			return time.Time{}, newDecodeError(b[0:1], "invalid timezone offset character")
 		}
 
 		hours := digitsToInt(b[1:3])
 		minutes := digitsToInt(b[4:6])
 		seconds := direction * (hours*3600 + minutes*60)
 		zone = time.FixedZone("", seconds)
+		b = b[dateTimeByteLen:]
 	}
 
 	if len(b) > 0 {
@@ -170,21 +166,14 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 	t.Second = parseDecimalDigits(b[6:8])
 
-	if len(b) >= 9 && b[8] == '.' {
+	const minLengthWithFrac = 9
+	if len(b) >= minLengthWithFrac && b[minLengthWithFrac-1] == '.' {
 		frac := 0
 		digits := 0
 
-		for i, c := range b[9:] {
-			if !isDigit(c) {
-				if i == 0 {
-					return t, nil, newDecodeError(b[i:i+1], "need at least one digit after fraction point")
-				}
-
-				break
-			}
-
-			//nolint:gomnd
-			if i >= 9 {
+		for i, c := range b[minLengthWithFrac:] {
+			const maxFracPrecision = 9
+			if i >= maxFracPrecision {
 				return t, nil, newDecodeError(b[i:i+1], "maximum precision for date time is nanosecond")
 			}
 
@@ -203,8 +192,6 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 //nolint:cyclop
 func parseFloat(b []byte) (float64, error) {
-	//nolint:godox
-	// TODO: inefficient
 	if len(b) == 4 && (b[0] == '+' || b[0] == '-') && b[1] == 'n' && b[2] == 'a' && b[3] == 'n' {
 		return math.NaN(), nil
 	}
@@ -224,7 +211,7 @@ func parseFloat(b []byte) (float64, error) {
 
 	f, err := strconv.ParseFloat(string(cleaned), 64)
 	if err != nil {
-		return 0, newDecodeError(b, "coudn't parse float: %w", err)
+		return 0, newDecodeError(b, "unable to parse float: %w", err)
 	}
 
 	return f, nil
@@ -287,10 +274,6 @@ func parseIntDec(b []byte) (int64, error) {
 }
 
 func checkAndRemoveUnderscores(b []byte) ([]byte, error) {
-	if len(b) == 0 {
-		return b, nil
-	}
-
 	if b[0] == '_' {
 		return nil, newDecodeError(b[0:1], "number cannot start with underscore")
 	}

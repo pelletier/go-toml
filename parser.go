@@ -826,11 +826,14 @@ byteLoop:
 		c := b[i]
 
 		switch {
-		case isDigit(c) || c == '-':
+		case isDigit(c):
+		case c == '-':
+			const offsetOfTz = 19
+			if i == offsetOfTz {
+				hasTz = true
+			}
 		case c == 'T' || c == ':' || c == '.':
 			hasTime = true
-
-			continue byteLoop
 		case c == '+' || c == '-' || c == 'Z':
 			hasTz = true
 		case c == ' ':

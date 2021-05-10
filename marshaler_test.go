@@ -385,7 +385,7 @@ hello = 'world'`,
 			err: true,
 		},
 		{
-			desc: "empty slice of empty structs",
+			desc: "empty slice of empty struct",
 			v: struct {
 				A []struct{}
 			}{

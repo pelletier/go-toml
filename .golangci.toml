@@ -57,7 +57,7 @@ enable = [
     "nakedret",
     "nestif",
     "nilerr",
-    "nlreturn",
+    # "nlreturn",
     "noctx",
     "nolintlint",
     "paralleltest",

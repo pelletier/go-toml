@@ -241,6 +241,34 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "time.time with negative zone",
+			input: `a = 1979-05-27T00:32:00-07:00 `, // space intentional
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(1979, 5, 27, 0, 32, 0, 0, time.FixedZone("", -7*3600)),
+					},
+				}
+			},
+		},
+		{
+			desc:  "time.time with positive zone",
+			input: `a = 1979-05-27T00:32:00+07:00`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(1979, 5, 27, 0, 32, 0, 0, time.FixedZone("", 7*3600)),
+					},
+				}
+			},
+		},
+		{
 			desc: "issue 475 - space between dots in key",
 			input: `fruit. color = "yellow"
 					fruit . flavor = "banana"`,
@@ -1005,8 +1033,60 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 			data: `a = 20x1-05-21`,
 		},
 		{
+			desc: "local time with fractional",
+			data: `a = 11:22:33.x`,
+		},
+		{
+			desc: "local time frac precision too large",
+			data: `a = 2021-05-09T11:22:33.99999999999`,
+		},
+		{
+			desc: "wrong time offset separator",
+			data: `a = 1979-05-27T00:32:00T07:00`,
+		},
+		{
+			desc: "wrong time offset separator",
+			data: `a = 1979-05-27T00:32:00Z07:00`,
+		},
+		{
+			desc: "float with double _",
+			data: `flt8 = 224_617.445_991__228`,
+		},
+		{
+			desc: "float with double _",
+			data: `flt8 = 1..2`,
+		},
+		{
 			desc: "int with wrong base",
 			data: `a = 0f2`,
+		},
+		{
+			desc: "int hex with double underscore",
+			data: `a = 0xFFF__FFF`,
+		},
+		{
+			desc: "int hex very large",
+			data: `a = 0xFFFFFFFFFFFFFFFFF`,
+		},
+		{
+			desc: "int oct with double underscore",
+			data: `a = 0o777__77`,
+		},
+		{
+			desc: "int oct very large",
+			data: `a = 0o77777777777777777777777`,
+		},
+		{
+			desc: "int bin with double underscore",
+			data: `a = 0b111__111`,
+		},
+		{
+			desc: "int bin very large",
+			data: `a = 0b11111111111111111111111111111111111111111111111111111111111111111111111111111`,
+		},
+		{
+			desc: "int dec very large",
+			data: `a = 999999999999999999999999`,
 		},
 		{
 			desc: "literal string with new lines",
