@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	t.Parallel()
 

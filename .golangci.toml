@@ -24,7 +24,7 @@ enable = [
     # "exhaustivestruct",
     "exportloopref",
     "forbidigo",
-    "forcetypeassert",
+    # "forcetypeassert",
     "funlen",
     "gci",
     # "gochecknoglobals",
@@ -80,5 +80,5 @@ enable = [
     "wastedassign",
     "whitespace",
     # "wrapcheck",
-    "wsl"
+    # "wsl"
 ]

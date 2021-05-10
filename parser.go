@@ -304,6 +304,7 @@ func atmost(b []byte, n int) []byte {
 	if n >= len(b) {
 		return b
 	}
+
 	return b[:n]
 }
 

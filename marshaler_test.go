@@ -685,18 +685,24 @@ func (c *customTextMarshaler) MarshalText() ([]byte, error) {
 }
 
 func TestMarshalTextMarshaler_NoRoot(t *testing.T) {
+	t.Parallel()
+
 	c := customTextMarshaler{}
 	_, err := toml.Marshal(&c)
 	require.Error(t, err)
 }
 
 func TestMarshalTextMarshaler_Error(t *testing.T) {
+	t.Parallel()
+
 	m := map[string]interface{}{"a": &customTextMarshaler{value: 1}}
 	_, err := toml.Marshal(m)
 	require.Error(t, err)
 }
 
 func TestMarshalTextMarshaler_ErrorInline(t *testing.T) {
+	t.Parallel()
+
 	type s struct {
 		A map[string]interface{} `inline:"true"`
 	}
@@ -710,6 +716,8 @@ func TestMarshalTextMarshaler_ErrorInline(t *testing.T) {
 }
 
 func TestMarshalTextMarshaler(t *testing.T) {
+	t.Parallel()
+
 	m := map[string]interface{}{"a": &customTextMarshaler{value: 2}}
 	r, err := toml.Marshal(m)
 	require.NoError(t, err)
