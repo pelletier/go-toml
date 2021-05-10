@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -16,7 +17,7 @@ func parseInteger(b []byte) (int64, error) {
 		case 'o':
 			return parseIntOct(b)
 		default:
-			return 0, newDecodeError(b[1:2], "invalid base: '%c'", b[1])
+			panic(fmt.Errorf("invalid base '%c', should have been checked by scanIntOrFloat", b[1]))
 		}
 	}
 
@@ -34,41 +35,26 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 		return date, newDecodeError(b, "dates are expected to have the format YYYY-MM-DD")
 	}
 
-	var err error
+	date.Year = parseDecimalDigits(b[0:4])
 
-	date.Year, err = parseDecimalDigits(b[0:4])
-	if err != nil {
-		return date, err
-	}
-
-	v, err := parseDecimalDigits(b[5:7])
-	if err != nil {
-		return date, err
-	}
+	v := parseDecimalDigits(b[5:7])
 
 	date.Month = time.Month(v)
 
-	date.Day, err = parseDecimalDigits(b[8:10])
-	if err != nil {
-		return date, err
-	}
+	date.Day = parseDecimalDigits(b[8:10])
 
 	return date, nil
 }
 
-func parseDecimalDigits(b []byte) (int, error) {
+func parseDecimalDigits(b []byte) int {
 	v := 0
 
-	for i, c := range b {
-		if !isDigit(c) {
-			return 0, newDecodeError(b[i:i+1], "should be a digit (0-9)")
-		}
-
+	for _, c := range b {
 		v *= 10
 		v += int(c - '0')
 	}
 
-	return v, nil
+	return v
 }
 
 func parseDateTime(b []byte) (time.Time, error) {
@@ -161,7 +147,6 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 // parseLocalTime is a bit different because it also returns the remaining
 // []byte that is didn't need. This is to allow parseDateTime to parse those
 // remaining bytes as a timezone.
-//nolint:cyclop,funlen
 func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	var (
 		nspow = [10]int{0, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1e0}
@@ -173,30 +158,17 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, newDecodeError(b, "times are expected to have the format HH:MM:SS[.NNNNNN]")
 	}
 
-	var err error
-
-	t.Hour, err = parseDecimalDigits(b[0:2])
-	if err != nil {
-		return t, nil, err
-	}
-
+	t.Hour = parseDecimalDigits(b[0:2])
 	if b[2] != ':' {
 		return t, nil, newDecodeError(b[2:3], "expecting colon between hours and minutes")
 	}
 
-	t.Minute, err = parseDecimalDigits(b[3:5])
-	if err != nil {
-		return t, nil, err
-	}
-
+	t.Minute = parseDecimalDigits(b[3:5])
 	if b[5] != ':' {
 		return t, nil, newDecodeError(b[5:6], "expecting colon between minutes and seconds")
 	}
 
-	t.Second, err = parseDecimalDigits(b[6:8])
-	if err != nil {
-		return t, nil, err
-	}
+	t.Second = parseDecimalDigits(b[6:8])
 
 	if len(b) >= 9 && b[8] == '.' {
 		frac := 0

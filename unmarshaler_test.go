@@ -1001,6 +1001,10 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 		msg  string
 	}{
 		{
+			desc: "local date with invalid digit",
+			data: `a = 20x1-05-21`,
+		},
+		{
 			desc: "int with wrong base",
 			data: `a = 0f2`,
 		},
