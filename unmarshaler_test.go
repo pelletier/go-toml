@@ -893,6 +893,85 @@ B = "data"`,
 			},
 		},
 		{
+			desc: "nested arrays",
+			input: `
+			[[A]]
+			[[A.B]]
+			C = 1
+			[[A]]
+			[[A.B]]
+			C = 2`,
+			gen: func() test {
+				type leaf struct {
+					C int
+				}
+				type inner struct {
+					B [2]leaf
+				}
+				type s struct {
+					A [2]inner
+				}
+				return test{
+					target: &s{},
+					expected: &s{A: [2]inner{
+						{B: [2]leaf{
+							{C: 1},
+						}},
+						{B: [2]leaf{
+							{C: 2},
+						}},
+					}},
+				}
+			},
+		},
+		{
+			desc: "nested arrays too many",
+			input: `
+			[[A]]
+			[[A.B]]
+			C = 1
+			[[A.B]]
+			C = 2`,
+			gen: func() test {
+				type leaf struct {
+					C int
+				}
+				type inner struct {
+					B [1]leaf
+				}
+				type s struct {
+					A [1]inner
+				}
+				return test{
+					target: &s{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "into map with invalid key type",
+			input: `A = "hello"`,
+			gen: func() test {
+				return test{
+					target: &map[int]string{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "into map with convertible key type",
+			input: `A = "hello"`,
+			gen: func() test {
+				type foo string
+				return test{
+					target: &map[foo]string{},
+					expected: &map[foo]string{
+						"A": "hello",
+					},
+				}
+			},
+		},
+		{
 			desc:  "array of int in struct",
 			input: `A = [1,2,3]`,
 			gen: func() test {
@@ -902,6 +981,20 @@ B = "data"`,
 				return test{
 					target:   &s{},
 					expected: &s{A: [3]int{1, 2, 3}},
+				}
+			},
+		},
+		{
+			desc: "array of int in struct",
+			input: `[A]
+			b = 42`,
+			gen: func() test {
+				type s struct {
+					A *map[string]interface{}
+				}
+				return test{
+					target:   &s{},
+					expected: &s{A: &map[string]interface{}{"b": int64(42)}},
 				}
 			},
 		},
