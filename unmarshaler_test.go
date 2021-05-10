@@ -1028,6 +1028,83 @@ B = "data"`,
 	}
 }
 
+//nolint:funlen
+func TestUnmarshalOverflows(t *testing.T) {
+	examples := []struct {
+		t      interface{}
+		errors []string
+	}{
+		{
+			t:      &map[string]int32{},
+			errors: []string{`-2147483649`, `2147483649`},
+		},
+		{
+			t:      &map[string]int16{},
+			errors: []string{`-2147483649`, `2147483649`},
+		},
+		{
+			t:      &map[string]int8{},
+			errors: []string{`-2147483649`, `2147483649`},
+		},
+		{
+			t:      &map[string]int{},
+			errors: []string{`-19223372036854775808`, `9223372036854775808`},
+		},
+		{
+			t:      &map[string]uint64{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint32{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint16{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint8{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		for _, v := range e.errors {
+			v := v
+			t.Run(fmt.Sprintf("%T %s", e.t, v), func(t *testing.T) {
+				doc := "A = " + v
+				err := toml.Unmarshal([]byte(doc), e.t)
+				t.Log("input:", doc)
+				require.Error(t, err)
+			})
+		}
+		t.Run(fmt.Sprintf("%T ok", e.t), func(t *testing.T) {
+			doc := "A = 1"
+			err := toml.Unmarshal([]byte(doc), e.t)
+			t.Log("input:", doc)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestUnmarshalFloat32(t *testing.T) {
+	t.Run("fits", func(t *testing.T) {
+		doc := "A = 1.2"
+		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
+		require.NoError(t, err)
+	})
+	t.Run("overflows", func(t *testing.T) {
+		doc := "A = 4.40282346638528859811704183484516925440e+38"
+		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
+		require.Error(t, err)
+	})
+}
+
 type Integer484 struct {
 	Value int
 }
