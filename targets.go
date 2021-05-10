@@ -70,19 +70,19 @@ func (t interfaceTarget) set(v reflect.Value) {
 }
 
 func (t interfaceTarget) setString(v string) {
-	t.x.setString(v)
+	panic("interface targets should always go through set")
 }
 
 func (t interfaceTarget) setBool(v bool) {
-	t.x.setBool(v)
+	panic("interface targets should always go through set")
 }
 
 func (t interfaceTarget) setInt64(v int64) {
-	t.x.setInt64(v)
+	panic("interface targets should always go through set")
 }
 
 func (t interfaceTarget) setFloat64(v float64) {
-	t.x.setFloat64(v)
+	panic("interface targets should always go through set")
 }
 
 // mapTarget targets a specific key of a map.

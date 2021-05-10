@@ -818,6 +818,61 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "interface holding a string",
+			input: `A = "Hello"`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: "Hello",
+					},
+				}
+			},
+		},
+		{
+			desc:  "map of bools",
+			input: `A = true`,
+			gen: func() test {
+				return test{
+					target:   &map[string]bool{},
+					expected: &map[string]bool{"A": true},
+				}
+			},
+		},
+		{
+			desc:  "map of int64",
+			input: `A = 42`,
+			gen: func() test {
+				return test{
+					target:   &map[string]int64{},
+					expected: &map[string]int64{"A": 42},
+				}
+			},
+		},
+		{
+			desc:  "map of float64",
+			input: `A = 4.2`,
+			gen: func() test {
+				return test{
+					target:   &map[string]float64{},
+					expected: &map[string]float64{"A": 4.2},
+				}
+			},
+		},
+		{
+			desc:  "assign bool to float",
+			input: `A = true`,
+			gen: func() test {
+				return test{
+					target: &map[string]float64{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc: "interface holding a struct",
 			input: `[A]
 					B = "After"`,
