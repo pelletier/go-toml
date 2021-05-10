@@ -197,7 +197,7 @@ func (ctx *encoderCtx) isRoot() bool {
 
 //nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	if v.Kind() == reflect.Interface && !v.IsZero() {
+	if !v.IsZero() {
 		i, ok := v.Interface().(time.Time)
 		if ok {
 			return i.AppendFormat(b, time.RFC3339), nil
