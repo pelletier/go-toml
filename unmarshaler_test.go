@@ -318,6 +318,73 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "multiline literal string with windows newline",
+			input: "A = '''\r\nTest'''",
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "Test"},
+				}
+			},
+		},
+		{
+			desc:  "multiline basic string with windows newline",
+			input: "A = \"\"\"\r\nTest\"\"\"",
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "Test"},
+				}
+			},
+		},
+		{
+			desc: "multiline basic string escapes",
+			input: `A = """
+\\\b\f\n\r\t\uffff\U0001D11E"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\\\b\f\n\r\t\uffff\U0001D11E"},
+				}
+			},
+		},
+		{
+			desc:  "basic string escapes",
+			input: `A = "\\\b\f\n\r\t\uffff\U0001D11E"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\\\b\f\n\r\t\uffff\U0001D11E"},
+				}
+			},
+		},
+		{
+			desc:  "spaces around dotted keys",
+			input: "a . b = 1",
+			gen: func() test {
+				return test{
+					target:   &map[string]map[string]interface{}{},
+					expected: &map[string]map[string]interface{}{"a": {"b": int64(1)}},
+				}
+			},
+		},
+		{
 			desc:  "kv bool true",
 			input: `A = true`,
 			gen: func() test {
@@ -1149,6 +1216,98 @@ world'`,
 			desc: "bad char between minutes and seconds",
 			data: `a = 2021-03-30 21:312:0`,
 			msg:  `expecting colon between minutes and seconds`,
+		},
+		{
+			desc: `binary with invalid digit`,
+			data: `a = 0bf`,
+		},
+		{
+			desc: `invalid i in dec`,
+			data: `a = 0i`,
+		},
+		{
+			desc: `invalid n in dec`,
+			data: `a = 0n`,
+		},
+		{
+			desc: "dt with tz has no time",
+			data: `a = 2021-03-30TZ`,
+		},
+		{
+			desc: "invalid end of array table",
+			data: `[[a}`,
+		},
+		{
+			desc: "invalid end of array table two",
+			data: `[[a]}`,
+		},
+		{
+			desc: "eof after equal",
+			data: `a =`,
+		},
+		{
+			desc: "invalid true boolean",
+			data: `a = trois`,
+		},
+		{
+			desc: "invalid false boolean",
+			data: `a = faux`,
+		},
+		{
+			desc: "inline table with incorrect separator",
+			data: `a = {b=1;}`,
+		},
+		{
+			desc: "inline table with invalid value",
+			data: `a = {b=faux}`,
+		},
+		{
+			desc: `incomplete array after whitespace`,
+			data: `a = [ `,
+		},
+		{
+			desc: `array with comma first`,
+			data: `a = [ ,]`,
+		},
+		{
+			desc: `array staring with incomplete newline`,
+			data: "a = [\r]",
+		},
+		{
+			desc: `array with incomplete newline after comma`,
+			data: "a = [1,\r]",
+		},
+		{
+			desc: `array with incomplete newline after value`,
+			data: "a = [1\r]",
+		},
+		{
+			desc: `invalid unicode in basic multiline string`,
+			data: `A = """\u123"""`,
+		},
+		{
+			desc: `invalid long unicode in basic multiline string`,
+			data: `A = """\U0001D11"""`,
+		},
+		{
+			desc: `invalid unicode in basic string`,
+			data: `A = "\u123"`,
+		},
+		{
+			desc: `invalid long unicode in basic string`,
+			data: `A = "\U0001D11"`,
+		},
+		{
+			desc: `invalid escape char basic multiline string`,
+			data: `A = """\z"""`,
+		},
+		{
+			desc: `invalid inf`,
+			data: `A = ick`,
+		},
+		{
+			desc: `invalid nan`,
+			data: `A = non`,
 		},
 	}
 

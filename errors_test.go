@@ -182,6 +182,8 @@ line 5`,
 }
 
 func TestDecodeError_Accessors(t *testing.T) {
+	t.Parallel()
+
 	e := DecodeError{
 		message: "foo",
 		line:    1,

@@ -2,7 +2,6 @@ package toml
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
@@ -77,7 +76,6 @@ func (p *parser) parseNewline(b []byte) ([]byte, error) {
 
 	if b[0] == '\r' {
 		_, rest, err := scanWindowsNewline(b)
-
 		return rest, err
 	}
 
@@ -398,8 +396,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		if len(b) == 0 {
-			//nolint:godox
-			return parent, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
+			return parent, nil, newDecodeError(b, "array is incomplete")
 		}
 
 		if b[0] == ']' {
@@ -563,7 +560,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 			case 't':
 				builder.WriteByte('\t')
 			case 'u':
-				x, err := hexToString(token[i+3:len(token)-3], 4)
+				x, err := hexToString(atmost(token[i+1:], 4), 4)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -571,7 +568,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 				builder.WriteString(x)
 				i += 4
 			case 'U':
-				x, err := hexToString(token[i+3:len(token)-3], 8)
+				x, err := hexToString(atmost(token[i+1:], 8), 8)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -611,12 +608,7 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	for {
 		b = p.parseWhitespace(b)
 		if len(b) > 0 && b[0] == '.' {
-			b, err = expect('.', b)
-			if err != nil {
-				return ref, nil, err
-			}
-
-			b = p.parseWhitespace(b)
+			b = p.parseWhitespace(b[1:])
 
 			key, b, err = p.parseSimpleKey(b)
 			if err != nil {
@@ -640,8 +632,7 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// quoted-key = basic-string / literal-string
 	if len(b) == 0 {
-		//nolint:godox
-		return nil, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
+		return nil, nil, newDecodeError(b, "key is incomplete")
 	}
 
 	switch {
@@ -652,8 +643,7 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	case isUnquotedKeyChar(b[0]):
 		return scanUnquotedKey(b)
 	default:
-		//nolint:godox
-		return nil, nil, unexpectedCharacter{b: b} // TODO: should be unexpected EOF
+		return nil, nil, newDecodeError(b[0:1], "invalid character at start of key: %c", b[0])
 	}
 }
 
@@ -858,9 +848,6 @@ byteLoop:
 			kind = ast.LocalDateTime
 		}
 	} else {
-		if hasTz {
-			return ast.Reference{}, nil, newDecodeError(b, "date-time has timezone but not time component")
-		}
 		kind = ast.LocalDate
 	}
 
@@ -981,26 +968,9 @@ func isValidBinaryRune(r byte) bool {
 }
 
 func expect(x byte, b []byte) ([]byte, error) {
-	if len(b) == 0 {
-		return nil, newDecodeError(b[:0], "expecting %#U", x)
-	}
-
 	if b[0] != x {
 		return nil, newDecodeError(b[0:1], "expected character %U", x)
 	}
 
 	return b[1:], nil
-}
-
-type unexpectedCharacter struct {
-	r byte
-	b []byte
-}
-
-func (u unexpectedCharacter) Error() string {
-	if len(u.b) == 0 {
-		return fmt.Sprintf("expected %#U, not EOF", u.r)
-	}
-
-	return fmt.Sprintf("expected %#U, not %#U", u.r, u.b[0])
 }
