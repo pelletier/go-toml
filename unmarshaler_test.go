@@ -1230,6 +1230,10 @@ world'`,
 			data: `a = 0n`,
 		},
 		{
+			desc: `invalid unquoted key`,
+			data: `a`,
+		},
+		{
 			desc: "dt with tz has no time",
 			data: `a = 2021-03-30TZ`,
 		},

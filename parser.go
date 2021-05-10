@@ -204,6 +204,10 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 
 	b = p.parseWhitespace(b)
 
+	if len(b) == 0 {
+		return ast.Reference{}, nil, newDecodeError(b, "expected = after a key, but the document ends there")
+	}
+
 	b, err = expect('=', b)
 	if err != nil {
 		return ast.Reference{}, nil, err
@@ -641,7 +645,8 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 	case b[0] == '"':
 		return p.parseBasicString(b)
 	case isUnquotedKeyChar(b[0]):
-		return scanUnquotedKey(b)
+		key, rest = scanUnquotedKey(b)
+		return key, rest, nil
 	default:
 		return nil, nil, newDecodeError(b[0:1], "invalid character at start of key: %c", b[0])
 	}

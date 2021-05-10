@@ -30,15 +30,15 @@ func scanFollowsNan(b []byte) bool {
 	return scanFollows(b, `nan`)
 }
 
-func scanUnquotedKey(b []byte) ([]byte, []byte, error) {
+func scanUnquotedKey(b []byte) ([]byte, []byte) {
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	for i := 0; i < len(b); i++ {
 		if !isUnquotedKeyChar(b[i]) {
-			return b[:i], b[i:], nil
+			return b[:i], b[i:]
 		}
 	}
 
-	return b, b[len(b):], nil
+	return b, b[len(b):]
 }
 
 func isUnquotedKeyChar(r byte) bool {
