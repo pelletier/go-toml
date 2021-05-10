@@ -107,7 +107,7 @@ func (e *DecodeError) Key() Key {
 func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 	offset := unsafe.SubsliceOffset(document, de.highlight)
 
-	errMessage := de.message
+	errMessage := de.Error()
 	errLine, errColumn := positionAtEnd(document[:offset])
 	before, after := linesOfContext(document, de.highlight, offset, 3)
 
