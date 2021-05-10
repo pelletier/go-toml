@@ -863,6 +863,49 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "array of int in map",
+			input: `A = [1,2,3]`,
+			gen: func() test {
+				return test{
+					target:   &map[string][3]int{},
+					expected: &map[string][3]int{"A": {1, 2, 3}},
+				}
+			},
+		},
+		{
+			desc:  "array of int in map with too many elements",
+			input: `A = [1,2,3,4,5]`,
+			gen: func() test {
+				return test{
+					target:   &map[string][3]int{},
+					expected: &map[string][3]int{"A": {1, 2, 3}},
+				}
+			},
+		},
+		{
+			desc:  "array of int in map with invalid element",
+			input: `A = [1,2,false]`,
+			gen: func() test {
+				return test{
+					target: &map[string][3]int{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "array of int in struct",
+			input: `A = [1,2,3]`,
+			gen: func() test {
+				type s struct {
+					A [3]int
+				}
+				return test{
+					target:   &s{},
+					expected: &s{A: [3]int{1, 2, 3}},
+				}
+			},
+		},
+		{
 			desc:  "assign bool to float",
 			input: `A = true`,
 			gen: func() test {
@@ -1028,7 +1071,6 @@ B = "data"`,
 	}
 }
 
-//nolint:funlen
 func TestUnmarshalOverflows(t *testing.T) {
 	examples := []struct {
 		t      interface{}
