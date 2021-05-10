@@ -181,6 +181,22 @@ line 5`,
 	}
 }
 
+func TestDecodeError_Accessors(t *testing.T) {
+	e := DecodeError{
+		message: "foo",
+		line:    1,
+		column:  2,
+		key:     []string{"one", "two"},
+		human:   "bar",
+	}
+	assert.Equal(t, "toml: foo", e.Error())
+	r, c := e.Position()
+	assert.Equal(t, 1, r)
+	assert.Equal(t, 2, c)
+	assert.Equal(t, Key{"one", "two"}, e.Key())
+	assert.Equal(t, "bar", e.String())
+}
+
 func ExampleDecodeError() {
 	doc := `name = 123__456`
 

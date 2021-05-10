@@ -105,10 +105,6 @@ func (e *DecodeError) Key() Key {
 // highlight can be freely deallocated.
 //nolint:funlen
 func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
-	if de == nil {
-		return nil
-	}
-
 	offset := unsafe.SubsliceOffset(document, de.highlight)
 
 	errMessage := de.message
