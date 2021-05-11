@@ -226,7 +226,9 @@ func tomlValueStringRepresentation(v interface{}, commented string, indent strin
 }
 
 func getTreeArrayLine(trees []*Tree) (line int) {
-	// get lowest line number that is not 0
+	// Prevent returning 0 for empty trees
+	line = int(^uint(0) >> 1)
+	// get lowest line number >= 0
 	for _, tv := range trees {
 		if tv.position.Line < line || line == 0 {
 			line = tv.position.Line

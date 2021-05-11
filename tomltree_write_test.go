@@ -364,6 +364,55 @@ c = nan`
 	}
 }
 
+func TestOrderedEmptyTrees(t *testing.T) {
+	type val struct {
+		Key string `toml:"key"`
+	}
+	type structure struct {
+		First val   `toml:"first"`
+		Empty []val `toml:"empty"`
+	}
+	input := structure{First: val{Key: "value"}}
+	buf := new(bytes.Buffer)
+	err := NewEncoder(buf).Order(OrderPreserve).Encode(input)
+	if err != nil {
+		t.Fatal("failed to encode input")
+	}
+	expected := `
+[first]
+  key = "value"
+`
+	if expected != buf.String() {
+		t.Fatal("expected and encoded body aren't equal: ", expected, buf.String())
+	}
+}
+
+func TestOrderedNonIncreasedLine(t *testing.T) {
+	type NiceMap map[string]string
+	type Manifest struct {
+		NiceMap `toml:"dependencies"`
+		Build   struct {
+			BuildCommand string `toml:"build-command"`
+		} `toml:"build"`
+	}
+
+	test := &Manifest{}
+	test.Build.BuildCommand = "test"
+	buf := new(bytes.Buffer)
+	if err := NewEncoder(buf).Order(OrderPreserve).Encode(test); err != nil {
+		panic(err)
+	}
+	expected := `
+[dependencies]
+
+[build]
+  build-command = "test"
+`
+	if expected != buf.String() {
+		t.Fatal("expected and encoded body aren't equal: ", expected, buf.String())
+	}
+}
+
 func TestIssue290(t *testing.T) {
 	tomlString :=
 		`[table]
