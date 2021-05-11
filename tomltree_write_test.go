@@ -387,6 +387,32 @@ func TestOrderedEmptyTrees(t *testing.T) {
 	}
 }
 
+func TestOrderedNonIncreasedLine(t *testing.T) {
+	type NiceMap map[string]string
+	type Manifest struct {
+		NiceMap `toml:"dependencies"`
+		Build   struct {
+			BuildCommand string `toml:"build-command"`
+		} `toml:"build"`
+	}
+
+	test := &Manifest{}
+	test.Build.BuildCommand = "test"
+	buf := new(bytes.Buffer)
+	if err := NewEncoder(buf).Order(OrderPreserve).Encode(test); err != nil {
+		panic(err)
+	}
+	expected := `
+[dependencies]
+
+[build]
+  build-command = "test"
+`
+	if expected != buf.String() {
+		t.Fatal("expected and encoded body aren't equal: ", expected, buf.String())
+	}
+}
+
 func TestIssue290(t *testing.T) {
 	tomlString :=
 		`[table]

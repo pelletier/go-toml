@@ -591,6 +591,7 @@ func (e *Encoder) wrapTomlValue(val interface{}, parent *Tree) interface{} {
 	_, isTree := val.(*Tree)
 	_, isTreeS := val.([]*Tree)
 	if isTree || isTreeS {
+		e.line++
 		return val
 	}
 
