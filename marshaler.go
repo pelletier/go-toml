@@ -640,8 +640,6 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	return b, nil
 }
 
-var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
-
 func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
 	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
 		return false

@@ -26,7 +26,6 @@ func cmpEqual(x, y interface{}) bool {
 }
 
 func TestDates(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		date     LocalDate
@@ -64,7 +63,6 @@ func TestDates(t *testing.T) {
 }
 
 func TestDateIsValid(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		date LocalDate
@@ -91,7 +89,6 @@ func TestDateIsValid(t *testing.T) {
 }
 
 func TestParseDate(t *testing.T) {
-	t.Parallel()
 
 	var emptyDate LocalDate
 
@@ -118,7 +115,6 @@ func TestParseDate(t *testing.T) {
 }
 
 func TestDateArithmetic(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		desc  string
@@ -180,7 +176,6 @@ func TestDateArithmetic(t *testing.T) {
 }
 
 func TestDateBefore(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		d1, d2 LocalDate
@@ -198,7 +193,6 @@ func TestDateBefore(t *testing.T) {
 }
 
 func TestDateAfter(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		d1, d2 LocalDate
@@ -215,7 +209,6 @@ func TestDateAfter(t *testing.T) {
 }
 
 func TestTimeToString(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		str       string
@@ -249,7 +242,6 @@ func TestTimeToString(t *testing.T) {
 }
 
 func TestTimeOf(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		time time.Time
@@ -265,7 +257,6 @@ func TestTimeOf(t *testing.T) {
 }
 
 func TestTimeIsValid(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		time LocalTime
@@ -291,7 +282,6 @@ func TestTimeIsValid(t *testing.T) {
 }
 
 func TestDateTimeToString(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		str       string
@@ -323,7 +313,6 @@ func TestDateTimeToString(t *testing.T) {
 }
 
 func TestParseDateTimeErrors(t *testing.T) {
-	t.Parallel()
 
 	for _, str := range []string{
 		"",
@@ -339,7 +328,6 @@ func TestParseDateTimeErrors(t *testing.T) {
 }
 
 func TestDateTimeOf(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		time time.Time
@@ -361,7 +349,6 @@ func TestDateTimeOf(t *testing.T) {
 }
 
 func TestDateTimeIsValid(t *testing.T) {
-	t.Parallel()
 
 	// No need to be exhaustive here; it's just LocalDate.IsValid && LocalTime.IsValid.
 	for _, test := range []struct {
@@ -380,7 +367,6 @@ func TestDateTimeIsValid(t *testing.T) {
 }
 
 func TestDateTimeIn(t *testing.T) {
-	t.Parallel()
 
 	dt := LocalDateTime{LocalDate{2016, 1, 2}, LocalTime{3, 4, 5, 6}}
 
@@ -391,7 +377,6 @@ func TestDateTimeIn(t *testing.T) {
 }
 
 func TestDateTimeBefore(t *testing.T) {
-	t.Parallel()
 
 	d1 := LocalDate{2016, 12, 31}
 	d2 := LocalDate{2017, 1, 1}
@@ -414,7 +399,6 @@ func TestDateTimeBefore(t *testing.T) {
 }
 
 func TestDateTimeAfter(t *testing.T) {
-	t.Parallel()
 
 	d1 := LocalDate{2016, 12, 31}
 	d2 := LocalDate{2017, 1, 1}
@@ -437,7 +421,6 @@ func TestDateTimeAfter(t *testing.T) {
 }
 
 func TestMarshalJSON(t *testing.T) {
-	t.Parallel()
 
 	for _, test := range []struct {
 		value interface{}
@@ -459,7 +442,6 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 func TestUnmarshalJSON(t *testing.T) {
-	t.Parallel()
 
 	var (
 		d  LocalDate

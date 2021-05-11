@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"reflect"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
-	"github.com/pelletier/go-toml/v2/internal/unsafe"
 )
 
 // Unmarshal deserializes a TOML document into a Go value.
@@ -20,9 +22,9 @@ import (
 func Unmarshal(data []byte, v interface{}) error {
 	p := parser{}
 	p.Reset(data)
-	d := decoder{}
+	d := decoder{p: &p}
 
-	return d.FromParser(&p, v)
+	return d.FromParser(v)
 }
 
 // Decoder reads and decode a TOML document from an input stream.
@@ -93,16 +95,34 @@ func (d *Decoder) Decode(v interface{}) error {
 	p := parser{}
 	p.Reset(b)
 	dec := decoder{
+		p: &p,
 		strict: strict{
 			Enabled: d.strict,
 		},
 	}
 
-	return dec.FromParser(&p, v)
+	return dec.FromParser(v)
 }
 
 type decoder struct {
+	// Which parser instance in use for this decoding session.
+	// TODO: Think about removing later.
+	p *parser
+
+	// Flag indicating that the current expression is stashed.
+	// If set to true, calling nextExpr will not actually pull a new expression
+	// but turn off the flag instead.
+	stashedExpr bool
+
+	// Skip expressions until a table is found. This is set to true when a
+	// table could not be create (missing field in map), so all KV expressions
+	// need to be skipped.
+	skipUntilTable bool
+
 	// Tracks position in Go arrays.
+	// This is used when decoding [[array tables]] into Go arrays. Given array
+	// tables are separate TOML expression, we need to keep track of where we
+	// are at in the Go array, as we can't just introspect its size.
 	arrayIndexes map[reflect.Value]int
 
 	// Tracks keys that have been seen, with which type.
@@ -110,6 +130,22 @@ type decoder struct {
 
 	// Strict mode
 	strict strict
+}
+
+func (d *decoder) expr() ast.Node {
+	return d.p.Expression()
+}
+
+func (d *decoder) nextExpr() bool {
+	if d.stashedExpr {
+		d.stashedExpr = false
+		return true
+	}
+	return d.p.NextExpression()
+}
+
+func (d *decoder) stashExpr() {
+	d.stashedExpr = true
 }
 
 func (d *decoder) arrayIndex(shouldAppend bool, v reflect.Value) int {
@@ -129,40 +165,7 @@ func (d *decoder) arrayIndex(shouldAppend bool, v reflect.Value) int {
 	return idx
 }
 
-func (d *decoder) FromParser(p *parser, v interface{}) error {
-	err := d.fromParser(p, v)
-	if err == nil {
-		return d.strict.Error(p.data)
-	}
-
-	var e *decodeError
-	if errors.As(err, &e) {
-		return wrapDecodeError(p.data, e)
-	}
-
-	return err
-}
-
-func keyLocation(node ast.Node) []byte {
-	k := node.Key()
-
-	hasOne := k.Next()
-	if !hasOne {
-		panic("should not be called with empty key")
-	}
-
-	start := k.Node().Data
-	end := k.Node().Data
-
-	for k.Next() {
-		end = k.Node().Data
-	}
-
-	return unsafe.BytesRange(start, end)
-}
-
-//nolint:funlen,cyclop
-func (d *decoder) fromParser(p *parser, v interface{}) error {
+func (d *decoder) FromParser(v interface{}) error {
 	r := reflect.ValueOf(v)
 	if r.Kind() != reflect.Ptr {
 		return fmt.Errorf("toml: decoding can only be performed into a pointer, not %s", r.Kind())
@@ -172,172 +175,369 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 		return fmt.Errorf("toml: decoding pointer target cannot be nil")
 	}
 
-	var (
-		skipUntilTable bool
-		root           target = valueTarget(r.Elem())
-	)
+	err := d.fromParser(r.Elem())
+	if err == nil {
+		return d.strict.Error(d.p.data)
+	}
 
-	current := root
+	var e *decodeError
+	if errors.As(err, &e) {
+		return wrapDecodeError(d.p.data, e)
+	}
 
-	for p.NextExpression() {
-		node := p.Expression()
+	return err
+}
 
-		if node.Kind == ast.KeyValue && skipUntilTable {
-			continue
-		}
-
-		err := d.seen.CheckExpression(node)
+func (d *decoder) fromParser(root reflect.Value) error {
+	for d.nextExpr() {
+		err := d.handleRootExpression(d.expr(), root)
 		if err != nil {
 			return err
 		}
-
-		var found bool
-
-		switch node.Kind {
-		case ast.KeyValue:
-			err = d.unmarshalKeyValue(current, node)
-			found = true
-		case ast.Table:
-			skipUntilTable = false
-			d.strict.EnterTable(node)
-
-			current, found, err = d.scopeWithKey(root, node.Key())
-			if err == nil && found {
-				// In case this table points to an interface,
-				// make sure it at least holds something that
-				// looks like a table. Otherwise the information
-				// of a table is lost, and marshal cannot do the
-				// round trip.
-				ensureMapIfInterface(current)
-			}
-		case ast.ArrayTable:
-			skipUntilTable = false
-			d.strict.EnterArrayTable(node)
-			current, found, err = d.scopeWithArrayTable(root, node.Key())
-		default:
-			panic(fmt.Sprintf("this should not be a top level node type: %s", node.Kind))
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if !found {
-			skipUntilTable = true
-
-			d.strict.MissingTable(node)
-		}
 	}
 
-	return p.Error()
+	return d.p.Error()
 }
 
-// scopeWithKey performs target scoping when unmarshaling an ast.KeyValue node.
-//
-// The goal is to hop from target to target recursively using the names in key.
-// Parts of the key should be used to resolve field names for structs, and as
-// keys when targeting maps.
-//
-// When encountering slices, it should always use its last element, and error
-// if the slice does not have any.
-func (d *decoder) scopeWithKey(x target, key ast.Iterator) (target, bool, error) {
-	var (
-		err   error
-		found bool
-	)
+/*
+Rules for the unmarshal code:
 
-	for key.Next() {
-		n := key.Node()
+- The stack is used to keep track of which values need to be set where.
+- handle* functions <=> switch on a given ast.Kind.
+- unmarshalX* functions need to unmarshal a node of kind X.
+- An "object" is either a struct or a map.
+*/
 
-		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
-		if err != nil || !found {
-			return nil, found, err
-		}
+func (d *decoder) handleRootExpression(expr ast.Node, v reflect.Value) error {
+	if !expr.Valid() {
+		panic("should only be called with a valid expression")
 	}
 
-	return x, true, nil
-}
+	var x reflect.Value
+	var err error
 
-//nolint:cyclop
-// scopeWithArrayTable performs target scoping when unmarshaling an
-// ast.ArrayTable node.
-//
-// It is the same as scopeWithKey, but when scoping the last part of the key
-// it creates a new element in the array instead of using the last one.
-func (d *decoder) scopeWithArrayTable(x target, key ast.Iterator) (target, bool, error) {
-	var (
-		err   error
-		found bool
-	)
-
-	for key.Next() {
-		n := key.Node()
-		if !n.Next().Valid() { // want to stop at one before last
-			break
-		}
-
-		x, found, err = d.scopeTableTarget(false, x, string(n.Data))
-		if err != nil || !found {
-			return nil, found, err
-		}
-	}
-
-	n := key.Node()
-
-	x, found, err = d.scopeTableTarget(false, x, string(n.Data))
-	if err != nil || !found {
-		return x, found, err
-	}
-
-	v := x.get()
-
-	if v.Kind() == reflect.Ptr {
-		x = scopePtr(x)
-		v = x.get()
-	}
-
-	if v.Kind() == reflect.Interface {
-		x = scopeInterface(true, x)
-		v = x.get()
-	}
-
-	switch v.Kind() {
-	case reflect.Slice:
-		x = scopeSlice(true, x)
-	case reflect.Array:
-		x, err = d.scopeArray(true, x)
-	default:
-	}
-
-	return x, found, err
-}
-
-func (d *decoder) unmarshalKeyValue(x target, node ast.Node) error {
-	assertNode(ast.KeyValue, node)
-
-	d.strict.EnterKeyValue(node)
-	defer d.strict.ExitKeyValue(node)
-
-	x, found, err := d.scopeWithKey(x, node.Key())
+	err = d.seen.CheckExpression(expr)
 	if err != nil {
 		return err
 	}
 
-	// A struct in the path was not found. Skip this value.
-	if !found {
-		d.strict.MissingField(node)
-
-		return nil
+	switch expr.Kind {
+	case ast.KeyValue:
+		if d.skipUntilTable {
+			return nil
+		}
+		x, err = d.handleKeyValue(expr, v)
+	case ast.Table:
+		d.skipUntilTable = false
+		d.strict.EnterTable(expr)
+		x, err = d.handleTable(expr.Key(), v)
+	case ast.ArrayTable:
+		d.skipUntilTable = false
+		d.strict.EnterArrayTable(expr)
+		x, err = d.handleArrayTable(expr.Key(), v)
+	default:
+		panic(fmt.Errorf("parser should not permit expression of kind %s at document root", expr.Kind))
 	}
 
-	return d.unmarshalValue(x, node.Value())
+	if d.skipUntilTable {
+		if expr.Kind == ast.Table || expr.Kind == ast.ArrayTable {
+			d.strict.MissingTable(expr)
+		}
+	} else if err == nil && x.IsValid() {
+		v.Set(x)
+	}
+
+	return err
 }
 
-var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
+func (d *decoder) handleArrayTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	if key.Next() {
+		return d.handleArrayTablePart(key, v)
+	}
+	return d.handleKeyValues(v)
+}
 
-func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
-	v := x.get()
+func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	switch v.Kind() {
+	case reflect.Interface:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			elem = reflect.New(sliceInterfaceType).Elem()
+			elem.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+		} else if elem.Kind() == reflect.Slice {
+			if elem.Type() != sliceInterfaceType {
+				elem = reflect.New(sliceInterfaceType).Elem()
+				elem.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+			} else if !elem.CanSet() {
+				nelem := reflect.New(sliceInterfaceType).Elem()
+				nelem.Set(reflect.MakeSlice(sliceInterfaceType, elem.Len(), elem.Cap()))
+				reflect.Copy(nelem, elem)
+				elem = nelem
+			}
+		}
+		return d.handleArrayTableCollection(key, elem)
+	case reflect.Ptr:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			ptr := reflect.New(v.Type().Elem())
+			v.Set(ptr)
+			elem = ptr.Elem()
+		}
 
+		elem, err := d.handleArrayTableCollection(key, elem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		v.Elem().Set(elem)
+
+		return v, nil
+	case reflect.Slice:
+		elem := reflect.New(v.Type().Elem()).Elem()
+		elem2, err := d.handleArrayTable(key, elem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if elem2.IsValid() {
+			elem = elem2
+		}
+		return reflect.Append(v, elem), nil
+	case reflect.Array:
+		idx := d.arrayIndex(true, v)
+		if idx >= v.Len() {
+			return v, fmt.Errorf("toml: cannot decode array table into %s at position %d", v.Type(), idx)
+		}
+		elem := v.Index(idx)
+		_, err := d.handleArrayTable(key, elem)
+		return v, err
+	}
+
+	return d.handleArrayTable(key, v)
+}
+
+// When parsing an array table expression, each part of the key needs to be
+// evaluated like a normal key, but if it returns a collection, it also needs to
+// point to the last element of the collection. Unless it is the last part of
+// the key, then it needs to create a new element at the end.
+func (d *decoder) handleArrayTableCollection(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	if !key.Node().Next().Valid() {
+		return d.handleArrayTableCollectionLast(key, v)
+	}
+
+	switch v.Kind() {
+	case reflect.Ptr:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			ptr := reflect.New(v.Type().Elem())
+			v.Set(ptr)
+			elem = ptr.Elem()
+		}
+
+		elem, err := d.handleArrayTableCollection(key, elem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		v.Elem().Set(elem)
+
+		return v, nil
+	case reflect.Slice:
+		elem := v.Index(v.Len() - 1)
+		x, err := d.handleArrayTable(key, elem)
+		if err != nil || d.skipUntilTable {
+			return reflect.Value{}, err
+		}
+		if x.IsValid() {
+			elem.Set(x)
+		}
+
+		return v, err
+	case reflect.Array:
+		idx := d.arrayIndex(false, v)
+		if idx >= v.Len() {
+			return v, fmt.Errorf("toml: cannot decode array table into %s at position %d", v.Type(), idx)
+		}
+		elem := v.Index(idx)
+		_, err := d.handleArrayTable(key, elem)
+		return v, err
+	}
+
+	return d.handleArrayTable(key, v)
+}
+
+func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
+	var rv reflect.Value
+
+	// First, dispatch over v to make sure it is a valid object.
+	// There is no guarantee over what it could be.
+	switch v.Kind() {
+	case reflect.Map:
+		// Create the key for the map element. For now assume it's a string.
+		mk := reflect.ValueOf(string(key.Node().Data))
+
+		// If the map does not exist, create it.
+		if v.IsNil() {
+			v = reflect.MakeMap(v.Type())
+			rv = v
+		}
+
+		mv := v.MapIndex(mk)
+		set := false
+		if !mv.IsValid() {
+			// If there is no value in the map, create a new one according to
+			// the map type. If the element type is interface, create either a
+			// map[string]interface{} or a []interface{} depending on whether
+			// this is the last part of the array table key.
+
+			t := v.Type().Elem()
+			if t.Kind() == reflect.Interface {
+				mv = makeFn()
+			} else {
+				mv = reflect.New(t).Elem()
+			}
+			set = true
+		} else if mv.Kind() == reflect.Interface {
+			mv = mv.Elem()
+			if !mv.IsValid() {
+				mv = makeFn()
+			}
+			set = true
+		}
+
+		x, err := nextFn(key, mv)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		if x.IsValid() {
+			mv = x
+			set = true
+		}
+
+		if set {
+			v.SetMapIndex(mk, mv)
+		}
+	case reflect.Struct:
+		f, found := structField(v, string(key.Node().Data))
+		if !found {
+			d.skipUntilTable = true
+			return reflect.Value{}, nil
+		}
+
+		x, err := nextFn(key, f)
+		if err != nil || d.skipUntilTable {
+			return reflect.Value{}, err
+		}
+		if x.IsValid() {
+			f.Set(x)
+		}
+	case reflect.Interface:
+		if v.Elem().IsValid() {
+			v = v.Elem()
+		} else {
+			v = reflect.MakeMap(mapStringInterfaceType)
+		}
+
+		x, err := d.handleKeyPart(key, v, nextFn, makeFn)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if x.IsValid() {
+			v = x
+		}
+		rv = v
+	default:
+		panic(fmt.Errorf("unhandled part: %s", v.Kind()))
+	}
+
+	return rv, nil
+}
+
+// HandleArrayTablePart navigates the Go structure v using the key v. It is
+// only used for the prefix (non-last) parts of an array-table. When
+// encountering a collection, it should go to the last element.
+//
+// TODO: this function is basically a copy-paste from handleArrayPart.
+//   Find a way to refactor.
+func (d *decoder) handleArrayTablePart(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	var makeFn valueMakerFn
+	last := !key.Node().Next().Valid()
+	if last {
+		makeFn = makeSliceInterface
+	} else {
+		makeFn = makeMapStringInterface
+	}
+	return d.handleKeyPart(key, v, d.handleArrayTableCollection, makeFn)
+}
+
+// HandleTable returns a reference when it has checked the next expression but
+// cannot handle it.
+func (d *decoder) handleTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	if v.Kind() == reflect.Slice {
+		elem := v.Index(v.Len() - 1)
+		x, err := d.handleTable(key, elem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if x.IsValid() {
+			elem.Set(x)
+		}
+		return reflect.Value{}, nil
+	}
+	if key.Next() {
+		// Still scoping the key
+		return d.handleTablePart(key, v)
+	}
+	// Done scoping the key.
+	// Now handle all the key-value expressions in this table.
+	return d.handleKeyValues(v)
+}
+
+// Handle root expressions until the end of the document or the next
+// non-key-value.
+func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
+	var rv reflect.Value
+	for d.nextExpr() {
+		expr := d.expr()
+		if expr.Kind != ast.KeyValue {
+			// Stash the expression so that fromParser can just loop and use
+			// the right handler.
+			// We could just recurse ourselves here, but at least this gives a
+			// chance to pop the stack a bit.
+			d.stashExpr()
+			break
+		}
+
+		x, err := d.handleKeyValue(expr, v)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if x.IsValid() {
+			v = x
+			rv = x
+		}
+	}
+	return rv, nil
+}
+
+type (
+	handlerFn    func(key ast.Iterator, v reflect.Value) (reflect.Value, error)
+	valueMakerFn func() reflect.Value
+)
+
+func makeMapStringInterface() reflect.Value {
+	return reflect.MakeMap(mapStringInterfaceType)
+}
+
+func makeSliceInterface() reflect.Value {
+	mv := reflect.New(sliceInterfaceType).Elem()
+	mv.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+	return mv
+}
+
+func (d *decoder) handleTablePart(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	return d.handleKeyPart(key, v, d.handleTable, makeMapStringInterface)
+}
+
+func tryTextUnmarshaler(node ast.Node, v reflect.Value) (bool, error) {
 	if v.Kind() != reflect.Struct {
 		return false, nil
 	}
@@ -351,7 +551,11 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	if v.Type().Implements(textUnmarshalerType) {
 		err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
+			return false, fmt.Errorf("toml: error calling UnmarshalText: %w", err)
+			// TODO: use newDecodeError.
+			//   Problem: node.Data is pointing to a parsed string, so it is
+			//   not a reference to the doc anymore.
+			// return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
 		}
 
 		return true, nil
@@ -360,7 +564,9 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
+			return false, fmt.Errorf("toml: error calling UnmarshalText: %w", err)
+			// TODO: same as above
+			// return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
 		}
 
 		return true, nil
@@ -369,65 +575,189 @@ func tryTextUnmarshaler(x target, node ast.Node) (bool, error) {
 	return false, nil
 }
 
-//nolint:cyclop
-func (d *decoder) unmarshalValue(x target, node ast.Node) error {
-	v := x.get()
+func (d *decoder) handleValue(value ast.Node, v reflect.Value) error {
+	assertSettable(v)
 
-	if v.Kind() == reflect.Ptr {
-		if !v.Elem().IsValid() {
-			x.set(reflect.New(v.Type().Elem()))
-			v = x.get()
-		}
-
-		return d.unmarshalValue(valueTarget(v.Elem()), node)
+	for v.Kind() == reflect.Ptr {
+		v = initAndDereferencePointer(v)
 	}
 
-	ok, err := tryTextUnmarshaler(x, node)
-	if ok {
+	ok, err := tryTextUnmarshaler(value, v)
+	if ok || err != nil {
 		return err
 	}
 
-	switch node.Kind {
+	switch value.Kind {
 	case ast.String:
-		return unmarshalString(x, node)
-	case ast.Bool:
-		return unmarshalBool(x, node)
+		return d.unmarshalString(value, v)
 	case ast.Integer:
-		return unmarshalInteger(x, node)
+		return d.unmarshalInteger(value, v)
 	case ast.Float:
-		return unmarshalFloat(x, node)
-	case ast.Array:
-		return d.unmarshalArray(x, node)
-	case ast.InlineTable:
-		return d.unmarshalInlineTable(x, node)
-	case ast.LocalDateTime:
-		return unmarshalLocalDateTime(x, node)
+		return d.unmarshalFloat(value, v)
+	case ast.Bool:
+		return d.unmarshalBool(value, v)
 	case ast.DateTime:
-		return unmarshalDateTime(x, node)
+		return d.unmarshalDateTime(value, v)
 	case ast.LocalDate:
-		return unmarshalLocalDate(x, node)
+		return d.unmarshalLocalDate(value, v)
+	case ast.LocalDateTime:
+		return d.unmarshalLocalDateTime(value, v)
+	case ast.InlineTable:
+		return d.unmarshalInlineTable(value, v)
+	case ast.Array:
+		return d.unmarshalArray(value, v)
 	default:
-		panic(fmt.Sprintf("unhandled node kind %s", node.Kind))
+		panic(fmt.Errorf("handleValue not implemented for %s", value.Kind))
 	}
 }
 
-func unmarshalLocalDate(x target, node ast.Node) error {
-	assertNode(ast.LocalDate, node)
+func (d *decoder) unmarshalArray(array ast.Node, v reflect.Value) error {
+	assertNode(ast.Array, array)
 
-	v, err := parseLocalDate(node.Data)
-	if err != nil {
-		return err
+	switch v.Kind() {
+	case reflect.Slice:
+		if v.IsNil() {
+			v.Set(reflect.MakeSlice(v.Type(), 0, 16))
+		} else {
+			v.SetLen(0)
+		}
+	case reflect.Array:
+		// arrays are always initialized
+	case reflect.Interface:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			elem = reflect.New(sliceInterfaceType).Elem()
+			elem.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+		} else if elem.Kind() == reflect.Slice {
+			if elem.Type() != sliceInterfaceType {
+				elem = reflect.New(sliceInterfaceType).Elem()
+				elem.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+			} else if !elem.CanSet() {
+				nelem := reflect.New(sliceInterfaceType).Elem()
+				nelem.Set(reflect.MakeSlice(sliceInterfaceType, elem.Len(), elem.Cap()))
+				reflect.Copy(nelem, elem)
+				elem = nelem
+			}
+		}
+		err := d.unmarshalArray(array, elem)
+		if err != nil {
+			return err
+		}
+		v.Set(elem)
+		return nil
+	default:
+		// TODO: use newDecodeError, but first the parser needs to fill
+		//   array.Data.
+		return fmt.Errorf("toml: cannot store array in Go type %s", v.Kind())
 	}
 
-	setDate(x, v)
+	elemType := v.Type().Elem()
+
+	it := array.Children()
+	idx := 0
+	for it.Next() {
+		n := it.Node()
+
+		// TODO: optimize
+		if v.Kind() == reflect.Slice {
+			elem := reflect.New(elemType).Elem()
+
+			err := d.handleValue(n, elem)
+			if err != nil {
+				return err
+			}
+
+			v.Set(reflect.Append(v, elem))
+		} else { // array
+			if idx >= v.Len() {
+				return nil
+			}
+			elem := v.Index(idx)
+			err := d.handleValue(n, elem)
+			if err != nil {
+				return err
+			}
+			idx++
+		}
+	}
 
 	return nil
 }
 
-func unmarshalLocalDateTime(x target, node ast.Node) error {
-	assertNode(ast.LocalDateTime, node)
+func (d *decoder) unmarshalInlineTable(itable ast.Node, v reflect.Value) error {
+	assertNode(ast.InlineTable, itable)
 
-	v, rest, err := parseLocalDateTime(node.Data)
+	// Make sure v is an initialized object.
+	switch v.Kind() {
+	case reflect.Map:
+		if v.IsNil() {
+			v.Set(reflect.MakeMap(v.Type()))
+		}
+	case reflect.Struct:
+	// structs are always initialized.
+	case reflect.Interface:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			elem = reflect.MakeMap(mapStringInterfaceType)
+			v.Set(elem)
+		}
+		return d.unmarshalInlineTable(itable, elem)
+	default:
+		return newDecodeError(itable.Data, "cannot store inline table in Go type %s", v.Kind())
+	}
+
+	it := itable.Children()
+	for it.Next() {
+		n := it.Node()
+
+		x, err := d.handleKeyValue(n, v)
+		if err != nil {
+			return err
+		}
+		if x.IsValid() {
+			v = x
+		}
+	}
+
+	return nil
+}
+
+func (d *decoder) unmarshalDateTime(value ast.Node, v reflect.Value) error {
+	assertNode(ast.DateTime, value)
+
+	dt, err := parseDateTime(value.Data)
+	if err != nil {
+		return err
+	}
+
+	v.Set(reflect.ValueOf(dt))
+	return nil
+}
+
+func (d *decoder) unmarshalLocalDate(value ast.Node, v reflect.Value) error {
+	assertNode(ast.LocalDate, value)
+
+	ld, err := parseLocalDate(value.Data)
+	if err != nil {
+		return err
+	}
+
+	if v.Type() == timeType {
+		cast := ld.In(time.Local)
+
+		v.Set(reflect.ValueOf(cast))
+		return nil
+	}
+
+	v.Set(reflect.ValueOf(ld))
+
+	return nil
+}
+
+func (d *decoder) unmarshalLocalDateTime(value ast.Node, v reflect.Value) error {
+	assertNode(ast.LocalDateTime, value)
+
+	ldt, rest, err := parseLocalDateTime(value.Data)
 	if err != nil {
 		return err
 	}
@@ -436,160 +766,389 @@ func unmarshalLocalDateTime(x target, node ast.Node) error {
 		return newDecodeError(rest, "extra characters at the end of a local date time")
 	}
 
-	setLocalDateTime(x, v)
+	if v.Type() == timeType {
+		cast := ldt.In(time.Local)
+
+		v.Set(reflect.ValueOf(cast))
+		return nil
+	}
+
+	v.Set(reflect.ValueOf(ldt))
 
 	return nil
 }
 
-func unmarshalDateTime(x target, node ast.Node) error {
-	assertNode(ast.DateTime, node)
+func (d *decoder) unmarshalBool(value ast.Node, v reflect.Value) error {
+	assertNode(ast.Bool, value)
+	b := value.Data[0] == 't'
 
-	v, err := parseDateTime(node.Data)
-	if err != nil {
-		return err
+	switch v.Kind() {
+	case reflect.Bool:
+		v.SetBool(b)
+	case reflect.Interface:
+		v.Set(reflect.ValueOf(b))
+	default:
+		return newDecodeError(value.Data, "cannot assign boolean to a %t", b)
 	}
-
-	setDateTime(x, v)
 
 	return nil
 }
 
-func setLocalDateTime(x target, v LocalDateTime) {
-	if x.get().Type() == timeType {
-		cast := v.In(time.Local)
+func (d *decoder) unmarshalFloat(value ast.Node, v reflect.Value) error {
+	assertNode(ast.Float, value)
 
-		setDateTime(x, cast)
-		return
-	}
-
-	x.set(reflect.ValueOf(v))
-}
-
-func setDateTime(x target, v time.Time) {
-	x.set(reflect.ValueOf(v))
-}
-
-var timeType = reflect.TypeOf(time.Time{})
-
-func setDate(x target, v LocalDate) {
-	if x.get().Type() == timeType {
-		cast := v.In(time.Local)
-
-		setDateTime(x, cast)
-		return
-	}
-
-	x.set(reflect.ValueOf(v))
-}
-
-func unmarshalString(x target, node ast.Node) error {
-	assertNode(ast.String, node)
-
-	return setString(x, string(node.Data))
-}
-
-func unmarshalBool(x target, node ast.Node) error {
-	assertNode(ast.Bool, node)
-	v := node.Data[0] == 't'
-
-	return setBool(x, v)
-}
-
-func unmarshalInteger(x target, node ast.Node) error {
-	assertNode(ast.Integer, node)
-
-	v, err := parseInteger(node.Data)
+	f, err := parseFloat(value.Data)
 	if err != nil {
 		return err
 	}
 
-	return setInt64(x, v)
-}
-
-func unmarshalFloat(x target, node ast.Node) error {
-	assertNode(ast.Float, node)
-
-	v, err := parseFloat(node.Data)
-	if err != nil {
-		return err
-	}
-
-	return setFloat64(x, v)
-}
-
-func (d *decoder) unmarshalInlineTable(x target, node ast.Node) error {
-	assertNode(ast.InlineTable, node)
-
-	ensureMapIfInterface(x)
-
-	it := node.Children()
-	for it.Next() {
-		n := it.Node()
-
-		err := d.unmarshalKeyValue(x, n)
-		if err != nil {
-			return err
+	switch v.Kind() {
+	case reflect.Float64:
+		v.SetFloat(f)
+	case reflect.Float32:
+		if f > math.MaxFloat32 {
+			return newDecodeError(value.Data, "number %f does not fit in a float32", f)
 		}
+		v.SetFloat(f)
+	case reflect.Interface:
+		v.Set(reflect.ValueOf(f))
+	default:
+		return newDecodeError(value.Data, "float cannot be assigned to %s", v.Kind())
 	}
 
 	return nil
 }
 
-func (d *decoder) unmarshalArray(x target, node ast.Node) error {
-	assertNode(ast.Array, node)
+func (d *decoder) unmarshalInteger(value ast.Node, v reflect.Value) error {
+	assertNode(ast.Integer, value)
 
-	err := ensureValueIndexable(x)
+	const (
+		maxInt = int64(^uint(0) >> 1)
+		minInt = -maxInt - 1
+	)
+
+	i, err := parseInteger(value.Data)
 	if err != nil {
 		return err
 	}
 
-	// Special work around when unmarshaling into an array.
-	// If the array is not addressable, for example when stored as a value in a
-	// map, calling elementAt in the inner function would fail.
-	// Instead, we allocate a new array that will be filled then inserted into
-	// the container.
-	// This problem does not exist with slices because they are addressable.
-	// There may be a better way of doing this, but it is not obvious to me
-	// with the target system.
-	if x.get().Kind() == reflect.Array {
-		container := x
-		newArrayPtr := reflect.New(x.get().Type())
-		x = valueTarget(newArrayPtr.Elem())
-		defer func() {
-			container.set(newArrayPtr.Elem())
-		}()
+	switch v.Kind() {
+	case reflect.Int64:
+		v.SetInt(i)
+	case reflect.Int32:
+		if i < math.MinInt32 || i > math.MaxInt32 {
+			return fmt.Errorf("toml: number %d does not fit in an int32", i)
+		}
+
+		v.Set(reflect.ValueOf(int32(i)))
+		return nil
+	case reflect.Int16:
+		if i < math.MinInt16 || i > math.MaxInt16 {
+			return fmt.Errorf("toml: number %d does not fit in an int16", i)
+		}
+
+		v.Set(reflect.ValueOf(int16(i)))
+	case reflect.Int8:
+		if i < math.MinInt8 || i > math.MaxInt8 {
+			return fmt.Errorf("toml: number %d does not fit in an int8", i)
+		}
+
+		v.Set(reflect.ValueOf(int8(i)))
+	case reflect.Int:
+		if i < minInt || i > maxInt {
+			return fmt.Errorf("toml: number %d does not fit in an int", i)
+		}
+
+		v.Set(reflect.ValueOf(int(i)))
+	case reflect.Uint64:
+		if i < 0 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint64", i)
+		}
+
+		v.Set(reflect.ValueOf(uint64(i)))
+	case reflect.Uint32:
+		if i < 0 || i > math.MaxUint32 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint32", i)
+		}
+
+		v.Set(reflect.ValueOf(uint32(i)))
+	case reflect.Uint16:
+		if i < 0 || i > math.MaxUint16 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint16", i)
+		}
+
+		v.Set(reflect.ValueOf(uint16(i)))
+	case reflect.Uint8:
+		if i < 0 || i > math.MaxUint8 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint8", i)
+		}
+
+		v.Set(reflect.ValueOf(uint8(i)))
+	case reflect.Uint:
+		if i < 0 {
+			return fmt.Errorf("toml: negative number %d does not fit in an uint", i)
+		}
+
+		v.Set(reflect.ValueOf(uint(i)))
+	case reflect.Interface:
+		v.Set(reflect.ValueOf(i))
+	default:
+		err = fmt.Errorf("toml: cannot store TOML integer into a Go %s", v.Kind())
 	}
 
-	return d.unmarshalArrayInner(x, node)
+	return err
 }
 
-func (d *decoder) unmarshalArrayInner(x target, node ast.Node) error {
-	idx := 0
+func (d *decoder) unmarshalString(value ast.Node, v reflect.Value) error {
+	assertNode(ast.String, value)
 
-	it := node.Children()
-	for it.Next() {
-		n := it.Node()
+	var err error
 
-		v := elementAt(x, idx)
+	switch v.Kind() {
+	case reflect.String:
+		v.SetString(string(value.Data))
+	case reflect.Interface:
+		v.Set(reflect.ValueOf(string(value.Data)))
+	default:
+		err = fmt.Errorf("toml: cannot store TOML string into a Go %s", v.Kind())
+	}
 
-		if v == nil {
-			// when we go out of bound for an array just stop processing it to
-			// mimic encoding/json
+	return err
+}
+
+func (d *decoder) handleKeyValue(expr ast.Node, v reflect.Value) (reflect.Value, error) {
+	d.strict.EnterKeyValue(expr)
+
+	v, err := d.handleKeyValueInner(expr.Key(), expr.Value(), v)
+	if d.skipUntilTable {
+		d.strict.MissingField(expr)
+		d.skipUntilTable = false
+	}
+
+	d.strict.ExitKeyValue(expr)
+
+	return v, err
+}
+
+func (d *decoder) handleKeyValueInner(key ast.Iterator, value ast.Node, v reflect.Value) (reflect.Value, error) {
+	if key.Next() {
+		// Still scoping the key
+		return d.handleKeyValuePart(key, value, v)
+	}
+	// Done scoping the key.
+	// v is whatever Go value we need to fill.
+	return reflect.Value{}, d.handleValue(value, v)
+}
+
+func (d *decoder) handleKeyValuePart(key ast.Iterator, value ast.Node, v reflect.Value) (reflect.Value, error) {
+	// contains the replacement for v
+	var rv reflect.Value
+
+	// First, dispatch over v to make sure it is a valid object.
+	// There is no guarantee over what it could be.
+	switch v.Kind() {
+	case reflect.Map:
+		mk := reflect.ValueOf(string(key.Node().Data))
+
+		keyType := v.Type().Key()
+		if !mk.Type().AssignableTo(keyType) {
+			if !mk.Type().ConvertibleTo(keyType) {
+				return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", mk.Type(), keyType)
+			}
+
+			mk = mk.Convert(keyType)
+		}
+
+		// If the map does not exist, create it.
+		if v.IsNil() {
+			v = reflect.MakeMap(v.Type())
+			rv = v
+		}
+
+		mv := v.MapIndex(mk)
+		set := false
+		if !mv.IsValid() {
+			set = true
+			mv = reflect.New(v.Type().Elem()).Elem()
+		} else {
+			last := !key.Node().Next().Valid()
+			if last {
+				var x interface{}
+				mv = reflect.ValueOf(&x).Elem()
+				set = true
+			}
+		}
+
+		nv, err := d.handleKeyValueInner(key, value, mv)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if nv.IsValid() {
+			mv = nv
+			set = true
+		}
+
+		if set {
+			v.SetMapIndex(mk, mv)
+		}
+	case reflect.Struct:
+		f, found := structField(v, string(key.Node().Data))
+		if !found {
+			d.skipUntilTable = true
 			break
 		}
 
-		err := d.unmarshalValue(v, n)
+		x, err := d.handleKeyValueInner(key, value, f)
 		if err != nil {
-			return err
+			return reflect.Value{}, err
 		}
 
-		idx++
+		if x.IsValid() {
+			f.Set(x)
+		}
+	case reflect.Interface:
+		v = v.Elem()
+
+		// Following encoding/toml: decoding an object into an interface{}, it
+		// needs to always hold a map[string]interface{}. This is for the types
+		// to be consistent whether a previous value was set or not.
+		if !v.IsValid() || v.Type() != mapStringInterfaceType {
+			v = reflect.MakeMap(mapStringInterfaceType)
+		}
+
+		x, err := d.handleKeyValuePart(key, value, v)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if x.IsValid() {
+			v = x
+		}
+		rv = v
+	case reflect.Ptr:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			ptr := reflect.New(v.Type().Elem())
+			v.Set(ptr)
+			rv = v
+			elem = ptr.Elem()
+		}
+
+		elem2, err := d.handleKeyValuePart(key, value, elem)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if elem2.IsValid() {
+			elem = elem2
+		}
+		v.Elem().Set(elem)
+	default:
+		return reflect.Value{}, fmt.Errorf("unhandled kv part: %s", v.Kind())
 	}
-	return nil
+
+	return rv, nil
+}
+
+func initAndDereferencePointer(v reflect.Value) reflect.Value {
+	var elem reflect.Value
+	if v.IsNil() {
+		ptr := reflect.New(v.Type().Elem())
+		v.Set(ptr)
+	}
+	elem = v.Elem()
+	return elem
+}
+
+type fieldPathsMap = map[string][]int
+
+type fieldPathsCache struct {
+	m map[reflect.Type]fieldPathsMap
+	l sync.RWMutex
+}
+
+func (c *fieldPathsCache) get(t reflect.Type) (fieldPathsMap, bool) {
+	c.l.RLock()
+	paths, ok := c.m[t]
+	c.l.RUnlock()
+
+	return paths, ok
+}
+
+func (c *fieldPathsCache) set(t reflect.Type, m fieldPathsMap) {
+	c.l.Lock()
+	c.m[t] = m
+	c.l.Unlock()
+}
+
+var globalFieldPathsCache = fieldPathsCache{
+	m: map[reflect.Type]fieldPathsMap{},
+	l: sync.RWMutex{},
+}
+
+func structField(v reflect.Value, name string) (reflect.Value, bool) {
+	//nolint:godox
+	// TODO: cache this, and reduce allocations
+	fieldPaths, ok := globalFieldPathsCache.get(v.Type())
+	if !ok {
+		fieldPaths = map[string][]int{}
+
+		path := make([]int, 0, 16)
+
+		var walk func(reflect.Value)
+		walk = func(v reflect.Value) {
+			t := v.Type()
+			for i := 0; i < t.NumField(); i++ {
+				l := len(path)
+				path = append(path, i)
+				f := t.Field(i)
+
+				if f.Anonymous {
+					walk(v.Field(i))
+				} else if f.PkgPath == "" {
+					// only consider exported fields
+					fieldName, ok := f.Tag.Lookup("toml")
+					if !ok {
+						fieldName = f.Name
+					}
+
+					pathCopy := make([]int, len(path))
+					copy(pathCopy, path)
+
+					fieldPaths[fieldName] = pathCopy
+					// extra copy for the case-insensitive match
+					fieldPaths[strings.ToLower(fieldName)] = pathCopy
+				}
+				path = path[:l]
+			}
+		}
+
+		walk(v)
+
+		globalFieldPathsCache.set(v.Type(), fieldPaths)
+	}
+
+	path, ok := fieldPaths[name]
+	if !ok {
+		path, ok = fieldPaths[strings.ToLower(name)]
+	}
+
+	if !ok {
+		return reflect.Value{}, false
+	}
+
+	return v.FieldByIndex(path), true
 }
 
 func assertNode(expected ast.Kind, node ast.Node) {
 	if node.Kind != expected {
 		panic(fmt.Sprintf("expected node of kind %s, not %s", expected, node.Kind))
+	}
+}
+
+func assertSettable(v reflect.Value) {
+	if !v.CanAddr() {
+		panic(fmt.Errorf("%s is not addressable (kind: %s)", v, v.Kind()))
+	}
+	if !v.CanSet() {
+		panic(fmt.Errorf("%s is not settable", v))
 	}
 }
