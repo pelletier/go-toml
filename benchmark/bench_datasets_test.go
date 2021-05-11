@@ -31,13 +31,14 @@ var bench_inputs = []struct {
 
 func TestUnmarshalDatasetCode(t *testing.T) {
 	for _, tc := range bench_inputs {
-		buf := fixture(t, tc.name)
 		t.Run(tc.name, func(t *testing.T) {
+			buf := fixture(t, tc.name)
+
 			var v interface{}
-			check(t, toml.Unmarshal(buf, &v))
+			require.NoError(t, toml.Unmarshal(buf, &v))
 
 			b, err := json.Marshal(v)
-			check(t, err)
+			require.NoError(t, err)
 			require.Equal(t, len(b), tc.jsonLen)
 		})
 	}
@@ -45,14 +46,14 @@ func TestUnmarshalDatasetCode(t *testing.T) {
 
 func BenchmarkUnmarshalDataset(b *testing.B) {
 	for _, tc := range bench_inputs {
-		buf := fixture(b, tc.name)
 		b.Run(tc.name, func(b *testing.B) {
+			buf := fixture(b, tc.name)
 			b.SetBytes(int64(len(buf)))
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				var v interface{}
-				check(b, toml.Unmarshal(buf, &v))
+				require.NoError(b, toml.Unmarshal(buf, &v))
 			}
 		})
 	}
@@ -60,22 +61,20 @@ func BenchmarkUnmarshalDataset(b *testing.B) {
 
 // fixture returns the uncompressed contents of path.
 func fixture(tb testing.TB, path string) []byte {
-	f, err := os.Open(filepath.Join("testdata", path+".toml.gz"))
-	check(tb, err)
+	tb.Helper()
+
+	file := path + ".toml.gz"
+	f, err := os.Open(filepath.Join("testdata", file))
+	if os.IsNotExist(err) {
+		tb.Skip("benchmark fixture not found:", file)
+	}
+	require.NoError(tb, err)
 	defer f.Close()
 
 	gz, err := gzip.NewReader(f)
-	check(tb, err)
+	require.NoError(tb, err)
 
 	buf, err := ioutil.ReadAll(gz)
-	check(tb, err)
-
+	require.NoError(tb, err)
 	return buf
-}
-
-func check(tb testing.TB, err error) {
-	if err != nil {
-		tb.Helper()
-		tb.Fatal(err)
-	}
 }

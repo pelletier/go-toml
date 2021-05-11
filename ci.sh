@@ -39,6 +39,9 @@ benchmark [OPTIONS...] [BRANCH]
         -d      Compare benchmarks of HEAD with BRANCH using benchstats. In
                 this form the BRANCH argument is required.
 
+        -a      Compare benchmarks of HEAD against go-toml v1 and
+                BurntSushi/toml.
+
 coverage [OPTIONS...] [BRANCH]
 
     Generates code coverage.
@@ -118,6 +121,7 @@ coverage() {
 bench() {
     branch="${1}"
     out="${2}"
+    replace="${3}"
     dir="$(mktemp -d)"
 
     stderr "Executing benchmark for ${branch} at ${dir}"
@@ -129,6 +133,15 @@ bench() {
     fi
 
     pushd "$dir"
+
+    if [ "${replace}" != "" ]; then
+        find ./benchmark/ -iname '*.go' -exec sed -i -E "s|github.com/pelletier/go-toml/v2|${replace}|g" {} \;
+        go get "${replace}"
+        # hack: remove canada.toml.gz because it is not supported by
+        # burntsushi, and replace is only used for benchmark -a
+        rm -f benchmark/testdata/canada.toml.gz
+    fi
+
     go test -bench=. -count=10 ./... | tee "${out}"
     popd
 
@@ -142,14 +155,34 @@ benchmark() {
     -d)
         shift
      	target="${1?Need to provide a target branch argument}"
-        old=`mktemp`
+
+        old=`mktemp --suffix=-${target}`
         bench "${target}" "${old}"
 
-        new=`mktemp`
+        new=`mktemp --suffix=-HEAD`
         bench HEAD "${new}"
+
         benchstat "${old}" "${new}"
         return 0
         ;;
+    -a)
+        shift
+
+        v2stats=`mktemp --suffix=-go-toml-v2`
+        bench HEAD "${v2stats}" "github.com/pelletier/go-toml/v2"
+        v1stats=`mktemp --suffix=-go-toml-v1`
+        bench HEAD "${v1stats}" "github.com/pelletier/go-toml"
+        bsstats=`mktemp --suffix=-bs-toml`
+        bench HEAD "${bsstats}" "github.com/BurntSushi/toml"
+
+        cp "${v2stats}" go-toml-v2.txt
+        cp "${v1stats}" go-toml-v1.txt
+        cp "${bsstats}" bs-toml.txt
+
+        benchstat -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt
+
+        rm -f go-toml-v2.txt go-toml-v1.txt bs-toml.txt
+        return $?
     esac
 
     bench "${1-HEAD}" `mktemp`
