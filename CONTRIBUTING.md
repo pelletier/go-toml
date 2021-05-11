@@ -51,17 +51,17 @@ Want to contribute a patch? Very happy to hear that!
 
 First, some high-level rules:
 
-* A short proposal with some POC code is better than a lengthy piece of text
+- A short proposal with some POC code is better than a lengthy piece of text
   with no code. Code speaks louder than words. That being said, bigger changes
   should probably start with a [discussion][discussions].
-* No backward-incompatible patch will be accepted unless discussed. Sometimes
+- No backward-incompatible patch will be accepted unless discussed. Sometimes
   it's hard, but we try not to break people's programs unless we absolutely have
   to.
-* If you are writing a new feature or extending an existing one, make sure to
+- If you are writing a new feature or extending an existing one, make sure to
   write some documentation.
-* Bug fixes need to be accompanied with regression tests.
-* New code needs to be tested.
-* Your commit messages need to explain why the change is needed, even if already
+- Bug fixes need to be accompanied with regression tests.
+- New code needs to be tested.
+- Your commit messages need to explain why the change is needed, even if already
   included in the PR description.
 
 It does sound like a lot, but those best practices are here to save time overall
@@ -129,12 +129,14 @@ Benchmark results should be compared against each other with
    `new.txt`).
 4. Run `benchstat old.txt new.txt` to check that time/op does not go up in any
    test.
-   
+
+On Unix you can use `./ci.sh benchmark -d v2` to verify how your code impacts
+performance.
+
 It is highly encouraged to add the benchstat results to your pull request
 description. Pull requests that lower performance will receive more scrutiny.
 
 [benchstat]: https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
-
 
 ### Style
 
@@ -149,10 +151,10 @@ code. We enforce using `go fmt` on the whole code base.
 
 Checklist:
 
-* Passing CI.
-* Does not introduce backward-incompatible changes (unless discussed).
-* Has relevant doc changes.
-* Benchstat does not show performance regression.
+- Passing CI.
+- Does not introduce backward-incompatible changes (unless discussed).
+- Has relevant doc changes.
+- Benchstat does not show performance regression.
 
 1. Merge using "squash and merge".
 2. Make sure to edit the commit message to keep all the useful information
