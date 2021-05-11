@@ -1476,6 +1476,47 @@ commented out"""
 	}
 }
 
+func TestCompactComments(t *testing.T) {
+	expected := []byte(`
+[first-section]
+  # comment for first-key
+  first-key = 1
+  # comment for second-key
+  second-key = "value"
+  # comment for commented third-key
+  # third-key = []
+
+[second-section]
+  # comment for first-key
+  first-key = 2
+  # comment for second-key
+  second-key = "another value"
+  # comment for commented third-key
+  # third-key = ["value1", "value2"]
+`)
+	type Settings struct {
+		FirstKey  int      `toml:"first-key" comment:"comment for first-key"`
+		SecondKey string   `toml:"second-key" comment:"comment for second-key"`
+		ThirdKey  []string `toml:"third-key" comment:"comment for commented third-key" commented:"true"`
+	}
+	type Config struct {
+		FirstSection  Settings `toml:"first-section"`
+		SecondSection Settings `toml:"second-section"`
+	}
+	data := Config{
+		FirstSection:  Settings{1, "value", []string{}},
+		SecondSection: Settings{2, "another value", []string{"value1", "value2"}},
+	}
+	buf := new(bytes.Buffer)
+	if err := NewEncoder(buf).CompactComments(true).Encode(data); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(expected, buf.Bytes()) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, buf.Bytes())
+	}
+}
+
 type mapsTestStruct struct {
 	Simple map[string]string
 	Paths  map[string]string
