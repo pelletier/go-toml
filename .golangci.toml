@@ -24,7 +24,7 @@ enable = [
     # "exhaustivestruct",
     "exportloopref",
     "forbidigo",
-    "forcetypeassert",
+    # "forcetypeassert",
     "funlen",
     "gci",
     # "gochecknoglobals",
@@ -35,7 +35,7 @@ enable = [
     "gocyclo",
     "godot",
     "godox",
-    "goerr113",
+    # "goerr113",
     "gofmt",
     "gofumpt",
     "goheader",
@@ -57,7 +57,7 @@ enable = [
     "nakedret",
     "nestif",
     "nilerr",
-    "nlreturn",
+    # "nlreturn",
     "noctx",
     "nolintlint",
     "paralleltest",
@@ -80,5 +80,5 @@ enable = [
     "wastedassign",
     "whitespace",
     # "wrapcheck",
-    "wsl"
+    # "wsl"
 ]

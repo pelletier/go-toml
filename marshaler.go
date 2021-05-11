@@ -127,6 +127,10 @@ func (enc *Encoder) Encode(v interface{}) error {
 
 	ctx.inline = enc.tablesInline
 
+	if v == nil {
+		return fmt.Errorf("toml: cannot encode a nil interface")
+	}
+
 	b, err := enc.encode(b, ctx, reflect.ValueOf(v))
 	if err != nil {
 		return err
@@ -193,9 +197,11 @@ func (ctx *encoderCtx) isRoot() bool {
 
 //nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	i, ok := v.Interface().(time.Time)
-	if ok {
-		return i.AppendFormat(b, time.RFC3339), nil
+	if !v.IsZero() {
+		i, ok := v.Interface().(time.Time)
+		if ok {
+			return i.AppendFormat(b, time.RFC3339), nil
+		}
 	}
 
 	if v.Type().Implements(textMarshalerType) {
@@ -273,11 +279,6 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 	if !ctx.hasKey {
 		panic("caller of encodeKv should have set the key in the context")
 	}
-
-	if isNil(v) {
-		return b, nil
-	}
-
 	b = enc.indent(ctx.indent, b)
 
 	b, err = enc.encodeKey(b, ctx.key)
@@ -470,12 +471,7 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 			continue
 		}
 
-		table, err := willConvertToTableOrArrayTable(ctx, v)
-		if err != nil {
-			return nil, err
-		}
-
-		if table {
+		if willConvertToTableOrArrayTable(ctx, v) {
 			t.pushTable(k, v, emptyValueOptions)
 		} else {
 			t.pushKV(k, v, emptyValueOptions)
@@ -543,18 +539,13 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			continue
 		}
 
-		willConvert, err := willConvertToTableOrArrayTable(ctx, f)
-		if err != nil {
-			return nil, err
-		}
-
 		options := valueOptions{
 			multiline: fieldBoolTag(fieldType, "multiline"),
 		}
 
 		inline := fieldBoolTag(fieldType, "inline")
 
-		if inline || !willConvert {
+		if inline || !willConvertToTableOrArrayTable(ctx, f) {
 			t.pushKV(k, f, options)
 		} else {
 			t.pushTable(k, f, options)
@@ -640,21 +631,8 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 		}
 	}
 
-	for _, table := range t.tables {
-		if first {
-			first = false
-		} else {
-			b = append(b, `, `...)
-		}
-
-		ctx.setKey(table.Key)
-
-		b, err = enc.encode(b, ctx, table.Value)
-		if err != nil {
-			return nil, err
-		}
-
-		b = append(b, '\n')
+	if len(t.tables) > 0 {
+		panic("inline table cannot contain nested tables, online key-values")
 	}
 
 	b = append(b, "}"...)
@@ -664,61 +642,50 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 
 var textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 
-func willConvertToTable(ctx encoderCtx, v reflect.Value) (bool, error) {
+func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
 	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
-		return false, nil
+		return false
 	}
 
 	t := v.Type()
 	switch t.Kind() {
 	case reflect.Map, reflect.Struct:
-		return !ctx.inline, nil
+		return !ctx.inline
 	case reflect.Interface:
-		if v.IsNil() {
-			return false, fmt.Errorf("toml: encoding a nil interface is not supported")
-		}
-
 		return willConvertToTable(ctx, v.Elem())
 	case reflect.Ptr:
 		if v.IsNil() {
-			return false, nil
+			return false
 		}
 
 		return willConvertToTable(ctx, v.Elem())
 	default:
-		return false, nil
+		return false
 	}
 }
 
-func willConvertToTableOrArrayTable(ctx encoderCtx, v reflect.Value) (bool, error) {
+func willConvertToTableOrArrayTable(ctx encoderCtx, v reflect.Value) bool {
 	t := v.Type()
 
 	if t.Kind() == reflect.Interface {
-		if v.IsNil() {
-			return false, fmt.Errorf("toml: encoding a nil interface is not supported")
-		}
-
 		return willConvertToTableOrArrayTable(ctx, v.Elem())
 	}
 
 	if t.Kind() == reflect.Slice {
 		if v.Len() == 0 {
 			// An empty slice should be a kv = [].
-			return false, nil
+			return false
 		}
 
 		for i := 0; i < v.Len(); i++ {
-			t, err := willConvertToTable(ctx, v.Index(i))
-			if err != nil {
-				return false, err
-			}
+			t := willConvertToTable(ctx, v.Index(i))
 
 			if !t {
-				return false, nil
+				return false
 			}
 		}
 
-		return true, nil
+		return true
 	}
 
 	return willConvertToTable(ctx, v)
@@ -731,12 +698,7 @@ func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]by
 		return b, nil
 	}
 
-	allTables, err := willConvertToTableOrArrayTable(ctx, v)
-	if err != nil {
-		return nil, err
-	}
-
-	if allTables {
+	if willConvertToTableOrArrayTable(ctx, v) {
 		return enc.encodeSliceAsArrayTable(b, ctx, v)
 	}
 
@@ -746,10 +708,6 @@ func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]by
 // caller should have checked that v is a slice that only contains values that
 // encode into tables.
 func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	if v.Len() == 0 {
-		return b, nil
-	}
-
 	ctx.shiftKey()
 
 	var err error

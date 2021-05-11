@@ -70,19 +70,19 @@ func (t interfaceTarget) set(v reflect.Value) {
 }
 
 func (t interfaceTarget) setString(v string) {
-	t.x.setString(v)
+	panic("interface targets should always go through set")
 }
 
 func (t interfaceTarget) setBool(v bool) {
-	t.x.setBool(v)
+	panic("interface targets should always go through set")
 }
 
 func (t interfaceTarget) setInt64(v int64) {
-	t.x.setInt64(v)
+	panic("interface targets should always go through set")
 }
 
 func (t interfaceTarget) setFloat64(v float64) {
-	t.x.setFloat64(v)
+	panic("interface targets should always go through set")
 }
 
 // mapTarget targets a specific key of a map.
@@ -115,7 +115,6 @@ func (t mapTarget) setFloat64(v float64) {
 	t.set(reflect.ValueOf(v))
 }
 
-//nolint:cyclop
 // makes sure that the value pointed at by t is indexable (Slice, Array), or
 // dereferences to an indexable (Ptr, Interface).
 func ensureValueIndexable(t target) error {
@@ -193,7 +192,7 @@ const (
 	minInt = -maxInt - 1
 )
 
-//nolint:funlen,gocognit,cyclop,gocyclo
+//nolint:funlen,gocognit,cyclop
 func setInt64(t target, v int64) error {
 	f := t.get()
 
@@ -285,7 +284,6 @@ func setFloat64(t target, v float64) error {
 	return nil
 }
 
-//nolint:cyclop
 // Returns the element at idx of the value pointed at by target, or an error if
 // t does not point to an indexable.
 // If the target points to an Array and idx is out of bounds, it returns
@@ -311,7 +309,6 @@ func elementAt(t target, idx int) target {
 	case reflect.Interface:
 		// This function is called after ensureValueIndexable, so it's
 		// guaranteed that f contains an initialized slice.
-
 		ifaceElem := f.Elem()
 		idx := ifaceElem.Len()
 		newElem := reflect.New(ifaceElem.Type().Elem()).Elem()
@@ -326,7 +323,6 @@ func elementAt(t target, idx int) target {
 	}
 }
 
-//nolint:cyclop
 func (d *decoder) scopeTableTarget(shouldAppend bool, t target, name string) (target, bool, error) {
 	x := t.get()
 

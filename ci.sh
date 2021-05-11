@@ -25,6 +25,20 @@ USAGE
 
 COMMANDS
 
+benchmark [OPTIONS...] [BRANCH]
+
+    Run benchmarks.
+
+    ARGUMENTS
+
+        BRANCH Optional. Defines which Git branch to use when running
+               benchmarks.
+
+    OPTIONS
+
+        -d      Compare benchmarks of HEAD with BRANCH using benchstats. In
+                this form the BRANCH argument is required.
+
 coverage [OPTIONS...] [BRANCH]
 
     Generates code coverage.
@@ -50,9 +64,9 @@ cover() {
     stderr "Executing coverage for ${branch} at ${dir}"
 
     if [ "${branch}" = "HEAD" ]; then
-	cp -r . "${dir}/"
+	    cp -r . "${dir}/"
     else
-	git worktree add "$dir" "$branch"
+	    git worktree add "$dir" "$branch"
     fi
 
     pushd "$dir"
@@ -61,7 +75,7 @@ cover() {
     popd
 
     if [ "${branch}" != "HEAD" ]; then
-	git worktree remove --force "$dir"
+	    git worktree remove --force "$dir"
     fi
 }
 
@@ -101,7 +115,48 @@ coverage() {
     cover "${1-HEAD}"
 }
 
+bench() {
+    branch="${1}"
+    out="${2}"
+    dir="$(mktemp -d)"
+
+    stderr "Executing benchmark for ${branch} at ${dir}"
+
+    if [ "${branch}" = "HEAD" ]; then
+    	cp -r . "${dir}/"
+    else
+	    git worktree add "$dir" "$branch"
+    fi
+
+    pushd "$dir"
+    go test -bench=. -count=10 ./... | tee "${out}"
+    popd
+
+    if [ "${branch}" != "HEAD" ]; then
+	    git worktree remove --force "$dir"
+    fi
+}
+
+benchmark() {
+    case "$1" in
+    -d)
+        shift
+     	target="${1?Need to provide a target branch argument}"
+        old=`mktemp`
+        bench "${target}" "${old}"
+
+        new=`mktemp`
+        bench HEAD "${new}"
+        benchstat "${old}" "${new}"
+        return 0
+        ;;
+    esac
+
+    bench "${1-HEAD}" `mktemp`
+}
+
 case "$1" in
     coverage) shift; coverage $@;;
+    benchmark) shift; benchmark $@;;
     *) usage "bad argument $1";;
 esac

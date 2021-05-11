@@ -181,6 +181,24 @@ line 5`,
 	}
 }
 
+func TestDecodeError_Accessors(t *testing.T) {
+	t.Parallel()
+
+	e := DecodeError{
+		message: "foo",
+		line:    1,
+		column:  2,
+		key:     []string{"one", "two"},
+		human:   "bar",
+	}
+	assert.Equal(t, "toml: foo", e.Error())
+	r, c := e.Position()
+	assert.Equal(t, 1, r)
+	assert.Equal(t, 2, c)
+	assert.Equal(t, Key{"one", "two"}, e.Key())
+	assert.Equal(t, "bar", e.String())
+}
+
 func ExampleDecodeError() {
 	doc := `name = 123__456`
 
@@ -189,14 +207,15 @@ func ExampleDecodeError() {
 
 	fmt.Println(err)
 
+	//nolint:errorlint
 	de := err.(*DecodeError)
 	fmt.Println(de.String())
 
 	row, col := de.Position()
-	fmt.Println("error occured at row", row, "column", col)
+	fmt.Println("error occurred at row", row, "column", col)
 	// Output:
 	// toml: number must have at least one digit between underscores
 	// 1| name = 123__456
 	//  |           ~~ number must have at least one digit between underscores
-	// error occured at row 1 column 11
+	// error occurred at row 1 column 11
 }

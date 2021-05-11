@@ -16,6 +16,12 @@ import (
 func TestMarshal(t *testing.T) {
 	t.Parallel()
 
+	someInt := 42
+
+	type structInline struct {
+		A interface{} `inline:"true"`
+	}
+
 	examples := []struct {
 		desc     string
 		v        interface{}
@@ -298,6 +304,213 @@ A = [
 ]
 `,
 		},
+		{
+			desc: "nil interface not supported at root",
+			v:    nil,
+			err:  true,
+		},
+		{
+			desc: "nil interface not supported in slice",
+			v: map[string]interface{}{
+				"a": []interface{}{"a", nil, 2},
+			},
+			err: true,
+		},
+		{
+			desc: "nil pointer in slice uses zero value",
+			v: struct {
+				A []*int
+			}{
+				A: []*int{nil},
+			},
+			expected: `A = [0]`,
+		},
+		{
+			desc: "nil pointer in slice uses zero value",
+			v: struct {
+				A []*int
+			}{
+				A: []*int{nil},
+			},
+			expected: `A = [0]`,
+		},
+		{
+			desc: "pointer in slice",
+			v: struct {
+				A []*int
+			}{
+				A: []*int{&someInt},
+			},
+			expected: `A = [42]`,
+		},
+		{
+			desc: "inline table in inline table",
+			v: structInline{
+				A: structInline{
+					A: structInline{
+						A: "hello",
+					},
+				},
+			},
+			expected: `A = {A = {A = 'hello'}}`,
+		},
+		{
+			desc: "empty slice in map",
+			v: map[string][]string{
+				"a": {},
+			},
+			expected: `a = []`,
+		},
+		{
+			desc: "map in slice",
+			v: map[string][]map[string]string{
+				"a": {{"hello": "world"}},
+			},
+			expected: `
+[[a]]
+hello = 'world'`,
+		},
+		{
+			desc: "newline in map in slice",
+			v: map[string][]map[string]string{
+				"a\n": {{"hello": "world"}},
+			},
+			err: true,
+		},
+		{
+			desc: "newline in map in slice",
+			v: map[string][]map[string]*customTextMarshaler{
+				"a": {{"hello": &customTextMarshaler{1}}},
+			},
+			err: true,
+		},
+		{
+			desc: "empty slice of empty struct",
+			v: struct {
+				A []struct{}
+			}{
+				A: []struct{}{},
+			},
+			expected: `A = []`,
+		},
+		{
+			desc: "nil field is ignored",
+			v: struct {
+				A interface{}
+			}{
+				A: nil,
+			},
+			expected: ``,
+		},
+		{
+			desc: "private fields are ignored",
+			v: struct {
+				Public  string
+				private string
+			}{
+				Public:  "shown",
+				private: "hidden",
+			},
+			expected: `Public = 'shown'`,
+		},
+		{
+			desc: "fields tagged - are ignored",
+			v: struct {
+				Public  string `toml:"-"`
+				private string
+			}{
+				Public: "hidden",
+			},
+			expected: ``,
+		},
+		{
+			desc: "nil value in map is ignored",
+			v: map[string]interface{}{
+				"A": nil,
+			},
+			expected: ``,
+		},
+		{
+			desc: "new line in table key",
+			v: map[string]interface{}{
+				"hello\nworld": 42,
+			},
+			err: true,
+		},
+		{
+			desc: "new line in parent of nested table key",
+			v: map[string]interface{}{
+				"hello\nworld": map[string]interface{}{
+					"inner": 42,
+				},
+			},
+			err: true,
+		},
+		{
+			desc: "new line in nested table key",
+			v: map[string]interface{}{
+				"parent": map[string]interface{}{
+					"in\ner": map[string]interface{}{
+						"foo": 42,
+					},
+				},
+			},
+			err: true,
+		},
+		{
+			desc: "invalid map key",
+			v:    map[int]interface{}{},
+			err:  true,
+		},
+		{
+			desc: "unhandled type",
+			v: struct {
+				A chan int
+			}{
+				A: make(chan int),
+			},
+			err: true,
+		},
+		{
+			desc: "numbers",
+			v: struct {
+				A float32
+				B uint64
+				C uint32
+				D uint16
+				E uint8
+				F uint
+				G int64
+				H int32
+				I int16
+				J int8
+				K int
+			}{
+				A: 1.1,
+				B: 42,
+				C: 42,
+				D: 42,
+				E: 42,
+				F: 42,
+				G: 42,
+				H: 42,
+				I: 42,
+				J: 42,
+				K: 42,
+			},
+			expected: `
+A = 1.1
+B = 42
+C = 42
+D = 42
+E = 42
+F = 42
+G = 42
+H = 42
+I = 42
+J = 42
+K = 42`,
+		},
 	}
 
 	for _, e := range examples {
@@ -458,6 +671,85 @@ root = 'value0'
 			equalStringsIgnoreNewlines(t, e.expected, buf.String())
 		})
 	}
+}
+
+type customTextMarshaler struct {
+	value int64
+}
+
+func (c *customTextMarshaler) MarshalText() ([]byte, error) {
+	if c.value == 1 {
+		return nil, fmt.Errorf("cannot represent 1 because this is a silly test")
+	}
+	return []byte(fmt.Sprintf("::%d", c.value)), nil
+}
+
+func TestMarshalTextMarshaler_NoRoot(t *testing.T) {
+	t.Parallel()
+
+	c := customTextMarshaler{}
+	_, err := toml.Marshal(&c)
+	require.Error(t, err)
+}
+
+func TestMarshalTextMarshaler_Error(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]interface{}{"a": &customTextMarshaler{value: 1}}
+	_, err := toml.Marshal(m)
+	require.Error(t, err)
+}
+
+func TestMarshalTextMarshaler_ErrorInline(t *testing.T) {
+	t.Parallel()
+
+	type s struct {
+		A map[string]interface{} `inline:"true"`
+	}
+
+	d := s{
+		A: map[string]interface{}{"a": &customTextMarshaler{value: 1}},
+	}
+
+	_, err := toml.Marshal(d)
+	require.Error(t, err)
+}
+
+func TestMarshalTextMarshaler(t *testing.T) {
+	t.Parallel()
+
+	m := map[string]interface{}{"a": &customTextMarshaler{value: 2}}
+	r, err := toml.Marshal(m)
+	require.NoError(t, err)
+	equalStringsIgnoreNewlines(t, "a = '::2'", string(r))
+}
+
+type brokenWriter struct{}
+
+func (b *brokenWriter) Write([]byte) (int, error) {
+	return 0, fmt.Errorf("dead")
+}
+
+func TestEncodeToBrokenWriter(t *testing.T) {
+	t.Parallel()
+	w := brokenWriter{}
+	enc := toml.NewEncoder(&w)
+	err := enc.Encode(map[string]string{"hello": "world"})
+	require.Error(t, err)
+}
+
+func TestEncoderSetIndentSymbol(t *testing.T) {
+	t.Parallel()
+	var w strings.Builder
+	enc := toml.NewEncoder(&w)
+	enc.SetIndentTables(true)
+	enc.SetIndentSymbol(">>>")
+	err := enc.Encode(map[string]map[string]string{"parent": {"hello": "world"}})
+	require.NoError(t, err)
+	expected := `
+[parent]
+>>>hello = 'world'`
+	equalStringsIgnoreNewlines(t, expected, w.String())
 }
 
 func TestIssue436(t *testing.T) {

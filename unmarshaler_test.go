@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	t.Parallel()
 
@@ -240,6 +241,34 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "time.time with negative zone",
+			input: `a = 1979-05-27T00:32:00-07:00 `, // space intentional
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(1979, 5, 27, 0, 32, 0, 0, time.FixedZone("", -7*3600)),
+					},
+				}
+			},
+		},
+		{
+			desc:  "time.time with positive zone",
+			input: `a = 1979-05-27T00:32:00+07:00`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(1979, 5, 27, 0, 32, 0, 0, time.FixedZone("", 7*3600)),
+					},
+				}
+			},
+		},
+		{
 			desc: "issue 475 - space between dots in key",
 			input: `fruit. color = "yellow"
 					fruit . flavor = "banana"`,
@@ -285,6 +314,73 @@ func TestUnmarshal(t *testing.T) {
 				return test{
 					target:   &doc{},
 					expected: &doc{A: "Test"},
+				}
+			},
+		},
+		{
+			desc:  "multiline literal string with windows newline",
+			input: "A = '''\r\nTest'''",
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "Test"},
+				}
+			},
+		},
+		{
+			desc:  "multiline basic string with windows newline",
+			input: "A = \"\"\"\r\nTest\"\"\"",
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "Test"},
+				}
+			},
+		},
+		{
+			desc: "multiline basic string escapes",
+			input: `A = """
+\\\b\f\n\r\t\uffff\U0001D11E"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\\\b\f\n\r\t\uffff\U0001D11E"},
+				}
+			},
+		},
+		{
+			desc:  "basic string escapes",
+			input: `A = "\\\b\f\n\r\t\uffff\U0001D11E"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\\\b\f\n\r\t\uffff\U0001D11E"},
+				}
+			},
+		},
+		{
+			desc:  "spaces around dotted keys",
+			input: "a . b = 1",
+			gen: func() test {
+				return test{
+					target:   &map[string]map[string]interface{}{},
+					expected: &map[string]map[string]interface{}{"a": {"b": int64(1)}},
 				}
 			},
 		},
@@ -722,6 +818,197 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "interface holding a string",
+			input: `A = "Hello"`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: "Hello",
+					},
+				}
+			},
+		},
+		{
+			desc:  "map of bools",
+			input: `A = true`,
+			gen: func() test {
+				return test{
+					target:   &map[string]bool{},
+					expected: &map[string]bool{"A": true},
+				}
+			},
+		},
+		{
+			desc:  "map of int64",
+			input: `A = 42`,
+			gen: func() test {
+				return test{
+					target:   &map[string]int64{},
+					expected: &map[string]int64{"A": 42},
+				}
+			},
+		},
+		{
+			desc:  "map of float64",
+			input: `A = 4.2`,
+			gen: func() test {
+				return test{
+					target:   &map[string]float64{},
+					expected: &map[string]float64{"A": 4.2},
+				}
+			},
+		},
+		{
+			desc:  "array of int in map",
+			input: `A = [1,2,3]`,
+			gen: func() test {
+				return test{
+					target:   &map[string][3]int{},
+					expected: &map[string][3]int{"A": {1, 2, 3}},
+				}
+			},
+		},
+		{
+			desc:  "array of int in map with too many elements",
+			input: `A = [1,2,3,4,5]`,
+			gen: func() test {
+				return test{
+					target:   &map[string][3]int{},
+					expected: &map[string][3]int{"A": {1, 2, 3}},
+				}
+			},
+		},
+		{
+			desc:  "array of int in map with invalid element",
+			input: `A = [1,2,false]`,
+			gen: func() test {
+				return test{
+					target: &map[string][3]int{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc: "nested arrays",
+			input: `
+			[[A]]
+			[[A.B]]
+			C = 1
+			[[A]]
+			[[A.B]]
+			C = 2`,
+			gen: func() test {
+				type leaf struct {
+					C int
+				}
+				type inner struct {
+					B [2]leaf
+				}
+				type s struct {
+					A [2]inner
+				}
+				return test{
+					target: &s{},
+					expected: &s{A: [2]inner{
+						{B: [2]leaf{
+							{C: 1},
+						}},
+						{B: [2]leaf{
+							{C: 2},
+						}},
+					}},
+				}
+			},
+		},
+		{
+			desc: "nested arrays too many",
+			input: `
+			[[A]]
+			[[A.B]]
+			C = 1
+			[[A.B]]
+			C = 2`,
+			gen: func() test {
+				type leaf struct {
+					C int
+				}
+				type inner struct {
+					B [1]leaf
+				}
+				type s struct {
+					A [1]inner
+				}
+				return test{
+					target: &s{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "into map with invalid key type",
+			input: `A = "hello"`,
+			gen: func() test {
+				return test{
+					target: &map[int]string{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "into map with convertible key type",
+			input: `A = "hello"`,
+			gen: func() test {
+				type foo string
+				return test{
+					target: &map[foo]string{},
+					expected: &map[foo]string{
+						"A": "hello",
+					},
+				}
+			},
+		},
+		{
+			desc:  "array of int in struct",
+			input: `A = [1,2,3]`,
+			gen: func() test {
+				type s struct {
+					A [3]int
+				}
+				return test{
+					target:   &s{},
+					expected: &s{A: [3]int{1, 2, 3}},
+				}
+			},
+		},
+		{
+			desc: "array of int in struct",
+			input: `[A]
+			b = 42`,
+			gen: func() test {
+				type s struct {
+					A *map[string]interface{}
+				}
+				return test{
+					target:   &s{},
+					expected: &s{A: &map[string]interface{}{"b": int64(42)}},
+				}
+			},
+		},
+		{
+			desc:  "assign bool to float",
+			input: `A = true`,
+			gen: func() test {
+				return test{
+					target: &map[string]float64{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc: "interface holding a struct",
 			input: `[A]
 					B = "After"`,
@@ -877,6 +1164,82 @@ B = "data"`,
 	}
 }
 
+func TestUnmarshalOverflows(t *testing.T) {
+	examples := []struct {
+		t      interface{}
+		errors []string
+	}{
+		{
+			t:      &map[string]int32{},
+			errors: []string{`-2147483649`, `2147483649`},
+		},
+		{
+			t:      &map[string]int16{},
+			errors: []string{`-2147483649`, `2147483649`},
+		},
+		{
+			t:      &map[string]int8{},
+			errors: []string{`-2147483649`, `2147483649`},
+		},
+		{
+			t:      &map[string]int{},
+			errors: []string{`-19223372036854775808`, `9223372036854775808`},
+		},
+		{
+			t:      &map[string]uint64{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint32{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint16{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint8{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+		{
+			t:      &map[string]uint{},
+			errors: []string{`-1`, `18446744073709551616`},
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		for _, v := range e.errors {
+			v := v
+			t.Run(fmt.Sprintf("%T %s", e.t, v), func(t *testing.T) {
+				doc := "A = " + v
+				err := toml.Unmarshal([]byte(doc), e.t)
+				t.Log("input:", doc)
+				require.Error(t, err)
+			})
+		}
+		t.Run(fmt.Sprintf("%T ok", e.t), func(t *testing.T) {
+			doc := "A = 1"
+			err := toml.Unmarshal([]byte(doc), e.t)
+			t.Log("input:", doc)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestUnmarshalFloat32(t *testing.T) {
+	t.Run("fits", func(t *testing.T) {
+		doc := "A = 1.2"
+		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
+		require.NoError(t, err)
+	})
+	t.Run("overflows", func(t *testing.T) {
+		doc := "A = 4.40282346638528859811704183484516925440e+38"
+		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
+		require.Error(t, err)
+	})
+}
+
 type Integer484 struct {
 	Value int
 }
@@ -1000,8 +1363,64 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 		msg  string
 	}{
 		{
+			desc: "local date with invalid digit",
+			data: `a = 20x1-05-21`,
+		},
+		{
+			desc: "local time with fractional",
+			data: `a = 11:22:33.x`,
+		},
+		{
+			desc: "local time frac precision too large",
+			data: `a = 2021-05-09T11:22:33.99999999999`,
+		},
+		{
+			desc: "wrong time offset separator",
+			data: `a = 1979-05-27T00:32:00T07:00`,
+		},
+		{
+			desc: "wrong time offset separator",
+			data: `a = 1979-05-27T00:32:00Z07:00`,
+		},
+		{
+			desc: "float with double _",
+			data: `flt8 = 224_617.445_991__228`,
+		},
+		{
+			desc: "float with double _",
+			data: `flt8 = 1..2`,
+		},
+		{
 			desc: "int with wrong base",
 			data: `a = 0f2`,
+		},
+		{
+			desc: "int hex with double underscore",
+			data: `a = 0xFFF__FFF`,
+		},
+		{
+			desc: "int hex very large",
+			data: `a = 0xFFFFFFFFFFFFFFFFF`,
+		},
+		{
+			desc: "int oct with double underscore",
+			data: `a = 0o777__77`,
+		},
+		{
+			desc: "int oct very large",
+			data: `a = 0o77777777777777777777777`,
+		},
+		{
+			desc: "int bin with double underscore",
+			data: `a = 0b111__111`,
+		},
+		{
+			desc: "int bin very large",
+			data: `a = 0b11111111111111111111111111111111111111111111111111111111111111111111111111111`,
+		},
+		{
+			desc: "int dec very large",
+			data: `a = 999999999999999999999999`,
 		},
 		{
 			desc: "literal string with new lines",
@@ -1064,6 +1483,102 @@ world'`,
 			desc: "bad char between minutes and seconds",
 			data: `a = 2021-03-30 21:312:0`,
 			msg:  `expecting colon between minutes and seconds`,
+		},
+		{
+			desc: `binary with invalid digit`,
+			data: `a = 0bf`,
+		},
+		{
+			desc: `invalid i in dec`,
+			data: `a = 0i`,
+		},
+		{
+			desc: `invalid n in dec`,
+			data: `a = 0n`,
+		},
+		{
+			desc: `invalid unquoted key`,
+			data: `a`,
+		},
+		{
+			desc: "dt with tz has no time",
+			data: `a = 2021-03-30TZ`,
+		},
+		{
+			desc: "invalid end of array table",
+			data: `[[a}`,
+		},
+		{
+			desc: "invalid end of array table two",
+			data: `[[a]}`,
+		},
+		{
+			desc: "eof after equal",
+			data: `a =`,
+		},
+		{
+			desc: "invalid true boolean",
+			data: `a = trois`,
+		},
+		{
+			desc: "invalid false boolean",
+			data: `a = faux`,
+		},
+		{
+			desc: "inline table with incorrect separator",
+			data: `a = {b=1;}`,
+		},
+		{
+			desc: "inline table with invalid value",
+			data: `a = {b=faux}`,
+		},
+		{
+			desc: `incomplete array after whitespace`,
+			data: `a = [ `,
+		},
+		{
+			desc: `array with comma first`,
+			data: `a = [ ,]`,
+		},
+		{
+			desc: `array staring with incomplete newline`,
+			data: "a = [\r]",
+		},
+		{
+			desc: `array with incomplete newline after comma`,
+			data: "a = [1,\r]",
+		},
+		{
+			desc: `array with incomplete newline after value`,
+			data: "a = [1\r]",
+		},
+		{
+			desc: `invalid unicode in basic multiline string`,
+			data: `A = """\u123"""`,
+		},
+		{
+			desc: `invalid long unicode in basic multiline string`,
+			data: `A = """\U0001D11"""`,
+		},
+		{
+			desc: `invalid unicode in basic string`,
+			data: `A = "\u123"`,
+		},
+		{
+			desc: `invalid long unicode in basic string`,
+			data: `A = "\U0001D11"`,
+		},
+		{
+			desc: `invalid escape char basic multiline string`,
+			data: `A = """\z"""`,
+		},
+		{
+			desc: `invalid inf`,
+			data: `A = ick`,
+		},
+		{
+			desc: `invalid nan`,
+			data: `A = non`,
 		},
 	}
 
@@ -1270,21 +1785,35 @@ bar = 42
 		t.Run(e.desc, func(t *testing.T) {
 			t.Parallel()
 
-			r := strings.NewReader(e.input)
-			d := toml.NewDecoder(r)
-			d.SetStrict(true)
-			x := e.target
-			if x == nil {
-				x = &struct{}{}
-			}
-			err := d.Decode(x)
+			t.Run("strict", func(t *testing.T) {
+				r := strings.NewReader(e.input)
+				d := toml.NewDecoder(r)
+				d.SetStrict(true)
+				x := e.target
+				if x == nil {
+					x = &struct{}{}
+				}
+				err := d.Decode(x)
 
-			var tsm *toml.StrictMissingError
-			if errors.As(err, &tsm) {
-				equalStringsIgnoreNewlines(t, e.expected, tsm.String())
-			} else {
-				t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
-			}
+				var tsm *toml.StrictMissingError
+				if errors.As(err, &tsm) {
+					equalStringsIgnoreNewlines(t, e.expected, tsm.String())
+				} else {
+					t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
+				}
+			})
+
+			t.Run("default", func(t *testing.T) {
+				r := strings.NewReader(e.input)
+				d := toml.NewDecoder(r)
+				d.SetStrict(false)
+				x := e.target
+				if x == nil {
+					x = &struct{}{}
+				}
+				err := d.Decode(x)
+				require.NoError(t, err)
+			})
 		})
 	}
 }

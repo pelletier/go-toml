@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -16,7 +17,7 @@ func parseInteger(b []byte) (int64, error) {
 		case 'o':
 			return parseIntOct(b)
 		default:
-			return 0, newDecodeError(b[1:2], "invalid base: '%c'", b[1])
+			panic(fmt.Errorf("invalid base '%c', should have been checked by scanIntOrFloat", b[1]))
 		}
 	}
 
@@ -34,41 +35,26 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 		return date, newDecodeError(b, "dates are expected to have the format YYYY-MM-DD")
 	}
 
-	var err error
+	date.Year = parseDecimalDigits(b[0:4])
 
-	date.Year, err = parseDecimalDigits(b[0:4])
-	if err != nil {
-		return date, err
-	}
-
-	v, err := parseDecimalDigits(b[5:7])
-	if err != nil {
-		return date, err
-	}
+	v := parseDecimalDigits(b[5:7])
 
 	date.Month = time.Month(v)
 
-	date.Day, err = parseDecimalDigits(b[8:10])
-	if err != nil {
-		return date, err
-	}
+	date.Day = parseDecimalDigits(b[8:10])
 
 	return date, nil
 }
 
-func parseDecimalDigits(b []byte) (int, error) {
+func parseDecimalDigits(b []byte) int {
 	v := 0
 
-	for i, c := range b {
-		if !isDigit(c) {
-			return 0, newDecodeError(b[i:i+1], "should be a digit (0-9)")
-		}
-
+	for _, c := range b {
 		v *= 10
 		v += int(c - '0')
 	}
 
-	return v, nil
+	return v
 }
 
 func parseDateTime(b []byte) (time.Time, error) {
@@ -76,8 +62,6 @@ func parseDateTime(b []byte) (time.Time, error) {
 	// full-time      = partial-time time-offset
 	// time-offset    = "Z" / time-numoffset
 	// time-numoffset = ( "+" / "-" ) time-hour ":" time-minute
-
-	originalBytes := b
 
 	dt, b, err := parseLocalDateTime(b)
 	if err != nil {
@@ -87,7 +71,8 @@ func parseDateTime(b []byte) (time.Time, error) {
 	var zone *time.Location
 
 	if len(b) == 0 {
-		return time.Time{}, newDecodeError(originalBytes, "date-time is missing timezone")
+		// parser should have checked that when assigning the date time node
+		panic("date time should have a timezone")
 	}
 
 	if b[0] == 'Z' {
@@ -99,18 +84,15 @@ func parseDateTime(b []byte) (time.Time, error) {
 			return time.Time{}, newDecodeError(b, "invalid date-time timezone")
 		}
 		direction := 1
-		switch b[0] {
-		case '+':
-		case '-':
+		if b[0] == '-' {
 			direction = -1
-		default:
-			return time.Time{}, newDecodeError(b[0:1], "invalid timezone offset character")
 		}
 
 		hours := digitsToInt(b[1:3])
 		minutes := digitsToInt(b[4:6])
 		seconds := direction * (hours*3600 + minutes*60)
 		zone = time.FixedZone("", seconds)
+		b = b[dateTimeByteLen:]
 	}
 
 	if len(b) > 0 {
@@ -161,7 +143,6 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 // parseLocalTime is a bit different because it also returns the remaining
 // []byte that is didn't need. This is to allow parseDateTime to parse those
 // remaining bytes as a timezone.
-//nolint:cyclop,funlen
 func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	var (
 		nspow = [10]int{0, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1e0}
@@ -173,46 +154,26 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, newDecodeError(b, "times are expected to have the format HH:MM:SS[.NNNNNN]")
 	}
 
-	var err error
-
-	t.Hour, err = parseDecimalDigits(b[0:2])
-	if err != nil {
-		return t, nil, err
-	}
-
+	t.Hour = parseDecimalDigits(b[0:2])
 	if b[2] != ':' {
 		return t, nil, newDecodeError(b[2:3], "expecting colon between hours and minutes")
 	}
 
-	t.Minute, err = parseDecimalDigits(b[3:5])
-	if err != nil {
-		return t, nil, err
-	}
-
+	t.Minute = parseDecimalDigits(b[3:5])
 	if b[5] != ':' {
 		return t, nil, newDecodeError(b[5:6], "expecting colon between minutes and seconds")
 	}
 
-	t.Second, err = parseDecimalDigits(b[6:8])
-	if err != nil {
-		return t, nil, err
-	}
+	t.Second = parseDecimalDigits(b[6:8])
 
-	if len(b) >= 9 && b[8] == '.' {
+	const minLengthWithFrac = 9
+	if len(b) >= minLengthWithFrac && b[minLengthWithFrac-1] == '.' {
 		frac := 0
 		digits := 0
 
-		for i, c := range b[9:] {
-			if !isDigit(c) {
-				if i == 0 {
-					return t, nil, newDecodeError(b[i:i+1], "need at least one digit after fraction point")
-				}
-
-				break
-			}
-
-			//nolint:gomnd
-			if i >= 9 {
+		for i, c := range b[minLengthWithFrac:] {
+			const maxFracPrecision = 9
+			if i >= maxFracPrecision {
 				return t, nil, newDecodeError(b[i:i+1], "maximum precision for date time is nanosecond")
 			}
 
@@ -231,8 +192,6 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 //nolint:cyclop
 func parseFloat(b []byte) (float64, error) {
-	//nolint:godox
-	// TODO: inefficient
 	if len(b) == 4 && (b[0] == '+' || b[0] == '-') && b[1] == 'n' && b[2] == 'a' && b[3] == 'n' {
 		return math.NaN(), nil
 	}
@@ -252,7 +211,7 @@ func parseFloat(b []byte) (float64, error) {
 
 	f, err := strconv.ParseFloat(string(cleaned), 64)
 	if err != nil {
-		return 0, newDecodeError(b, "coudn't parse float: %w", err)
+		return 0, newDecodeError(b, "unable to parse float: %w", err)
 	}
 
 	return f, nil
@@ -315,10 +274,6 @@ func parseIntDec(b []byte) (int64, error) {
 }
 
 func checkAndRemoveUnderscores(b []byte) ([]byte, error) {
-	if len(b) == 0 {
-		return b, nil
-	}
-
 	if b[0] == '_' {
 		return nil, newDecodeError(b[0:1], "number cannot start with underscore")
 	}

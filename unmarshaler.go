@@ -541,6 +541,27 @@ func (d *decoder) unmarshalArray(x target, node ast.Node) error {
 		return err
 	}
 
+	// Special work around when unmarshaling into an array.
+	// If the array is not addressable, for example when stored as a value in a
+	// map, calling elementAt in the inner function would fail.
+	// Instead, we allocate a new array that will be filled then inserted into
+	// the container.
+	// This problem does not exist with slices because they are addressable.
+	// There may be a better way of doing this, but it is not obvious to me
+	// with the target system.
+	if x.get().Kind() == reflect.Array {
+		container := x
+		newArrayPtr := reflect.New(x.get().Type())
+		x = valueTarget(newArrayPtr.Elem())
+		defer func() {
+			container.set(newArrayPtr.Elem())
+		}()
+	}
+
+	return d.unmarshalArrayInner(x, node)
+}
+
+func (d *decoder) unmarshalArrayInner(x target, node ast.Node) error {
 	idx := 0
 
 	it := node.Children()
@@ -555,14 +576,13 @@ func (d *decoder) unmarshalArray(x target, node ast.Node) error {
 			break
 		}
 
-		err = d.unmarshalValue(v, n)
+		err := d.unmarshalValue(v, n)
 		if err != nil {
 			return err
 		}
 
 		idx++
 	}
-
 	return nil
 }
 
