@@ -1,15 +1,12 @@
 name: coverage
 on:
-  push:
-    branches:
-      - v2
   pull_request:
     branches:
       - v2
 
 jobs:
   report:
-    runs-on: 'ubuntu-latest'
+    runs-on: "ubuntu-latest"
     name: report
     steps:
       - uses: actions/checkout@master
