@@ -14,7 +14,11 @@ with v1, and fixes a lot known bugs and performance issues along the way.
 If you do not need the advanced document editing features of v1, you are
 encouraged to try out this version.
 
-👉 [Roadmap for v2](https://github.com/pelletier/go-toml/discussions/506).
+[👉 Roadmap for v2](https://github.com/pelletier/go-toml/discussions/506)
+
+[🐞 Bug Reports](https://github.com/pelletier/go-toml/issues)
+
+[💬 Anything else](https://github.com/pelletier/go-toml/discussions)
 
 
 ## Documentation
