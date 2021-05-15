@@ -248,6 +248,23 @@ This method was not widely used, poorly defined, and added a lot of complexity.
 A similar effect can be achieved by implementing the `encoding.TextUnmarshaler`
 interface and use strings.
 
+
+#### Support for `default` struct tag has been dropped
+
+This feature adds complexity and a poorly defined API for an effect that can be
+accomplished outside of the library.
+
+It does not seem like other format parsers in Go support that feature (the
+project referenced in the original ticket #202 has not been updated since 2017).
+Given that go-toml v2 should not touch values not in the document, the same
+effect can be achieved by pre-filling the struct with defaults (libraries like
+[go-defaults][go-defaults] can help). Also, string representation is not well
+defined for all types: it creates issues like #278.
+
+The recommended replacement is pre-filling the struct before unmarshaling.
+
+[go-defaults]: https://github.com/mcuadros/go-defaults
+
 ### Encoding / Marshal
 
 #### Default struct fields order
