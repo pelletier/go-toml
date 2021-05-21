@@ -172,6 +172,14 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		digits := 0
 
 		for i, c := range b[minLengthWithFrac:] {
+			if !isDigit(c) {
+				if i == 0 {
+					return t, nil, newDecodeError(b[i:i+1], "need at least one digit after fraction point")
+				}
+
+				break
+			}
+
 			const maxFracPrecision = 9
 			if i >= maxFracPrecision {
 				return t, nil, newDecodeError(b[i:i+1], "maximum precision for date time is nanosecond")
