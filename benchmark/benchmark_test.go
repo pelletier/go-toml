@@ -150,7 +150,6 @@ func BenchmarkReferenceFileMap(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	benchmetrics.ResetCounters()
 	b.SetBytes(int64(len(bytes)))
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -161,7 +160,6 @@ func BenchmarkReferenceFileMap(b *testing.B) {
 			panic(err)
 		}
 	}
-	benchmetrics.Report(b)
 }
 
 func TestReferenceFile(t *testing.T) {
