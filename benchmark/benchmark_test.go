@@ -145,6 +145,23 @@ func BenchmarkReferenceFile(b *testing.B) {
 	}
 }
 
+func BenchmarkReferenceFileMap(b *testing.B) {
+	bytes, err := ioutil.ReadFile("benchmark.toml")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.SetBytes(int64(len(bytes)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m := map[string]interface{}{}
+		err := toml.Unmarshal(bytes, &m)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func TestReferenceFile(t *testing.T) {
 	bytes, err := ioutil.ReadFile("benchmark.toml")
 	require.NoError(t, err)

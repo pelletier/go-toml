@@ -269,6 +269,20 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "time.time with zone and fractional",
+			input: `a = 1979-05-27T00:32:00.999999-07:00`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(1979, 5, 27, 0, 32, 0, 999999000, time.FixedZone("", -7*3600)),
+					},
+				}
+			},
+		},
+		{
 			desc: "issue 475 - space between dots in key",
 			input: `fruit. color = "yellow"
 					fruit . flavor = "banana"`,
@@ -1376,7 +1390,11 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 		},
 		{
 			desc: "wrong time offset separator",
-			data: `a = 1979-05-27T00:32:00T07:00`,
+			data: `a = 1979-05-27T00:32:00.-07:00`,
+		},
+		{
+			desc: "missing fractional with tz",
+			data: `a = 2021-05-09T11:22:33.99999999999`,
 		},
 		{
 			desc: "wrong time offset separator",

@@ -823,8 +823,8 @@ byteLoop:
 		switch {
 		case isDigit(c):
 		case c == '-':
-			const offsetOfTz = 19
-			if i == offsetOfTz {
+			const minOffsetOfTz = 8
+			if i >= minOffsetOfTz {
 				hasTz = true
 			}
 		case c == 'T' || c == ':' || c == '.':
