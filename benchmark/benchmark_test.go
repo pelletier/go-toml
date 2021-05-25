@@ -10,19 +10,38 @@ import (
 )
 
 func BenchmarkUnmarshalSimple(b *testing.B) {
-	d := struct {
-		A string
-	}{}
 	doc := []byte(`A = "hello"`)
-	b.SetBytes(int64(len(doc)))
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		err := toml.Unmarshal(doc, &d)
-		if err != nil {
-			panic(err)
+
+	b.Run("struct", func(b *testing.B) {
+		b.SetBytes(int64(len(doc)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			d := struct {
+				A string
+			}{}
+
+			err := toml.Unmarshal(doc, &d)
+			if err != nil {
+				panic(err)
+			}
 		}
-	}
+	})
+
+	b.Run("map", func(b *testing.B) {
+		b.SetBytes(int64(len(doc)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			d := map[string]interface{}{}
+			err := toml.Unmarshal(doc, &d)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
 }
 
 type benchmarkDoc struct {
@@ -136,33 +155,32 @@ func BenchmarkReferenceFile(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.SetBytes(int64(len(bytes)))
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		d := benchmarkDoc{}
-		err := toml.Unmarshal(bytes, &d)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
 
-func BenchmarkReferenceFileMap(b *testing.B) {
-	bytes, err := ioutil.ReadFile("benchmark.toml")
-	if err != nil {
-		b.Fatal(err)
-	}
-	b.SetBytes(int64(len(bytes)))
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		m := map[string]interface{}{}
-		err := toml.Unmarshal(bytes, &m)
-		if err != nil {
-			panic(err)
+	b.Run("struct", func(b *testing.B) {
+		b.SetBytes(int64(len(bytes)))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d := benchmarkDoc{}
+			err := toml.Unmarshal(bytes, &d)
+			if err != nil {
+				panic(err)
+			}
 		}
-	}
+	})
+
+	b.Run("map", func(b *testing.B) {
+		b.SetBytes(int64(len(bytes)))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d := map[string]interface{}{}
+			err := toml.Unmarshal(bytes, &d)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
 }
 
 func TestReferenceFile(t *testing.T) {
