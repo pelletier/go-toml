@@ -190,3 +190,38 @@ func TestReferenceFile(t *testing.T) {
 	err = toml.Unmarshal(bytes, &d)
 	require.NoError(t, err)
 }
+
+func BenchmarkHugoFrontMatter(b *testing.B) {
+	bytes := []byte(`
+categories = ["Development", "VIM"]
+date = "2012-04-06"
+description = "spf13-vim is a cross platform distribution of vim plugins and resources for Vim."
+slug = "spf13-vim-3-0-release-and-new-website"
+tags = [".vimrc", "plugins", "spf13-vim", "vim"]
+title = "spf13-vim 3.0 release and new website"
+include_toc = true
+show_comments = false
+
+[[cascade]]
+  background = "yosemite.jpg"
+  [cascade._target]
+    kind = "page"
+    lang = "en"
+    path = "/blog/**"
+
+[[cascade]]
+  background = "goldenbridge.jpg"
+  [cascade._target]
+    kind = "section"
+`)
+	b.SetBytes(int64(len(bytes)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d := map[string]interface{}{}
+		err := toml.Unmarshal(bytes, &d)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
