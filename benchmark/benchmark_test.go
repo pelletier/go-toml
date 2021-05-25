@@ -14,6 +14,9 @@ func BenchmarkUnmarshalSimple(b *testing.B) {
 		A string
 	}{}
 	doc := []byte(`A = "hello"`)
+	b.SetBytes(int64(len(doc)))
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		err := toml.Unmarshal(doc, &d)
 		if err != nil {
