@@ -126,8 +126,6 @@ func (s *SeenTracker) checkTable(node ast.Node) error {
 		parentIdx = idx
 	}
 
-	//parentIdx := s.createTablesFromKey(&it, -1)
-
 	k := it.Node().Data
 	idx := s.find(parentIdx, k)
 
@@ -151,8 +149,6 @@ func (s *SeenTracker) checkTable(node ast.Node) error {
 
 func (s *SeenTracker) checkArrayTable(node ast.Node) error {
 	it := node.Key()
-
-	//parentIdx := s.createTablesFromKey(&it, -1)
 
 	parentIdx := -1
 
@@ -236,24 +232,4 @@ func (s *SeenTracker) find(parentIdx int, k []byte) int {
 	}
 
 	return -1
-}
-
-func (s *SeenTracker) createTablesFromKey(it *ast.Iterator, parentIdx int) int {
-	// handle the first parts of the key, excluding the last one
-	for it.Next() {
-		if !it.Node().Next().Valid() {
-			break
-		}
-
-		k := it.Node().Data
-
-		idx := s.find(parentIdx, k)
-
-		if idx < 0 {
-			idx = s.create(parentIdx, k, tableKind, false)
-		}
-		parentIdx = idx
-	}
-
-	return parentIdx
 }
