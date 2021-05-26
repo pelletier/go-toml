@@ -35,7 +35,7 @@ func (k keyKind) String() string {
 type SeenTracker struct {
 	entries    []entry
 	currentIdx int
-	nextId     int
+	nextID     int
 }
 
 type entry struct {
@@ -53,9 +53,9 @@ func (s *SeenTracker) clear(idx int) {
 	s.entries = s.entries[:idx+1+len(rest)]
 }
 
-func clear(parentId int, entries []entry) []entry {
+func clear(parentID int, entries []entry) []entry {
 	for i := 0; i < len(entries); {
-		if entries[i].parent == parentId {
+		if entries[i].parent == parentID {
 			id := entries[i].id
 			copy(entries[i:], entries[i+1:])
 			entries = entries[:len(entries)-1]
@@ -69,17 +69,17 @@ func clear(parentId int, entries []entry) []entry {
 }
 
 func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit bool) int {
-	parentId := s.id(parentIdx)
+	parentID := s.id(parentIdx)
 
 	idx := len(s.entries)
 	s.entries = append(s.entries, entry{
-		id:       s.nextId,
-		parent:   parentId,
+		id:       s.nextID,
+		parent:   parentID,
 		name:     name,
 		kind:     kind,
 		explicit: explicit,
 	})
-	s.nextId++
+	s.nextID++
 	return idx
 }
 
@@ -90,7 +90,7 @@ func (s *SeenTracker) CheckExpression(node ast.Node) error {
 		//s.entries = make([]entry, 0, 8)
 		// Skip ID = 0 to remove the confusion between nodes whose parent has
 		// id 0 and root nodes (parent id is 0 because it's the zero value).
-		s.nextId = 1
+		s.nextID = 1
 		// Start unscoped, so idx is negative.
 		s.currentIdx = -1
 	}
@@ -227,10 +227,10 @@ func (s *SeenTracker) id(idx int) int {
 }
 
 func (s *SeenTracker) find(parentIdx int, k []byte) int {
-	parentId := s.id(parentIdx)
+	parentID := s.id(parentIdx)
 
 	for i := parentIdx + 1; i < len(s.entries); i++ {
-		if s.entries[i].parent == parentId && bytes.Equal(s.entries[i].name, k) {
+		if s.entries[i].parent == parentID && bytes.Equal(s.entries[i].name, k) {
 			return i
 		}
 	}
