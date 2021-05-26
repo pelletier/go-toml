@@ -30,8 +30,27 @@ func (k keyKind) String() string {
 	panic("missing keyKind string mapping")
 }
 
-// SeenTracker tracks which keys have been seen with which TOML type to flag duplicates
-// and mismatches according to the spec.
+// SeenTracker tracks which keys have been seen with which TOML type to flag
+// duplicates and mismatches according to the spec.
+//
+// Each node in the visited tree is represented by an entry. Each entry has an
+// identifier, which is provided by a counter. Entries are stored in the array
+// entries. As new nodes are discovered (referenced for the first time in the
+// TOML document), entries are created and appended to the array. An entry
+// points to its parent using its id.
+//
+// To find whether a given key (sequence of []byte) has already been visited,
+// the entries are linearly searched, looking for one with the right name and
+// parent id.
+//
+// Given that all keys appear in the document after their parent, it is
+// guaranteed that all descendants of a node are stored after the node, this
+// speeds up the search process.
+//
+// When encountering [[array tables]], the descendants of that node are removed
+// to allow that branch of the tree to be "rediscovered". To maintain the
+// invariant above, the deletion process needs to keep the order of entries.
+// This results in more copies in that case.
 type SeenTracker struct {
 	entries    []entry
 	currentIdx int
@@ -111,6 +130,9 @@ func (s *SeenTracker) checkTable(node ast.Node) error {
 
 	parentIdx := -1
 
+	// This code is duplicated in checkArrayTable. This is because factoring
+	// it in a function requires to copy the iterator, or allocate it to the
+	// heap, which is not cheap.
 	for it.Next() {
 		if !it.Node().Next().Valid() {
 			break
