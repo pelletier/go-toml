@@ -209,10 +209,6 @@ Rules for the unmarshal code:
 */
 
 func (d *decoder) handleRootExpression(expr ast.Node, v reflect.Value) error {
-	if !expr.Valid() {
-		panic("should only be called with a valid expression")
-	}
-
 	var x reflect.Value
 	var err error
 
@@ -275,7 +271,7 @@ func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Val
 				elem = nelem
 			}
 		}
-		return d.handleArrayTableCollection(key, elem)
+		return d.handleArrayTableCollectionLast(key, elem)
 	case reflect.Ptr:
 		elem := v.Elem()
 		if !elem.IsValid() {
@@ -284,7 +280,7 @@ func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Val
 			elem = ptr.Elem()
 		}
 
-		elem, err := d.handleArrayTableCollection(key, elem)
+		elem, err := d.handleArrayTableCollectionLast(key, elem)
 		if err != nil {
 			return reflect.Value{}, err
 		}
@@ -319,7 +315,7 @@ func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Val
 // point to the last element of the collection. Unless it is the last part of
 // the key, then it needs to create a new element at the end.
 func (d *decoder) handleArrayTableCollection(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
-	if !key.Node().Next().Valid() {
+	if key.IsLast() {
 		return d.handleArrayTableCollectionLast(key, v)
 	}
 
@@ -454,13 +450,9 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 // HandleArrayTablePart navigates the Go structure v using the key v. It is
 // only used for the prefix (non-last) parts of an array-table. When
 // encountering a collection, it should go to the last element.
-//
-// TODO: this function is basically a copy-paste from handleArrayPart.
-//   Find a way to refactor.
 func (d *decoder) handleArrayTablePart(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
 	var makeFn valueMakerFn
-	last := !key.Node().Next().Valid()
-	if last {
+	if key.IsLast() {
 		makeFn = makeSliceInterface
 	} else {
 		makeFn = makeMapStringInterface
@@ -971,8 +963,7 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value ast.Node, v reflect
 			set = true
 			mv = reflect.New(v.Type().Elem()).Elem()
 		} else {
-			last := !key.Node().Next().Valid()
-			if last {
+			if key.IsLast() {
 				var x interface{}
 				mv = reflect.ValueOf(&x).Elem()
 				set = true

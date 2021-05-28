@@ -106,7 +106,7 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 // that have been seen in previous calls, and validates that types are consistent.
 func (s *SeenTracker) CheckExpression(node ast.Node) error {
 	if s.entries == nil {
-		//s.entries = make([]entry, 0, 8)
+		// s.entries = make([]entry, 0, 8)
 		// Skip ID = 0 to remove the confusion between nodes whose parent has
 		// id 0 and root nodes (parent id is 0 because it's the zero value).
 		s.nextID = 1
@@ -134,7 +134,7 @@ func (s *SeenTracker) checkTable(node ast.Node) error {
 	// it in a function requires to copy the iterator, or allocate it to the
 	// heap, which is not cheap.
 	for it.Next() {
-		if !it.Node().Next().Valid() {
+		if it.IsLast() {
 			break
 		}
 
@@ -175,7 +175,7 @@ func (s *SeenTracker) checkArrayTable(node ast.Node) error {
 	parentIdx := -1
 
 	for it.Next() {
-		if !it.Node().Next().Valid() {
+		if it.IsLast() {
 			break
 		}
 

@@ -28,6 +28,12 @@ func (c *Iterator) Next() bool {
 	return c.node.Valid()
 }
 
+// IsLast returns true if the current node of the iterator is the last one.
+// Subsequent call to Next() will return false.
+func (c *Iterator) IsLast() bool {
+	return c.node.next <= 0
+}
+
 // Node returns a copy of the node pointed at by the iterator.
 func (c *Iterator) Node() Node {
 	return c.node
