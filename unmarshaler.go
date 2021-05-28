@@ -520,9 +520,7 @@ func makeMapStringInterface() reflect.Value {
 }
 
 func makeSliceInterface() reflect.Value {
-	mv := reflect.New(sliceInterfaceType).Elem()
-	mv.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
-	return mv
+	return reflect.MakeSlice(sliceInterfaceType, 0, 16)
 }
 
 func (d *decoder) handleTablePart(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
