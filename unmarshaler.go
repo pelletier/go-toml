@@ -198,6 +198,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 			err = d.unmarshalKeyValue(current, node)
 			found = true
 		case ast.Table:
+			skipUntilTable = false
 			d.strict.EnterTable(node)
 
 			current, found, err = d.scopeWithKey(root, node.Key())
@@ -210,6 +211,7 @@ func (d *decoder) fromParser(p *parser, v interface{}) error {
 				ensureMapIfInterface(current)
 			}
 		case ast.ArrayTable:
+			skipUntilTable = false
 			d.strict.EnterArrayTable(node)
 			current, found, err = d.scopeWithArrayTable(root, node.Key())
 		default:
