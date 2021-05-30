@@ -57,7 +57,7 @@ type benchmarkDoc struct {
 			}
 			Point struct {
 				X int64
-				U int64
+				Y int64
 			}
 		}
 	}
@@ -130,6 +130,7 @@ type benchmarkDoc struct {
 		Key2 []string
 		Key3 [][]int64
 		// TODO: Key4 not supported by go-toml's Unmarshal
+		Key4 []interface{}
 		Key5 []int64
 		Key6 []int64
 	}
@@ -141,11 +142,11 @@ type benchmarkDoc struct {
 	Fruit []struct {
 		Name     string
 		Physical struct {
-			Color   string
-			Shape   string
-			Variety []struct {
-				Name string
-			}
+			Color string
+			Shape string
+		}
+		Variety []struct {
+			Name string
 		}
 	}
 }
@@ -201,7 +202,7 @@ func TestReferenceFile(t *testing.T) {
 				}
 				Point struct {
 					X int64
-					U int64
+					Y int64
 				}
 			}
 		}{
@@ -209,7 +210,7 @@ func TestReferenceFile(t *testing.T) {
 			Subtable: struct{ Key string }{
 				Key: "another value",
 			},
-			// note: x.y.z.w is missing
+			// note: x.y.z.w is purposefully missing
 			Inline: struct {
 				Name struct {
 					First string
@@ -217,7 +218,7 @@ func TestReferenceFile(t *testing.T) {
 				}
 				Point struct {
 					X int64
-					U int64
+					Y int64
 				}
 			}{
 				Name: struct {
@@ -229,12 +230,10 @@ func TestReferenceFile(t *testing.T) {
 				},
 				Point: struct {
 					X int64
-					U int64
+					Y int64
 				}{
 					X: 1,
-
-					// note: should be Y, not U
-					// Y: 2,
+					Y: 2,
 				},
 			},
 		},
@@ -408,13 +407,17 @@ trimmed in raw strings.
 			Key1 []int64
 			Key2 []string
 			Key3 [][]int64
+			Key4 []interface{}
 			Key5 []int64
 			Key6 []int64
 		}{
 			Key1: []int64{1, 2, 3},
 			Key2: []string{"red", "yellow", "green"},
 			Key3: [][]int64{{1, 2}, {3, 4, 5}},
-			// note: add key4
+			Key4: []interface{}{
+				[]interface{}{int64(1), int64(2)},
+				[]interface{}{"a", "b", "c"},
+			},
 			Key5: []int64{1, 2, 3},
 			Key6: []int64{1, 2},
 		},
@@ -437,27 +440,30 @@ trimmed in raw strings.
 		Fruit: []struct {
 			Name     string
 			Physical struct {
-				Color   string
-				Shape   string
-				Variety []struct{ Name string }
+				Color string
+				Shape string
 			}
+			Variety []struct{ Name string }
 		}{
 			{
 				Name: "apple",
 				Physical: struct {
-					Color   string
-					Shape   string
-					Variety []struct{ Name string }
+					Color string
+					Shape string
 				}{
 					Color: "red",
 					Shape: "round",
 				},
-
-				// note: variety is missing
+				Variety: []struct{ Name string }{
+					{Name: "red delicious"},
+					{Name: "granny smith"},
+				},
 			},
 			{
 				Name: "banana",
-				// variety is missing
+				Variety: []struct{ Name string }{
+					{Name: "plantain"},
+				},
 			},
 		},
 	}
