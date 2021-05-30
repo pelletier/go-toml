@@ -189,6 +189,280 @@ func TestReferenceFile(t *testing.T) {
 	d := benchmarkDoc{}
 	err = toml.Unmarshal(bytes, &d)
 	require.NoError(t, err)
+
+	expected := benchmarkDoc{
+		Table: struct {
+			Key      string
+			Subtable struct{ Key string }
+			Inline   struct {
+				Name struct {
+					First string
+					Last  string
+				}
+				Point struct {
+					X int64
+					U int64
+				}
+			}
+		}{
+			Key: "value",
+			Subtable: struct{ Key string }{
+				Key: "another value",
+			},
+			// note: x.y.z.w is missing
+			Inline: struct {
+				Name struct {
+					First string
+					Last  string
+				}
+				Point struct {
+					X int64
+					U int64
+				}
+			}{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "Tom",
+					Last:  "Preston-Werner",
+				},
+				Point: struct {
+					X int64
+					U int64
+				}{
+					X: 1,
+
+					// note: should be Y, not U
+					// Y: 2,
+				},
+			},
+		},
+		String: struct {
+			Basic     struct{ Basic string }
+			Multiline struct {
+				Key1      string
+				Key2      string
+				Key3      string
+				Continued struct {
+					Key1 string
+					Key2 string
+					Key3 string
+				}
+			}
+			Literal struct {
+				Winpath   string
+				Winpath2  string
+				Quoted    string
+				Regex     string
+				Multiline struct {
+					Regex2 string
+					Lines  string
+				}
+			}
+		}{
+			Basic: struct{ Basic string }{
+				Basic: "I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF.",
+			},
+			Multiline: struct {
+				Key1      string
+				Key2      string
+				Key3      string
+				Continued struct {
+					Key1 string
+					Key2 string
+					Key3 string
+				}
+			}{
+				Key1: "One\nTwo",
+				Key2: "One\nTwo",
+				Key3: "One\nTwo",
+
+				Continued: struct {
+					Key1 string
+					Key2 string
+					Key3 string
+				}{
+					Key1: `The quick brown fox jumps over the lazy dog.`,
+					Key2: `The quick brown fox jumps over the lazy dog.`,
+					Key3: `The quick brown fox jumps over the lazy dog.`,
+				},
+			},
+			Literal: struct {
+				Winpath   string
+				Winpath2  string
+				Quoted    string
+				Regex     string
+				Multiline struct {
+					Regex2 string
+					Lines  string
+				}
+			}{
+				Winpath:  `C:\Users\nodejs\templates`,
+				Winpath2: `\\ServerX\admin$\system32\`,
+				Quoted:   `Tom "Dubs" Preston-Werner`,
+				Regex:    `<\i\c*\s*>`,
+
+				Multiline: struct {
+					Regex2 string
+					Lines  string
+				}{
+					Regex2: `I [dw]on't need \d{2} apples`,
+					Lines: `The first newline is
+trimmed in raw strings.
+   All other whitespace
+   is preserved.
+`,
+				},
+			},
+		},
+		Integer: struct {
+			Key1        int64
+			Key2        int64
+			Key3        int64
+			Key4        int64
+			Underscores struct {
+				Key1 int64
+				Key2 int64
+				Key3 int64
+			}
+		}{
+			Key1: 99,
+			Key2: 42,
+			Key3: 0,
+			Key4: -17,
+
+			Underscores: struct {
+				Key1 int64
+				Key2 int64
+				Key3 int64
+			}{
+				Key1: 1000,
+				Key2: 5349221,
+				Key3: 12345,
+			},
+		},
+		Float: struct {
+			Fractional struct {
+				Key1 float64
+				Key2 float64
+				Key3 float64
+			}
+			Exponent struct {
+				Key1 float64
+				Key2 float64
+				Key3 float64
+			}
+			Both        struct{ Key float64 }
+			Underscores struct {
+				Key1 float64
+				Key2 float64
+			}
+		}{
+			Fractional: struct {
+				Key1 float64
+				Key2 float64
+				Key3 float64
+			}{
+				Key1: 1.0,
+				Key2: 3.1415,
+				Key3: -0.01,
+			},
+			Exponent: struct {
+				Key1 float64
+				Key2 float64
+				Key3 float64
+			}{
+				Key1: 5e+22,
+				Key2: 1e6,
+				Key3: -2e-2,
+			},
+			Both: struct{ Key float64 }{
+				Key: 6.626e-34,
+			},
+			Underscores: struct {
+				Key1 float64
+				Key2 float64
+			}{
+				Key1: 9224617.445991228313,
+				Key2: 1e100,
+			},
+		},
+		Boolean: struct {
+			True  bool
+			False bool
+		}{
+			True:  true,
+			False: false,
+		},
+		Datetime: struct {
+			Key1 time.Time
+			Key2 time.Time
+			Key3 time.Time
+		}{
+			Key1: time.Date(1979, 5, 27, 7, 32, 0, 0, time.UTC),
+			Key2: time.Date(1979, 5, 27, 0, 32, 0, 0, time.FixedZone("", -7*3600)),
+			Key3: time.Date(1979, 5, 27, 0, 32, 0, 999999000, time.FixedZone("", -7*3600)),
+		},
+		Array: struct {
+			Key1 []int64
+			Key2 []string
+			Key3 [][]int64
+			Key5 []int64
+			Key6 []int64
+		}{
+			Key1: []int64{1, 2, 3},
+			Key2: []string{"red", "yellow", "green"},
+			Key3: [][]int64{{1, 2}, {3, 4, 5}},
+			// note: add key4
+			Key5: []int64{1, 2, 3},
+			Key6: []int64{1, 2},
+		},
+		Products: []struct {
+			Name  string
+			Sku   int64
+			Color string
+		}{
+			{
+				Name: "Hammer",
+				Sku:  738594937,
+			},
+			{},
+			{
+				Name:  "Nail",
+				Sku:   284758393,
+				Color: "gray",
+			},
+		},
+		Fruit: []struct {
+			Name     string
+			Physical struct {
+				Color   string
+				Shape   string
+				Variety []struct{ Name string }
+			}
+		}{
+			{
+				Name: "apple",
+				Physical: struct {
+					Color   string
+					Shape   string
+					Variety []struct{ Name string }
+				}{
+					Color: "red",
+					Shape: "round",
+				},
+
+				// note: variety is missing
+			},
+			{
+				Name: "banana",
+				// variety is missing
+			},
+		},
+	}
+
+	require.Equal(t, expected, d)
 }
 
 func BenchmarkHugoFrontMatter(b *testing.B) {
