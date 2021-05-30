@@ -212,9 +212,11 @@ func (d *decoder) handleRootExpression(expr ast.Node, v reflect.Value) error {
 	var x reflect.Value
 	var err error
 
-	err = d.seen.CheckExpression(expr)
-	if err != nil {
-		return err
+	if !(d.skipUntilTable && expr.Kind == ast.KeyValue) {
+		err = d.seen.CheckExpression(expr)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch expr.Kind {
@@ -247,6 +249,9 @@ func (d *decoder) handleRootExpression(expr ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) handleArrayTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	if d.skipUntilTable {
+		return reflect.Value{}, nil
+	}
 	if key.Next() {
 		return d.handleArrayTablePart(key, v)
 	}
@@ -463,6 +468,9 @@ func (d *decoder) handleArrayTablePart(key ast.Iterator, v reflect.Value) (refle
 // HandleTable returns a reference when it has checked the next expression but
 // cannot handle it.
 func (d *decoder) handleTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
+	if d.skipUntilTable {
+		return reflect.Value{}, nil
+	}
 	if v.Kind() == reflect.Slice {
 		elem := v.Index(v.Len() - 1)
 		x, err := d.handleTable(key, elem)
@@ -907,6 +915,10 @@ func (d *decoder) unmarshalString(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) handleKeyValue(expr ast.Node, v reflect.Value) (reflect.Value, error) {
+	if d.skipUntilTable {
+		return reflect.Value{}, nil
+	}
+
 	d.strict.EnterKeyValue(expr)
 
 	v, err := d.handleKeyValueInner(expr.Key(), expr.Value(), v)
