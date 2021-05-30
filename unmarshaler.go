@@ -249,9 +249,6 @@ func (d *decoder) handleRootExpression(expr ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) handleArrayTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
-	if d.skipUntilTable {
-		return reflect.Value{}, nil
-	}
 	if key.Next() {
 		return d.handleArrayTablePart(key, v)
 	}
@@ -468,9 +465,6 @@ func (d *decoder) handleArrayTablePart(key ast.Iterator, v reflect.Value) (refle
 // HandleTable returns a reference when it has checked the next expression but
 // cannot handle it.
 func (d *decoder) handleTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
-	if d.skipUntilTable {
-		return reflect.Value{}, nil
-	}
 	if v.Kind() == reflect.Slice {
 		elem := v.Index(v.Len() - 1)
 		x, err := d.handleTable(key, elem)
@@ -546,19 +540,6 @@ func tryTextUnmarshaler(node ast.Node, v reflect.Value) (bool, error) {
 		return false, nil
 	}
 
-	if v.Type().Implements(textUnmarshalerType) {
-		err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
-		if err != nil {
-			return false, fmt.Errorf("toml: error calling UnmarshalText: %w", err)
-			// TODO: use newDecodeError.
-			//   Problem: node.Data is pointing to a parsed string, so it is
-			//   not a reference to the doc anymore.
-			// return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
-		}
-
-		return true, nil
-	}
-
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
@@ -574,8 +555,6 @@ func tryTextUnmarshaler(node ast.Node, v reflect.Value) (bool, error) {
 }
 
 func (d *decoder) handleValue(value ast.Node, v reflect.Value) error {
-	assertSettable(v)
-
 	for v.Kind() == reflect.Ptr {
 		v = initAndDereferencePointer(v)
 	}
@@ -610,8 +589,6 @@ func (d *decoder) handleValue(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalArray(array ast.Node, v reflect.Value) error {
-	assertNode(ast.Array, array)
-
 	switch v.Kind() {
 	case reflect.Slice:
 		if v.IsNil() {
@@ -683,8 +660,6 @@ func (d *decoder) unmarshalArray(array ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalInlineTable(itable ast.Node, v reflect.Value) error {
-	assertNode(ast.InlineTable, itable)
-
 	// Make sure v is an initialized object.
 	switch v.Kind() {
 	case reflect.Map:
@@ -721,8 +696,6 @@ func (d *decoder) unmarshalInlineTable(itable ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalDateTime(value ast.Node, v reflect.Value) error {
-	assertNode(ast.DateTime, value)
-
 	dt, err := parseDateTime(value.Data)
 	if err != nil {
 		return err
@@ -733,8 +706,6 @@ func (d *decoder) unmarshalDateTime(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalLocalDate(value ast.Node, v reflect.Value) error {
-	assertNode(ast.LocalDate, value)
-
 	ld, err := parseLocalDate(value.Data)
 	if err != nil {
 		return err
@@ -753,8 +724,6 @@ func (d *decoder) unmarshalLocalDate(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalLocalDateTime(value ast.Node, v reflect.Value) error {
-	assertNode(ast.LocalDateTime, value)
-
 	ldt, rest, err := parseLocalDateTime(value.Data)
 	if err != nil {
 		return err
@@ -777,7 +746,6 @@ func (d *decoder) unmarshalLocalDateTime(value ast.Node, v reflect.Value) error 
 }
 
 func (d *decoder) unmarshalBool(value ast.Node, v reflect.Value) error {
-	assertNode(ast.Bool, value)
 	b := value.Data[0] == 't'
 
 	switch v.Kind() {
@@ -793,8 +761,6 @@ func (d *decoder) unmarshalBool(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalFloat(value ast.Node, v reflect.Value) error {
-	assertNode(ast.Float, value)
-
 	f, err := parseFloat(value.Data)
 	if err != nil {
 		return err
@@ -818,8 +784,6 @@ func (d *decoder) unmarshalFloat(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalInteger(value ast.Node, v reflect.Value) error {
-	assertNode(ast.Integer, value)
-
 	const (
 		maxInt = int64(^uint(0) >> 1)
 		minInt = -maxInt - 1
@@ -898,8 +862,6 @@ func (d *decoder) unmarshalInteger(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalString(value ast.Node, v reflect.Value) error {
-	assertNode(ast.String, value)
-
 	var err error
 
 	switch v.Kind() {
@@ -915,10 +877,6 @@ func (d *decoder) unmarshalString(value ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) handleKeyValue(expr ast.Node, v reflect.Value) (reflect.Value, error) {
-	if d.skipUntilTable {
-		return reflect.Value{}, nil
-	}
-
 	d.strict.EnterKeyValue(expr)
 
 	v, err := d.handleKeyValueInner(expr.Key(), expr.Value(), v)
@@ -1137,19 +1095,4 @@ func structField(v reflect.Value, name string) (reflect.Value, bool) {
 	}
 
 	return v.FieldByIndex(path), true
-}
-
-func assertNode(expected ast.Kind, node ast.Node) {
-	if node.Kind != expected {
-		panic(fmt.Sprintf("expected node of kind %s, not %s", expected, node.Kind))
-	}
-}
-
-func assertSettable(v reflect.Value) {
-	if !v.CanAddr() {
-		panic(fmt.Errorf("%s is not addressable (kind: %s)", v, v.Kind()))
-	}
-	if !v.CanSet() {
-		panic(fmt.Errorf("%s is not settable", v))
-	}
 }

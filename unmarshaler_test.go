@@ -14,6 +14,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type badReader struct{}
+
+func (r *badReader) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("testing error")
+}
+
+func TestDecodeReaderError(t *testing.T) {
+	r := &badReader{}
+
+	dec := toml.NewDecoder(r)
+	m := map[string]interface{}{}
+	err := dec.Decode(&m)
+	require.Error(t, err)
+}
+
 // nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	examples := []struct {
@@ -805,6 +820,240 @@ B = "data"`,
 			},
 		},
 		{
+			desc: "array table into interface in struct",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: []interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into interface in struct already initialized with right type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo interface{}
+				}
+				return test{
+					target: &doc{
+						Foo: []interface{}{},
+					},
+					expected: &doc{
+						Foo: []interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into interface in struct already initialized with wrong type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo interface{}
+				}
+				return test{
+					target: &doc{
+						Foo: []string{},
+					},
+					expected: &doc{
+						Foo: []interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into nil ptr",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo *[]interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &[]interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into nil ptr of invalid type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo *string
+				}
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc: "array table with intermediate ptr",
+			input: `[[foo.bar]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo *map[string]interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &map[string]interface{}{
+							"bar": []interface{}{
+								map[string]interface{}{
+									"bar": "hello",
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal array into interface that contains a slice",
+			input: `a = [1,2,3]`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{
+						A: []string{},
+					},
+					expected: &doc{
+						A: []interface{}{
+							int64(1),
+							int64(2),
+							int64(3),
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal array into interface that contains a []interface{}",
+			input: `a = [1,2,3]`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{
+						A: []interface{}{},
+					},
+					expected: &doc{
+						A: []interface{}{
+							int64(1),
+							int64(2),
+							int64(3),
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal key into map with existing value",
+			input: `a = "new"`,
+			gen: func() test {
+				return test{
+					target:   &map[string]interface{}{"a": "old"},
+					expected: &map[string]interface{}{"a": "new"},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal key into map with existing value",
+			input: `a.b = "new"`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: map[string]interface{}{
+							"b": "new",
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal array into struct field with existing array",
+			input: `a = [1,2]`,
+			gen: func() test {
+				type doc struct {
+					A []int
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: []int{1, 2},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal inline table into map",
+			input: `a = {b="hello"}`,
+			gen: func() test {
+				type doc struct {
+					A map[string]interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: map[string]interface{}{
+							"b": "hello",
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal inline table into map of incorrect type",
+			input: `a = {b="hello"}`,
+			gen: func() test {
+				type doc struct {
+					A map[string]int
+				}
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc:  "slice pointer in slice pointer",
 			input: `A = ["Hello"]`,
 			gen: func() test {
@@ -1227,6 +1476,16 @@ func TestUnmarshalOverflows(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestUnmarshalInvalidTarget(t *testing.T) {
+	x := "foo"
+	err := toml.Unmarshal([]byte{}, x)
+	require.Error(t, err)
+
+	var m *map[string]interface{}
+	err = toml.Unmarshal([]byte{}, m)
+	require.Error(t, err)
 }
 
 func TestUnmarshalFloat32(t *testing.T) {
