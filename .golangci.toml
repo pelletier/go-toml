@@ -60,7 +60,7 @@ enable = [
     # "nlreturn",
     "noctx",
     "nolintlint",
-    "paralleltest",
+    #"paralleltest",
     "prealloc",
     "predeclared",
     "revive",

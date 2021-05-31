@@ -9,6 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUnmarshalSimple(t *testing.T) {
+	doc := []byte(`A = "hello"`)
+	d := struct {
+		A string
+	}{}
+
+	err := toml.Unmarshal(doc, &d)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func BenchmarkUnmarshalSimple(b *testing.B) {
 	doc := []byte(`A = "hello"`)
 

@@ -3,6 +3,7 @@ package toml
 import (
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
+	"github.com/pelletier/go-toml/v2/internal/unsafe"
 )
 
 type strict struct {
@@ -85,4 +86,22 @@ func (s *strict) Error(doc []byte) error {
 	}
 
 	return err
+}
+
+func keyLocation(node ast.Node) []byte {
+	k := node.Key()
+
+	hasOne := k.Next()
+	if !hasOne {
+		panic("should not be called with empty key")
+	}
+
+	start := k.Node().Data
+	end := k.Node().Data
+
+	for k.Next() {
+		end = k.Node().Data
+	}
+
+	return unsafe.BytesRange(start, end)
 }

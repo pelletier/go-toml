@@ -12,7 +12,6 @@ import (
 
 //nolint:funlen
 func TestDecodeError(t *testing.T) {
-	t.Parallel()
 
 	examples := []struct {
 		desc     string
@@ -154,7 +153,7 @@ line 5`,
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
+
 			b := bytes.Buffer{}
 			b.Write([]byte(e.doc[0]))
 			start := b.Len()
@@ -182,7 +181,6 @@ line 5`,
 }
 
 func TestDecodeError_Accessors(t *testing.T) {
-	t.Parallel()
 
 	e := DecodeError{
 		message: "foo",

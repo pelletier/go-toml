@@ -14,10 +14,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type badReader struct{}
+
+func (r *badReader) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("testing error")
+}
+
+func TestDecodeReaderError(t *testing.T) {
+	r := &badReader{}
+
+	dec := toml.NewDecoder(r)
+	m := map[string]interface{}{}
+	err := dec.Decode(&m)
+	require.Error(t, err)
+}
+
 // nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
-	t.Parallel()
-
 	examples := []struct {
 		desc     string
 		input    string
@@ -88,8 +101,6 @@ func TestUnmarshal_Integers(t *testing.T) {
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
-
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			if e.err {
@@ -104,8 +115,6 @@ func TestUnmarshal_Integers(t *testing.T) {
 
 //nolint:funlen
 func TestUnmarshal_Floats(t *testing.T) {
-	t.Parallel()
-
 	examples := []struct {
 		desc     string
 		input    string
@@ -197,8 +206,6 @@ func TestUnmarshal_Floats(t *testing.T) {
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
-
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			require.NoError(t, err)
@@ -213,8 +220,6 @@ func TestUnmarshal_Floats(t *testing.T) {
 
 //nolint:funlen
 func TestUnmarshal(t *testing.T) {
-	t.Parallel()
-
 	type test struct {
 		target   interface{}
 		expected interface{}
@@ -815,6 +820,240 @@ B = "data"`,
 			},
 		},
 		{
+			desc: "array table into interface in struct",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: []interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into interface in struct already initialized with right type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo interface{}
+				}
+				return test{
+					target: &doc{
+						Foo: []interface{}{},
+					},
+					expected: &doc{
+						Foo: []interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into interface in struct already initialized with wrong type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo interface{}
+				}
+				return test{
+					target: &doc{
+						Foo: []string{},
+					},
+					expected: &doc{
+						Foo: []interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into nil ptr",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo *[]interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &[]interface{}{
+							map[string]interface{}{
+								"bar": "hello",
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into nil ptr of invalid type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo *string
+				}
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc: "array table with intermediate ptr",
+			input: `[[foo.bar]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo *map[string]interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &map[string]interface{}{
+							"bar": []interface{}{
+								map[string]interface{}{
+									"bar": "hello",
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal array into interface that contains a slice",
+			input: `a = [1,2,3]`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{
+						A: []string{},
+					},
+					expected: &doc{
+						A: []interface{}{
+							int64(1),
+							int64(2),
+							int64(3),
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal array into interface that contains a []interface{}",
+			input: `a = [1,2,3]`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{
+						A: []interface{}{},
+					},
+					expected: &doc{
+						A: []interface{}{
+							int64(1),
+							int64(2),
+							int64(3),
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal key into map with existing value",
+			input: `a = "new"`,
+			gen: func() test {
+				return test{
+					target:   &map[string]interface{}{"a": "old"},
+					expected: &map[string]interface{}{"a": "new"},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal key into map with existing value",
+			input: `a.b = "new"`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: map[string]interface{}{
+							"b": "new",
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal array into struct field with existing array",
+			input: `a = [1,2]`,
+			gen: func() test {
+				type doc struct {
+					A []int
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: []int{1, 2},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal inline table into map",
+			input: `a = {b="hello"}`,
+			gen: func() test {
+				type doc struct {
+					A map[string]interface{}
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: map[string]interface{}{
+							"b": "hello",
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "unmarshal inline table into map of incorrect type",
+			input: `a = {b="hello"}`,
+			gen: func() test {
+				type doc struct {
+					A map[string]int
+				}
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc:  "slice pointer in slice pointer",
 			input: `A = ["Hello"]`,
 			gen: func() test {
@@ -1155,8 +1394,6 @@ B = "data"`,
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
-
 			if e.skip {
 				t.Skip()
 			}
@@ -1241,6 +1478,16 @@ func TestUnmarshalOverflows(t *testing.T) {
 	}
 }
 
+func TestUnmarshalInvalidTarget(t *testing.T) {
+	x := "foo"
+	err := toml.Unmarshal([]byte{}, x)
+	require.Error(t, err)
+
+	var m *map[string]interface{}
+	err = toml.Unmarshal([]byte{}, m)
+	require.Error(t, err)
+}
+
 func TestUnmarshalFloat32(t *testing.T) {
 	t.Run("fits", func(t *testing.T) {
 		doc := "A = 1.2"
@@ -1277,8 +1524,6 @@ type Config484 struct {
 }
 
 func TestIssue484(t *testing.T) {
-	t.Parallel()
-
 	raw := []byte(`integers = ["1","2","3","100"]`)
 
 	var cfg Config484
@@ -1299,8 +1544,6 @@ func (m Map458) A(s string) Slice458 {
 }
 
 func TestIssue458(t *testing.T) {
-	t.Parallel()
-
 	s := []byte(`[[package]]
 dependencies = ["regex"]
 name = "decode"
@@ -1320,8 +1563,6 @@ version = "0.1.0"`)
 }
 
 func TestIssue252(t *testing.T) {
-	t.Parallel()
-
 	type config struct {
 		Val1 string `toml:"val1"`
 		Val2 string `toml:"val2"`
@@ -1342,8 +1583,6 @@ val1 = "test1"
 }
 
 func TestIssue494(t *testing.T) {
-	t.Parallel()
-
 	data := `
 foo = 2021-04-08
 bar = 2021-04-08
@@ -1359,8 +1598,6 @@ bar = 2021-04-08
 }
 
 func TestIssue507(t *testing.T) {
-	t.Parallel()
-
 	data := []byte{'0', '=', '\n', '0', 'a', 'm', 'e'}
 	m := map[string]interface{}{}
 	err := toml.Unmarshal(data, &m)
@@ -1369,8 +1606,6 @@ func TestIssue507(t *testing.T) {
 
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
-	t.Parallel()
-
 	examples := []struct {
 		desc string
 		data string
@@ -1603,8 +1838,6 @@ world'`,
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
-
 			m := map[string]interface{}{}
 			err := toml.Unmarshal([]byte(e.data), &m)
 			require.Error(t, err)
@@ -1624,8 +1857,6 @@ world'`,
 
 //nolint:funlen
 func TestLocalDateTime(t *testing.T) {
-	t.Parallel()
-
 	examples := []struct {
 		desc  string
 		input string
@@ -1675,7 +1906,6 @@ func TestLocalDateTime(t *testing.T) {
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
 			t.Log("input:", e.input)
 			doc := `a = ` + e.input
 			m := map[string]toml.LocalDateTime{}
@@ -1691,8 +1921,6 @@ func TestLocalDateTime(t *testing.T) {
 }
 
 func TestIssue287(t *testing.T) {
-	t.Parallel()
-
 	b := `y=[[{}]]`
 	v := map[string]interface{}{}
 	err := toml.Unmarshal([]byte(b), &v)
@@ -1709,8 +1937,6 @@ func TestIssue287(t *testing.T) {
 }
 
 func TestIssue508(t *testing.T) {
-	t.Parallel()
-
 	type head struct {
 		Title string `toml:"title"`
 	}
@@ -1729,8 +1955,6 @@ func TestIssue508(t *testing.T) {
 
 //nolint:funlen
 func TestDecoderStrict(t *testing.T) {
-	t.Parallel()
-
 	examples := []struct {
 		desc     string
 		input    string
@@ -1801,8 +2025,6 @@ bar = 42
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-			t.Parallel()
-
 			t.Run("strict", func(t *testing.T) {
 				r := strings.NewReader(e.input)
 				d := toml.NewDecoder(r)
