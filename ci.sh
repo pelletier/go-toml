@@ -168,11 +168,11 @@ benchmark() {
     -a)
         shift
 
-        v2stats=`mktemp --suffix=-go-toml-v2`
+        v2stats=`mktemp -t go-toml-v2`
         bench HEAD "${v2stats}" "github.com/pelletier/go-toml/v2"
-        v1stats=`mktemp --suffix=-go-toml-v1`
+        v1stats=`mktemp -t go-toml-v1`
         bench HEAD "${v1stats}" "github.com/pelletier/go-toml"
-        bsstats=`mktemp --suffix=-bs-toml`
+        bsstats=`mktemp -t bs-toml`
         bench HEAD "${bsstats}" "github.com/BurntSushi/toml"
 
         cp "${v2stats}" go-toml-v2.txt
