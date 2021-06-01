@@ -511,8 +511,6 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 
-	var builder bytes.Buffer
-
 	i := 3
 
 	// skip the immediate new line
@@ -521,6 +519,21 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	} else if token[i] == '\r' && token[i+1] == '\n' {
 		i += 2
 	}
+
+	// fast path
+	startIdx := i
+	endIdx := len(token) - len(`"""`)
+	for ; i < endIdx; i++ {
+		if token[i] == '\\' {
+			break
+		}
+	}
+	if i == endIdx {
+		return token[startIdx:endIdx], rest, nil
+	}
+
+	var builder bytes.Buffer
+	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
 	// escapes are balanced.
@@ -673,11 +686,25 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 
+	// fast path
+	i := len(`"`)
+	startIdx := i
+	endIdx := len(token) - len(`"`)
+	for ; i < endIdx; i++ {
+		if token[i] == '\\' {
+			break
+		}
+	}
+	if i == endIdx {
+		return token[startIdx:endIdx], rest, nil
+	}
+
 	var builder bytes.Buffer
+	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
 	// escapes are balanced.
-	for i := 1; i < len(token)-1; i++ {
+	for ; i < len(token)-1; i++ {
 		c := token[i]
 		if c == '\\' {
 			i++
