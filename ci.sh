@@ -42,6 +42,9 @@ benchmark [OPTIONS...] [BRANCH]
         -a      Compare benchmarks of HEAD against go-toml v1 and
                 BurntSushi/toml.
 
+        -html   When used with -a, emits the output as HTML, ready to be
+                embedded in the README.
+
 coverage [OPTIONS...] [BRANCH]
 
     Generates code coverage.
@@ -150,16 +153,78 @@ bench() {
     fi
 }
 
+fmktemp() {
+    if mktemp --version|grep GNU >/dev/null; then
+        mktemp --suffix=-$1;
+    else
+        mktemp -t $1;
+    fi
+}
+
+benchstathtml() {
+python3 - $1 <<'EOF'
+import sys
+
+lines = []
+stop = False
+
+with open(sys.argv[1]) as f:
+    for line in f.readlines():
+        line = line.strip()
+        if line == "":
+            stop = True
+        if not stop:
+            lines.append(line.split(','))
+
+results = []
+for line in reversed(lines[1:]):
+    v2 = float(line[1])
+    results.append([
+        line[0].replace("-32", ""),
+        "%.1fx" % (float(line[3])/v2),  # v1
+        "%.1fx" % (float(line[5])/v2),  # bs
+    ])
+# move geomean to the end
+results.append(results[0])
+del results[0]
+
+
+def printtable(data):
+    print("""
+<table>
+    <thead>
+        <tr><th>Benchmark</th><th>go-toml v1</th><th>BurntSushi/toml</th></tr>
+    </thead>
+    <tbody>""")
+
+    for r in data:
+        print("        <tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(*r))
+
+    print("""     </tbody>
+</table>""")
+
+
+fold = 3
+printtable(results[:fold])
+print("<details><summary>See more</summary>")
+print('<p>The table above has the results of the most common use-cases. The table below contains the results of all benchmarks, including unrealistic ones. is provided for completeness.</p>')
+printtable(results[fold:])
+print('<p>This table can be generated with <code>./ci.sh benchmark -a -html</code>.</p>')
+print("</details>")
+
+EOF
+}
+
 benchmark() {
     case "$1" in
     -d)
         shift
      	target="${1?Need to provide a target branch argument}"
 
-        old=`mktemp --suffix=-${target}`
+        old=`fmktemp ${target}`
         bench "${target}" "${old}"
 
-        new=`mktemp --suffix=-HEAD`
+        new=`fmktemp HEAD`
         bench HEAD "${new}"
 
         benchstat "${old}" "${new}"
@@ -168,18 +233,24 @@ benchmark() {
     -a)
         shift
 
-        v2stats=`mktemp -t go-toml-v2`
+        v2stats=`fmktemp go-toml-v2`
         bench HEAD "${v2stats}" "github.com/pelletier/go-toml/v2"
-        v1stats=`mktemp -t go-toml-v1`
+        v1stats=`fmktemp go-toml-v1`
         bench HEAD "${v1stats}" "github.com/pelletier/go-toml"
-        bsstats=`mktemp -t bs-toml`
+        bsstats=`fmktemp bs-toml`
         bench HEAD "${bsstats}" "github.com/BurntSushi/toml"
 
         cp "${v2stats}" go-toml-v2.txt
         cp "${v1stats}" go-toml-v1.txt
         cp "${bsstats}" bs-toml.txt
 
-        benchstat -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt
+        if [ "$1" = "-html" ]; then
+            tmpcsv=`fmktemp csv`
+            benchstat -csv -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt > $tmpcsv
+            benchstathtml $tmpcsv
+        else
+            benchstat -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt
+        fi
 
         rm -f go-toml-v2.txt go-toml-v1.txt bs-toml.txt
         return $?

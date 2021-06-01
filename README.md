@@ -4,7 +4,6 @@ Go library for the [TOML](https://toml.io/en/) format.
 
 This library supports [TOML v1.0.0](https://toml.io/en/v1.0.0).
 
-
 ## Development status
 
 This is the upcoming major version of go-toml. It is currently in active
@@ -20,13 +19,11 @@ encouraged to try out this version.
 
 [💬 Anything else](https://github.com/pelletier/go-toml/discussions)
 
-
 ## Documentation
 
 Full API, examples, and implementation notes are available in the Go documentation.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/pelletier/go-toml/v2.svg)](https://pkg.go.dev/github.com/pelletier/go-toml/v2)
-
 
 ## Import
 
@@ -44,7 +41,7 @@ standard library's `encoding/json`.
 ### Performance
 
 While go-toml favors usability, it is written with performance in mind. Most
-operations should not be shockingly slow.
+operations should not be shockingly slow. See [benchmarks](#benchmarks).
 
 ### Strict mode
 
@@ -150,6 +147,43 @@ fmt.Println(string(b))
 
 [marshal]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#Marshal
 
+## Benchmarks
+
+Execution time speedup compared to other Go TOML libraries:
+
+<table>
+    <thead>
+        <tr><th>Benchmark</th><th>go-toml v1</th><th>BurntSushi/toml</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>HugoFrontMatter</td><td>2.6x</td><td>2.2x</td></tr>
+        <tr><td>ReferenceFile/map</td><td>2.8x</td><td>3.0x</td></tr>
+        <tr><td>ReferenceFile/struct</td><td>5.4x</td><td>6.2x</td></tr>
+     </tbody>
+</table>
+<details><summary>See more</summary>
+<p>The table above has the results of the most common use-cases. The table
+below contains the results of all benchmarks, including unrealistic ones. is
+provided for completeness.</p>
+
+<table>
+    <thead>
+        <tr><th>Benchmark</th><th>go-toml v1</th><th>BurntSushi/toml</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>UnmarshalSimple/map</td><td>3.8x</td><td>2.4x</td></tr>
+        <tr><td>UnmarshalSimple/struct</td><td>5.4x</td><td>3.1x</td></tr>
+        <tr><td>UnmarshalDataset/example</td><td>2.8x</td><td>2.0x</td></tr>
+        <tr><td>UnmarshalDataset/code</td><td>1.8x</td><td>2.2x</td></tr>
+        <tr><td>UnmarshalDataset/twitter</td><td>2.5x</td><td>1.8x</td></tr>
+        <tr><td>UnmarshalDataset/citm_catalog</td><td>1.9x</td><td>1.2x</td></tr>
+        <tr><td>UnmarshalDataset/config</td><td>3.0x</td><td>2.5x</td></tr>
+        <tr><td>[Geo mean]</td><td>3.0x</td><td>2.4x</td></tr>
+     </tbody>
+</table>
+<p>This table can be generated with <code>./ci.sh benchmark -a -html</code>.</p>
+</details>
+
 ## Migrating from v1
 
 This section describes the differences between v1 and v2, with some pointers on
@@ -191,7 +225,7 @@ d := doc{
 }
 
 data := `
-[A]                                                                                                                           
+[A]
 B = "After"
 `
 
@@ -252,7 +286,6 @@ This method was not widely used, poorly defined, and added a lot of complexity.
 A similar effect can be achieved by implementing the `encoding.TextUnmarshaler`
 interface and use strings.
 
-
 #### Support for `default` struct tag has been dropped
 
 This feature adds complexity and a poorly defined API for an effect that can be
@@ -311,7 +344,6 @@ manually sort the fields alphabetically in the struct definition.
 V1 automatically indents content of tables by default. V2 does not. However the
 same behavior can be obtained using [`Encoder.SetIndentTables`][sit]. For example:
 
-
 ```go
 data := map[string]interface{}{
 	"table": map[string]string{
@@ -333,15 +365,15 @@ fmt.Println("v2 Encoder:\n" + string(buf.Bytes()))
 
 // Output:
 // v1:
-// 
+//
 // [table]
 //   key = "value"
-// 
+//
 // v2:
 // [table]
 // key = 'value'
-// 
-// 
+//
+//
 // v2 Encoder:
 // [table]
 //   key = 'value'
