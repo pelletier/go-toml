@@ -641,6 +641,9 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 }
 
 func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
+	if !v.IsValid() {
+		return false
+	}
 	if v.Type() == timeType || v.Type().Implements(textMarshalerType) {
 		return false
 	}
