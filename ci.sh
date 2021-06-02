@@ -204,11 +204,18 @@ def printtable(data):
 </table>""")
 
 
-fold = 3
-printtable(results[:fold])
+def match(x):
+    return "ReferenceFile" in x[0] or "HugoFrontMatter" in x[0]
+
+above = [x for x in results if match(x)]
+below = [x for x in results if not match(x)]
+
+printtable(above)
 print("<details><summary>See more</summary>")
-print('<p>The table above has the results of the most common use-cases. The table below contains the results of all benchmarks, including unrealistic ones. is provided for completeness.</p>')
-printtable(results[fold:])
+print("""<p>The table above has the results of the most common use-cases. The table below
+contains the results of all benchmarks, including unrealistic ones. It is
+provided for completeness.</p>""")
+printtable(below)
 print('<p>This table can be generated with <code>./ci.sh benchmark -a -html</code>.</p>')
 print("</details>")
 

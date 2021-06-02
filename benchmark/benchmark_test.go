@@ -1,6 +1,7 @@
 package benchmark_test
 
 import (
+	"bytes"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -21,15 +22,101 @@ func TestUnmarshalSimple(t *testing.T) {
 	}
 }
 
-func BenchmarkUnmarshalSimple(b *testing.B) {
-	doc := []byte(`A = "hello"`)
+func BenchmarkUnmarshal(b *testing.B) {
+	b.Run("SimpleDocument", func(b *testing.B) {
+		doc := []byte(`A = "hello"`)
 
-	b.Run("struct", func(b *testing.B) {
-		b.SetBytes(int64(len(doc)))
+		b.Run("struct", func(b *testing.B) {
+			b.SetBytes(int64(len(doc)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				d := struct {
+					A string
+				}{}
+
+				err := toml.Unmarshal(doc, &d)
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+
+		b.Run("map", func(b *testing.B) {
+			b.SetBytes(int64(len(doc)))
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				d := map[string]interface{}{}
+				err := toml.Unmarshal(doc, &d)
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+	})
+
+	b.Run("ReferenceFile", func(b *testing.B) {
+		bytes, err := ioutil.ReadFile("benchmark.toml")
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.Run("struct", func(b *testing.B) {
+			b.SetBytes(int64(len(bytes)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				d := benchmarkDoc{}
+				err := toml.Unmarshal(bytes, &d)
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+
+		b.Run("map", func(b *testing.B) {
+			b.SetBytes(int64(len(bytes)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				d := map[string]interface{}{}
+				err := toml.Unmarshal(bytes, &d)
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+	})
+
+	b.Run("HugoFrontMatter", func(b *testing.B) {
+		b.SetBytes(int64(len(hugoFrontMatterbytes)))
 		b.ReportAllocs()
 		b.ResetTimer()
-
 		for i := 0; i < b.N; i++ {
+			d := map[string]interface{}{}
+			err := toml.Unmarshal(hugoFrontMatterbytes, &d)
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
+}
+
+func marshal(v interface{}) ([]byte, error) {
+	var b bytes.Buffer
+	enc := toml.NewEncoder(&b)
+	err := enc.Encode(v)
+	return b.Bytes(), err
+}
+
+func BenchmarkMarshal(b *testing.B) {
+	b.Run("SimpleDocument", func(b *testing.B) {
+		doc := []byte(`A = "hello"`)
+
+		b.Run("struct", func(b *testing.B) {
 			d := struct {
 				A string
 			}{}
@@ -38,21 +125,114 @@ func BenchmarkUnmarshalSimple(b *testing.B) {
 			if err != nil {
 				panic(err)
 			}
-		}
-	})
 
-	b.Run("map", func(b *testing.B) {
-		b.SetBytes(int64(len(doc)))
-		b.ReportAllocs()
-		b.ResetTimer()
+			b.ReportAllocs()
+			b.ResetTimer()
 
-		for i := 0; i < b.N; i++ {
+			var out []byte
+
+			for i := 0; i < b.N; i++ {
+				out, err = marshal(d)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			b.SetBytes(int64(len(out)))
+		})
+
+		b.Run("map", func(b *testing.B) {
 			d := map[string]interface{}{}
 			err := toml.Unmarshal(doc, &d)
 			if err != nil {
 				panic(err)
 			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			var out []byte
+
+			for i := 0; i < b.N; i++ {
+				out, err = marshal(d)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			b.SetBytes(int64(len(out)))
+		})
+	})
+
+	b.Run("ReferenceFile", func(b *testing.B) {
+		bytes, err := ioutil.ReadFile("benchmark.toml")
+		if err != nil {
+			b.Fatal(err)
 		}
+
+		b.Run("struct", func(b *testing.B) {
+			d := benchmarkDoc{}
+			err := toml.Unmarshal(bytes, &d)
+			if err != nil {
+				panic(err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			var out []byte
+
+			for i := 0; i < b.N; i++ {
+				out, err = marshal(d)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			b.SetBytes(int64(len(out)))
+		})
+
+		b.Run("map", func(b *testing.B) {
+			d := map[string]interface{}{}
+			err := toml.Unmarshal(bytes, &d)
+			if err != nil {
+				panic(err)
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			var out []byte
+			for i := 0; i < b.N; i++ {
+				out, err = marshal(d)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			b.SetBytes(int64(len(out)))
+		})
+	})
+
+	b.Run("HugoFrontMatter", func(b *testing.B) {
+		d := map[string]interface{}{}
+		err := toml.Unmarshal(hugoFrontMatterbytes, &d)
+		if err != nil {
+			panic(err)
+		}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		var out []byte
+
+		for i := 0; i < b.N; i++ {
+			out, err = marshal(d)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		b.SetBytes(int64(len(out)))
 	})
 }
 
@@ -163,40 +343,7 @@ type benchmarkDoc struct {
 	}
 }
 
-func BenchmarkReferenceFile(b *testing.B) {
-	bytes, err := ioutil.ReadFile("benchmark.toml")
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	b.Run("struct", func(b *testing.B) {
-		b.SetBytes(int64(len(bytes)))
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			d := benchmarkDoc{}
-			err := toml.Unmarshal(bytes, &d)
-			if err != nil {
-				panic(err)
-			}
-		}
-	})
-
-	b.Run("map", func(b *testing.B) {
-		b.SetBytes(int64(len(bytes)))
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			d := map[string]interface{}{}
-			err := toml.Unmarshal(bytes, &d)
-			if err != nil {
-				panic(err)
-			}
-		}
-	})
-}
-
-func TestReferenceFile(t *testing.T) {
+func TestUnmarshalReferenceFile(t *testing.T) {
 	bytes, err := ioutil.ReadFile("benchmark.toml")
 	require.NoError(t, err)
 	d := benchmarkDoc{}
@@ -483,8 +630,7 @@ trimmed in raw strings.
 	require.Equal(t, expected, d)
 }
 
-func BenchmarkHugoFrontMatter(b *testing.B) {
-	bytes := []byte(`
+var hugoFrontMatterbytes = []byte(`
 categories = ["Development", "VIM"]
 date = "2012-04-06"
 description = "spf13-vim is a cross platform distribution of vim plugins and resources for Vim."
@@ -506,14 +652,3 @@ show_comments = false
   [cascade._target]
     kind = "section"
 `)
-	b.SetBytes(int64(len(bytes)))
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		d := map[string]interface{}{}
-		err := toml.Unmarshal(bytes, &d)
-		if err != nil {
-			panic(err)
-		}
-	}
-}

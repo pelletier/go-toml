@@ -688,7 +688,7 @@ B = "data"`,
 								"Name": "Hammer",
 								"Sku":  int64(738594937),
 							},
-							nil,
+							map[string]interface{}(nil),
 							map[string]interface{}{
 								"Name":  "Nail",
 								"Sku":   int64(284758393),
@@ -1198,6 +1198,20 @@ B = "data"`,
 				return test{
 					target: &s{},
 					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "empty array table in interface{}",
+			input: `[[products]]`,
+			gen: func() test {
+				return test{
+					target: &map[string]interface{}{},
+					expected: &map[string]interface{}{
+						"products": []interface{}{
+							map[string]interface{}(nil),
+						},
+					},
 				}
 			},
 		},
