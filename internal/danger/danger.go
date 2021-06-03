@@ -59,9 +59,7 @@ func BytesRange(start []byte, end []byte) []byte {
 }
 
 func Stride(ptr unsafe.Pointer, size uintptr, offset int) unsafe.Pointer {
-	// TODO: there must be a better way than using a conditional
-	if offset < 0 {
-		return unsafe.Pointer(uintptr(ptr) - size*uintptr(-1*offset))
-	}
-	return unsafe.Pointer(uintptr(ptr) + size*uintptr(offset))
+	// TODO: replace with unsafe.Add when Go 1.17 is released
+	//   https://github.com/golang/go/issues/40481
+	return unsafe.Pointer(uintptr(ptr) + uintptr(int(size)*offset))
 }
