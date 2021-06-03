@@ -9,7 +9,6 @@ import (
 
 //nolint:funlen
 func TestParser_AST_Numbers(t *testing.T) {
-
 	examples := []struct {
 		desc  string
 		input string
@@ -136,7 +135,6 @@ func TestParser_AST_Numbers(t *testing.T) {
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-
 			p := parser{}
 			p.Reset([]byte(`A = ` + e.input))
 			p.NextExpression()
@@ -167,7 +165,7 @@ type (
 	}
 )
 
-func compareNode(t *testing.T, e astNode, n ast.Node) {
+func compareNode(t *testing.T, e astNode, n *ast.Node) {
 	t.Helper()
 	require.Equal(t, e.Kind, n.Kind)
 	require.Equal(t, e.Data, n.Data)
@@ -199,7 +197,6 @@ func compareIterator(t *testing.T, expected []astNode, actual ast.Iterator) {
 
 //nolint:funlen
 func TestParser_AST(t *testing.T) {
-
 	examples := []struct {
 		desc  string
 		input string
@@ -338,7 +335,6 @@ func TestParser_AST(t *testing.T) {
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-
 			p := parser{}
 			p.Reset([]byte(e.input))
 			p.NextExpression()

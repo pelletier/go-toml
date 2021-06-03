@@ -18,7 +18,7 @@ func (b *Builder) Tree() *Root {
 	return &b.tree
 }
 
-func (b *Builder) NodeAt(ref Reference) Node {
+func (b *Builder) NodeAt(ref Reference) *Node {
 	return b.tree.at(ref.idx)
 }
 
@@ -28,7 +28,6 @@ func (b *Builder) Reset() {
 }
 
 func (b *Builder) Push(n Node) Reference {
-	n.root = &b.tree
 	b.lastIdx = len(b.tree.nodes)
 	b.tree.nodes = append(b.tree.nodes, n)
 	return Reference{
@@ -38,11 +37,10 @@ func (b *Builder) Push(n Node) Reference {
 }
 
 func (b *Builder) PushAndChain(n Node) Reference {
-	n.root = &b.tree
 	newIdx := len(b.tree.nodes)
 	b.tree.nodes = append(b.tree.nodes, n)
 	if b.lastIdx >= 0 {
-		b.tree.nodes[b.lastIdx].next = newIdx
+		b.tree.nodes[b.lastIdx].next = newIdx - b.lastIdx
 	}
 	b.lastIdx = newIdx
 	return Reference{
@@ -52,9 +50,9 @@ func (b *Builder) PushAndChain(n Node) Reference {
 }
 
 func (b *Builder) AttachChild(parent Reference, child Reference) {
-	b.tree.nodes[parent.idx].child = child.idx
+	b.tree.nodes[parent.idx].child = child.idx - parent.idx
 }
 
 func (b *Builder) Chain(from Reference, to Reference) {
-	b.tree.nodes[from.idx].next = to.idx
+	b.tree.nodes[from.idx].next = to.idx - from.idx
 }

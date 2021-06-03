@@ -61,7 +61,7 @@ func (p *parser) NextExpression() bool {
 	}
 }
 
-func (p *parser) Expression() ast.Node {
+func (p *parser) Expression() *ast.Node {
 	return p.builder.NodeAt(p.ref)
 }
 

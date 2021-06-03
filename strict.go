@@ -2,8 +2,8 @@ package toml
 
 import (
 	"github.com/pelletier/go-toml/v2/internal/ast"
+	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
-	"github.com/pelletier/go-toml/v2/internal/unsafe"
 )
 
 type strict struct {
@@ -15,7 +15,7 @@ type strict struct {
 	missing []decodeError
 }
 
-func (s *strict) EnterTable(node ast.Node) {
+func (s *strict) EnterTable(node *ast.Node) {
 	if !s.Enabled {
 		return
 	}
@@ -23,7 +23,7 @@ func (s *strict) EnterTable(node ast.Node) {
 	s.key.UpdateTable(node)
 }
 
-func (s *strict) EnterArrayTable(node ast.Node) {
+func (s *strict) EnterArrayTable(node *ast.Node) {
 	if !s.Enabled {
 		return
 	}
@@ -31,7 +31,7 @@ func (s *strict) EnterArrayTable(node ast.Node) {
 	s.key.UpdateArrayTable(node)
 }
 
-func (s *strict) EnterKeyValue(node ast.Node) {
+func (s *strict) EnterKeyValue(node *ast.Node) {
 	if !s.Enabled {
 		return
 	}
@@ -39,7 +39,7 @@ func (s *strict) EnterKeyValue(node ast.Node) {
 	s.key.Push(node)
 }
 
-func (s *strict) ExitKeyValue(node ast.Node) {
+func (s *strict) ExitKeyValue(node *ast.Node) {
 	if !s.Enabled {
 		return
 	}
@@ -47,7 +47,7 @@ func (s *strict) ExitKeyValue(node ast.Node) {
 	s.key.Pop(node)
 }
 
-func (s *strict) MissingTable(node ast.Node) {
+func (s *strict) MissingTable(node *ast.Node) {
 	if !s.Enabled {
 		return
 	}
@@ -59,7 +59,7 @@ func (s *strict) MissingTable(node ast.Node) {
 	})
 }
 
-func (s *strict) MissingField(node ast.Node) {
+func (s *strict) MissingField(node *ast.Node) {
 	if !s.Enabled {
 		return
 	}
@@ -88,7 +88,7 @@ func (s *strict) Error(doc []byte) error {
 	return err
 }
 
-func keyLocation(node ast.Node) []byte {
+func keyLocation(node *ast.Node) []byte {
 	k := node.Key()
 
 	hasOne := k.Next()
@@ -103,5 +103,5 @@ func keyLocation(node ast.Node) []byte {
 		end = k.Node().Data
 	}
 
-	return unsafe.BytesRange(start, end)
+	return danger.BytesRange(start, end)
 }

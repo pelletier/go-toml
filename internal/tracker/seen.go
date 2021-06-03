@@ -104,7 +104,7 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 
 // CheckExpression takes a top-level node and checks that it does not contain keys
 // that have been seen in previous calls, and validates that types are consistent.
-func (s *SeenTracker) CheckExpression(node ast.Node) error {
+func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 	if s.entries == nil {
 		// s.entries = make([]entry, 0, 8)
 		// Skip ID = 0 to remove the confusion between nodes whose parent has
@@ -125,7 +125,7 @@ func (s *SeenTracker) CheckExpression(node ast.Node) error {
 	}
 }
 
-func (s *SeenTracker) checkTable(node ast.Node) error {
+func (s *SeenTracker) checkTable(node *ast.Node) error {
 	it := node.Key()
 
 	parentIdx := -1
@@ -169,7 +169,7 @@ func (s *SeenTracker) checkTable(node ast.Node) error {
 	return nil
 }
 
-func (s *SeenTracker) checkArrayTable(node ast.Node) error {
+func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 	it := node.Key()
 
 	parentIdx := -1
@@ -207,7 +207,7 @@ func (s *SeenTracker) checkArrayTable(node ast.Node) error {
 	return nil
 }
 
-func (s *SeenTracker) checkKeyValue(node ast.Node) error {
+func (s *SeenTracker) checkKeyValue(node *ast.Node) error {
 	it := node.Key()
 
 	parentIdx := s.currentIdx

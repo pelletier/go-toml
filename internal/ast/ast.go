@@ -2,6 +2,9 @@ package ast
 
 import (
 	"fmt"
+	"unsafe"
+
+	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 // Iterator starts uninitialized, you need to call Next() first.
@@ -14,7 +17,7 @@ import (
 // }
 type Iterator struct {
 	started bool
-	node    Node
+	node    *Node
 }
 
 // Next moves the iterator forward and returns true if points to a node, false
@@ -31,11 +34,11 @@ func (c *Iterator) Next() bool {
 // IsLast returns true if the current node of the iterator is the last one.
 // Subsequent call to Next() will return false.
 func (c *Iterator) IsLast() bool {
-	return c.node.next <= 0
+	return c.node.next == 0
 }
 
 // Node returns a copy of the node pointed at by the iterator.
-func (c *Iterator) Node() Node {
+func (c *Iterator) Node() *Node {
 	return c.node
 }
 
@@ -50,14 +53,13 @@ type Root struct {
 func (r *Root) Iterator() Iterator {
 	it := Iterator{}
 	if len(r.nodes) > 0 {
-		it.node = r.nodes[0]
+		it.node = &r.nodes[0]
 	}
 	return it
 }
 
-func (r *Root) at(idx int) Node {
-	// TODO: unsafe to point to the node directly
-	return r.nodes[idx]
+func (r *Root) at(idx int) *Node {
+	return &r.nodes[idx]
 }
 
 // Arrays have one child per element in the array.
@@ -71,39 +73,39 @@ type Node struct {
 	Kind Kind
 	Data []byte // Raw bytes from the input
 
-	// next idx (in the root array). 0 if last of the collection.
-	next int
-	// child idx (in the root array). 0 if no child.
-	child int
-	// pointer to the root array
-	root *Root
+	// References to other nodes, as offsets in the backing array from this
+	// node. References can go backward, so those can be negative.
+	next  int // 0 if last element
+	child int // 0 if no child
 }
 
 // Next returns a copy of the next node, or an invalid Node if there is no
 // next node.
-func (n Node) Next() Node {
-	if n.next <= 0 {
-		return noNode
+func (n *Node) Next() *Node {
+	if n.next == 0 {
+		return nil
 	}
-	return n.root.at(n.next)
+	ptr := unsafe.Pointer(n)
+	size := unsafe.Sizeof(Node{})
+	return (*Node)(danger.Stride(ptr, size, n.next))
 }
 
 // Child returns a copy of the first child node of this node. Other children
 // can be accessed calling Next on the first child.
 // Returns an invalid Node if there is none.
-func (n Node) Child() Node {
-	if n.child <= 0 {
-		return noNode
+func (n *Node) Child() *Node {
+	if n.child == 0 {
+		return nil
 	}
-	return n.root.at(n.child)
+	ptr := unsafe.Pointer(n)
+	size := unsafe.Sizeof(Node{})
+	return (*Node)(danger.Stride(ptr, size, n.child))
 }
 
 // Valid returns true if the node's kind is set (not to Invalid).
-func (n Node) Valid() bool {
-	return n.Kind != Invalid
+func (n *Node) Valid() bool {
+	return n != nil
 }
-
-var noNode = Node{}
 
 // Key returns the child nodes making the Key on a supported node. Panics
 // otherwise.
@@ -127,13 +129,13 @@ func (n *Node) Key() Iterator {
 // Value returns a pointer to the value node of a KeyValue.
 // Guaranteed to be non-nil.
 // Panics if not called on a KeyValue node, or if the Children are malformed.
-func (n Node) Value() Node {
-	assertKind(KeyValue, n)
+func (n *Node) Value() *Node {
+	assertKind(KeyValue, *n)
 	return n.Child()
 }
 
 // Children returns an iterator over a node's children.
-func (n Node) Children() Iterator {
+func (n *Node) Children() Iterator {
 	return Iterator{node: n.Child()}
 }
 
