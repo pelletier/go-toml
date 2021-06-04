@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pelletier/go-toml/v2/internal/unsafe"
+	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 // DecodeError represents an error encountered during the parsing or decoding
@@ -105,7 +105,7 @@ func (e *DecodeError) Key() Key {
 // highlight can be freely deallocated.
 //nolint:funlen
 func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
-	offset := unsafe.SubsliceOffset(document, de.highlight)
+	offset := danger.SubsliceOffset(document, de.highlight)
 
 	errMessage := de.Error()
 	errLine, errColumn := positionAtEnd(document[:offset])

@@ -1,4 +1,4 @@
-package unsafe
+package danger
 
 import (
 	"fmt"
@@ -56,4 +56,10 @@ func BytesRange(start []byte, end []byte) []byte {
 	}
 
 	return start[:l]
+}
+
+func Stride(ptr unsafe.Pointer, size uintptr, offset int) unsafe.Pointer {
+	// TODO: replace with unsafe.Add when Go 1.17 is released
+	//   https://github.com/golang/go/issues/40481
+	return unsafe.Pointer(uintptr(ptr) + uintptr(int(size)*offset))
 }

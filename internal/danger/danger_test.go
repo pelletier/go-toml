@@ -1,15 +1,16 @@
-package unsafe_test
+package danger_test
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pelletier/go-toml/v2/internal/unsafe"
+	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
-func TestUnsafeSubsliceOffsetValid(t *testing.T) {
+func TestSubsliceOffsetValid(t *testing.T) {
 	examples := []struct {
 		desc   string
 		test   func() ([]byte, []byte)
@@ -28,13 +29,13 @@ func TestUnsafeSubsliceOffsetValid(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			d, s := e.test()
-			offset := unsafe.SubsliceOffset(d, s)
+			offset := danger.SubsliceOffset(d, s)
 			assert.Equal(t, e.offset, offset)
 		})
 	}
 }
 
-func TestUnsafeSubsliceOffsetInvalid(t *testing.T) {
+func TestSubsliceOffsetInvalid(t *testing.T) {
 	examples := []struct {
 		desc string
 		test func() ([]byte, []byte)
@@ -72,13 +73,22 @@ func TestUnsafeSubsliceOffsetInvalid(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			d, s := e.test()
 			require.Panics(t, func() {
-				unsafe.SubsliceOffset(d, s)
+				danger.SubsliceOffset(d, s)
 			})
 		})
 	}
 }
 
-func TestUnsafeBytesRange(t *testing.T) {
+func TestStride(t *testing.T) {
+	a := []byte{1, 2, 3, 4}
+	x := &a[1]
+	n := (*byte)(danger.Stride(unsafe.Pointer(x), unsafe.Sizeof(byte(0)), 1))
+	require.Equal(t, &a[2], n)
+	n = (*byte)(danger.Stride(unsafe.Pointer(x), unsafe.Sizeof(byte(0)), -1))
+	require.Equal(t, &a[0], n)
+}
+
+func TestBytesRange(t *testing.T) {
 	type fn = func() ([]byte, []byte)
 	examples := []struct {
 		desc     string
@@ -157,10 +167,10 @@ func TestUnsafeBytesRange(t *testing.T) {
 			start, end := e.test()
 			if e.expected == nil {
 				require.Panics(t, func() {
-					unsafe.BytesRange(start, end)
+					danger.BytesRange(start, end)
 				})
 			} else {
-				res := unsafe.BytesRange(start, end)
+				res := danger.BytesRange(start, end)
 				require.Equal(t, e.expected, res)
 			}
 		})
