@@ -30,7 +30,7 @@ func (p *parser) Raw(raw ast.Range) []byte {
 
 func (p *parser) Reset(b []byte) {
 	p.builder.Reset()
-	p.ref = ast.Reference{}
+	p.ref = ast.InvalidReference
 	p.data = b
 	p.left = b
 	p.err = nil
@@ -44,7 +44,7 @@ func (p *parser) NextExpression() bool {
 	}
 
 	p.builder.Reset()
-	p.ref = ast.Reference{}
+	p.ref = ast.InvalidReference
 
 	for {
 		if len(p.left) == 0 || p.err != nil {
@@ -98,7 +98,7 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
 	// expression =/ ws table ws [ comment ]
-	var ref ast.Reference
+	ref := ast.InvalidReference
 
 	b = p.parseWhitespace(b)
 
@@ -209,7 +209,7 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 
 	key, b, err := p.parseKey(b)
 	if err != nil {
-		return ast.Reference{}, nil, err
+		return ast.InvalidReference, nil, err
 	}
 
 	// keyval-sep = ws %x3D ws ; =
@@ -217,12 +217,12 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) == 0 {
-		return ast.Reference{}, nil, newDecodeError(b, "expected = after a key, but the document ends there")
+		return ast.InvalidReference, nil, newDecodeError(b, "expected = after a key, but the document ends there")
 	}
 
 	b, err = expect('=', b)
 	if err != nil {
-		return ast.Reference{}, nil, err
+		return ast.InvalidReference, nil, err
 	}
 
 	b = p.parseWhitespace(b)
@@ -241,7 +241,7 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 //nolint:cyclop,funlen
 func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
-	var ref ast.Reference
+	ref := ast.InvalidReference
 
 	if len(b) == 0 {
 		return ref, nil, newDecodeError(b, "expected value, not eof")
@@ -630,7 +630,7 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	// dot-sep   = ws %x2E ws  ; . Period
 	raw, key, b, err := p.parseSimpleKey(b)
 	if err != nil {
-		return ast.Reference{}, nil, err
+		return ast.InvalidReference, nil, err
 	}
 
 	ref := p.builder.Push(ast.Node{
@@ -798,7 +798,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
-			return ast.Reference{}, nil, newDecodeError(atmost(b, 3), "expected 'inf'")
+			return ast.InvalidReference, nil, newDecodeError(atmost(b, 3), "expected 'inf'")
 		}
 
 		return p.builder.Push(ast.Node{
@@ -807,7 +807,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
-			return ast.Reference{}, nil, newDecodeError(atmost(b, 3), "expected 'nan'")
+			return ast.InvalidReference, nil, newDecodeError(atmost(b, 3), "expected 'nan'")
 		}
 
 		return p.builder.Push(ast.Node{
@@ -963,7 +963,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return ast.Reference{}, nil, newDecodeError(b[i:i+1], "unexpected character 'i' while scanning for a number")
+			return ast.InvalidReference, nil, newDecodeError(b[i:i+1], "unexpected character 'i' while scanning for a number")
 		}
 
 		if c == 'n' {
@@ -974,14 +974,14 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return ast.Reference{}, nil, newDecodeError(b[i:i+1], "unexpected character 'n' while scanning for a number")
+			return ast.InvalidReference, nil, newDecodeError(b[i:i+1], "unexpected character 'n' while scanning for a number")
 		}
 
 		break
 	}
 
 	if i == 0 {
-		return ast.Reference{}, b, newDecodeError(b, "incomplete number")
+		return ast.InvalidReference, b, newDecodeError(b, "incomplete number")
 	}
 
 	kind := ast.Integer

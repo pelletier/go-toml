@@ -1,12 +1,11 @@
 package ast
 
-type Reference struct {
-	idx int
-	set bool
-}
+type Reference int
+
+const InvalidReference Reference = -1
 
 func (r Reference) Valid() bool {
-	return r.set
+	return r != InvalidReference
 }
 
 type Builder struct {
@@ -19,7 +18,7 @@ func (b *Builder) Tree() *Root {
 }
 
 func (b *Builder) NodeAt(ref Reference) *Node {
-	return b.tree.at(ref.idx)
+	return b.tree.at(ref)
 }
 
 func (b *Builder) Reset() {
@@ -30,10 +29,7 @@ func (b *Builder) Reset() {
 func (b *Builder) Push(n Node) Reference {
 	b.lastIdx = len(b.tree.nodes)
 	b.tree.nodes = append(b.tree.nodes, n)
-	return Reference{
-		idx: b.lastIdx,
-		set: true,
-	}
+	return Reference(b.lastIdx)
 }
 
 func (b *Builder) PushAndChain(n Node) Reference {
@@ -43,16 +39,13 @@ func (b *Builder) PushAndChain(n Node) Reference {
 		b.tree.nodes[b.lastIdx].next = newIdx - b.lastIdx
 	}
 	b.lastIdx = newIdx
-	return Reference{
-		idx: b.lastIdx,
-		set: true,
-	}
+	return Reference(b.lastIdx)
 }
 
 func (b *Builder) AttachChild(parent Reference, child Reference) {
-	b.tree.nodes[parent.idx].child = child.idx - parent.idx
+	b.tree.nodes[parent].child = int(child) - int(parent)
 }
 
 func (b *Builder) Chain(from Reference, to Reference) {
-	b.tree.nodes[from.idx].next = to.idx - from.idx
+	b.tree.nodes[from].next = int(to) - int(from)
 }

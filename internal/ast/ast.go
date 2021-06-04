@@ -58,7 +58,7 @@ func (r *Root) Iterator() Iterator {
 	return it
 }
 
-func (r *Root) at(idx int) *Node {
+func (r *Root) at(idx Reference) *Node {
 	return &r.nodes[idx]
 }
 
