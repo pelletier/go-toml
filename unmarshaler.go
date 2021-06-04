@@ -106,7 +106,6 @@ func (d *Decoder) Decode(v interface{}) error {
 
 type decoder struct {
 	// Which parser instance in use for this decoding session.
-	// TODO: Think about removing later.
 	p *parser
 
 	// Flag indicating that the current expression is stashed.
@@ -533,7 +532,7 @@ func (d *decoder) handleTablePart(key ast.Iterator, v reflect.Value) (reflect.Va
 	return d.handleKeyPart(key, v, d.handleTable, makeMapStringInterface)
 }
 
-func tryTextUnmarshaler(node *ast.Node, v reflect.Value) (bool, error) {
+func (d *decoder) tryTextUnmarshaler(node *ast.Node, v reflect.Value) (bool, error) {
 	if v.Kind() != reflect.Struct {
 		return false, nil
 	}
@@ -547,9 +546,7 @@ func tryTextUnmarshaler(node *ast.Node, v reflect.Value) (bool, error) {
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, fmt.Errorf("toml: error calling UnmarshalText: %w", err)
-			// TODO: same as above
-			// return false, newDecodeError(node.Data, "error calling UnmarshalText: %w", err)
+			return false, newDecodeError(d.p.Raw(node.Raw), "error calling UnmarshalText: %w", err)
 		}
 
 		return true, nil
@@ -563,7 +560,7 @@ func (d *decoder) handleValue(value *ast.Node, v reflect.Value) error {
 		v = initAndDereferencePointer(v)
 	}
 
-	ok, err := tryTextUnmarshaler(value, v)
+	ok, err := d.tryTextUnmarshaler(value, v)
 	if ok || err != nil {
 		return err
 	}
@@ -874,7 +871,7 @@ func (d *decoder) unmarshalString(value *ast.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
-		err = fmt.Errorf("toml: cannot store TOML string into a Go %s", v.Kind())
+		err = newDecodeError(d.p.Raw(value.Raw), "cannot store TOML string into a Go %s", v.Kind())
 	}
 
 	return err

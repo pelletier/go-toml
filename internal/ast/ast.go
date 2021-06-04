@@ -71,12 +71,18 @@ func (r *Root) at(idx int) *Node {
 // children []Node
 type Node struct {
 	Kind Kind
-	Data []byte // Raw bytes from the input
+	Raw  Range  // Raw bytes from the input.
+	Data []byte // Node value (could be either allocated or referencing the input).
 
 	// References to other nodes, as offsets in the backing array from this
 	// node. References can go backward, so those can be negative.
 	next  int // 0 if last element
 	child int // 0 if no child
+}
+
+type Range struct {
+	Offset int
+	Length int
 }
 
 // Next returns a copy of the next node, or an invalid Node if there is no

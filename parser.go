@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
+	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 type parser struct {
@@ -14,6 +15,17 @@ type parser struct {
 	left    []byte
 	err     error
 	first   bool
+}
+
+func (p *parser) Range(b []byte) ast.Range {
+	return ast.Range{
+		Offset: danger.SubsliceOffset(p.data, b),
+		Length: len(b),
+	}
+}
+
+func (p *parser) Raw(raw ast.Range) []byte {
+	return p.data[raw.Offset : raw.Offset+raw.Length]
 }
 
 func (p *parser) Reset(b []byte) {
@@ -240,32 +252,36 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 
 	switch c {
 	case '"':
+		var raw []byte
 		var v []byte
 		if scanFollowsMultilineBasicStringDelimiter(b) {
-			v, b, err = p.parseMultilineBasicString(b)
+			raw, v, b, err = p.parseMultilineBasicString(b)
 		} else {
-			v, b, err = p.parseBasicString(b)
+			raw, v, b, err = p.parseBasicString(b)
 		}
 
 		if err == nil {
 			ref = p.builder.Push(ast.Node{
 				Kind: ast.String,
+				Raw:  p.Range(raw),
 				Data: v,
 			})
 		}
 
 		return ref, b, err
 	case '\'':
+		var raw []byte
 		var v []byte
 		if scanFollowsMultilineLiteralStringDelimiter(b) {
-			v, b, err = p.parseMultilineLiteralString(b)
+			raw, v, b, err = p.parseMultilineLiteralString(b)
 		} else {
-			v, b, err = p.parseLiteralString(b)
+			raw, v, b, err = p.parseLiteralString(b)
 		}
 
 		if err == nil {
 			ref = p.builder.Push(ast.Node{
 				Kind: ast.String,
+				Raw:  p.Range(raw),
 				Data: v,
 			})
 		}
@@ -310,13 +326,13 @@ func atmost(b []byte, n int) []byte {
 	return b[:n]
 }
 
-func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, error) {
+func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	v, rest, err := scanLiteralString(b)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return v[1 : len(v)-1], rest, nil
+	return v, v[1 : len(v)-1], rest, nil
 }
 
 func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
@@ -476,10 +492,10 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 	return b, nil
 }
 
-func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
+func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	token, rest, err := scanMultilineLiteralString(b)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	i := 3
@@ -491,11 +507,11 @@ func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 		i += 2
 	}
 
-	return token[i : len(token)-3], rest, err
+	return token, token[i : len(token)-3], rest, err
 }
 
 //nolint:funlen,gocognit,cyclop
-func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
+func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
 	// ml-basic-string-delim = 3quotation-mark
@@ -508,7 +524,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
 	token, rest, err := scanMultilineBasicString(b)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	i := 3
@@ -529,7 +545,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 		}
 	}
 	if i == endIdx {
-		return token[startIdx:endIdx], rest, nil
+		return token, token[startIdx:endIdx], rest, nil
 	}
 
 	var builder bytes.Buffer
@@ -579,7 +595,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 			case 'u':
 				x, err := hexToString(atmost(token[i+1:], 4), 4)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				builder.WriteString(x)
@@ -587,20 +603,20 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, error) {
 			case 'U':
 				x, err := hexToString(atmost(token[i+1:], 8), 8)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				builder.WriteString(x)
 				i += 8
 			default:
-				return nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
+				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
 		} else {
 			builder.WriteByte(c)
 		}
 	}
 
-	return builder.Bytes(), rest, nil
+	return token, builder.Bytes(), rest, nil
 }
 
 func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
@@ -612,13 +628,14 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	// dotted-key = simple-key 1*( dot-sep simple-key )
 	//
 	// dot-sep   = ws %x2E ws  ; . Period
-	key, b, err := p.parseSimpleKey(b)
+	raw, key, b, err := p.parseSimpleKey(b)
 	if err != nil {
 		return ast.Reference{}, nil, err
 	}
 
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.Key,
+		Raw:  p.Range(raw),
 		Data: key,
 	})
 
@@ -627,13 +644,14 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 		if len(b) > 0 && b[0] == '.' {
 			b = p.parseWhitespace(b[1:])
 
-			key, b, err = p.parseSimpleKey(b)
+			raw, key, b, err = p.parseSimpleKey(b)
 			if err != nil {
 				return ref, nil, err
 			}
 
 			p.builder.PushAndChain(ast.Node{
 				Kind: ast.Key,
+				Raw:  p.Range(raw),
 				Data: key,
 			})
 		} else {
@@ -644,12 +662,12 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	return ref, b, nil
 }
 
-func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
+func (p *parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 	// simple-key = quoted-key / unquoted-key
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// quoted-key = basic-string / literal-string
 	if len(b) == 0 {
-		return nil, nil, newDecodeError(b, "key is incomplete")
+		return nil, nil, nil, newDecodeError(b, "key is incomplete")
 	}
 
 	switch {
@@ -659,14 +677,14 @@ func (p *parser) parseSimpleKey(b []byte) (key, rest []byte, err error) {
 		return p.parseBasicString(b)
 	case isUnquotedKeyChar(b[0]):
 		key, rest = scanUnquotedKey(b)
-		return key, rest, nil
+		return key, key, rest, nil
 	default:
-		return nil, nil, newDecodeError(b[0:1], "invalid character at start of key: %c", b[0])
+		return nil, nil, nil, newDecodeError(b[0:1], "invalid character at start of key: %c", b[0])
 	}
 }
 
 //nolint:funlen,cyclop
-func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
+func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
 	// basic-char = basic-unescaped / escaped
@@ -683,7 +701,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 	// escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
 	token, rest, err := scanBasicString(b)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// fast path
@@ -696,7 +714,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 		}
 	}
 	if i == endIdx {
-		return token[startIdx:endIdx], rest, nil
+		return token, token[startIdx:endIdx], rest, nil
 	}
 
 	var builder bytes.Buffer
@@ -726,7 +744,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 			case 'u':
 				x, err := hexToString(token[i+1:len(token)-1], 4)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				builder.WriteString(x)
@@ -734,20 +752,20 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, error) {
 			case 'U':
 				x, err := hexToString(token[i+1:len(token)-1], 8)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				builder.WriteString(x)
 				i += 8
 			default:
-				return nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
+				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
 		} else {
 			builder.WriteByte(c)
 		}
 	}
 
-	return builder.Bytes(), rest, nil
+	return token, builder.Bytes(), rest, nil
 }
 
 func hexToString(b []byte, length int) (string, error) {
