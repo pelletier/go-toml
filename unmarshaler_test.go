@@ -288,6 +288,54 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "local datetime into time.Time",
+			input: `a = 1979-05-27T00:32:00`,
+			gen: func() test {
+				type doc struct {
+					A time.Time
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: time.Date(1979, 5, 27, 0, 32, 0, 0, time.Local),
+					},
+				}
+			},
+		},
+		{
+			desc:  "local datetime into interface",
+			input: `a = 1979-05-27T00:32:00`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: toml.LocalDateTimeOf(time.Date(1979, 5, 27, 0, 32, 0, 0, time.Local)),
+					},
+				}
+			},
+		},
+		{
+			desc:  "local date into interface",
+			input: `a = 1979-05-27`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: toml.LocalDateOf(time.Date(1979, 5, 27, 0, 32, 0, 0, time.Local)),
+					},
+				}
+			},
+		},
+		{
 			desc: "issue 475 - space between dots in key",
 			input: `fruit. color = "yellow"
 					fruit . flavor = "banana"`,

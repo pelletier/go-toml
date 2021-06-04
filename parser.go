@@ -19,8 +19,8 @@ type parser struct {
 
 func (p *parser) Range(b []byte) ast.Range {
 	return ast.Range{
-		Offset: danger.SubsliceOffset(p.data, b),
-		Length: len(b),
+		Offset: uint32(danger.SubsliceOffset(p.data, b)),
+		Length: uint32(len(b)),
 	}
 }
 

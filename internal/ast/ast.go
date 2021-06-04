@@ -81,8 +81,8 @@ type Node struct {
 }
 
 type Range struct {
-	Offset int
-	Length int
+	Offset uint32
+	Length uint32
 }
 
 // Next returns a copy of the next node, or an invalid Node if there is no
