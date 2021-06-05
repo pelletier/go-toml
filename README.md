@@ -173,4 +173,4 @@ this document. The last two major versions of Go are supported
 
 ## License
 
-The MIT License (MIT). Read [LICENSE](LICENSE).
+The MIT License (MIT) + Apache 2.0. Read [LICENSE](LICENSE).
