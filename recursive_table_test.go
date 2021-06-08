@@ -61,6 +61,16 @@ func TestUnmarshal_RecursiveTable(t *testing.T) {
 			`,
 			expected: `{"I":1,"F":{"I":2,"F":{"I":3,"F":{"I":4,"F":null}}}}`,
 		},
+		// {
+		// 	desc: "skip mid step", // this input makes panic, not error.
+		// 	input: `
+		// 		I=1
+		// 		[F.F]
+		// 		I=7
+		// 	`,
+		// 	expected: `{"I":1,"F":{"I":2,"F":{"I":3,"F":{"I":4,"F":null}}}}`,
+		// 	err:      true,
+		// },
 	}
 
 	for _, ex := range examples {
