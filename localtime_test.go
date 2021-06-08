@@ -1,3 +1,13 @@
+// Implementation of TOML's local date/time.
+//
+// Copied over from Google's civil to avoid pulling all the Google dependencies.
+// Originals:
+//   https://raw.githubusercontent.com/googleapis/google-cloud-go/ed46f5086358513cf8c25f8e3f022cb838a49d66/civil/civil_test.go
+// Changes:
+//   * Renamed files from civil* to localtime*.
+//   * Package changed from civil to toml.
+//   * 'Local' prefix added to all structs.
+//
 // Copyright 2016 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
