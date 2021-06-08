@@ -373,7 +373,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 	case reflect.Ptr:
 		elem := v.Elem()
 		if !elem.IsValid() {
-			panic(fmt.Errorf("unhandled part: %s", v.Kind()))
+			v.Set(reflect.New(v.Type().Elem()))
 		}
 		elem = v.Elem()
 		return d.handleKeyPart(key, elem, nextFn, makeFn)
