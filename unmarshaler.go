@@ -370,6 +370,13 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 	// First, dispatch over v to make sure it is a valid object.
 	// There is no guarantee over what it could be.
 	switch v.Kind() {
+	case reflect.Ptr:
+		elem := v.Elem()
+		if !elem.IsValid() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		elem = v.Elem()
+		return d.handleKeyPart(key, elem, nextFn, makeFn)
 	case reflect.Map:
 		// Create the key for the map element. For now assume it's a string.
 		mk := reflect.ValueOf(string(key.Node().Data))
