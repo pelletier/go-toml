@@ -720,8 +720,7 @@ func (d *decoder) unmarshalLocalDate(value *ast.Node, v reflect.Value) error {
 	}
 
 	if v.Type() == timeType {
-		cast := ld.In(time.Local)
-
+		cast := ld.AsTime(time.Local)
 		v.Set(reflect.ValueOf(cast))
 		return nil
 	}
@@ -742,7 +741,7 @@ func (d *decoder) unmarshalLocalDateTime(value *ast.Node, v reflect.Value) error
 	}
 
 	if v.Type() == timeType {
-		cast := ldt.In(time.Local)
+		cast := ldt.AsTime(time.Local)
 
 		v.Set(reflect.ValueOf(cast))
 		return nil

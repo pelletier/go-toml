@@ -315,7 +315,10 @@ func TestUnmarshal(t *testing.T) {
 				return test{
 					target: &doc{},
 					expected: &doc{
-						A: toml.LocalDateTimeOf(time.Date(1979, 5, 27, 0, 32, 0, 0, time.Local)),
+						A: toml.LocalDateTime{
+							toml.LocalDate{1979, 5, 27},
+							toml.LocalTime{0, 32, 0, 0},
+						},
 					},
 				}
 			},
@@ -331,7 +334,7 @@ func TestUnmarshal(t *testing.T) {
 				return test{
 					target: &doc{},
 					expected: &doc{
-						A: toml.LocalDateOf(time.Date(1979, 5, 27, 0, 32, 0, 0, time.Local)),
+						A: toml.LocalDate{1979, 5, 27},
 					},
 				}
 			},
@@ -1977,7 +1980,10 @@ func TestLocalDateTime(t *testing.T) {
 			actual := m["a"]
 			golang, err := time.Parse("2006-01-02T15:04:05.999999999", e.input)
 			require.NoError(t, err)
-			expected := toml.LocalDateTimeOf(golang)
+			expected := toml.LocalDateTime{
+				toml.LocalDate{golang.Year(), int(golang.Month()), golang.Day()},
+				toml.LocalTime{golang.Hour(), golang.Minute(), golang.Second(), golang.Nanosecond()},
+			}
 			require.Equal(t, expected, actual)
 		})
 	}
