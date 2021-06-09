@@ -39,7 +39,7 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 
 	v := parseDecimalDigits(b[5:7])
 
-	date.Month = time.Month(v)
+	date.Month = v
 
 	date.Day = parseDecimalDigits(b[8:10])
 
@@ -100,13 +100,13 @@ func parseDateTime(b []byte) (time.Time, error) {
 	}
 
 	t := time.Date(
-		dt.Date.Year,
-		dt.Date.Month,
-		dt.Date.Day,
-		dt.Time.Hour,
-		dt.Time.Minute,
-		dt.Time.Second,
-		dt.Time.Nanosecond,
+		dt.Year,
+		time.Month(dt.Month),
+		dt.Day,
+		dt.Hour,
+		dt.Minute,
+		dt.Second,
+		dt.Nanosecond,
 		zone)
 
 	return t, nil
@@ -124,7 +124,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	if err != nil {
 		return dt, nil, err
 	}
-	dt.Date = date
+	dt.LocalDate = date
 
 	sep := b[10]
 	if sep != 'T' && sep != ' ' {
@@ -135,7 +135,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	if err != nil {
 		return dt, nil, err
 	}
-	dt.Time = t
+	dt.LocalTime = t
 
 	return dt, rest, nil
 }

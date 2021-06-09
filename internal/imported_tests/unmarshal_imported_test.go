@@ -1487,12 +1487,12 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 			name: "normal",
 			in:   "1979-05-27T07:32:00",
 			out: toml.LocalDateTime{
-				Date: toml.LocalDate{
+				LocalDate: toml.LocalDate{
 					Year:  1979,
 					Month: 5,
 					Day:   27,
 				},
-				Time: toml.LocalTime{
+				LocalTime: toml.LocalTime{
 					Hour:       7,
 					Minute:     32,
 					Second:     0,
@@ -1504,12 +1504,12 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 			name: "with nanoseconds",
 			in:   "1979-05-27T00:32:00.999999",
 			out: toml.LocalDateTime{
-				Date: toml.LocalDate{
+				LocalDate: toml.LocalDate{
 					Year:  1979,
 					Month: 5,
 					Day:   27,
 				},
-				Time: toml.LocalTime{
+				LocalTime: toml.LocalTime{
 					Hour:       0,
 					Minute:     32,
 					Second:     0,
@@ -1551,26 +1551,26 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if obj.Date.Year() != example.out.Date.Year {
-				t.Errorf("expected year %d, got %d", example.out.Date.Year, obj.Date.Year())
+			if obj.Date.Year() != example.out.Year {
+				t.Errorf("expected year %d, got %d", example.out.Year, obj.Date.Year())
 			}
-			if obj.Date.Month() != example.out.Date.Month {
-				t.Errorf("expected month %d, got %d", example.out.Date.Month, obj.Date.Month())
+			if obj.Date.Month() != time.Month(example.out.Month) {
+				t.Errorf("expected month %d, got %d", example.out.Month, obj.Date.Month())
 			}
-			if obj.Date.Day() != example.out.Date.Day {
-				t.Errorf("expected day %d, got %d", example.out.Date.Day, obj.Date.Day())
+			if obj.Date.Day() != example.out.Day {
+				t.Errorf("expected day %d, got %d", example.out.Day, obj.Date.Day())
 			}
-			if obj.Date.Hour() != example.out.Time.Hour {
-				t.Errorf("expected hour %d, got %d", example.out.Time.Hour, obj.Date.Hour())
+			if obj.Date.Hour() != example.out.Hour {
+				t.Errorf("expected hour %d, got %d", example.out.Hour, obj.Date.Hour())
 			}
-			if obj.Date.Minute() != example.out.Time.Minute {
-				t.Errorf("expected minute %d, got %d", example.out.Time.Minute, obj.Date.Minute())
+			if obj.Date.Minute() != example.out.Minute {
+				t.Errorf("expected minute %d, got %d", example.out.Minute, obj.Date.Minute())
 			}
-			if obj.Date.Second() != example.out.Time.Second {
-				t.Errorf("expected second %d, got %d", example.out.Time.Second, obj.Date.Second())
+			if obj.Date.Second() != example.out.Second {
+				t.Errorf("expected second %d, got %d", example.out.Second, obj.Date.Second())
 			}
-			if obj.Date.Nanosecond() != example.out.Time.Nanosecond {
-				t.Errorf("expected nanoseconds %d, got %d", example.out.Time.Nanosecond, obj.Date.Nanosecond())
+			if obj.Date.Nanosecond() != example.out.Nanosecond {
+				t.Errorf("expected nanoseconds %d, got %d", example.out.Nanosecond, obj.Date.Nanosecond())
 			}
 		})
 	}
