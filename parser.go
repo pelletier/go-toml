@@ -2,7 +2,6 @@ package toml
 
 import (
 	"bytes"
-	"strconv"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/danger"
@@ -768,20 +767,31 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	return token, builder.Bytes(), rest, nil
 }
 
+func hexToRune(s []byte) rune {
+	var r rune
+	for _, c := range s {
+		switch {
+		case '0' <= c && c <= '9':
+			c = c - '0'
+		case 'a' <= c && c <= 'f':
+			c = c - 'a' + 10
+		case 'A' <= c && c <= 'F':
+			c = c - 'A' + 10
+		default:
+			return -1
+		}
+		r = r*16 + rune(c)
+	}
+	return r
+}
+
 func hexToString(b []byte, length int) (string, error) {
 	if len(b) < length {
 		return "", newDecodeError(b, "unicode point needs %d character, not %d", length, len(b))
 	}
 	b = b[:length]
 
-	//nolint:godox
-	// TODO: slow
-	intcode, err := strconv.ParseInt(string(b), 16, 32)
-	if err != nil {
-		return "", newDecodeError(b, "couldn't parse hexadecimal number: %w", err)
-	}
-
-	return string(rune(intcode)), nil
+	return string(hexToRune(b)), nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {
