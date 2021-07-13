@@ -25,6 +25,7 @@ const (
 	Float
 	Integer
 	LocalDate
+	LocalTime
 	LocalDateTime
 	DateTime
 	Time
@@ -58,6 +59,8 @@ func (k Kind) String() string {
 		return "Integer"
 	case LocalDate:
 		return "LocalDate"
+	case LocalTime:
+		return "LocalTime"
 	case LocalDateTime:
 		return "LocalDateTime"
 	case DateTime:

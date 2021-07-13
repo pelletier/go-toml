@@ -856,6 +856,7 @@ func digitsToInt(b []byte) int {
 func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
+	hasDate := false
 	hasTime := false
 	hasTz := false
 	seenSpace := false
@@ -868,6 +869,7 @@ byteLoop:
 		switch {
 		case isDigit(c):
 		case c == '-':
+			hasDate = true
 			const minOffsetOfTz = 8
 			if i >= minOffsetOfTz {
 				hasTz = true
@@ -892,10 +894,14 @@ byteLoop:
 	var kind ast.Kind
 
 	if hasTime {
-		if hasTz {
-			kind = ast.DateTime
+		if hasDate {
+			if hasTz {
+				kind = ast.DateTime
+			} else {
+				kind = ast.LocalDateTime
+			}
 		} else {
-			kind = ast.LocalDateTime
+			kind = ast.LocalTime
 		}
 	} else {
 		kind = ast.LocalDate
