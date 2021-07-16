@@ -28,7 +28,6 @@ const (
 	LocalTime
 	LocalDateTime
 	DateTime
-	Time
 )
 
 func (k Kind) String() string {
@@ -65,8 +64,6 @@ func (k Kind) String() string {
 		return "LocalDateTime"
 	case DateTime:
 		return "DateTime"
-	case Time:
-		return "Time"
 	}
 	panic(fmt.Errorf("Kind.String() not implemented for '%d'", k))
 }

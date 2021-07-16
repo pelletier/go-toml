@@ -733,9 +733,13 @@ func (d *decoder) unmarshalLocalDate(value *ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalLocalTime(value *ast.Node, v reflect.Value) error {
-	lt, _, err := parseLocalTime(value.Data)
+	lt, rest, err := parseLocalTime(value.Data)
 	if err != nil {
 		return err
+	}
+
+	if len(rest) > 0 {
+		return newDecodeError(rest, "extra characters at the end of a local time")
 	}
 
 	v.Set(reflect.ValueOf(lt))
