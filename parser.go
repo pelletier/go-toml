@@ -2,7 +2,6 @@ package toml
 
 import (
 	"bytes"
-	"strconv"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/danger"
@@ -593,20 +592,19 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 			case 't':
 				builder.WriteByte('\t')
 			case 'u':
-				x, err := hexToString(atmost(token[i+1:], 4), 4)
+				x, err := hexToRune(atmost(token[i+1:], 4), 4)
 				if err != nil {
 					return nil, nil, nil, err
 				}
-
-				builder.WriteString(x)
+				builder.WriteRune(x)
 				i += 4
 			case 'U':
-				x, err := hexToString(atmost(token[i+1:], 8), 8)
+				x, err := hexToRune(atmost(token[i+1:], 8), 8)
 				if err != nil {
 					return nil, nil, nil, err
 				}
 
-				builder.WriteString(x)
+				builder.WriteRune(x)
 				i += 8
 			default:
 				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
@@ -742,20 +740,20 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 			case 't':
 				builder.WriteByte('\t')
 			case 'u':
-				x, err := hexToString(token[i+1:len(token)-1], 4)
+				x, err := hexToRune(token[i+1:len(token)-1], 4)
 				if err != nil {
 					return nil, nil, nil, err
 				}
 
-				builder.WriteString(x)
+				builder.WriteRune(x)
 				i += 4
 			case 'U':
-				x, err := hexToString(token[i+1:len(token)-1], 8)
+				x, err := hexToRune(token[i+1:len(token)-1], 8)
 				if err != nil {
 					return nil, nil, nil, err
 				}
 
-				builder.WriteString(x)
+				builder.WriteRune(x)
 				i += 8
 			default:
 				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
@@ -768,20 +766,28 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	return token, builder.Bytes(), rest, nil
 }
 
-func hexToString(b []byte, length int) (string, error) {
+func hexToRune(b []byte, length int) (rune, error) {
 	if len(b) < length {
-		return "", newDecodeError(b, "unicode point needs %d character, not %d", length, len(b))
+		return -1, newDecodeError(b, "unicode point needs %d character, not %d", length, len(b))
 	}
 	b = b[:length]
 
-	//nolint:godox
-	// TODO: slow
-	intcode, err := strconv.ParseInt(string(b), 16, 32)
-	if err != nil {
-		return "", newDecodeError(b, "couldn't parse hexadecimal number: %w", err)
+	var r rune
+	for i, c := range b {
+		switch {
+		case '0' <= c && c <= '9':
+			c = c - '0'
+		case 'a' <= c && c <= 'f':
+			c = c - 'a' + 10
+		case 'A' <= c && c <= 'F':
+			c = c - 'A' + 10
+		default:
+			return -1, newDecodeError(b[i:i+1], "non-hex character")
+		}
+		r = r*16 + rune(c)
 	}
 
-	return string(rune(intcode)), nil
+	return r, nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {
