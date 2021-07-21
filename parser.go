@@ -791,7 +791,12 @@ func hexToString(b []byte, length int) (string, error) {
 	}
 	b = b[:length]
 
-	return string(hexToRune(b)), nil
+	r := hexToRune(b)
+	if r == -1 {
+		return "", newDecodeError(b, "contains non-hex character")
+	}
+
+	return string(r), nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {
