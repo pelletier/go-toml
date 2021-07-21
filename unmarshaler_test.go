@@ -340,6 +340,58 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "local-time with nano second",
+			input: `a = 12:08:05.666666666`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalTime{Hour: 12, Minute: 8, Second: 5, Nanosecond: 666666666},
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-time",
+			input: `a = 12:08:05`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalTime{Hour: 12, Minute: 8, Second: 5},
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-time missing digit",
+			input: `a = 12:08:0`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "local-time extra digit",
+			input: `a = 12:08:000`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					err:    true,
+				}
+			},
+		},
+		{
 			desc: "issue 475 - space between dots in key",
 			input: `fruit. color = "yellow"
 					fruit . flavor = "banana"`,

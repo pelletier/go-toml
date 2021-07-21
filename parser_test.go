@@ -403,16 +403,6 @@ func TestParser_AST_DateTimes(t *testing.T) {
 			input: `2021-07-21`,
 			kind:  ast.LocalDate,
 		},
-		{
-			desc:  "local-time with nano second",
-			input: `12:08:05.666666666`,
-			kind:  ast.LocalTime,
-		},
-		{
-			desc:  "local-time",
-			input: `12:08:05`,
-			kind:  ast.LocalTime,
-		},
 	}
 
 	for _, e := range examples {
