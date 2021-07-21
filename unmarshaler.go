@@ -585,6 +585,8 @@ func (d *decoder) handleValue(value *ast.Node, v reflect.Value) error {
 		return d.unmarshalDateTime(value, v)
 	case ast.LocalDate:
 		return d.unmarshalLocalDate(value, v)
+	case ast.LocalTime:
+		return d.unmarshalLocalTime(value, v)
 	case ast.LocalDateTime:
 		return d.unmarshalLocalDateTime(value, v)
 	case ast.InlineTable:
@@ -727,6 +729,20 @@ func (d *decoder) unmarshalLocalDate(value *ast.Node, v reflect.Value) error {
 
 	v.Set(reflect.ValueOf(ld))
 
+	return nil
+}
+
+func (d *decoder) unmarshalLocalTime(value *ast.Node, v reflect.Value) error {
+	lt, rest, err := parseLocalTime(value.Data)
+	if err != nil {
+		return err
+	}
+
+	if len(rest) > 0 {
+		return newDecodeError(rest, "extra characters at the end of a local time")
+	}
+
+	v.Set(reflect.ValueOf(lt))
 	return nil
 }
 

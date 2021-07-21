@@ -806,3 +806,10 @@ func ExampleMarshal() {
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
 }
+
+func TestIssue567(t *testing.T) {
+	var m map[string]interface{}
+	err := toml.Unmarshal([]byte("A = 12:08:05"), &m)
+	require.NoError(t, err)
+	require.IsType(t, m["A"], toml.LocalTime{})
+}
