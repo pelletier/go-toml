@@ -349,21 +349,24 @@ func TestParser_AST(t *testing.T) {
 	}
 }
 
-func BenchmarkHexToString(b *testing.B) {
+func BenchmarkParseBasicStringWithUnicode(b *testing.B) {
+	p := &parser{}
 	b.Run("4", func(b *testing.B) {
+		input := []byte(`"\u1234\u5678\u9ABC\u1234\u5678\u9ABC"`)
 		b.ReportAllocs()
-		b.SetBytes(4)
+		b.SetBytes(int64(len(input)))
 
 		for i := 0; i < b.N; i++ {
-			_, _ = hexToString([]byte("ABCD"), 4)
+			p.parseBasicString(input)
 		}
 	})
 	b.Run("8", func(b *testing.B) {
+		input := []byte(`"\u12345678\u9ABCDEF0\u12345678\u9ABCDEF0"`)
 		b.ReportAllocs()
-		b.SetBytes(8)
+		b.SetBytes(int64(len(input)))
 
 		for i := 0; i < b.N; i++ {
-			_, _ = hexToString([]byte("0001F680"), 8)
+			p.parseBasicString(input)
 		}
 	})
 }
