@@ -348,3 +348,22 @@ func TestParser_AST(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkHexToString(b *testing.B) {
+	b.Run("4", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(4)
+
+		for i := 0; i < b.N; i++ {
+			_, _ = hexToString([]byte("ABCD"), 4)
+		}
+	})
+	b.Run("8", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(8)
+
+		for i := 0; i < b.N; i++ {
+			_, _ = hexToString([]byte("0001F680"), 8)
+		}
+	})
+}
