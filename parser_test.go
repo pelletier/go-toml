@@ -348,3 +348,72 @@ func TestParser_AST(t *testing.T) {
 		})
 	}
 }
+
+func TestParser_AST_DateTimes(t *testing.T) {
+	examples := []struct {
+		desc  string
+		input string
+		kind  ast.Kind
+		err   bool
+	}{
+		{
+			desc:  "offset-date-time with delim 'T' and UTC offset",
+			input: `2021-07-21T12:08:05Z`,
+			kind:  ast.DateTime,
+		},
+		{
+			desc:  "offset-date-time with space delim and +8hours offset",
+			input: `2021-07-21 12:08:05+08:00`,
+			kind:  ast.DateTime,
+		},
+		{
+			desc:  "local-date-time with nano second",
+			input: `2021-07-21T12:08:05.666666666`,
+			kind:  ast.LocalDateTime,
+		},
+		{
+			desc:  "local-date-time",
+			input: `2021-07-21T12:08:05`,
+			kind:  ast.LocalDateTime,
+		},
+		{
+			desc:  "local-date",
+			input: `2021-07-21`,
+			kind:  ast.LocalDate,
+		},
+		{
+			desc:  "local-time with nano second",
+			input: `12:08:05.666666666`,
+			kind:  ast.LocalTime,
+		},
+		{
+			desc:  "local-time",
+			input: `12:08:05`,
+			kind:  ast.LocalTime,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			p := parser{}
+			p.Reset([]byte(`A = ` + e.input))
+			p.NextExpression()
+			err := p.Error()
+			if e.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+
+				expected := astNode{
+					Kind: ast.KeyValue,
+					Children: []astNode{
+						{Kind: e.kind, Data: []byte(e.input)},
+						{Kind: ast.Key, Data: []byte(`A`)},
+					},
+				}
+				compareNode(t, expected, p.Expression())
+			}
+		})
+	}
+}
