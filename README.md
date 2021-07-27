@@ -31,6 +31,8 @@ Full API, examples, and implementation notes are available in the Go documentati
 import "github.com/pelletier/go-toml/v2"
 ```
 
+See [Modules](#Modules).
+
 ## Features
 
 ### Stdlib behavior
@@ -188,6 +190,20 @@ provided for completeness.</p>
 </table>
 <p>This table can be generated with <code>./ci.sh benchmark -a -html</code>.</p>
 </details>
+
+## Modules
+
+go-toml uses Go's standard modules system.
+
+Installation instructions:
+
+- Go ≥ 1.16: Nothing to do. Use the import in your code. The `go` command deals
+  with it automatically.
+- Go ≥ 1.13: `GO111MODULE=on go get github.com/pelletier/go-toml/v2`.
+
+In case of trouble: [Go Modules FAQ][mod-faq].
+
+[mod-faq]: https://github.com/golang/go/wiki/Modules#why-does-installing-a-tool-via-go-get-fail-with-error-cannot-find-main-module
 
 ## Migrating from v1
 
