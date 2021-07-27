@@ -199,7 +199,7 @@ Installation instructions:
 
 - Go ≥ 1.16: Nothing to do. Use the import in your code. The `go` command deals
   with it automatically.
-- Go ≥ 1.13: `GO111MODULE=on go get github.com/pelletier/go-toml/v2`
+- Go ≥ 1.13: `GO111MODULE=on go get github.com/pelletier/go-toml/v2`.
 
 In case of trouble: [Go Modules FAQ][mod-faq].
 
