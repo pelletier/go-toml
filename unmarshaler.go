@@ -408,6 +408,12 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 				mv = makeFn()
 			}
 			set = true
+		} else if !mv.CanAddr() {
+			t := v.Type().Elem()
+			oldmv := mv
+			mv = reflect.New(t).Elem()
+			mv.Set(oldmv)
+			set = true
 		}
 
 		x, err := nextFn(key, mv)
