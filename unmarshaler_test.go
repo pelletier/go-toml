@@ -2074,6 +2074,60 @@ func TestIssue508(t *testing.T) {
 	require.Equal(t, "This is a title", t1.head.Title)
 }
 
+func TestIssue575(t *testing.T) {
+	b := []byte(`
+[pkg.cargo]
+version = "0.55.0 (5ae8d74b3 2021-06-22)"
+git_commit_hash = "a178d0322ce20e33eac124758e837cbd80a6f633"
+[pkg.cargo.target.aarch64-apple-darwin]
+available = true
+url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.gz"
+hash = "7bac3901d8eb6a4191ffeebe75b29c78bcb270158ec901addb31f588d965d35d"
+xz_url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz"
+xz_hash = "5207644fd6379f3e5b8ae60016b854efa55a381b0c363bff7f9b2f25bfccc430"
+
+[pkg.cargo.target.aarch64-pc-windows-msvc]
+available = true
+url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.gz"
+hash = "eb8ccd9b1f6312b06dc749c17896fa4e9c163661c273dcb61cd7a48376227f6d"
+xz_url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.xz"
+xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
+`)
+
+	type target struct {
+		XZ_URL string
+	}
+
+	type pkg struct {
+		Target map[string]target
+	}
+
+	type doc struct {
+		Pkg map[string]pkg
+	}
+
+	var dist doc
+	err := toml.Unmarshal(b, &dist)
+	require.NoError(t, err)
+
+	expected := doc{
+		Pkg: map[string]pkg{
+			"cargo": pkg{
+				Target: map[string]target{
+					"aarch64-apple-darwin": {
+						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz",
+					},
+					"aarch64-pc-windows-msvc": {
+						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.xz",
+					},
+				},
+			},
+		},
+	}
+
+	require.Equal(t, expected, dist)
+}
+
 //nolint:funlen
 func TestDecoderStrict(t *testing.T) {
 	examples := []struct {
