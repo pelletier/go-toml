@@ -1030,8 +1030,12 @@ func isValidBinaryRune(r byte) bool {
 }
 
 func expect(x byte, b []byte) ([]byte, error) {
+	if len(b) == 0 {
+		return nil, newDecodeError(b, "expected character %c but the document ended here", x)
+	}
+
 	if b[0] != x {
-		return nil, newDecodeError(b[0:1], "expected character %U", x)
+		return nil, newDecodeError(b[0:1], "expected character %c", x)
 	}
 
 	return b[1:], nil
