@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 )
 
 func main() {
+	multiLineArray := flag.Bool("multiLineArray", false, "sets up the linter to encode arrays with more than one element on multiple lines instead of one.")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "tomll can be used in two ways:")
 		fmt.Fprintln(os.Stderr, "Writing to STDIN and reading from STDOUT:")
@@ -25,11 +27,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, "  tomll a.toml b.toml c.toml")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "When given a list of files, tomll will modify all files in place without asking.")
+		fmt.Fprintln(os.Stderr, "When given a list of files, tomll will modify all files in place without asking.")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Flags:")
+		fmt.Fprintln(os.Stderr, "-multiLineArray      sets up the linter to encode arrays with more than one element on multiple lines instead of one.")
 	}
 	flag.Parse()
+
 	// read from stdin and print to stdout
 	if flag.NArg() == 0 {
-		s, err := lintReader(os.Stdin)
+		s, err := lintReader(os.Stdin, *multiLineArray)
 		if err != nil {
 			io.WriteString(os.Stderr, err.Error())
 			os.Exit(-1)
@@ -38,7 +45,7 @@ func main() {
 	} else {
 		// otherwise modify a list of files
 		for _, filename := range flag.Args() {
-			s, err := lintFile(filename)
+			s, err := lintFile(filename, *multiLineArray)
 			if err != nil {
 				io.WriteString(os.Stderr, err.Error())
 				os.Exit(-1)
@@ -48,18 +55,29 @@ func main() {
 	}
 }
 
-func lintFile(filename string) (string, error) {
+func lintFile(filename string, multiLineArray bool) (string, error) {
 	tree, err := toml.LoadFile(filename)
 	if err != nil {
 		return "", err
 	}
-	return tree.String(), nil
+
+	buf := new(bytes.Buffer)
+	if err := toml.NewEncoder(buf).ArraysWithOneElementPerLine(multiLineArray).Encode(tree); err != nil {
+		panic(err)
+	}
+
+	return buf.String(), nil
 }
 
-func lintReader(r io.Reader) (string, error) {
+func lintReader(r io.Reader, multiLineArray bool) (string, error) {
 	tree, err := toml.LoadReader(r)
 	if err != nil {
 		return "", err
 	}
-	return tree.String(), nil
+
+	buf := new(bytes.Buffer)
+	if err := toml.NewEncoder(buf).ArraysWithOneElementPerLine(multiLineArray).Encode(tree); err != nil {
+		panic(err)
+	}
+	return buf.String(), nil
 }
