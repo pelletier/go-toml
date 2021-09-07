@@ -1728,6 +1728,12 @@ func TestIssue579(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue581(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte(`P=[#`), &v)
+	require.Error(t, err)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
