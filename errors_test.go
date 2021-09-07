@@ -148,6 +148,13 @@ line 5`,
 6|
 7| line 4`,
 		},
+		{
+			desc: "handle remainder of the error line when there is only one line",
+			doc:  [3]string{`P=`, `[`, `#`},
+			msg:  "array is incomplete",
+			expected: `1| P=[#
+ |   ~ array is incomplete`,
+		},
 	}
 
 	for _, e := range examples {

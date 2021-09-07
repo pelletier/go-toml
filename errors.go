@@ -116,6 +116,7 @@ func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 	maxLine := errLine + len(after) - 1
 	lineColumnWidth := len(strconv.Itoa(maxLine))
 
+	// Write the lines of context strictly before the error.
 	for i := len(before) - 1; i > 0; i-- {
 		line := errLine - i
 		buf.WriteString(formatLineNumber(line, lineColumnWidth))
@@ -128,6 +129,8 @@ func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 
 		buf.WriteRune('\n')
 	}
+
+	// Write the document line that contains the error.
 
 	buf.WriteString(formatLineNumber(errLine, lineColumnWidth))
 	buf.WriteString("| ")
@@ -143,6 +146,10 @@ func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 	}
 
 	buf.WriteRune('\n')
+
+	// Write the line with the error message itself (so it does not have a line
+	// number).
+
 	buf.WriteString(strings.Repeat(" ", lineColumnWidth))
 	buf.WriteString("| ")
 
@@ -156,6 +163,8 @@ func wrapDecodeError(document []byte, de *decodeError) *DecodeError {
 		buf.WriteString(" ")
 		buf.WriteString(errMessage)
 	}
+
+	// Write the lines of context strictly after the error.
 
 	for i := 1; i < len(after); i++ {
 		buf.WriteRune('\n')
@@ -230,7 +239,7 @@ forward:
 			rest = rest[o+1:]
 			o = 0
 
-		case o == len(rest)-1 && o > 0:
+		case o == len(rest)-1:
 			// add last line only if it's non-empty
 			afterLines = append(afterLines, rest)
 
