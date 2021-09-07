@@ -397,6 +397,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	// array-values =/ ws-comment-newline val ws-comment-newline [ array-sep ]
 	// array-sep = %x2C  ; , Comma
 	// ws-comment-newline = *( wschar / [ comment ] newline )
+	arrayStart := b
 	b = b[1:]
 
 	parent := p.builder.Push(ast.Node{
@@ -415,7 +416,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		}
 
 		if len(b) == 0 {
-			return parent, nil, newDecodeError(b, "array is incomplete")
+			return parent, nil, newDecodeError(arrayStart[:1], "array is incomplete")
 		}
 
 		if b[0] == ']' {
