@@ -353,7 +353,13 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	var err error
 
 	for len(b) > 0 {
+		previousB := b
 		b = p.parseWhitespace(b)
+
+		if len(b) == 0 {
+			return parent, nil, newDecodeError(previousB[:1], "inline table is incomplete")
+		}
+
 		if b[0] == '}' {
 			break
 		}
