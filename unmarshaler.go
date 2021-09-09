@@ -823,71 +823,83 @@ func (d *decoder) unmarshalInteger(value *ast.Node, v reflect.Value) error {
 		return err
 	}
 
+	var r reflect.Value
+
 	switch v.Kind() {
 	case reflect.Int64:
 		v.SetInt(i)
+		return nil
 	case reflect.Int32:
 		if i < math.MinInt32 || i > math.MaxInt32 {
 			return fmt.Errorf("toml: number %d does not fit in an int32", i)
 		}
 
-		v.Set(reflect.ValueOf(int32(i)))
-		return nil
+		r = reflect.ValueOf(int32(i))
 	case reflect.Int16:
 		if i < math.MinInt16 || i > math.MaxInt16 {
 			return fmt.Errorf("toml: number %d does not fit in an int16", i)
 		}
 
-		v.Set(reflect.ValueOf(int16(i)))
+		r = reflect.ValueOf(int16(i))
 	case reflect.Int8:
 		if i < math.MinInt8 || i > math.MaxInt8 {
 			return fmt.Errorf("toml: number %d does not fit in an int8", i)
 		}
 
-		v.Set(reflect.ValueOf(int8(i)))
+		r = reflect.ValueOf(int8(i))
 	case reflect.Int:
 		if i < minInt || i > maxInt {
 			return fmt.Errorf("toml: number %d does not fit in an int", i)
 		}
 
-		v.Set(reflect.ValueOf(int(i)))
+		r = reflect.ValueOf(int(i))
 	case reflect.Uint64:
 		if i < 0 {
 			return fmt.Errorf("toml: negative number %d does not fit in an uint64", i)
 		}
 
-		v.Set(reflect.ValueOf(uint64(i)))
+		r = reflect.ValueOf(uint64(i))
 	case reflect.Uint32:
 		if i < 0 || i > math.MaxUint32 {
 			return fmt.Errorf("toml: negative number %d does not fit in an uint32", i)
 		}
 
-		v.Set(reflect.ValueOf(uint32(i)))
+		r = reflect.ValueOf(uint32(i))
 	case reflect.Uint16:
 		if i < 0 || i > math.MaxUint16 {
 			return fmt.Errorf("toml: negative number %d does not fit in an uint16", i)
 		}
 
-		v.Set(reflect.ValueOf(uint16(i)))
+		r = reflect.ValueOf(uint16(i))
 	case reflect.Uint8:
 		if i < 0 || i > math.MaxUint8 {
 			return fmt.Errorf("toml: negative number %d does not fit in an uint8", i)
 		}
 
-		v.Set(reflect.ValueOf(uint8(i)))
+		r = reflect.ValueOf(uint8(i))
 	case reflect.Uint:
 		if i < 0 {
 			return fmt.Errorf("toml: negative number %d does not fit in an uint", i)
 		}
 
-		v.Set(reflect.ValueOf(uint(i)))
+		r = reflect.ValueOf(uint(i))
 	case reflect.Interface:
-		v.Set(reflect.ValueOf(i))
+		r = reflect.ValueOf(i)
 	default:
-		err = fmt.Errorf("toml: cannot store TOML integer into a Go %s", v.Kind())
+		return fmt.Errorf("toml: cannot store TOML integer into a Go %s", v.Kind())
 	}
 
-	return err
+	if !r.Type().AssignableTo(v.Type()) {
+		if r.Type().ConvertibleTo(v.Type()) {
+			r = r.Convert(v.Type())
+		} else {
+			return fmt.Errorf("toml: cannot assign or convert a TOML integer into a %s", v.Type())
+		}
+	}
+
+	v.Set(r)
+
+	return nil
 }
 
 func (d *decoder) unmarshalString(value *ast.Node, v reflect.Value) error {
