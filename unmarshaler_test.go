@@ -1746,6 +1746,12 @@ func TestIssue588(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue585(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte(`a=1979-05127T 0`), &v)
+	require.Error(t, err)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {

@@ -894,6 +894,11 @@ byteLoop:
 		case c == ' ':
 			if !seenSpace && i+1 < len(b) && isDigit(b[i+1]) {
 				i += 2
+				// Avoid reaching past the end of the document in case the time
+				// is malformed. See TestIssue585.
+				if i >= len(b) {
+					i--
+				}
 				seenSpace = true
 				hasTime = true
 			} else {
