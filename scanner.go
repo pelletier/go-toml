@@ -118,7 +118,7 @@ func scanComment(b []byte) ([]byte, []byte) {
 		}
 	}
 
-	return b, nil
+	return b, b[len(b):]
 }
 
 func scanBasicString(b []byte) ([]byte, []byte, error) {
