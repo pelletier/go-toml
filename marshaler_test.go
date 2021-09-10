@@ -782,6 +782,22 @@ func TestIssue424(t *testing.T) {
 	require.Equal(t, msg2, msg2parsed)
 }
 
+func TestIssue567(t *testing.T) {
+	var m map[string]interface{}
+	err := toml.Unmarshal([]byte("A = 12:08:05"), &m)
+	require.NoError(t, err)
+	require.IsType(t, m["A"], toml.LocalTime{})
+}
+
+func TestIssue590(t *testing.T) {
+	type CustomType int
+	var cfg struct {
+		Option CustomType `toml:"option"`
+	}
+	err := toml.Unmarshal([]byte("option = 42"), &cfg)
+	require.NoError(t, err)
+}
+
 func ExampleMarshal() {
 	type MyConfig struct {
 		Version int
@@ -805,11 +821,4 @@ func ExampleMarshal() {
 	// Version = 2
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
-}
-
-func TestIssue567(t *testing.T) {
-	var m map[string]interface{}
-	err := toml.Unmarshal([]byte("A = 12:08:05"), &m)
-	require.NoError(t, err)
-	require.IsType(t, m["A"], toml.LocalTime{})
 }
