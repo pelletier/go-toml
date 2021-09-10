@@ -890,11 +890,7 @@ func (d *decoder) unmarshalInteger(value *ast.Node, v reflect.Value) error {
 	}
 
 	if !r.Type().AssignableTo(v.Type()) {
-		if r.Type().ConvertibleTo(v.Type()) {
-			r = r.Convert(v.Type())
-		} else {
-			return fmt.Errorf("toml: cannot assign or convert a TOML integer into a %s", v.Type())
-		}
+		r = r.Convert(v.Type())
 	}
 
 	v.Set(r)
