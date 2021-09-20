@@ -75,7 +75,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 		panic("date time should have a timezone")
 	}
 
-	if b[0] == 'Z' {
+	if b[0] == 'Z' || b[0] == 'z' {
 		b = b[1:]
 		zone = time.UTC
 	} else {
@@ -127,7 +127,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	dt.LocalDate = date
 
 	sep := b[10]
-	if sep != 'T' && sep != ' ' {
+	if sep != 'T' && sep != ' ' && sep != 't' {
 		return dt, nil, newDecodeError(b[10:11], "datetime separator is expected to be T or a space")
 	}
 

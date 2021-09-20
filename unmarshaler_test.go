@@ -1752,6 +1752,13 @@ func TestIssue585(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Support lowercase 'T' and 'Z'
+func TestIssue600(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte(`a=1979-05-27t00:32:00z`), &v)
+	require.NoError(t, err)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
