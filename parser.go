@@ -887,9 +887,9 @@ byteLoop:
 			if i >= minOffsetOfTz {
 				hasTz = true
 			}
-		case c == 'T' || c == ':' || c == '.':
+		case c == 'T' || c == 't' || c == ':' || c == '.':
 			hasTime = true
-		case c == '+' || c == '-' || c == 'Z':
+		case c == '+' || c == '-' || c == 'Z' || c == 'z':
 			hasTz = true
 		case c == ' ':
 			if !seenSpace && i+1 < len(b) && isDigit(b[i+1]) {
