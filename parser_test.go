@@ -1162,3 +1162,10 @@ str3 = """\
 		t.Errorf("expected '%s', got '%s'", expected, got)
 	}
 }
+
+func TestUint(t *testing.T) {
+	tree, err := Load("hello = 18446744073709551615")
+	assertTree(t, tree, err, map[string]interface{}{
+		"hello": uint64(math.MaxUint64),
+	})
+}
