@@ -44,15 +44,16 @@ type LocalTime struct {
 	Minute     int
 	Second     int
 	Nanosecond int
+	Precision  int
 }
 
 // String returns RFC 3339 representation of d.
 func (d LocalTime) String() string {
 	s := fmt.Sprintf("%02d:%02d:%02d", d.Hour, d.Minute, d.Second)
-	if d.Nanosecond == 0 {
+	if d.Nanosecond == 0 && d.Precision == 0 {
 		return s
 	}
-	return s + fmt.Sprintf(".%09d", d.Nanosecond)
+	return s + fmt.Sprintf(".%09d", d.Nanosecond)[:d.Precision+1]
 }
 
 // MarshalText returns RFC 3339 representation of d.

@@ -1514,6 +1514,7 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 					Minute:     32,
 					Second:     0,
 					Nanosecond: 999999000,
+					Precision:  6,
 				},
 			},
 		},
@@ -1600,6 +1601,7 @@ func TestUnmarshalLocalTime(t *testing.T) {
 				Minute:     32,
 				Second:     0,
 				Nanosecond: 999999000,
+				Precision:  6,
 			},
 		},
 	}

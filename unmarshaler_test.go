@@ -317,7 +317,7 @@ func TestUnmarshal(t *testing.T) {
 					expected: &doc{
 						A: toml.LocalDateTime{
 							toml.LocalDate{1979, 5, 27},
-							toml.LocalTime{0, 32, 0, 0},
+							toml.LocalTime{0, 32, 0, 0, 0},
 						},
 					},
 				}
@@ -348,7 +348,7 @@ func TestUnmarshal(t *testing.T) {
 				return test{
 					target: &v,
 					expected: &map[string]interface{}{
-						"a": toml.LocalTime{Hour: 12, Minute: 8, Second: 5, Nanosecond: 666666666},
+						"a": toml.LocalTime{Hour: 12, Minute: 8, Second: 5, Nanosecond: 666666666, Precision: 9},
 					},
 				}
 			},
@@ -2036,42 +2036,52 @@ func TestLocalDateTime(t *testing.T) {
 	examples := []struct {
 		desc  string
 		input string
+		prec  int
 	}{
 		{
 			desc:  "9 digits",
 			input: "2006-01-02T15:04:05.123456789",
+			prec:  9,
 		},
 		{
 			desc:  "8 digits",
 			input: "2006-01-02T15:04:05.12345678",
+			prec:  8,
 		},
 		{
 			desc:  "7 digits",
 			input: "2006-01-02T15:04:05.1234567",
+			prec:  7,
 		},
 		{
 			desc:  "6 digits",
 			input: "2006-01-02T15:04:05.123456",
+			prec:  6,
 		},
 		{
 			desc:  "5 digits",
 			input: "2006-01-02T15:04:05.12345",
+			prec:  5,
 		},
 		{
 			desc:  "4 digits",
 			input: "2006-01-02T15:04:05.1234",
+			prec:  4,
 		},
 		{
 			desc:  "3 digits",
 			input: "2006-01-02T15:04:05.123",
+			prec:  3,
 		},
 		{
 			desc:  "2 digits",
 			input: "2006-01-02T15:04:05.12",
+			prec:  2,
 		},
 		{
 			desc:  "1 digit",
 			input: "2006-01-02T15:04:05.1",
+			prec:  1,
 		},
 		{
 			desc:  "0 digit",
@@ -2092,7 +2102,7 @@ func TestLocalDateTime(t *testing.T) {
 			require.NoError(t, err)
 			expected := toml.LocalDateTime{
 				toml.LocalDate{golang.Year(), int(golang.Month()), golang.Day()},
-				toml.LocalTime{golang.Hour(), golang.Minute(), golang.Second(), golang.Nanosecond()},
+				toml.LocalTime{golang.Hour(), golang.Minute(), golang.Second(), golang.Nanosecond(), e.prec},
 			}
 			require.Equal(t, expected, actual)
 		})
