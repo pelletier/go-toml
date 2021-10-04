@@ -19,7 +19,11 @@ func testgenInvalid(t *testing.T, input string) {
 	err := testsuite.Unmarshal([]byte(input), &doc)
 
 	if err == nil {
-		t.Log(json.Marshal(doc))
+		out, err := json.Marshal(doc)
+		if err != nil {
+			panic("could not marshal map to json")
+		}
+		t.Log("JSON output from unmarshal:", string(out))
 		t.Fatalf("test did not fail")
 	}
 }
