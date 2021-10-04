@@ -5,6 +5,7 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -244,9 +245,17 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case reflect.String:
 		b = enc.encodeString(b, v.String(), ctx.options)
 	case reflect.Float32:
-		b = strconv.AppendFloat(b, v.Float(), 'f', -1, 32)
+		if math.Trunc(v.Float()) == v.Float() {
+			b = strconv.AppendFloat(b, v.Float(), 'f', 1, 32)
+		} else {
+			b = strconv.AppendFloat(b, v.Float(), 'f', -1, 32)
+		}
 	case reflect.Float64:
-		b = strconv.AppendFloat(b, v.Float(), 'f', -1, 64)
+		if math.Trunc(v.Float()) == v.Float() {
+			b = strconv.AppendFloat(b, v.Float(), 'f', 1, 64)
+		} else {
+			b = strconv.AppendFloat(b, v.Float(), 'f', -1, 64)
+		}
 	case reflect.Bool:
 		if v.Bool() {
 			b = append(b, "true"...)
