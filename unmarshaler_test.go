@@ -1885,12 +1885,17 @@ world'`,
 		{
 			desc: "bad char between hours and minutes",
 			data: `a = 2021-03-30 213:1:00`,
-			msg:  `expecting colon between hours and minutes`,
+			msg:  `times are expected to have the format HH:MM:SS[.NNNNNN]`,
 		},
 		{
 			desc: "bad char between minutes and seconds",
 			data: `a = 2021-03-30 21:312:0`,
-			msg:  `expecting colon between minutes and seconds`,
+			msg:  `times are expected to have the format HH:MM:SS[.NNNNNN]`,
+		},
+		{
+			desc: "invalid time part",
+			data: `a=1979-05-27T90:+2:99`,
+			msg:  `times are expected to have the format HH:MM:SS[.NNNNNN]`,
 		},
 		{
 			desc: `binary with invalid digit`,
