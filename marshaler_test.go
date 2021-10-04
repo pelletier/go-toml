@@ -822,3 +822,26 @@ func ExampleMarshal() {
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
 }
+
+func TestIssue571(t *testing.T) {
+	type Foo struct {
+		Float32 float32
+		Float64 float64
+	}
+
+	const closeEnough = 1e-9
+
+	foo := Foo{
+		Float32: 42,
+		Float64: 43,
+	}
+	b, err := toml.Marshal(foo)
+	require.NoError(t, err)
+
+	var foo2 Foo
+	err = toml.Unmarshal(b, &foo2)
+	require.NoError(t, err)
+
+	assert.InDelta(t, 42, foo2.Float32, closeEnough)
+	assert.InDelta(t, 43, foo2.Float64, closeEnough)
+}
