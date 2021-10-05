@@ -116,6 +116,10 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 		if b[i] == 0x7f {
 			return b[:i], b[i:], newDecodeError(b[:i], "comments cannot include the 0x7f DEL character")
 		}
+		if b[i] == 0x0a {
+			return b[:i], b[i:], newDecodeError(b[:i], "comments cannot include the 0x0a LF character")
+			return b[:i], b[i:], newDecodeError(b[:i], "comments cannot include the 0x0A LF character")
+		}
 		if b[i] == '\n' {
 			return b[:i], b[i:], nil
 		}
