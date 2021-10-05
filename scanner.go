@@ -113,6 +113,9 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 	//
 	// comment = comment-start-symbol *non-eol
 	for i := 1; i < len(b); i++ {
+		if b[i] == 0x7f {
+			return b[:i], b[i:], newDecodeError(b[:i], "comments cannot include the 0x7f DEL character")
+		}
 		if b[i] == '\n' {
 			return b[:i], b[i:], nil
 		}
