@@ -84,12 +84,12 @@ func TestTOMLTest_Invalid_Control_CommentLf(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_CommentNull(t *testing.T) {
-	input := "comment-null = \"null\" # \x00\n"
+	input := "comment-null = \"null\" # \u0000\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentUs(t *testing.T) {
-	input := "comment-us = \"ctrl-_\" # \x1f\n"
+	input := "comment-us = \"ctrl-_\" # \u001f\n"
 	testgenInvalid(t, input)
 }
 
