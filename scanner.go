@@ -122,6 +122,9 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 		if b[i] == 0x00 {
 			return b[:i], b[i:], newDecodeError(b[:i], "comments cannot include the 0x00 NUL character")
 		}
+		if b[i] == 0x1f {
+			return b[:i], b[i:], newDecodeError(b[:i], "comments cannot include the 0x1f US character")
+		}
 		if b[i] == '\n' {
 			return b[:i], b[i:], nil
 		}
