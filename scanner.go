@@ -106,7 +106,7 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 }
 
 //nolint:unparam
-func scanComment(b []byte) ([]byte, []byte) {
+func scanComment(b []byte) ([]byte, []byte, error) {
 	// comment-start-symbol = %x23 ; #
 	// non-ascii = %x80-D7FF / %xE000-10FFFF
 	// non-eol = %x09 / %x20-7F / non-ascii
@@ -114,11 +114,11 @@ func scanComment(b []byte) ([]byte, []byte) {
 	// comment = comment-start-symbol *non-eol
 	for i := 1; i < len(b); i++ {
 		if b[i] == '\n' {
-			return b[:i], b[i:]
+			return b[:i], b[i:], nil
 		}
 	}
 
-	return b, b[len(b):]
+	return b, b[len(b):], nil
 }
 
 func scanBasicString(b []byte) ([]byte, []byte, error) {
