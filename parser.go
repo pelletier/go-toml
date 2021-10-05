@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/danger"
@@ -106,9 +107,9 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	if b[0] == '#' {
-		_, rest := scanComment(b)
+		_, rest, err := scanComment(b)
 
-		return ref, rest, nil
+		return ref, rest, err
 	}
 
 	if b[0] == '\n' || b[0] == '\r' {
@@ -129,9 +130,9 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) > 0 && b[0] == '#' {
-		_, rest := scanComment(b)
+		_, rest, err := scanComment(b)
 
-		return ref, rest, nil
+		return ref, rest, err
 	}
 
 	return ref, b, nil
@@ -478,7 +479,10 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 		b = p.parseWhitespace(b)
 
 		if len(b) > 0 && b[0] == '#' {
-			_, b = scanComment(b)
+			_, b, err = scanComment(b)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if len(b) == 0 {
@@ -567,7 +571,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 			// When the last non-whitespace character on a line is an unescaped \,
 			// it will be trimmed along with all whitespace (including newlines) up
 			// to the next non-whitespace character or closing delimiter.
-			if token[i+1] == '\n' || (token[i+1] == '\r' && token[i+2] == '\n') {
+			if token[i+1] == '\n' || (token[i+1] == '\r' && token[i+2] == '\n') || token[i+1] == ' ' || token[i+1] == '\t' {
 				i++ // skip the \
 				for ; i < len(token)-3; i++ {
 					c := token[i]
@@ -792,6 +796,10 @@ func hexToRune(b []byte, length int) (rune, error) {
 			return -1, newDecodeError(b[i:i+1], "non-hex character")
 		}
 		r = r*16 + rune(c)
+	}
+
+	if !utf8.ValidRune(r) {
+		return r, newDecodeError(b, "invalid UTF-8 sequence")
 	}
 
 	return r, nil

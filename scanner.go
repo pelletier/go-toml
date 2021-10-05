@@ -1,5 +1,9 @@
 package toml
 
+import (
+	"unicode/utf8"
+)
+
 func scanFollows(b []byte, pattern string) bool {
 	n := len(pattern)
 
@@ -49,13 +53,24 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 	// literal-string = apostrophe *literal-char apostrophe
 	// apostrophe = %x27 ; ' apostrophe
 	// literal-char = %x09 / %x20-26 / %x28-7E / non-ascii
-	for i := 1; i < len(b); i++ {
+	for i := 1; i < len(b); {
 		switch b[i] {
 		case '\'':
 			return b[:i+1], b[i+1:], nil
 		case '\n':
 			return nil, nil, newDecodeError(b[i:i+1], "literal strings cannot have new lines")
 		}
+
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError {
+			return nil, nil, newDecodeError(b[i:i+size], "invalid UTF-8 byte in literal string %#U", b[i:i+size])
+		}
+
+		if !runeIsLiteralChar(r) {
+			return nil, nil, newDecodeError(b[i:i+size], "invalid code point in literal string %#U", b[i:i+size])
+		}
+
+		i = i + size
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], "unterminated literal string")
@@ -70,10 +85,30 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	// mll-content = mll-char / newline
 	// mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
 	// mll-quotes = 1*2apostrophe
-	for i := 3; i < len(b); i++ {
-		if b[i] == '\'' && scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
-			return b[:i+3], b[i+3:], nil
+	for i := 3; i < len(b); {
+		if b[i] == '\'' {
+			if scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
+				return b[:i+3], b[i+3:], nil
+			}
+			i++
+			continue
 		}
+
+		if b[i] == '\n' || b[i] == '\r' {
+			i++
+			continue
+		}
+
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError {
+			return nil, nil, newDecodeError(b[i:i+size], "invalid UTF-8 byte in multiline literal string %#U", b[i:i+size])
+		}
+
+		if !runeIsLiteralChar(r) {
+			return nil, nil, newDecodeError(b[i:i+size], "unpermitted UTF-8 code point in multiline literal string %#U", b[i:i+size])
+		}
+
+		i = i + size
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], `multiline literal string not terminated by '''`)
@@ -106,19 +141,31 @@ func scanWhitespace(b []byte) ([]byte, []byte) {
 }
 
 //nolint:unparam
-func scanComment(b []byte) ([]byte, []byte) {
+func scanComment(b []byte) ([]byte, []byte, error) {
 	// comment-start-symbol = %x23 ; #
 	// non-ascii = %x80-D7FF / %xE000-10FFFF
-	// non-eol = %x09 / %x20-7F / non-ascii
+	// non-eol = %x09 / %x20-7E / non-ascii
 	//
 	// comment = comment-start-symbol *non-eol
-	for i := 1; i < len(b); i++ {
+
+	for i := 1; i < len(b); {
 		if b[i] == '\n' {
-			return b[:i], b[i:]
+			return b[:i], b[i:], nil
 		}
+
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError {
+			return nil, nil, newDecodeError(b[i:i+size], "invalid UTF-8 byte in comment %#U", b[i:i+size])
+		}
+
+		if !runeIsNonEOL(r) {
+			return nil, nil, newDecodeError(b[i:i+size], "unpermitted UTF-8 code point in comment %#U", b[i:i+size])
+		}
+
+		i = i + size
 	}
 
-	return b, b[len(b):]
+	return b, b[len(b):], nil
 }
 
 func scanBasicString(b []byte) ([]byte, []byte, error) {
@@ -127,7 +174,13 @@ func scanBasicString(b []byte) ([]byte, []byte, error) {
 	// basic-char = basic-unescaped / escaped
 	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// escaped = escape escape-seq-char
-	for i := 1; i < len(b); i++ {
+
+	var (
+		r    rune
+		size int
+	)
+
+	for i := 1; i < len(b); {
 		switch b[i] {
 		case '"':
 			return b[:i+1], b[i+1:], nil
@@ -137,8 +190,20 @@ func scanBasicString(b []byte) ([]byte, []byte, error) {
 			if len(b) < i+2 {
 				return nil, nil, newDecodeError(b[i:i+1], "need a character after \\")
 			}
-			i++ // skip the next character
+			i = i + 2 // skip the next character
+			continue
 		}
+
+		r, size = utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError {
+			return nil, nil, newDecodeError(b[i:i+size], "invalid UTF-8 byte in basic string %#U", b[i:i+size])
+		}
+
+		if !runeIsBasicUnescaped(r) {
+			return nil, nil, newDecodeError(b[i:i+size], "unpermitted UTF-8 code point in basic string %#U", b[i:i+size])
+		}
+
+		i = i + size
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], `basic string not terminated by "`)
@@ -155,19 +220,56 @@ func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// mlb-quotes = 1*2quotation-mark
 	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
-	for i := 3; i < len(b); i++ {
+	for i := 3; i < len(b); {
 		switch b[i] {
 		case '"':
 			if scanFollowsMultilineBasicStringDelimiter(b[i:]) {
 				return b[:i+3], b[i+3:], nil
 			}
+			i++
+			continue
 		case '\\':
 			if len(b) < i+2 {
 				return nil, nil, newDecodeError(b[len(b):], "need a character after \\")
 			}
-			i++ // skip the next character
+			i = i + 2 // skip the next character
+			continue
+		case '\n', '\r':
+			i++
+			continue
 		}
+
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError {
+			return nil, nil, newDecodeError(b[i:i+size], "invalid UTF-8 byte in multiline basic string %#U", b[i:i+size])
+		}
+
+		if !runeIsBasicUnescaped(r) {
+			return nil, nil, newDecodeError(b[i:i+size], "unpermitted UTF-8 code point in multiline basic string %#U", b[i:i+size])
+		}
+
+		i = i + size
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], `multiline basic string not terminated by """`)
+}
+
+func runeIsBasicUnescaped(r rune) bool {
+	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
+	return r == 0x09 || r == 0x20 || r == 0x21 || (r >= 0x23 && r <= 0x5b) || (r >= 0x5d && r <= 0x7e) || runeIsNonASCII(r)
+}
+
+func runeIsLiteralChar(r rune) bool {
+	// literal-char = %x09 / %x20-26 / %x28-7E / non-ascii
+	return r == 0x09 || (r >= 0x20 && r <= 0x26) || (r >= 0x28 && r <= 0x7e) || runeIsNonASCII(r)
+}
+
+func runeIsNonASCII(r rune) bool {
+	// non-ascii = %x80-D7FF / %xE000-10FFFF
+	return (r >= 0x80 && r <= 0xd7ff) || (r >= 0xe000 && r <= 0x10ffff)
+}
+
+func runeIsNonEOL(r rune) bool {
+	// non-eol = %x09 / %x20-7E / non-ascii
+	return r == 0x09 || (r >= 0x20 && r <= 0x7e) || runeIsNonASCII(r)
 }
