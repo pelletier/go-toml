@@ -4,7 +4,7 @@ package testsuite
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/pelletier/go-toml/v2"
@@ -33,16 +33,18 @@ func ValueToTaggedJSON(doc interface{}) ([]byte, error) {
 // DecodeStdin is a helper function for the toml-test binary interface.  TOML input
 // is read from STDIN and a resulting tagged JSON representation is written to
 // STDOUT.
-func DecodeStdin() {
+func DecodeStdin() error {
 	var decoded map[string]interface{}
 
 	if err := toml.NewDecoder(os.Stdin).Decode(&decoded); err != nil {
-		log.Fatalf("Error decoding TOML: %s", err)
+		return fmt.Errorf("Error decoding TOML: %s", err)
 	}
 
 	j := json.NewEncoder(os.Stdout)
 	j.SetIndent("", "  ")
 	if err := j.Encode(addTag("", decoded)); err != nil {
-		log.Fatalf("Error encoding JSON: %s", err)
+		fmt.Errorf("Error encoding JSON: %s", err)
 	}
+
+	return nil
 }
