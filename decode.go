@@ -37,9 +37,7 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 
 	date.Year = parseDecimalDigits(b[0:4])
 
-	v := parseDecimalDigits(b[5:7])
-
-	date.Month = v
+	date.Month = parseDecimalDigits(b[5:7])
 
 	date.Day = parseDecimalDigits(b[8:10])
 
