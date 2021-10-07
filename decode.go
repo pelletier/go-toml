@@ -149,22 +149,32 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		t     LocalTime
 	)
 
+	// check if b matches to have expected format HH:MM:SS[.NNNNNN]
 	const localTimeByteLen = 8
 	if len(b) < localTimeByteLen {
 		return t, nil, newDecodeError(b, "times are expected to have the format HH:MM:SS[.NNNNNN]")
 	}
 
 	t.Hour = parseDecimalDigits(b[0:2])
+	if t.Hour > 23 {
+		return t, nil, newDecodeError(b[0:2], "hour cannot be greater 23")
+	}
 	if b[2] != ':' {
 		return t, nil, newDecodeError(b[2:3], "expecting colon between hours and minutes")
 	}
 
 	t.Minute = parseDecimalDigits(b[3:5])
+	if t.Minute > 59 {
+		return t, nil, newDecodeError(b[3:5], "minutes cannot be greater 59")
+	}
 	if b[5] != ':' {
 		return t, nil, newDecodeError(b[5:6], "expecting colon between minutes and seconds")
 	}
 
 	t.Second = parseDecimalDigits(b[6:8])
+	if t.Second > 59 {
+		return t, nil, newDecodeError(b[3:5], "seconds cannot be greater 59")
+	}
 
 	const minLengthWithFrac = 9
 	if len(b) >= minLengthWithFrac && b[minLengthWithFrac-1] == '.' {

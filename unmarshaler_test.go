@@ -1759,6 +1759,12 @@ func TestIssue600(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestIssue596(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte(`a=1979-05-27T90:+2:99`), &v)
+	require.Error(t, err)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
@@ -1891,6 +1897,21 @@ world'`,
 			desc: "bad char between minutes and seconds",
 			data: `a = 2021-03-30 21:312:0`,
 			msg:  `expecting colon between minutes and seconds`,
+		},
+		{
+			desc: "invalid hour value",
+			data: `a=1979-05-27T90:+2:99`,
+			msg:  `hour cannot be greater 23`,
+		},
+		{
+			desc: "invalid minutes value",
+			data: `a=1979-05-27T23:+2:99`,
+			msg:  `minutes cannot be greater 59`,
+		},
+		{
+			desc: "invalid seconds value",
+			data: `a=1979-05-27T12:45:99`,
+			msg:  `seconds cannot be greater 59`,
 		},
 		{
 			desc: `binary with invalid digit`,
