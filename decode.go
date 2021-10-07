@@ -165,7 +165,6 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 	t.Minute = parseDecimalDigits(b[3:5])
 	if t.Minute > 59 {
-		fmt.Println("!!!", t.Minute)
 		return t, nil, newDecodeError(b[3:5], "minutes cannot be greater 59")
 	}
 	if b[5] != ':' {
