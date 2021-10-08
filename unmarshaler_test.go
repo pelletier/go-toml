@@ -2091,6 +2091,11 @@ world'`,
 			desc: "multiline basic string with unfinished escape sequence after the first escape code",
 			data: "a = \"\"\"\\t\\",
 		},
+		{
+			desc: `impossible date-day`,
+			data: `A = 2021-03-40T23:59:00`,
+			msg:  `impossible date`,
+		},
 	}
 
 	for _, e := range examples {
