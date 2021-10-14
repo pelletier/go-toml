@@ -757,7 +757,6 @@ func TestTOMLTest_Invalid_String_BadByteEscape(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_String_BadCodepoint(t *testing.T) {
-	t.Skip("FIXME")
 	input := "invalid-codepoint = \"This string contains a non scalar unicode codepoint \\uD801\"\n"
 	testgenInvalid(t, input)
 }

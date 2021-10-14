@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"unicode"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/danger"
@@ -780,22 +781,27 @@ func hexToRune(b []byte, length int) (rune, error) {
 	}
 	b = b[:length]
 
-	var r rune
+	var r uint32
 	for i, c := range b {
+		d := uint32(0)
 		switch {
 		case '0' <= c && c <= '9':
-			c = c - '0'
+			d = uint32(c - '0')
 		case 'a' <= c && c <= 'f':
-			c = c - 'a' + 10
+			d = uint32(c - 'a' + 10)
 		case 'A' <= c && c <= 'F':
-			c = c - 'A' + 10
+			d = uint32(c - 'A' + 10)
 		default:
 			return -1, newDecodeError(b[i:i+1], "non-hex character")
 		}
-		r = r*16 + rune(c)
+		r = r*16 + d
 	}
 
-	return r, nil
+	if r > unicode.MaxRune || 0xD800 <= r && r < 0xE000 {
+		return -1, newDecodeError(b, "escape sequence is invalid Unicode code point")
+	}
+
+	return rune(r), nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {

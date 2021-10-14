@@ -899,18 +899,16 @@ func (d *decoder) unmarshalInteger(value *ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalString(value *ast.Node, v reflect.Value) error {
-	var err error
-
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(string(value.Data))
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
-		err = newDecodeError(d.p.Raw(value.Raw), "cannot store TOML string into a Go %s", v.Kind())
+		return newDecodeError(d.p.Raw(value.Raw), "cannot store TOML string into a Go %s", v.Kind())
 	}
 
-	return err
+	return nil
 }
 
 func (d *decoder) handleKeyValue(expr *ast.Node, v reflect.Value) (reflect.Value, error) {
