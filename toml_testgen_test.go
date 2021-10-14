@@ -179,31 +179,26 @@ func TestTOMLTest_Invalid_Control_RawstringUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_StringBs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-bs = \"backspace\b\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringDel(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-del = \"null\u007f\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringLf(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-lf = \"null\x10\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringNull(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-null = \"null\x00\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringUs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-us = \"null\x1f\"\n"
 	testgenInvalid(t, input)
 }

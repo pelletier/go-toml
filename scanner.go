@@ -121,27 +121,47 @@ func scanComment(b []byte) ([]byte, []byte) {
 	return b, b[len(b):]
 }
 
-func scanBasicString(b []byte) ([]byte, []byte, error) {
+func scanBasicString(b []byte) ([]byte, int, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
 	// basic-char = basic-unescaped / escaped
 	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// escaped = escape escape-seq-char
-	for i := 1; i < len(b); i++ {
+	escaped := -1 // index of the first \. -1 means no escape character in there.
+	i := 1
+
+loop:
+	for ; i < len(b); i++ {
 		switch b[i] {
 		case '"':
-			return b[:i+1], b[i+1:], nil
+			return b[:i+1], escaped, b[i+1:], nil
 		case '\n':
-			return nil, nil, newDecodeError(b[i:i+1], "basic strings cannot have new lines")
+			return nil, escaped, nil, newDecodeError(b[i:i+1], "basic strings cannot have new lines")
 		case '\\':
 			if len(b) < i+2 {
-				return nil, nil, newDecodeError(b[i:i+1], "need a character after \\")
+				return nil, escaped, nil, newDecodeError(b[i:i+1], "need a character after \\")
+			}
+			escaped = i
+			i += 2 // skip the next character
+			break loop
+		}
+	}
+
+	for ; i < len(b); i++ {
+		switch b[i] {
+		case '"':
+			return b[:i+1], escaped, b[i+1:], nil
+		case '\n':
+			return nil, escaped, nil, newDecodeError(b[i:i+1], "basic strings cannot have new lines")
+		case '\\':
+			if len(b) < i+2 {
+				return nil, escaped, nil, newDecodeError(b[i:i+1], "need a character after \\")
 			}
 			i++ // skip the next character
 		}
 	}
 
-	return nil, nil, newDecodeError(b[len(b):], `basic string not terminated by "`)
+	return nil, escaped, nil, newDecodeError(b[len(b):], `basic string not terminated by "`)
 }
 
 func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {

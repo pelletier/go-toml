@@ -706,25 +706,30 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// escape-seq-char =/ %x74         ; t    tab             U+0009
 	// escape-seq-char =/ %x75 4HEXDIG ; uXXXX                U+XXXX
 	// escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
-	token, rest, err := scanBasicString(b)
+	token, escaped, rest, err := scanBasicString(b)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	// fast path
-	i := len(`"`)
-	startIdx := i
+	startIdx := len(`"`)
 	endIdx := len(token) - len(`"`)
-	for ; i < endIdx; i++ {
-		if token[i] == '\\' {
-			break
+
+	// Fast path. If there is no escape sequence, the string should just be
+	// an UTF-8 encoded string, which is the same as Go. In that case,
+	// validate the string and return a direct reference to the buffer.
+	if escaped < 0 {
+		str := token[startIdx:endIdx]
+		verr := utf8TomlValidAlreadyEscaped(str)
+		if verr.Zero() {
+			return token, str, rest, nil
 		}
-	}
-	if i == endIdx {
-		return token, token[startIdx:endIdx], rest, nil
+		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
+	i := escaped
+
 	var builder bytes.Buffer
+	// grow?
 	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
@@ -771,8 +776,19 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 			builder.WriteByte(c)
 		}
 	}
+	/*
+		str := builder.Bytes()
+		verr := utf8.Valid(str)
+		if !verr.Zero() {
+			return nil, nil, nil, newDecodeError(token[startIdx:endIdx], "string is not valid UTF-8")
+		}
+	*/
 
 	return token, builder.Bytes(), rest, nil
+}
+
+func validUnescapedChar(c byte) bool {
+	return (c >= 0x20 && c <= 0x7E) || (c >= 0x80 && c <= 0x7E)
 }
 
 func hexToRune(b []byte, length int) (rune, error) {
