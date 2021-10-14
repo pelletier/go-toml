@@ -49,13 +49,18 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 	// literal-string = apostrophe *literal-char apostrophe
 	// apostrophe = %x27 ; ' apostrophe
 	// literal-char = %x09 / %x20-26 / %x28-7E / non-ascii
-	for i := 1; i < len(b); i++ {
+	for i := 1; i < len(b); {
 		switch b[i] {
 		case '\'':
 			return b[:i+1], b[i+1:], nil
 		case '\n':
 			return nil, nil, newDecodeError(b[i:i+1], "literal strings cannot have new lines")
 		}
+		size := utf8ValidNext(b[i:])
+		if size == 0 {
+			return nil, nil, newDecodeError(b[i:i+1], "invalid character")
+		}
+		i += size
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], "unterminated literal string")

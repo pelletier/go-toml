@@ -105,6 +105,41 @@ func utf8TomlValidAlreadyEscaped(p []byte) (err utf8Err) {
 	return
 }
 
+// Return the size of the next rune if valid, 0 otherwise.
+func utf8ValidNext(p []byte) int {
+	c := p[0]
+
+	if c < utf8.RuneSelf {
+		if invalidAscii(c) {
+			return 0
+		}
+		return 1
+	}
+
+	x := first[c]
+	if x == xx {
+		// Illegal starter byte.
+		return 0
+	}
+	size := int(x & 7)
+	if size > len(p) {
+		// Short or invalid.
+		return 0
+	}
+	accept := acceptRanges[x>>4]
+	if c := p[1]; c < accept.lo || accept.hi < c {
+		return 0
+	} else if size == 2 {
+	} else if c := p[2]; c < locb || hicb < c {
+		return 0
+	} else if size == 3 {
+	} else if c := p[3]; c < locb || hicb < c {
+		return 0
+	}
+
+	return size
+}
+
 func invalidAscii(b byte) bool {
 	return b <= 0x08 || b >= 0x0A && b <= 0x1F || b == 0x7F
 }

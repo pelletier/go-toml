@@ -151,29 +151,21 @@ func TestTOMLTest_Invalid_Control_RawmultiUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_RawstringDel(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-del = 'null\u007f'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringLf(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-lf = 'null\x10'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringNull(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-null = 'null\x00'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringUs(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-us = 'null\x1f'\n"
 	testgenInvalid(t, input)
 }
