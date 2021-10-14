@@ -141,7 +141,7 @@ func utf8ValidNext(p []byte) int {
 }
 
 func invalidAscii(b byte) bool {
-	return b <= 0x08 || b >= 0x0A && b <= 0x1F || b == 0x7F
+	return b <= 0x08 || (b > 0x0A && b < 0x0D) || (b > 0x0D && b <= 0x1F) || b == 0x7F
 }
 
 func minInt(a, b int) int {

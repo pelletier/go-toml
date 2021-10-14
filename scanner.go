@@ -75,10 +75,15 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	// mll-content = mll-char / newline
 	// mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
 	// mll-quotes = 1*2apostrophe
-	for i := 3; i < len(b); i++ {
+	for i := 3; i < len(b); {
 		if b[i] == '\'' && scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
 			return b[:i+3], b[i+3:], nil
 		}
+		size := utf8ValidNext(b[i:])
+		if size == 0 {
+			return nil, nil, newDecodeError(b[i:i+1], "invalid character")
+		}
+		i += size
 	}
 
 	return nil, nil, newDecodeError(b[len(b):], `multiline literal string not terminated by '''`)

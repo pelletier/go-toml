@@ -123,29 +123,21 @@ func TestTOMLTest_Invalid_Control_MultiUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiDel(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-del = '''null\u007f'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiLf(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-lf = '''null\x10'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiNull(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-null = '''null\x00'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiUs(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-us = '''null\x1f'''\n"
 	testgenInvalid(t, input)
 }
