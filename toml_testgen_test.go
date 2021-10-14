@@ -793,13 +793,11 @@ func TestTOMLTest_Invalid_String_BasicMultilineUnknownEscape(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_String_BasicOutOfRangeUnicodeEscape1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\\UFFFFFFFF\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_String_BasicOutOfRangeUnicodeEscape2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\\U00D80000\"\n"
 	testgenInvalid(t, input)
 }
