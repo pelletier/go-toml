@@ -414,7 +414,6 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 	var lastChild ast.Reference
 
-	var valueRef ast.Reference
 	var err error
 	for len(b) > 0 {
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
@@ -440,8 +439,8 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 			if err != nil {
 				return parent, nil, err
 			}
-		} else {
-			valueRef = 0
+		} else if !first {
+			return parent, nil, newDecodeError(b[0:1], "array elements must be separated by commas")
 		}
 
 		// TOML allows trailing commas in arrays.
@@ -449,10 +448,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 			break
 		}
 
-		if !first && valueRef == 0 {
-			return parent, nil, newDecodeError(b[0:1], "array elements must be separated by commas")
-		}
-
+		var valueRef ast.Reference
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
 			return parent, nil, err
