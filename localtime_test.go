@@ -41,6 +41,8 @@ func TestLocalTime_String(t *testing.T) {
 	require.Equal(t, "20:12:01.000000002", d.String())
 	d = toml.LocalTime{20, 12, 1, 0, 0}
 	require.Equal(t, "20:12:01", d.String())
+	d = toml.LocalTime{20, 12, 1, 0, 9}
+	require.Equal(t, "20:12:01.000000000", d.String())
 }
 
 func TestLocalTime_MarshalText(t *testing.T) {

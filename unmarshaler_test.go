@@ -2039,6 +2039,11 @@ func TestLocalDateTime(t *testing.T) {
 		prec  int
 	}{
 		{
+			desc:  "9 digits zero nanoseconds",
+			input: "2006-01-02T15:04:05.000000000",
+			prec:  9,
+		},
+		{
 			desc:  "9 digits",
 			input: "2006-01-02T15:04:05.123456789",
 			prec:  9,
