@@ -71,25 +71,21 @@ func TestTOMLTest_Invalid_Bool_WrongCaseTrue(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_CommentDel(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-del = \"0x7f\" # \u007f\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentLf(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-lf = \"ctrl-P\" # \x10\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentNull(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-null = \"null\" # \x00\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentUs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-us = \"ctrl-_\" # \x1f\n"
 	testgenInvalid(t, input)
 }

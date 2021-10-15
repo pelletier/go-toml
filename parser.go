@@ -107,9 +107,8 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	if b[0] == '#' {
-		_, rest := scanComment(b)
-
-		return ref, rest, nil
+		_, rest, err := scanComment(b)
+		return ref, rest, err
 	}
 
 	if b[0] == '\n' || b[0] == '\r' {
@@ -130,9 +129,8 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) > 0 && b[0] == '#' {
-		_, rest := scanComment(b)
-
-		return ref, rest, nil
+		_, rest, err := scanComment(b)
+		return ref, rest, err
 	}
 
 	return ref, b, nil
@@ -480,7 +478,10 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 		b = p.parseWhitespace(b)
 
 		if len(b) > 0 && b[0] == '#' {
-			_, b = scanComment(b)
+			_, b, err = scanComment(b)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if len(b) == 0 {
