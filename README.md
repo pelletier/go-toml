@@ -158,12 +158,12 @@ Execution time speedup compared to other Go TOML libraries:
         <tr><th>Benchmark</th><th>go-toml v1</th><th>BurntSushi/toml</th></tr>
     </thead>
     <tbody>
-        <tr><td>Marshal/HugoFrontMatter</td><td>2.0x</td><td>2.0x</td></tr>
-        <tr><td>Marshal/ReferenceFile/map</td><td>1.8x</td><td>2.0x</td></tr>
-        <tr><td>Marshal/ReferenceFile/struct</td><td>2.7x</td><td>2.7x</td></tr>
-        <tr><td>Unmarshal/HugoFrontMatter</td><td>3.0x</td><td>2.6x</td></tr>
-        <tr><td>Unmarshal/ReferenceFile/map</td><td>3.0x</td><td>3.1x</td></tr>
-        <tr><td>Unmarshal/ReferenceFile/struct</td><td>5.9x</td><td>6.6x</td></tr>
+        <tr><td>Marshal/HugoFrontMatter-2</td><td>1.9x</td><td>1.9x</td></tr>
+        <tr><td>Marshal/ReferenceFile/map-2</td><td>1.7x</td><td>1.9x</td></tr>
+        <tr><td>Marshal/ReferenceFile/struct-2</td><td>2.4x</td><td>2.6x</td></tr>
+        <tr><td>Unmarshal/HugoFrontMatter-2</td><td>2.9x</td><td>2.5x</td></tr>
+        <tr><td>Unmarshal/ReferenceFile/map-2</td><td>2.7x</td><td>2.6x</td></tr>
+        <tr><td>Unmarshal/ReferenceFile/struct-2</td><td>4.8x</td><td>5.1x</td></tr>
      </tbody>
 </table>
 <details><summary>See more</summary>
@@ -176,16 +176,17 @@ provided for completeness.</p>
         <tr><th>Benchmark</th><th>go-toml v1</th><th>BurntSushi/toml</th></tr>
     </thead>
     <tbody>
-        <tr><td>Marshal/SimpleDocument/map</td><td>1.7x</td><td>2.1x</td></tr>
-        <tr><td>Marshal/SimpleDocument/struct</td><td>2.6x</td><td>2.9x</td></tr>
-        <tr><td>Unmarshal/SimpleDocument/map</td><td>4.1x</td><td>2.9x</td></tr>
-        <tr><td>Unmarshal/SimpleDocument/struct</td><td>6.3x</td><td>4.1x</td></tr>
-        <tr><td>UnmarshalDataset/example</td><td>3.5x</td><td>2.4x</td></tr>
-        <tr><td>UnmarshalDataset/code</td><td>2.2x</td><td>2.8x</td></tr>
-        <tr><td>UnmarshalDataset/twitter</td><td>2.8x</td><td>2.1x</td></tr>
-        <tr><td>UnmarshalDataset/citm_catalog</td><td>2.3x</td><td>1.5x</td></tr>
-        <tr><td>UnmarshalDataset/config</td><td>4.2x</td><td>3.2x</td></tr>
-        <tr><td>[Geo mean]</td><td>3.0x</td><td>2.7x</td></tr>
+        <tr><td>Marshal/SimpleDocument/map-2</td><td>1.7x</td><td>2.1x</td></tr>
+        <tr><td>Marshal/SimpleDocument/struct-2</td><td>2.5x</td><td>2.8x</td></tr>
+        <tr><td>Unmarshal/SimpleDocument/map-2</td><td>4.1x</td><td>3.1x</td></tr>
+        <tr><td>Unmarshal/SimpleDocument/struct-2</td><td>6.4x</td><td>4.3x</td></tr>
+        <tr><td>UnmarshalDataset/example-2</td><td>3.4x</td><td>3.2x</td></tr>
+        <tr><td>UnmarshalDataset/code-2</td><td>2.2x</td><td>2.5x</td></tr>
+        <tr><td>UnmarshalDataset/twitter-2</td><td>2.8x</td><td>2.7x</td></tr>
+        <tr><td>UnmarshalDataset/citm_catalog-2</td><td>2.2x</td><td>2.0x</td></tr>
+        <tr><td>UnmarshalDataset/canada-2</td><td>1.8x</td><td>1.4x</td></tr>
+        <tr><td>UnmarshalDataset/config-2</td><td>4.4x</td><td>2.9x</td></tr>
+        <tr><td>[Geo mean]</td><td>2.8x</td><td>2.6x</td></tr>
      </tbody>
 </table>
 <p>This table can be generated with <code>./ci.sh benchmark -a -html</code>.</p>
