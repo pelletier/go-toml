@@ -81,7 +81,7 @@ func utf8TomlValidAlreadyEscaped(p []byte) (err utf8Err) {
 		if i+size > n {
 			// Short or invalid.
 			err.Index = offset + i
-			err.Size = minInt(size, n-i)
+			err.Size = n - i
 			return
 		}
 		accept := acceptRanges[x>>4]
@@ -144,13 +144,6 @@ func invalidAscii(b byte) bool {
 	return b <= 0x08 || (b > 0x0A && b < 0x0D) || (b > 0x0D && b <= 0x1F) || b == 0x7F
 }
 
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // acceptRange gives the range of valid values for the second byte in a UTF-8
 // sequence.
 type acceptRange struct {
@@ -189,29 +182,7 @@ var first = [256]uint8{
 	s5, s6, s6, s6, s7, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, // 0xF0-0xFF
 }
 
-// Code points in the surrogate range are not valid for UTF-8.
 const (
-	surrogateMin = 0xD800
-	surrogateMax = 0xDFFF
-)
-
-const (
-	t1 = 0b00000000
-	tx = 0b10000000
-	t2 = 0b11000000
-	t3 = 0b11100000
-	t4 = 0b11110000
-	t5 = 0b11111000
-
-	maskx = 0b00111111
-	mask2 = 0b00011111
-	mask3 = 0b00001111
-	mask4 = 0b00000111
-
-	rune1Max = 1<<7 - 1
-	rune2Max = 1<<11 - 1
-	rune3Max = 1<<16 - 1
-
 	// The default lowest and highest continuation byte.
 	locb = 0b10000000
 	hicb = 0b10111111

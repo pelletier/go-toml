@@ -785,10 +785,6 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	return token, builder.Bytes(), rest, nil
 }
 
-func validUnescapedChar(c byte) bool {
-	return (c >= 0x20 && c <= 0x7E) || (c >= 0x80 && c <= 0x7E)
-}
-
 func hexToRune(b []byte, length int) (rune, error) {
 	if len(b) < length {
 		return -1, newDecodeError(b, "unicode point needs %d character, not %d", length, len(b))

@@ -247,6 +247,20 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "kv literal string",
+			input: `A = 'foo 🙂 '`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "foo 🙂 "},
+				}
+			},
+		},
+		{
 			desc:  "time.time with negative zone",
 			input: `a = 1979-05-27T00:32:00-07:00 `, // space intentional
 			gen: func() test {
@@ -2008,6 +2022,74 @@ world'`,
 		{
 			desc: `invalid nan`,
 			data: `A = non`,
+		},
+		{
+			desc: `invalid character in comment in array`,
+			data: "A = [#\x00\n]",
+		},
+		{
+			desc: "invalid utf8 character in long string with no escape sequence",
+			data: "a = \"aaaa\x80aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
+		},
+		{
+			desc: "invalid ascii character in long string with no escape sequence",
+			data: "a = \"aaaa\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
+		},
+		{
+			desc: "unfinished 2-byte utf8 character in string with no escape sequence",
+			data: "a = \"aaaa\xC2\"",
+		},
+		{
+			desc: "unfinished 3-byte utf8 character in string with no escape sequence",
+			data: "a = \"aaaa\xE2\x00\x00\"",
+		},
+		{
+			desc: "invalid 3rd byte of 3-byte utf8 character in string with no escape sequence",
+			data: "a = \"aaaa\xE2\x80\x00\"",
+		},
+		{
+			desc: "invalid 4rd byte of 4-byte utf8 character in string with no escape sequence",
+			data: "a = \"aaaa\xF2\x81\x81\x00\"",
+		},
+		{
+			desc: "unfinished 2-byte utf8 character in literal string",
+			data: "a = 'aaa\xC2'",
+		},
+		{
+			desc: "unfinished 3-byte utf8 character in literal string",
+			data: "a = 'aaaa\xE2\x00\x00'",
+		},
+		{
+			desc: "invalid 3rd byte of 3-byte utf8 character in literal string",
+			data: "a = 'aaaa\xE2\x80\x00'",
+		},
+		{
+			desc: "invalid 4rd byte of 4-byte utf8 character in literal string",
+			data: "a = 'aaaa\xF2\x81\x81\x00'",
+		},
+		{
+			desc: "invalid start utf8 character in literal string",
+			data: "a = '\x80'",
+		},
+		{
+			desc: "utf8 character with not enough bytes before end in literal string",
+			data: "a = '\xEF'",
+		},
+		{
+			desc: "basic string with newline after the first escape code",
+			data: "a = \"\\t\n\"",
+		},
+		{
+			desc: "basic string with unfinished escape sequence after the first escape code",
+			data: "a = \"\\t\\",
+		},
+		{
+			desc: "basic string with unfinished after the first escape code",
+			data: "a = \"\\t",
+		},
+		{
+			desc: "multiline basic string with unfinished escape sequence after the first escape code",
+			data: "a = \"\"\"\\t\\",
 		},
 	}
 
