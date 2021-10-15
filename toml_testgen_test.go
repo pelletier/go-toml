@@ -71,139 +71,106 @@ func TestTOMLTest_Invalid_Bool_WrongCaseTrue(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_CommentDel(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-del = \"0x7f\" # \u007f\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentLf(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-lf = \"ctrl-P\" # \x10\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentNull(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-null = \"null\" # \x00\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_CommentUs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "comment-us = \"ctrl-_\" # \x1f\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiDel(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-del = \"\"\"null\u007f\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiLf(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-lf = \"\"\"null\x10\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiNull(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-null = \"\"\"null\x00\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiUs(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-us = \"\"\"null\x1f\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiDel(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-del = '''null\u007f'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiLf(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-lf = '''null\x10'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiNull(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-null = '''null\x00'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawmultiUs(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawmulti-us = '''null\x1f'''\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringDel(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-del = 'null\u007f'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringLf(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-lf = 'null\x10'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringNull(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-null = 'null\x00'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_RawstringUs(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "rawstring-us = 'null\x1f'\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringBs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-bs = \"backspace\b\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringDel(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-del = \"null\u007f\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringLf(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-lf = \"null\x10\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringNull(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-null = \"null\x00\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_StringUs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "string-us = \"null\x1f\"\n"
 	testgenInvalid(t, input)
 }
@@ -757,7 +724,6 @@ func TestTOMLTest_Invalid_String_BadByteEscape(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_String_BadCodepoint(t *testing.T) {
-	t.Skip("FIXME")
 	input := "invalid-codepoint = \"This string contains a non scalar unicode codepoint \\uD801\"\n"
 	testgenInvalid(t, input)
 }
@@ -793,13 +759,11 @@ func TestTOMLTest_Invalid_String_BasicByteEscapes(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_String_BasicMultilineOutOfRangeUnicodeEscape1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\"\"\\UFFFFFFFF\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_String_BasicMultilineOutOfRangeUnicodeEscape2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\"\"\\U00D80000\"\"\"\n"
 	testgenInvalid(t, input)
 }
@@ -815,13 +779,11 @@ func TestTOMLTest_Invalid_String_BasicMultilineUnknownEscape(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_String_BasicOutOfRangeUnicodeEscape1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\\UFFFFFFFF\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_String_BasicOutOfRangeUnicodeEscape2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\\U00D80000\"\n"
 	testgenInvalid(t, input)
 }

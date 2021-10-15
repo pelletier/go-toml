@@ -2,6 +2,7 @@ package toml
 
 import (
 	"bytes"
+	"unicode"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/danger"
@@ -106,9 +107,8 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	}
 
 	if b[0] == '#' {
-		_, rest := scanComment(b)
-
-		return ref, rest, nil
+		_, rest, err := scanComment(b)
+		return ref, rest, err
 	}
 
 	if b[0] == '\n' || b[0] == '\r' {
@@ -129,9 +129,8 @@ func (p *parser) parseExpression(b []byte) (ast.Reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) > 0 && b[0] == '#' {
-		_, rest := scanComment(b)
-
-		return ref, rest, nil
+		_, rest, err := scanComment(b)
+		return ref, rest, err
 	}
 
 	return ref, b, nil
@@ -479,7 +478,10 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 		b = p.parseWhitespace(b)
 
 		if len(b) > 0 && b[0] == '#' {
-			_, b = scanComment(b)
+			_, b, err = scanComment(b)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if len(b) == 0 {
@@ -529,7 +531,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	// mlb-quotes = 1*2quotation-mark
 	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
-	token, rest, err := scanMultilineBasicString(b)
+	token, escaped, rest, err := scanMultilineBasicString(b)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -546,16 +548,20 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	// fast path
 	startIdx := i
 	endIdx := len(token) - len(`"""`)
-	for ; i < endIdx; i++ {
-		if token[i] == '\\' {
-			break
+
+	if escaped < 0 {
+		str := token[startIdx:endIdx]
+		verr := utf8TomlValidAlreadyEscaped(str)
+		if verr.Zero() {
+			return token, str, rest, nil
 		}
-	}
-	if i == endIdx {
-		return token, token[startIdx:endIdx], rest, nil
+		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
+	i = escaped
+
 	var builder bytes.Buffer
+	// grow?
 	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
@@ -705,25 +711,30 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// escape-seq-char =/ %x74         ; t    tab             U+0009
 	// escape-seq-char =/ %x75 4HEXDIG ; uXXXX                U+XXXX
 	// escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
-	token, rest, err := scanBasicString(b)
+	token, escaped, rest, err := scanBasicString(b)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	// fast path
-	i := len(`"`)
-	startIdx := i
+	startIdx := len(`"`)
 	endIdx := len(token) - len(`"`)
-	for ; i < endIdx; i++ {
-		if token[i] == '\\' {
-			break
+
+	// Fast path. If there is no escape sequence, the string should just be
+	// an UTF-8 encoded string, which is the same as Go. In that case,
+	// validate the string and return a direct reference to the buffer.
+	if escaped < 0 {
+		str := token[startIdx:endIdx]
+		verr := utf8TomlValidAlreadyEscaped(str)
+		if verr.Zero() {
+			return token, str, rest, nil
 		}
-	}
-	if i == endIdx {
-		return token, token[startIdx:endIdx], rest, nil
+		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
+	i := escaped
+
 	var builder bytes.Buffer
+	// grow?
 	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
@@ -780,22 +791,27 @@ func hexToRune(b []byte, length int) (rune, error) {
 	}
 	b = b[:length]
 
-	var r rune
+	var r uint32
 	for i, c := range b {
+		d := uint32(0)
 		switch {
 		case '0' <= c && c <= '9':
-			c = c - '0'
+			d = uint32(c - '0')
 		case 'a' <= c && c <= 'f':
-			c = c - 'a' + 10
+			d = uint32(c - 'a' + 10)
 		case 'A' <= c && c <= 'F':
-			c = c - 'A' + 10
+			d = uint32(c - 'A' + 10)
 		default:
 			return -1, newDecodeError(b[i:i+1], "non-hex character")
 		}
-		r = r*16 + rune(c)
+		r = r*16 + d
 	}
 
-	return r, nil
+	if r > unicode.MaxRune || 0xD800 <= r && r < 0xE000 {
+		return -1, newDecodeError(b, "escape sequence is invalid Unicode code point")
+	}
+
+	return rune(r), nil
 }
 
 func (p *parser) parseWhitespace(b []byte) []byte {
