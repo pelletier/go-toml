@@ -174,7 +174,7 @@ loop:
 	return nil, escaped, nil, newDecodeError(b[len(b):], `basic string not terminated by "`)
 }
 
-func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
+func scanMultilineBasicString(b []byte) ([]byte, int, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
 	// ml-basic-string-delim = 3quotation-mark
@@ -185,19 +185,40 @@ func scanMultilineBasicString(b []byte) ([]byte, []byte, error) {
 	// mlb-quotes = 1*2quotation-mark
 	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
-	for i := 3; i < len(b); i++ {
+
+	escaped := -1
+	i := 3
+
+loop:
+	for ; i < len(b); i++ {
 		switch b[i] {
 		case '"':
 			if scanFollowsMultilineBasicStringDelimiter(b[i:]) {
-				return b[:i+3], b[i+3:], nil
+				return b[:i+3], escaped, b[i+3:], nil
 			}
 		case '\\':
 			if len(b) < i+2 {
-				return nil, nil, newDecodeError(b[len(b):], "need a character after \\")
+				return nil, escaped, nil, newDecodeError(b[len(b):], "need a character after \\")
+			}
+			escaped = i
+			i += 2 // skip the next character
+			break loop
+		}
+	}
+
+	for ; i < len(b); i++ {
+		switch b[i] {
+		case '"':
+			if scanFollowsMultilineBasicStringDelimiter(b[i:]) {
+				return b[:i+3], escaped, b[i+3:], nil
+			}
+		case '\\':
+			if len(b) < i+2 {
+				return nil, escaped, nil, newDecodeError(b[len(b):], "need a character after \\")
 			}
 			i++ // skip the next character
 		}
 	}
 
-	return nil, nil, newDecodeError(b[len(b):], `multiline basic string not terminated by """`)
+	return nil, escaped, nil, newDecodeError(b[len(b):], `multiline basic string not terminated by """`)
 }

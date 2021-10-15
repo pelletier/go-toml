@@ -530,7 +530,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	// mlb-quotes = 1*2quotation-mark
 	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
-	token, rest, err := scanMultilineBasicString(b)
+	token, escaped, rest, err := scanMultilineBasicString(b)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -547,16 +547,20 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	// fast path
 	startIdx := i
 	endIdx := len(token) - len(`"""`)
-	for ; i < endIdx; i++ {
-		if token[i] == '\\' {
-			break
+
+	if escaped < 0 {
+		str := token[startIdx:endIdx]
+		verr := utf8TomlValidAlreadyEscaped(str)
+		if verr.Zero() {
+			return token, str, rest, nil
 		}
-	}
-	if i == endIdx {
-		return token, token[startIdx:endIdx], rest, nil
+		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
+	i = escaped
+
 	var builder bytes.Buffer
+	// grow?
 	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
@@ -776,13 +780,6 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 			builder.WriteByte(c)
 		}
 	}
-	/*
-		str := builder.Bytes()
-		verr := utf8.Valid(str)
-		if !verr.Zero() {
-			return nil, nil, nil, newDecodeError(token[startIdx:endIdx], "string is not valid UTF-8")
-		}
-	*/
 
 	return token, builder.Bytes(), rest, nil
 }

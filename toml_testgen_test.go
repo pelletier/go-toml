@@ -95,29 +95,21 @@ func TestTOMLTest_Invalid_Control_CommentUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Control_MultiDel(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-del = \"\"\"null\u007f\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiLf(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-lf = \"\"\"null\x10\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiNull(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-null = \"\"\"null\x00\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Control_MultiUs(t *testing.T) {
-	t.Skip("FIXME")
-
 	input := "multi-us = \"\"\"null\x1f\"\"\"\n"
 	testgenInvalid(t, input)
 }
@@ -771,13 +763,11 @@ func TestTOMLTest_Invalid_String_BasicByteEscapes(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_String_BasicMultilineOutOfRangeUnicodeEscape1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\"\"\\UFFFFFFFF\"\"\"\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_String_BasicMultilineOutOfRangeUnicodeEscape2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "a = \"\"\"\\U00D80000\"\"\"\n"
 	testgenInvalid(t, input)
 }
