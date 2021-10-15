@@ -140,12 +140,10 @@ bench() {
     if [ "${replace}" != "" ]; then
         find ./benchmark/ -iname '*.go' -exec sed -i -E "s|github.com/pelletier/go-toml/v2|${replace}|g" {} \;
         go get "${replace}"
-        # hack: remove canada.toml.gz because it is not supported by
-        # burntsushi, and replace is only used for benchmark -a
-        rm -f benchmark/testdata/canada.toml.gz
     fi
 
-    go test -bench=. -count=10 ./... | tee "${out}"
+    export GOMAXPROCS=2
+    nice -n -19 taskset --cpu-list 0,1 go test '-bench=^Benchmark(Un)?[mM]arshal' -count=5 -run=Nothing ./... | tee "${out}"
     popd
 
     if [ "${branch}" != "HEAD" ]; then
