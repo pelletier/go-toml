@@ -176,7 +176,6 @@ func TestTOMLTest_Invalid_Control_StringUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Datetime_ImpossibleDate(t *testing.T) {
-	t.Skip("FIXME")
 	input := "d = 2006-01-50T00:00:00Z\n"
 	testgenInvalid(t, input)
 }
