@@ -354,6 +354,22 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "local leap-day date into interface",
+			input: `a = 2020-02-29`,
+			gen: func() test {
+				type doc struct {
+					A interface{}
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{
+						A: toml.LocalDate{2020, 2, 29},
+					},
+				}
+			},
+		},
+		{
 			desc:  "local-time with nano second",
 			input: `a = 12:08:05.666666666`,
 			gen: func() test {
@@ -2094,6 +2110,11 @@ world'`,
 		{
 			desc: `impossible date-day`,
 			data: `A = 2021-03-40T23:59:00`,
+			msg:  `impossible date`,
+		},
+		{
+			desc: `leap day in non-leap year`,
+			data: `A = 2021-02-29T23:59:00`,
 			msg:  `impossible date`,
 		},
 	}
