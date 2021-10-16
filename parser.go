@@ -558,15 +558,11 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
-	i = escaped
-
 	var builder bytes.Buffer
-	// grow?
-	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
 	// escapes are balanced.
-	for ; i < len(token)-3; i++ {
+	for i < len(token)-3 {
 		c := token[i]
 
 		//nolint:nestif
@@ -584,7 +580,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 						break
 					}
 				}
-
+				i++
 				continue
 			}
 
@@ -623,8 +619,14 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 			default:
 				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
+			i++
 		} else {
-			builder.WriteByte(c)
+			size := utf8ValidNext(token[i:])
+			if size == 0 {
+				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid character %#U", c)
+			}
+			builder.Write(token[i : i+size])
+			i += size
 		}
 	}
 
@@ -731,15 +733,13 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
-	i := escaped
+	i := startIdx
 
 	var builder bytes.Buffer
-	// grow?
-	builder.Write(token[startIdx:i])
 
 	// The scanner ensures that the token starts and ends with quotes and that
 	// escapes are balanced.
-	for ; i < len(token)-1; i++ {
+	for i < len(token)-1 {
 		c := token[i]
 		if c == '\\' {
 			i++
@@ -777,8 +777,14 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 			default:
 				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
+			i++
 		} else {
-			builder.WriteByte(c)
+			size := utf8ValidNext(token[i:])
+			if size == 0 {
+				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid character %#U", c)
+			}
+			builder.Write(token[i : i+size])
+			i += size
 		}
 	}
 

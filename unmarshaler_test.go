@@ -2113,6 +2113,66 @@ world'`,
 	}
 }
 
+func TestASCIIControlCharacters(t *testing.T) {
+	invalidCharacters := []byte{0x7F}
+	for c := byte(0x0); c <= 0x08; c++ {
+		invalidCharacters = append(invalidCharacters, c)
+	}
+	for c := byte(0x0B); c <= 0x0C; c++ {
+		invalidCharacters = append(invalidCharacters, c)
+	}
+	for c := byte(0x0E); c <= 0x1F; c++ {
+		invalidCharacters = append(invalidCharacters, c)
+	}
+
+	type stringType struct {
+		Delimiter string
+		CanEscape bool
+	}
+
+	stringTypes := map[string]stringType{
+		"basic":            {Delimiter: "\"", CanEscape: true},
+		"basicMultiline":   {Delimiter: "\"\"\"", CanEscape: true},
+		"literal":          {Delimiter: "'", CanEscape: false},
+		"literalMultiline": {Delimiter: "'''", CanEscape: false},
+	}
+
+	checkError := func(t *testing.T, input []byte) {
+		t.Helper()
+		m := map[string]interface{}{}
+		err := toml.Unmarshal(input, &m)
+		require.Error(t, err)
+
+		var de *toml.DecodeError
+		if !errors.As(err, &de) {
+			t.Fatalf("err should have been a *toml.DecodeError, but got %s (%T)", err, err)
+		}
+	}
+
+	for name, st := range stringTypes {
+		t.Run(name, func(t *testing.T) {
+			for _, c := range invalidCharacters {
+				name := fmt.Sprintf("%2X", c)
+				t.Run(name, func(t *testing.T) {
+					data := []byte("A = " + st.Delimiter + string(c) + st.Delimiter)
+					checkError(t, data)
+
+					if st.CanEscape {
+						t.Run("withEscapeBefore", func(t *testing.T) {
+							data := []byte("A = " + st.Delimiter + "\\t" + string(c) + st.Delimiter)
+							checkError(t, data)
+						})
+						t.Run("withEscapeAfter", func(t *testing.T) {
+							data := []byte("A = " + st.Delimiter + string(c) + "\\t" + st.Delimiter)
+							checkError(t, data)
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
 //nolint:funlen
 func TestLocalDateTime(t *testing.T) {
 	examples := []struct {
@@ -2266,6 +2326,13 @@ xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
 	}
 
 	require.Equal(t, expected, dist)
+}
+
+func TestIssue631(t *testing.T) {
+	v := map[string]interface{}{}
+
+	err := toml.Unmarshal([]byte("\"\\b\u007f\"= 2"), &v)
+	require.Error(t, err)
 }
 
 //nolint:funlen
