@@ -86,7 +86,7 @@ func (d LocalDateTime) AsTime(zone *time.Location) time.Time {
 
 // String returns RFC 3339 representation of d.
 func (d LocalDateTime) String() string {
-	return d.LocalDate.String() + " " + d.LocalTime.String()
+	return d.LocalDate.String() + "T" + d.LocalTime.String()
 }
 
 // MarshalText returns RFC 3339 representation of d.
