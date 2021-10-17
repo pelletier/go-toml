@@ -43,7 +43,7 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 
 	date.Day = parseDecimalDigits(b[8:10])
 
-	if !isValidDate(date.Year, time.Month(date.Month), date.Day) {
+	if !isValidDate(date.Year, date.Month, date.Day) {
 		return LocalDate{}, newDecodeError(b, "impossible date")
 	}
 
@@ -141,7 +141,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	}
 	dt.LocalTime = t
 
-	if !isValidDate(dt.Year, time.Month(dt.Month), dt.Day) {
+	if !isValidDate(dt.Year, dt.Month, dt.Day) {
 		return LocalDateTime{}, rest, newDecodeError(b, "impossible date")
 	}
 
@@ -340,27 +340,9 @@ func checkAndRemoveUnderscores(b []byte) ([]byte, error) {
 }
 
 // isValidDate checks if a provided date is a date that exists.
-func isValidDate(year int, month time.Month, day int) bool {
-	if day > daysIn(month, year) {
-		return false
-	}
-	return true
+func isValidDate(year int, month int, day int) bool {
+	return day <= daysIn(month, year)
 }
-
-const (
-	January time.Month = 1 + iota
-	February
-	March
-	April
-	May
-	June
-	July
-	August
-	September
-	October
-	November
-	December
-)
 
 // daysBefore[m] counts the number of days in a non-leap year
 // before month m begins. There is an entry for m=12, counting
@@ -381,8 +363,8 @@ var daysBefore = [...]int32{
 	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
 }
 
-func daysIn(m time.Month, year int) int {
-	if m == February && isLeap(year) {
+func daysIn(m int, year int) int {
+	if m == 2 && isLeap(year) {
 		return 29
 	}
 	return int(daysBefore[m] - daysBefore[m-1])
