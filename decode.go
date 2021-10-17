@@ -141,10 +141,6 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 	}
 	dt.LocalTime = t
 
-	if !isValidDate(dt.Year, dt.Month, dt.Day) {
-		return LocalDateTime{}, rest, newDecodeError(b, "impossible date")
-	}
-
 	return dt, rest, nil
 }
 
