@@ -205,6 +205,7 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		}
 
 		t.Nanosecond = frac * nspow[digits]
+		t.Precision = digits
 
 		return t, b[9+digits:], nil
 	}
