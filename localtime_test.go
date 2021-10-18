@@ -88,7 +88,7 @@ func TestLocalDateTime_String(t *testing.T) {
 		toml.LocalDate{2021, 6, 8},
 		toml.LocalTime{20, 12, 1, 2, 9},
 	}
-	require.Equal(t, "2021-06-08 20:12:01.000000002", d.String())
+	require.Equal(t, "2021-06-08T20:12:01.000000002", d.String())
 }
 
 func TestLocalDateTime_MarshalText(t *testing.T) {
@@ -98,7 +98,7 @@ func TestLocalDateTime_MarshalText(t *testing.T) {
 	}
 	b, err := d.MarshalText()
 	require.NoError(t, err)
-	require.Equal(t, []byte("2021-06-08 20:12:01.000000002"), b)
+	require.Equal(t, []byte("2021-06-08T20:12:01.000000002"), b)
 }
 
 func TestLocalDateTime_UnmarshalMarshalText(t *testing.T) {
