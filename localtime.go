@@ -2,6 +2,7 @@ package toml
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -40,20 +41,29 @@ func (d *LocalDate) UnmarshalText(b []byte) error {
 // LocalTime represents a time of day of no specific day in no specific
 // timezone.
 type LocalTime struct {
-	Hour       int
-	Minute     int
-	Second     int
-	Nanosecond int
-	Precision  int
+	Hour       int // Hour of the day: [0; 24[
+	Minute     int // Minute of the hour: [0; 60[
+	Second     int // Second of the minute: [0; 60[
+	Nanosecond int // Nanoseconds within the second:  [0, 1000000000[
+	Precision  int // Number of digits to display for Nanosecond.
 }
 
 // String returns RFC 3339 representation of d.
+// If d.Nanosecond and d.Precision are zero, the time won't have a nanosecond
+// component. If d.Nanosecond > 0 but d.Precision = 0, then the minimum number
+// of digits for nanoseconds is provided.
 func (d LocalTime) String() string {
 	s := fmt.Sprintf("%02d:%02d:%02d", d.Hour, d.Minute, d.Second)
-	if d.Nanosecond == 0 && d.Precision == 0 {
-		return s
+
+	if d.Precision > 0 {
+		s += fmt.Sprintf(".%09d", d.Nanosecond)[:d.Precision+1]
+	} else if d.Nanosecond > 0 {
+		// Nanoseconds are specified, but precision is not provided. Use the
+		// minimum.
+		s += strings.Trim(fmt.Sprintf(".%09d", d.Nanosecond), "0")
 	}
-	return s + fmt.Sprintf(".%09d", d.Nanosecond)[:d.Precision+1]
+
+	return s
 }
 
 // MarshalText returns RFC 3339 representation of d.
