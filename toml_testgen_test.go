@@ -211,13 +211,11 @@ func TestTOMLTest_Invalid_Encoding_BadUtf8AtEnd(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Encoding_BadUtf8InComment(t *testing.T) {
-	t.Skip("FIXME")
 	input := "# \xc3\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Encoding_BadUtf8InString(t *testing.T) {
-	t.Skip("FIXME")
 	input := "# The following line contains an invalid UTF-8 sequence.\nbad = \"\xc3\"\n"
 	testgenInvalid(t, input)
 }
