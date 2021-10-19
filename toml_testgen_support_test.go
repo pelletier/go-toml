@@ -41,5 +41,14 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	}
 	j, err := testsuite.ValueToTaggedJSON(doc)
 	require.NoError(t, err)
-	require.Equal(t, jsonRef, string(j)+"\n")
+
+	var ref interface{}
+	err = json.Unmarshal([]byte(jsonRef), &ref)
+	require.NoError(t, err)
+
+	var actual interface{}
+	err = json.Unmarshal([]byte(j), &actual)
+	require.NoError(t, err)
+
+	require.Equal(t, ref, actual)
 }

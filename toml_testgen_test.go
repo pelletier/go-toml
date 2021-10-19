@@ -1493,7 +1493,6 @@ func TestTOMLTest_Valid_Table_Empty(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Table_Keyword(t *testing.T) {
-	t.Skip("FIXME")
 	input := "[true]\n\n[false]\n\n[inf]\n\n[nan]\n\n\n"
 	jsonRef := "{\n  \"true\": {},\n  \"false\": {},\n  \"inf\": {},\n  \"nan\": {}\n}\n"
 	testgenValid(t, input, jsonRef)
