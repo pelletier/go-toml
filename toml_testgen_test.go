@@ -1098,7 +1098,6 @@ func TestTOMLTest_Valid_Datetime_LocalDate(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Datetime_LocalTime(t *testing.T) {
-	t.Skip("FIXME")
 	input := "besttimeever = 17:45:00\nmilliseconds = 10:32:00.555\n"
 	jsonRef := "{\n  \"besttimeever\": {\n    \"type\": \"time-local\",\n    \"value\": \"17:45:00\"\n  },\n  \"milliseconds\": {\n    \"type\": \"time-local\",\n    \"value\": \"10:32:00.555\"\n  }\n}\n"
 	testgenValid(t, input, jsonRef)
