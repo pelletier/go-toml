@@ -266,7 +266,6 @@ func TestTOMLTest_Invalid_Float_ExpDoubleUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Float_ExpLeadingUs(t *testing.T) {
-	t.Skip("FIXME")
 	input := "exp-leading-us = 1e_23\n"
 	testgenInvalid(t, input)
 }
@@ -277,7 +276,6 @@ func TestTOMLTest_Invalid_Float_ExpPoint1(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Float_ExpPoint2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "exp-point-2 = 1.e2\n"
 	testgenInvalid(t, input)
 }
@@ -308,13 +306,11 @@ func TestTOMLTest_Invalid_Float_Inf_underscore(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Float_LeadingPointNeg(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-point-neg = -.12345\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Float_LeadingPointPlus(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-point-plus = +.12345\n"
 	testgenInvalid(t, input)
 }
@@ -330,13 +326,11 @@ func TestTOMLTest_Invalid_Float_LeadingUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Float_LeadingZeroNeg(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-zero-neg = -03.14\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Float_LeadingZeroPlus(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-zero-plus = +03.14\n"
 	testgenInvalid(t, input)
 }
@@ -387,13 +381,11 @@ func TestTOMLTest_Invalid_Float_TrailingUs(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Float_UsAfterPoint(t *testing.T) {
-	t.Skip("FIXME")
 	input := "us-after-point = 1._2\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Float_UsBeforePoint(t *testing.T) {
-	t.Skip("FIXME")
 	input := "us-before-point = 1_.2\n"
 	testgenInvalid(t, input)
 }
