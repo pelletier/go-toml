@@ -50,5 +50,5 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	err = json.Unmarshal([]byte(j), &actual)
 	require.NoError(t, err)
 
-	require.Equal(t, ref, actual)
+	testsuite.CmpJSON(t, "", ref, actual)
 }
