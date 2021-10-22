@@ -1102,7 +1102,6 @@ func TestTOMLTest_Valid_Datetime_Local(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Datetime_Milliseconds(t *testing.T) {
-	t.Skip("FIXME")
 	input := "utc1  = 1987-07-05T17:45:56.123456Z\nutc2  = 1987-07-05T17:45:56.6Z\nwita1 = 1987-07-05T17:45:56.123456+08:00\nwita2 = 1987-07-05T17:45:56.6+08:00\n"
 	jsonRef := "{\n  \"utc1\": {\n    \"type\": \"datetime\",\n    \"value\": \"1987-07-05T17:45:56.123456Z\"\n  },\n  \"utc2\": {\n    \"type\": \"datetime\",\n    \"value\": \"1987-07-05T17:45:56.600000Z\"\n  },\n  \"wita1\": {\n    \"type\": \"datetime\",\n    \"value\": \"1987-07-05T17:45:56.123456+08:00\"\n  },\n  \"wita2\": {\n    \"type\": \"datetime\",\n    \"value\": \"1987-07-05T17:45:56.600000+08:00\"\n  }\n}\n"
 	testgenValid(t, input, jsonRef)
@@ -1127,7 +1126,6 @@ func TestTOMLTest_Valid_Example(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Float_Exponent(t *testing.T) {
-	t.Skip("FIXME")
 	input := "lower = 3e2\nupper = 3E2\nneg = 3e-2\npos = 3E+2\nzero = 3e0\npointlower = 3.1e2\npointupper = 3.1E2\nminustenth = -1E-1\n"
 	jsonRef := "{\n  \"lower\": {\n    \"type\": \"float\",\n    \"value\": \"300.0\"\n  },\n  \"minustenth\": {\n    \"type\": \"float\",\n    \"value\": \"-0.1\"\n  },\n  \"neg\": {\n    \"type\": \"float\",\n    \"value\": \"0.03\"\n  },\n  \"pointlower\": {\n    \"type\": \"float\",\n    \"value\": \"310.0\"\n  },\n  \"pointupper\": {\n    \"type\": \"float\",\n    \"value\": \"310.0\"\n  },\n  \"pos\": {\n    \"type\": \"float\",\n    \"value\": \"300.0\"\n  },\n  \"upper\": {\n    \"type\": \"float\",\n    \"value\": \"300.0\"\n  },\n  \"zero\": {\n    \"type\": \"float\",\n    \"value\": \"3.0\"\n  }\n}\n"
 	testgenValid(t, input, jsonRef)
@@ -1140,7 +1138,6 @@ func TestTOMLTest_Valid_Float_Float(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Float_InfAndNan(t *testing.T) {
-	t.Skip("FIXME")
 	input := "# We don't encode +nan and -nan back with the signs; many languages don't\n# support a sign on NaN (it doesn't really make much sense).\nnan = nan\nnan_neg = -nan\nnan_plus = +nan\ninfinity = inf\ninfinity_neg = -inf\ninfinity_plus = +inf\n"
 	jsonRef := "{\n  \"infinity\": {\n    \"type\": \"float\",\n    \"value\": \"inf\"\n  },\n  \"infinity_neg\": {\n    \"type\": \"float\",\n    \"value\": \"-inf\"\n  },\n  \"infinity_plus\": {\n    \"type\": \"float\",\n    \"value\": \"+inf\"\n  },\n  \"nan\": {\n    \"type\": \"float\",\n    \"value\": \"nan\"\n  },\n  \"nan_neg\": {\n    \"type\": \"float\",\n    \"value\": \"nan\"\n  },\n  \"nan_plus\": {\n    \"type\": \"float\",\n    \"value\": \"nan\"\n  }\n}\n"
 	testgenValid(t, input, jsonRef)
@@ -1153,7 +1150,6 @@ func TestTOMLTest_Valid_Float_Long(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Float_Underscore(t *testing.T) {
-	t.Skip("FIXME")
 	input := "before = 3_141.5927\nafter = 3141.592_7\nexponent = 3e1_4\n"
 	jsonRef := "{\n  \"after\": {\n    \"type\": \"float\",\n    \"value\": \"3141.5927\"\n  },\n  \"before\": {\n    \"type\": \"float\",\n    \"value\": \"3141.5927\"\n  },\n  \"exponent\": {\n    \"type\": \"float\",\n    \"value\": \"3.0e14\"\n  }\n}\n"
 	testgenValid(t, input, jsonRef)
