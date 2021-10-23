@@ -506,13 +506,11 @@ func TestTOMLTest_Invalid_Integer_LeadingZero2(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Integer_LeadingZeroSign1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-zero-sign-1 = -01\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Integer_LeadingZeroSign2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-zero-sign-2 = +01\n"
 	testgenInvalid(t, input)
 }
