@@ -106,7 +106,6 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 // that have been seen in previous calls, and validates that types are consistent.
 func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 	if s.entries == nil {
-		// s.entries = make([]entry, 0, 8)
 		// Skip ID = 0 to remove the confusion between nodes whose parent has
 		// id 0 and root nodes (parent id is 0 because it's the zero value).
 		s.nextID = 1
@@ -220,6 +219,9 @@ func (s *SeenTracker) checkKeyValue(node *ast.Node) error {
 		if idx >= 0 {
 			if s.entries[idx].kind != tableKind {
 				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), s.entries[idx].kind)
+			}
+			if s.entries[idx].explicit {
+				return fmt.Errorf("toml: cannot redefine table %s that has already been explicitly defined", string(k))
 			}
 		} else {
 			idx = s.create(parentIdx, k, tableKind, false)

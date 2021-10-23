@@ -516,6 +516,11 @@ func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
 			break
 		}
 
+		err := d.seen.CheckExpression(expr)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
 		x, err := d.handleKeyValue(expr, v)
 		if err != nil {
 			return reflect.Value{}, err
