@@ -506,13 +506,11 @@ func TestTOMLTest_Invalid_Integer_LeadingZero2(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Integer_LeadingZeroSign1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-zero-sign-1 = -01\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Integer_LeadingZeroSign2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "leading-zero-sign-2 = +01\n"
 	testgenInvalid(t, input)
 }
@@ -1155,7 +1153,6 @@ func TestTOMLTest_Valid_Float_Underscore(t *testing.T) {
 }
 
 func TestTOMLTest_Valid_Float_Zero(t *testing.T) {
-	t.Skip("FIXME")
 	input := "zero = 0.0\nsigned-pos = +0.0\nsigned-neg = -0.0\nexponent = 0e0\nexponent-two-0 = 0e00\nexponent-signed-pos = +0e0\nexponent-signed-neg = -0e0\n"
 	jsonRef := "{\n  \"zero\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  },\n  \"signed-pos\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  },\n  \"signed-neg\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  },\n  \"exponent\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  },\n  \"exponent-two-0\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  },\n  \"exponent-signed-pos\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  },\n  \"exponent-signed-neg\": {\n    \"type\": \"float\",\n    \"value\": \"0\"\n  }\n}\n"
 	testgenValid(t, input, jsonRef)

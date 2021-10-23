@@ -306,10 +306,24 @@ func parseIntBin(b []byte) (int64, error) {
 	return i, nil
 }
 
+func isSign(b byte) bool {
+	return b == '+' || b == '-'
+}
+
 func parseIntDec(b []byte) (int64, error) {
 	cleaned, err := checkAndRemoveUnderscoresIntegers(b)
 	if err != nil {
 		return 0, err
+	}
+
+	startIdx := 0
+
+	if isSign(cleaned[0]) {
+		startIdx++
+	}
+
+	if len(cleaned) > startIdx+1 && cleaned[startIdx] == '0' {
+		return 0, newDecodeError(b, "leading zero not allowed on decimal number")
 	}
 
 	i, err := strconv.ParseInt(string(cleaned), 10, 64)
