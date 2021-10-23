@@ -150,6 +150,11 @@ func TestUnmarshal_Floats(t *testing.T) {
 			expected: -2e-2,
 		},
 		{
+			desc:     "float exponent zero",
+			input:    `0e0`,
+			expected: 0.0,
+		},
+		{
 			desc:     "float fractional with exponent",
 			input:    `6.626e-34`,
 			expected: 6.626e-34,
