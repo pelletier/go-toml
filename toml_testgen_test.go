@@ -886,13 +886,11 @@ func TestTOMLTest_Invalid_Table_EqualsSign(t *testing.T) {
 }
 
 func TestTOMLTest_Invalid_Table_Injection1(t *testing.T) {
-	t.Skip("FIXME")
 	input := "[a.b.c]\n  z = 9\n[a]\n  b.c.t = \"Using dotted keys to add to [a.b.c] after explicitly defining it above is not allowed\"\n  \n# see https://github.com/toml-lang/toml/issues/846\n"
 	testgenInvalid(t, input)
 }
 
 func TestTOMLTest_Invalid_Table_Injection2(t *testing.T) {
-	t.Skip("FIXME")
 	input := "[a.b.c.d]\n  z = 9\n[a]\n  b.c.d.k.t = \"Using dotted keys to add to [a.b.c.d] after explicitly defining it above is not allowed\"\n  \n# see https://github.com/toml-lang/toml/issues/846\n"
 	testgenInvalid(t, input)
 }
