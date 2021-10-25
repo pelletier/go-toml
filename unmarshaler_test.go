@@ -1800,6 +1800,16 @@ func TestIssue596(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue602(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte(""), &v)
+	require.NoError(t, err)
+
+	var expected interface{} = map[string]interface{}{}
+
+	require.Equal(t, expected, v)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
