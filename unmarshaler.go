@@ -174,7 +174,13 @@ func (d *decoder) FromParser(v interface{}) error {
 		return fmt.Errorf("toml: decoding pointer target cannot be nil")
 	}
 
-	err := d.fromParser(r.Elem())
+	r = r.Elem()
+	if r.Kind() == reflect.Interface && r.IsNil() {
+		newMap := map[string]interface{}{}
+		r.Set(reflect.ValueOf(newMap))
+	}
+
+	err := d.fromParser(r)
 	if err == nil {
 		return d.strict.Error(d.p.data)
 	}
