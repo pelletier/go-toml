@@ -1810,6 +1810,18 @@ func TestIssue602(t *testing.T) {
 	require.Equal(t, expected, v)
 }
 
+func TestIssue623(t *testing.T) {
+	definition := struct {
+		Things []string
+	}{}
+
+	values := `[things]
+foo = "bar"`
+
+	err := toml.Unmarshal([]byte(values), &definition)
+	require.Error(t, err)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
