@@ -488,6 +488,9 @@ func (d *decoder) handleArrayTablePart(key ast.Iterator, v reflect.Value) (refle
 // cannot handle it.
 func (d *decoder) handleTable(key ast.Iterator, v reflect.Value) (reflect.Value, error) {
 	if v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return reflect.Value{}, newDecodeError(key.Node().Data, "cannot store a table in a slice")
+		}
 		elem := v.Index(v.Len() - 1)
 		x, err := d.handleTable(key, elem)
 		if err != nil {
