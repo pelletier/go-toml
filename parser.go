@@ -570,13 +570,25 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 			// When the last non-whitespace character on a line is an unescaped \,
 			// it will be trimmed along with all whitespace (including newlines) up
 			// to the next non-whitespace character or closing delimiter.
-			if token[i+1] == '\n' || (token[i+1] == '\r' && token[i+2] == '\n') {
-				i++ // skip the \
+
+			isLastNonWhitespaceOnLine := false
+			j := 1
+		findEOLLoop:
+			for ; j < len(token)-3-i; j++ {
+				switch token[i+j] {
+				case ' ', '\t':
+					continue
+				case '\n':
+					isLastNonWhitespaceOnLine = true
+				}
+				break findEOLLoop
+			}
+			if isLastNonWhitespaceOnLine {
+				i += j
 				for ; i < len(token)-3; i++ {
 					c := token[i]
 					if !(c == '\n' || c == '\r' || c == ' ' || c == '\t') {
 						i--
-
 						break
 					}
 				}
