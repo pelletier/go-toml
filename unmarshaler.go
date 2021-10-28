@@ -560,10 +560,6 @@ func (d *decoder) handleTablePart(key ast.Iterator, v reflect.Value) (reflect.Va
 }
 
 func (d *decoder) tryTextUnmarshaler(node *ast.Node, v reflect.Value) (bool, error) {
-	if v.Kind() != reflect.Struct {
-		return false, nil
-	}
-
 	// Special case for time, because we allow to unmarshal to it from
 	// different kind of AST nodes.
 	if v.Type() == timeType {
