@@ -1,6 +1,7 @@
 package toml_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1820,6 +1821,30 @@ foo = "bar"`
 
 	err := toml.Unmarshal([]byte(values), &definition)
 	require.Error(t, err)
+}
+
+type uuid [16]byte
+
+func (u *uuid) UnmarshalText(text []byte) (err error) {
+	// Note: the original reported issue had a more complex implementation
+	// of this function. But the important part is to verify that a
+	// non-struct type implementing UnmarshalText works with the unmarshal
+	// process.
+	placeholder := bytes.Repeat([]byte{0xAA}, 16)
+	copy(u[:], placeholder)
+	return nil
+}
+
+func TestIssue564(t *testing.T) {
+	type Config struct {
+		ID uuid
+	}
+
+	var config Config
+
+	err := toml.Unmarshal([]byte(`id = "0818a52b97b94768941ba1172c76cf6c"`), &config)
+	require.NoError(t, err)
+	require.Equal(t, uuid{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}, config.ID)
 }
 
 //nolint:funlen
