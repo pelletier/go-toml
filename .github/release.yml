@@ -1,0 +1,17 @@
+changelog:
+  exclude:
+    labels:
+      - build
+  categories:
+    - title: What's new
+      labels:
+        - feature
+    - title: Fixed bugs
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - doc
+    - title: Other changes
+      labels:
+        - "*"
