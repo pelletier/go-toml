@@ -6,12 +6,12 @@ changelog:
     - title: What's new
       labels:
         - feature
-    - title: Bug fixes
+    - title: Fixed bugs
       labels:
         - bug
     - title: Documentation
       labels:
         - doc
-    - title: Other Changes
+    - title: Other changes
       labels:
         - "*"
