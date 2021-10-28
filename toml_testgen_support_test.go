@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/pelletier/go-toml/v2/testsuite"
 	"github.com/stretchr/testify/require"
 )
@@ -37,6 +38,9 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 
 	err := testsuite.Unmarshal([]byte(input), &doc)
 	if err != nil {
+		if de, ok := err.(*toml.DecodeError); ok {
+			t.Logf("%s\n%s", err, de)
+		}
 		t.Fatalf("failed parsing toml: %s", err)
 	}
 	j, err := testsuite.ValueToTaggedJSON(doc)
