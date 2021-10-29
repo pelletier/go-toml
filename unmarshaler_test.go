@@ -204,6 +204,16 @@ func TestUnmarshal_Floats(t *testing.T) {
 				assert.True(t, math.IsNaN(v))
 			},
 		},
+		{
+			desc:  "underscore after integer part",
+			input: `1_e2`,
+			err:   true,
+		},
+		{
+			desc:  "underscore after integer part",
+			input: `1.0_e2`,
+			err:   true,
+		},
 	}
 
 	type doc struct {
@@ -215,11 +225,15 @@ func TestUnmarshal_Floats(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
-			require.NoError(t, err)
-			if e.testFn != nil {
-				e.testFn(t, doc.A)
+			if e.err {
+				require.Error(t, err)
 			} else {
-				assert.Equal(t, e.expected, doc.A)
+				require.NoError(t, err)
+				if e.testFn != nil {
+					e.testFn(t, doc.A)
+				} else {
+					assert.Equal(t, e.expected, doc.A)
+				}
 			}
 		})
 	}
