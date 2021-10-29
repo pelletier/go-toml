@@ -405,6 +405,9 @@ func checkAndRemoveUnderscoresFloats(b []byte) ([]byte, error) {
 			if !before {
 				return nil, newDecodeError(b[i-1:i+1], "number must have at least one digit between underscores")
 			}
+			if i < len(b)-1 && (b[i+1] == 'e' || b[i+1] == 'E') {
+				return nil, newDecodeError(b[i+1:i+2], "cannot have underscore before exponent")
+			}
 			before = false
 		case 'e', 'E':
 			if i < len(b)-1 && b[i+1] == '_' {
