@@ -43,7 +43,7 @@ func DecodeStdin() error {
 	j := json.NewEncoder(os.Stdout)
 	j.SetIndent("", "  ")
 	if err := j.Encode(addTag("", decoded)); err != nil {
-		fmt.Errorf("Error encoding JSON: %s", err)
+		return fmt.Errorf("Error encoding JSON: %s", err)
 	}
 
 	return nil
