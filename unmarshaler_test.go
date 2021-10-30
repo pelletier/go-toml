@@ -2195,6 +2195,22 @@ world'`,
 			desc: `missing nanoseconds digits`,
 			data: `a=17:45:56.`,
 		},
+		{
+			desc: `minutes over 60`,
+			data: `a=17:99:00`,
+		},
+		{
+			desc: `invalid second`,
+			data: `a=17:00::0`,
+		},
+		{
+			desc: `invalid hour`,
+			data: `a=1::00:00`,
+		},
+		{
+			desc: `invalid month`,
+			data: `a=2021-0--29`,
+		},
 	}
 
 	for _, e := range examples {
