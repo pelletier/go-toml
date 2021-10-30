@@ -2002,7 +2002,7 @@ world'`,
 		{
 			desc: "invalid minutes value",
 			data: `a=1979-05-27T23:+2:99`,
-			msg:  `minutes cannot be greater 59`,
+			msg:  `expected digit (0-9)`,
 		},
 		{
 			desc: "invalid seconds value",
@@ -2182,6 +2182,18 @@ world'`,
 			desc: `leap day in non-leap year`,
 			data: `A = 2021-02-29T23:59:00`,
 			msg:  `impossible date`,
+		},
+		{
+			desc: `missing minute digit`,
+			data: `a=17:4::01`,
+		},
+		{
+			desc: `invalid space in year`,
+			data: `i=19 7-12-21T10:32:00`,
+		},
+		{
+			desc: `missing nanoseconds digits`,
+			data: `a=17:45:56.`,
 		},
 	}
 
