@@ -35,13 +35,22 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 		return date, newDecodeError(b, "dates are expected to have the format YYYY-MM-DD")
 	}
 
-	date.Year = parseDecimalDigits(b[0:4])
+	var err error
 
-	v := parseDecimalDigits(b[5:7])
+	date.Year, err = parseDecimalDigits(b[0:4])
+	if err != nil {
+		return LocalDate{}, err
+	}
 
-	date.Month = v
+	date.Month, err = parseDecimalDigits(b[5:7])
+	if err != nil {
+		return LocalDate{}, err
+	}
 
-	date.Day = parseDecimalDigits(b[8:10])
+	date.Day, err = parseDecimalDigits(b[8:10])
+	if err != nil {
+		return LocalDate{}, err
+	}
 
 	if !isValidDate(date.Year, date.Month, date.Day) {
 		return LocalDate{}, newDecodeError(b, "impossible date")
@@ -50,15 +59,18 @@ func parseLocalDate(b []byte) (LocalDate, error) {
 	return date, nil
 }
 
-func parseDecimalDigits(b []byte) int {
+func parseDecimalDigits(b []byte) (int, error) {
 	v := 0
 
-	for _, c := range b {
+	for i, c := range b {
+		if c < '0' || c > '9' {
+			return 0, newDecodeError(b[i:i+1], "expected digit (0-9)")
+		}
 		v *= 10
 		v += int(c - '0')
 	}
 
-	return v
+	return v, nil
 }
 
 func parseDateTime(b []byte) (time.Time, error) {
@@ -159,7 +171,13 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, newDecodeError(b, "times are expected to have the format HH:MM:SS[.NNNNNN]")
 	}
 
-	t.Hour = parseDecimalDigits(b[0:2])
+	var err error
+
+	t.Hour, err = parseDecimalDigits(b[0:2])
+	if err != nil {
+		return t, nil, err
+	}
+
 	if t.Hour > 23 {
 		return t, nil, newDecodeError(b[0:2], "hour cannot be greater 23")
 	}
@@ -167,7 +185,10 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, newDecodeError(b[2:3], "expecting colon between hours and minutes")
 	}
 
-	t.Minute = parseDecimalDigits(b[3:5])
+	t.Minute, err = parseDecimalDigits(b[3:5])
+	if err != nil {
+		return t, nil, err
+	}
 	if t.Minute > 59 {
 		return t, nil, newDecodeError(b[3:5], "minutes cannot be greater 59")
 	}
@@ -175,7 +196,11 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, newDecodeError(b[5:6], "expecting colon between minutes and seconds")
 	}
 
-	t.Second = parseDecimalDigits(b[6:8])
+	t.Second, err = parseDecimalDigits(b[6:8])
+	if err != nil {
+		return t, nil, err
+	}
+
 	if t.Second > 59 {
 		return t, nil, newDecodeError(b[3:5], "seconds cannot be greater 59")
 	}
@@ -202,6 +227,10 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 			frac *= 10
 			frac += int(c - '0')
 			digits++
+		}
+
+		if digits == 0 {
+			return t, nil, newDecodeError(b[minLengthWithFrac-1:minLengthWithFrac], "nanoseconds need at least one digit")
 		}
 
 		t.Nanosecond = frac * nspow[digits]
