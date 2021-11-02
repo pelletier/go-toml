@@ -549,7 +549,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	startIdx := i
 	endIdx := len(token) - len(`"""`)
 
-	if escaped < 0 {
+	if !escaped {
 		str := token[startIdx:endIdx]
 		verr := utf8TomlValidAlreadyEscaped(str)
 		if verr.Zero() {
@@ -736,7 +736,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// Fast path. If there is no escape sequence, the string should just be
 	// an UTF-8 encoded string, which is the same as Go. In that case,
 	// validate the string and return a direct reference to the buffer.
-	if escaped < 0 {
+	if !escaped {
 		str := token[startIdx:endIdx]
 		verr := utf8TomlValidAlreadyEscaped(str)
 		if verr.Zero() {
