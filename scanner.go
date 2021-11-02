@@ -160,42 +160,26 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 	return b, b[len(b):], nil
 }
 
-func scanBasicString(b []byte) ([]byte, int, []byte, error) {
+func scanBasicString(b []byte) ([]byte, bool, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
 	// basic-char = basic-unescaped / escaped
 	// basic-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// escaped = escape escape-seq-char
-	escaped := -1 // index of the first \. -1 means no escape character in there.
+	escaped := false
 	i := 1
 
-loop:
 	for ; i < len(b); i++ {
 		switch b[i] {
 		case '"':
 			return b[:i+1], escaped, b[i+1:], nil
-		case '\n':
+		case '\n', '\r':
 			return nil, escaped, nil, newDecodeError(b[i:i+1], "basic strings cannot have new lines")
 		case '\\':
 			if len(b) < i+2 {
 				return nil, escaped, nil, newDecodeError(b[i:i+1], "need a character after \\")
 			}
-			escaped = i
-			i += 2 // skip the next character
-			break loop
-		}
-	}
-
-	for ; i < len(b); i++ {
-		switch b[i] {
-		case '"':
-			return b[:i+1], escaped, b[i+1:], nil
-		case '\n':
-			return nil, escaped, nil, newDecodeError(b[i:i+1], "basic strings cannot have new lines")
-		case '\\':
-			if len(b) < i+2 {
-				return nil, escaped, nil, newDecodeError(b[i:i+1], "need a character after \\")
-			}
+			escaped = true
 			i++ // skip the next character
 		}
 	}
@@ -203,7 +187,7 @@ loop:
 	return nil, escaped, nil, newDecodeError(b[len(b):], `basic string not terminated by "`)
 }
 
-func scanMultilineBasicString(b []byte) ([]byte, int, []byte, error) {
+func scanMultilineBasicString(b []byte) ([]byte, bool, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
 	// ml-basic-string-delim = 3quotation-mark
@@ -215,10 +199,9 @@ func scanMultilineBasicString(b []byte) ([]byte, int, []byte, error) {
 	// mlb-unescaped = wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
 
-	escaped := -1
+	escaped := false
 	i := 3
 
-loop:
 	for ; i < len(b); i++ {
 		switch b[i] {
 		case '"':
@@ -251,22 +234,7 @@ loop:
 			if len(b) < i+2 {
 				return nil, escaped, nil, newDecodeError(b[len(b):], "need a character after \\")
 			}
-			escaped = i
-			i += 2 // skip the next character
-			break loop
-		}
-	}
-
-	for ; i < len(b); i++ {
-		switch b[i] {
-		case '"':
-			if scanFollowsMultilineBasicStringDelimiter(b[i:]) {
-				return b[:i+3], escaped, b[i+3:], nil
-			}
-		case '\\':
-			if len(b) < i+2 {
-				return nil, escaped, nil, newDecodeError(b[len(b):], "need a character after \\")
-			}
+			escaped = true
 			i++ // skip the next character
 		}
 	}

@@ -2211,6 +2211,14 @@ world'`,
 			desc: `invalid month`,
 			data: `a=2021-0--29`,
 		},
+		{
+			desc: `carriage return inside basic key`,
+			data: "\"\r\"=42",
+		},
+		{
+			desc: `carriage return inside basic string`,
+			data: "A = \"\r\"",
+		},
 	}
 
 	for _, e := range examples {
