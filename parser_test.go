@@ -1,6 +1,8 @@
 package toml
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
@@ -369,6 +371,23 @@ func BenchmarkParseBasicStringWithUnicode(b *testing.B) {
 			p.parseBasicString(input)
 		}
 	})
+}
+
+func BenchmarkParseBasicStringsEasy(b *testing.B) {
+	p := &parser{}
+
+	for _, size := range []int{1, 4, 8, 16, 21} {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			input := []byte(`"` + strings.Repeat("A", size) + `"`)
+
+			b.ReportAllocs()
+			b.SetBytes(int64(len(input)))
+
+			for i := 0; i < b.N; i++ {
+				p.parseBasicString(input)
+			}
+		})
+	}
 }
 
 func TestParser_AST_DateTimes(t *testing.T) {
