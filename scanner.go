@@ -149,6 +149,12 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 		if b[i] == '\n' {
 			return b[:i], b[i:], nil
 		}
+		if b[i] == '\r' {
+			if i+1 < len(b) && b[i+1] == '\n' {
+				return b[:i+1], b[i+1:], nil
+			}
+			return nil, nil, newDecodeError(b[i:i+1], "invalid character in comment")
+		}
 		size := utf8ValidNext(b[i:])
 		if size == 0 {
 			return nil, nil, newDecodeError(b[i:i+1], "invalid character in comment")
