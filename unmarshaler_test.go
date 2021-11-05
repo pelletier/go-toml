@@ -1557,6 +1557,18 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "comment with CRLF",
+			input: "# foo\r\na=2",
+			gen: func() test {
+				doc := map[string]interface{}{}
+
+				return test{
+					target:   &doc,
+					expected: &map[string]interface{}{"a": int64(2)},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
@@ -2218,6 +2230,14 @@ world'`,
 		{
 			desc: `carriage return inside basic string`,
 			data: "A = \"\r\"",
+		},
+		{
+			desc: `carriage return in comment`,
+			data: "# this is a test\ra=1",
+		},
+		{
+			desc: `backspace in comment`,
+			data: "# this is a test\ba=1",
 		},
 	}
 
