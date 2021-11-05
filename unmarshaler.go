@@ -1014,9 +1014,10 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 	case reflect.Interface:
 		v = v.Elem()
 
-		// Following encoding/toml: decoding an object into an interface{}, it
-		// needs to always hold a map[string]interface{}. This is for the types
-		// to be consistent whether a previous value was set or not.
+		// Following encoding/json: decoding an object into an
+		// interface{}, it needs to always hold a
+		// map[string]interface{}. This is for the types to be
+		// consistent whether a previous value was set or not.
 		if !v.IsValid() || v.Type() != mapStringInterfaceType {
 			v = reflect.MakeMap(mapStringInterfaceType)
 		}
