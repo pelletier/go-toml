@@ -385,12 +385,13 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 		elem = v.Elem()
 		return d.handleKeyPart(key, elem, nextFn, makeFn)
 	case reflect.Map:
+		vt := v.Type()
 		// Create the key for the map element. For now assume it's a string.
 		mk := reflect.ValueOf(string(key.Node().Data))
 
 		// If the map does not exist, create it.
 		if v.IsNil() {
-			v = reflect.MakeMap(v.Type())
+			v = reflect.MakeMap(vt)
 			rv = v
 		}
 
@@ -402,7 +403,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 			// map[string]interface{} or a []interface{} depending on whether
 			// this is the last part of the array table key.
 
-			t := v.Type().Elem()
+			t := vt.Elem()
 			if t.Kind() == reflect.Interface {
 				mv = makeFn()
 			} else {
@@ -416,7 +417,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 			}
 			set = true
 		} else if !mv.CanAddr() {
-			t := v.Type().Elem()
+			t := vt.Elem()
 			oldmv := mv
 			mv = reflect.New(t).Elem()
 			mv.Set(oldmv)
@@ -454,7 +455,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 		if v.Elem().IsValid() {
 			v = v.Elem()
 		} else {
-			v = reflect.MakeMap(mapStringInterfaceType)
+			v = makeMapStringInterface()
 		}
 
 		x, err := d.handleKeyPart(key, v, nextFn, makeFn)
@@ -698,7 +699,7 @@ func (d *decoder) unmarshalInlineTable(itable *ast.Node, v reflect.Value) error 
 	case reflect.Interface:
 		elem := v.Elem()
 		if !elem.IsValid() {
-			elem = reflect.MakeMap(mapStringInterfaceType)
+			elem = makeMapStringInterface()
 			v.Set(elem)
 		}
 		return d.unmarshalInlineTable(itable, elem)
@@ -954,12 +955,15 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 	// There is no guarantee over what it could be.
 	switch v.Kind() {
 	case reflect.Map:
-		mk := reflect.ValueOf(string(key.Node().Data))
+		vt := v.Type()
 
-		keyType := v.Type().Key()
-		if !mk.Type().AssignableTo(keyType) {
-			if !mk.Type().ConvertibleTo(keyType) {
-				return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", mk.Type(), keyType)
+		mk := reflect.ValueOf(string(key.Node().Data))
+		mkt := stringType
+
+		keyType := vt.Key()
+		if !mkt.AssignableTo(keyType) {
+			if !mkt.ConvertibleTo(keyType) {
+				return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", mkt, keyType)
 			}
 
 			mk = mk.Convert(keyType)
@@ -967,7 +971,7 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 
 		// If the map does not exist, create it.
 		if v.IsNil() {
-			v = reflect.MakeMap(v.Type())
+			v = reflect.MakeMap(vt)
 			rv = v
 		}
 
@@ -1019,7 +1023,7 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 		// map[string]interface{}. This is for the types to be
 		// consistent whether a previous value was set or not.
 		if !v.IsValid() || v.Type() != mapStringInterfaceType {
-			v = reflect.MakeMap(mapStringInterfaceType)
+			v = makeMapStringInterface()
 		}
 
 		x, err := d.handleKeyValuePart(key, value, v)
