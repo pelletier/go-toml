@@ -692,10 +692,6 @@ func (p *parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 	// simple-key = quoted-key / unquoted-key
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// quoted-key = basic-string / literal-string
-	if len(b) == 0 {
-		return nil, nil, nil, newDecodeError(b, "key is incomplete")
-	}
-
 	switch {
 	case b[0] == '\'':
 		return p.parseLiteralString(b)
@@ -884,6 +880,8 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		if idx == 2 && c == ':' || (idx == 4 && c == '-') {
 			return p.scanDateTime(b)
 		}
+
+		break
 	}
 
 	return p.scanIntOrFloat(b)
