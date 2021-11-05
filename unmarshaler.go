@@ -1089,45 +1089,19 @@ var globalFieldPathsCache = fieldPathsCache{
 }
 
 func structField(v reflect.Value, name string) (reflect.Value, bool) {
-	//nolint:godox
-	// TODO: cache this, and reduce allocations
-	fieldPaths, ok := globalFieldPathsCache.get(v.Type())
+	t := v.Type()
+	fieldPaths, ok := globalFieldPathsCache.get(t)
+
 	if !ok {
 		fieldPaths = map[string][]int{}
 
-		path := make([]int, 0, 16)
+		forEachField(t, nil, func(name string, path []int) {
+			fieldPaths[name] = path
+			// extra copy for the case-insensitive match
+			fieldPaths[strings.ToLower(name)] = path
+		})
 
-		var walk func(reflect.Value)
-		walk = func(v reflect.Value) {
-			t := v.Type()
-			for i := 0; i < t.NumField(); i++ {
-				l := len(path)
-				path = append(path, i)
-				f := t.Field(i)
-
-				if f.Anonymous {
-					walk(v.Field(i))
-				} else if f.PkgPath == "" {
-					// only consider exported fields
-					fieldName, ok := f.Tag.Lookup("toml")
-					if !ok {
-						fieldName = f.Name
-					}
-
-					pathCopy := make([]int, len(path))
-					copy(pathCopy, path)
-
-					fieldPaths[fieldName] = pathCopy
-					// extra copy for the case-insensitive match
-					fieldPaths[strings.ToLower(fieldName)] = pathCopy
-				}
-				path = path[:l]
-			}
-		}
-
-		walk(v)
-
-		globalFieldPathsCache.set(v.Type(), fieldPaths)
+		globalFieldPathsCache.set(t, fieldPaths)
 	}
 
 	path, ok := fieldPaths[name]
@@ -1140,4 +1114,31 @@ func structField(v reflect.Value, name string) (reflect.Value, bool) {
 	}
 
 	return v.FieldByIndex(path), true
+}
+
+func forEachField(t reflect.Type, path []int, do func(name string, path []int)) {
+	n := t.NumField()
+	for i := 0; i < n; i++ {
+		f := t.Field(i)
+
+		if !f.Anonymous && f.PkgPath != "" {
+			// only consider exported fields.
+			continue
+		}
+
+		fieldPath := append(path, i)
+		fieldPath = fieldPath[:len(fieldPath):len(fieldPath)]
+
+		if f.Anonymous {
+			forEachField(f.Type, fieldPath, do)
+			continue
+		}
+
+		name, ok := f.Tag.Lookup("toml")
+		if !ok {
+			name = f.Name
+		}
+
+		do(name, fieldPath)
+	}
 }
