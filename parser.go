@@ -884,6 +884,8 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		if idx == 2 && c == ':' || (idx == 4 && c == '-') {
 			return p.scanDateTime(b)
 		}
+
+		break
 	}
 
 	return p.scanIntOrFloat(b)

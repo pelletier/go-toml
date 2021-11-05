@@ -1569,6 +1569,30 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "comment that looks like a date",
+			input: "a=19#9-",
+			gen: func() test {
+				doc := map[string]interface{}{}
+
+				return test{
+					target:   &doc,
+					expected: &map[string]interface{}{"a": int64(19)},
+				}
+			},
+		},
+		{
+			desc:  "comment that looks like a date",
+			input: "a=199#-",
+			gen: func() test {
+				doc := map[string]interface{}{}
+
+				return test{
+					target:   &doc,
+					expected: &map[string]interface{}{"a": int64(199)},
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
