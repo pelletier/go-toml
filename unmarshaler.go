@@ -9,10 +9,11 @@ import (
 	"math"
 	"reflect"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
+	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 )
 
@@ -1064,33 +1065,13 @@ func initAndDereferencePointer(v reflect.Value) reflect.Value {
 
 type fieldPathsMap = map[string][]int
 
-type fieldPathsCache struct {
-	m map[reflect.Type]fieldPathsMap
-	l sync.RWMutex
-}
-
-func (c *fieldPathsCache) get(t reflect.Type) (fieldPathsMap, bool) {
-	c.l.RLock()
-	paths, ok := c.m[t]
-	c.l.RUnlock()
-
-	return paths, ok
-}
-
-func (c *fieldPathsCache) set(t reflect.Type, m fieldPathsMap) {
-	c.l.Lock()
-	c.m[t] = m
-	c.l.Unlock()
-}
-
-var globalFieldPathsCache = fieldPathsCache{
-	m: map[reflect.Type]fieldPathsMap{},
-	l: sync.RWMutex{},
-}
+var globalFieldPathsCache atomic.Value // map[danger.TypeID]fieldPathsMap
 
 func structField(v reflect.Value, name string) (reflect.Value, bool) {
 	t := v.Type()
-	fieldPaths, ok := globalFieldPathsCache.get(t)
+
+	cache, _ := globalFieldPathsCache.Load().(map[danger.TypeID]fieldPathsMap)
+	fieldPaths, ok := cache[danger.MakeTypeID(t)]
 
 	if !ok {
 		fieldPaths = map[string][]int{}
@@ -1101,7 +1082,12 @@ func structField(v reflect.Value, name string) (reflect.Value, bool) {
 			fieldPaths[strings.ToLower(name)] = path
 		})
 
-		globalFieldPathsCache.set(t, fieldPaths)
+		newCache := make(map[danger.TypeID]fieldPathsMap, len(cache)+1)
+		newCache[danger.MakeTypeID(t)] = fieldPaths
+		for k, v := range cache {
+			newCache[k] = v
+		}
+		globalFieldPathsCache.Store(newCache)
 	}
 
 	path, ok := fieldPaths[name]
