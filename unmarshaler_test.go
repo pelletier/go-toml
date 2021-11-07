@@ -1038,6 +1038,19 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "unexported struct fields are ignored",
+			input: `foo = "bar"`,
+			gen: func() test {
+				type doc struct {
+					foo string
+				}
+				return test{
+					target:   &doc{},
+					expected: &doc{},
+				}
+			},
+		},
+		{
 			desc: "array table into nil ptr",
 			input: `[[foo]]
 			bar = "hello"`,
