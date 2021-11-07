@@ -9,10 +9,11 @@ import (
 	"math"
 	"reflect"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
+	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 )
 
@@ -384,12 +385,14 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 		elem = v.Elem()
 		return d.handleKeyPart(key, elem, nextFn, makeFn)
 	case reflect.Map:
+
 		// Create the key for the map element. For now assume it's a string.
 		mk := reflect.ValueOf(string(key.Node().Data))
 
 		// If the map does not exist, create it.
 		if v.IsNil() {
-			v = reflect.MakeMap(v.Type())
+			vt := v.Type()
+			v = reflect.MakeMap(vt)
 			rv = v
 		}
 
@@ -401,7 +404,8 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 			// map[string]interface{} or a []interface{} depending on whether
 			// this is the last part of the array table key.
 
-			t := v.Type().Elem()
+			vt := v.Type()
+			t := vt.Elem()
 			if t.Kind() == reflect.Interface {
 				mv = makeFn()
 			} else {
@@ -415,7 +419,8 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 			}
 			set = true
 		} else if !mv.CanAddr() {
-			t := v.Type().Elem()
+			vt := v.Type()
+			t := vt.Elem()
 			oldmv := mv
 			mv = reflect.New(t).Elem()
 			mv.Set(oldmv)
@@ -453,7 +458,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 		if v.Elem().IsValid() {
 			v = v.Elem()
 		} else {
-			v = reflect.MakeMap(mapStringInterfaceType)
+			v = makeMapStringInterface()
 		}
 
 		x, err := d.handleKeyPart(key, v, nextFn, makeFn)
@@ -697,7 +702,7 @@ func (d *decoder) unmarshalInlineTable(itable *ast.Node, v reflect.Value) error 
 	case reflect.Interface:
 		elem := v.Elem()
 		if !elem.IsValid() {
-			elem = reflect.MakeMap(mapStringInterfaceType)
+			elem = makeMapStringInterface()
 			v.Set(elem)
 		}
 		return d.unmarshalInlineTable(itable, elem)
@@ -953,12 +958,15 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 	// There is no guarantee over what it could be.
 	switch v.Kind() {
 	case reflect.Map:
-		mk := reflect.ValueOf(string(key.Node().Data))
+		vt := v.Type()
 
-		keyType := v.Type().Key()
-		if !mk.Type().AssignableTo(keyType) {
-			if !mk.Type().ConvertibleTo(keyType) {
-				return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", mk.Type(), keyType)
+		mk := reflect.ValueOf(string(key.Node().Data))
+		mkt := stringType
+
+		keyType := vt.Key()
+		if !mkt.AssignableTo(keyType) {
+			if !mkt.ConvertibleTo(keyType) {
+				return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", mkt, keyType)
 			}
 
 			mk = mk.Convert(keyType)
@@ -966,7 +974,7 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 
 		// If the map does not exist, create it.
 		if v.IsNil() {
-			v = reflect.MakeMap(v.Type())
+			v = reflect.MakeMap(vt)
 			rv = v
 		}
 
@@ -1013,11 +1021,12 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 	case reflect.Interface:
 		v = v.Elem()
 
-		// Following encoding/toml: decoding an object into an interface{}, it
-		// needs to always hold a map[string]interface{}. This is for the types
-		// to be consistent whether a previous value was set or not.
+		// Following encoding/json: decoding an object into an
+		// interface{}, it needs to always hold a
+		// map[string]interface{}. This is for the types to be
+		// consistent whether a previous value was set or not.
 		if !v.IsValid() || v.Type() != mapStringInterfaceType {
-			v = reflect.MakeMap(mapStringInterfaceType)
+			v = makeMapStringInterface()
 		}
 
 		x, err := d.handleKeyValuePart(key, value, v)
@@ -1064,70 +1073,29 @@ func initAndDereferencePointer(v reflect.Value) reflect.Value {
 
 type fieldPathsMap = map[string][]int
 
-type fieldPathsCache struct {
-	m map[reflect.Type]fieldPathsMap
-	l sync.RWMutex
-}
-
-func (c *fieldPathsCache) get(t reflect.Type) (fieldPathsMap, bool) {
-	c.l.RLock()
-	paths, ok := c.m[t]
-	c.l.RUnlock()
-
-	return paths, ok
-}
-
-func (c *fieldPathsCache) set(t reflect.Type, m fieldPathsMap) {
-	c.l.Lock()
-	c.m[t] = m
-	c.l.Unlock()
-}
-
-var globalFieldPathsCache = fieldPathsCache{
-	m: map[reflect.Type]fieldPathsMap{},
-	l: sync.RWMutex{},
-}
+var globalFieldPathsCache atomic.Value // map[danger.TypeID]fieldPathsMap
 
 func structField(v reflect.Value, name string) (reflect.Value, bool) {
-	//nolint:godox
-	// TODO: cache this, and reduce allocations
-	fieldPaths, ok := globalFieldPathsCache.get(v.Type())
+	t := v.Type()
+
+	cache, _ := globalFieldPathsCache.Load().(map[danger.TypeID]fieldPathsMap)
+	fieldPaths, ok := cache[danger.MakeTypeID(t)]
+
 	if !ok {
 		fieldPaths = map[string][]int{}
 
-		path := make([]int, 0, 16)
+		forEachField(t, nil, func(name string, path []int) {
+			fieldPaths[name] = path
+			// extra copy for the case-insensitive match
+			fieldPaths[strings.ToLower(name)] = path
+		})
 
-		var walk func(reflect.Value)
-		walk = func(v reflect.Value) {
-			t := v.Type()
-			for i := 0; i < t.NumField(); i++ {
-				l := len(path)
-				path = append(path, i)
-				f := t.Field(i)
-
-				if f.Anonymous {
-					walk(v.Field(i))
-				} else if f.PkgPath == "" {
-					// only consider exported fields
-					fieldName, ok := f.Tag.Lookup("toml")
-					if !ok {
-						fieldName = f.Name
-					}
-
-					pathCopy := make([]int, len(path))
-					copy(pathCopy, path)
-
-					fieldPaths[fieldName] = pathCopy
-					// extra copy for the case-insensitive match
-					fieldPaths[strings.ToLower(fieldName)] = pathCopy
-				}
-				path = path[:l]
-			}
+		newCache := make(map[danger.TypeID]fieldPathsMap, len(cache)+1)
+		newCache[danger.MakeTypeID(t)] = fieldPaths
+		for k, v := range cache {
+			newCache[k] = v
 		}
-
-		walk(v)
-
-		globalFieldPathsCache.set(v.Type(), fieldPaths)
+		globalFieldPathsCache.Store(newCache)
 	}
 
 	path, ok := fieldPaths[name]
@@ -1140,4 +1108,31 @@ func structField(v reflect.Value, name string) (reflect.Value, bool) {
 	}
 
 	return v.FieldByIndex(path), true
+}
+
+func forEachField(t reflect.Type, path []int, do func(name string, path []int)) {
+	n := t.NumField()
+	for i := 0; i < n; i++ {
+		f := t.Field(i)
+
+		if !f.Anonymous && f.PkgPath != "" {
+			// only consider exported fields.
+			continue
+		}
+
+		fieldPath := append(path, i)
+		fieldPath = fieldPath[:len(fieldPath):len(fieldPath)]
+
+		if f.Anonymous {
+			forEachField(f.Type, fieldPath, do)
+			continue
+		}
+
+		name, ok := f.Tag.Lookup("toml")
+		if !ok {
+			name = f.Name
+		}
+
+		do(name, fieldPath)
+	}
 }
