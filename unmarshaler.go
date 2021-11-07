@@ -385,12 +385,13 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 		elem = v.Elem()
 		return d.handleKeyPart(key, elem, nextFn, makeFn)
 	case reflect.Map:
-		vt := v.Type()
+
 		// Create the key for the map element. For now assume it's a string.
 		mk := reflect.ValueOf(string(key.Node().Data))
 
 		// If the map does not exist, create it.
 		if v.IsNil() {
+			vt := v.Type()
 			v = reflect.MakeMap(vt)
 			rv = v
 		}
@@ -403,6 +404,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 			// map[string]interface{} or a []interface{} depending on whether
 			// this is the last part of the array table key.
 
+			vt := v.Type()
 			t := vt.Elem()
 			if t.Kind() == reflect.Interface {
 				mv = makeFn()
@@ -417,6 +419,7 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 			}
 			set = true
 		} else if !mv.CanAddr() {
+			vt := v.Type()
 			t := vt.Elem()
 			oldmv := mv
 			mv = reflect.New(t).Elem()
