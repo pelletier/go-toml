@@ -1910,6 +1910,12 @@ func TestIssue564(t *testing.T) {
 	require.Equal(t, uuid{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}, config.ID)
 }
 
+func TestIssue658(t *testing.T) {
+	var v map[string]interface{}
+	err := toml.Unmarshal([]byte("e={b=1,b=4}"), &v)
+	require.Error(t, err)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
