@@ -229,22 +229,18 @@ func (s *SeenTracker) checkKeyValue(parentIdx int, node *ast.Node) error {
 		parentIdx = idx
 	}
 
-	kind := valueKind
-	var err error
+	s.entries[parentIdx].kind = valueKind
 
 	value := node.Value()
 
 	switch value.Kind {
 	case ast.InlineTable:
-		kind = tableKind
-		err = s.checkInlineTable(parentIdx, value)
+		return s.checkInlineTable(parentIdx, value)
 	case ast.Array:
-		err = s.checkArray(parentIdx, value)
+		return s.checkArray(parentIdx, value)
 	}
 
-	s.entries[parentIdx].kind = kind
-
-	return err
+	return nil
 }
 
 func (s *SeenTracker) checkArray(parentIdx int, node *ast.Node) error {
