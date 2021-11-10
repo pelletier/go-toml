@@ -136,17 +136,10 @@ func (n *Node) Key() Iterator {
 // Guaranteed to be non-nil.
 // Panics if not called on a KeyValue node, or if the Children are malformed.
 func (n *Node) Value() *Node {
-	assertKind(KeyValue, *n)
 	return n.Child()
 }
 
 // Children returns an iterator over a node's children.
 func (n *Node) Children() Iterator {
 	return Iterator{node: n.Child()}
-}
-
-func assertKind(k Kind, n Node) {
-	if n.Kind != k {
-		panic(fmt.Errorf("method was expecting a %s, not a %s", k, n.Kind))
-	}
 }

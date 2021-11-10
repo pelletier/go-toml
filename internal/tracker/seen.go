@@ -232,14 +232,45 @@ func (s *SeenTracker) checkKeyValue(parentIdx int, node *ast.Node) error {
 	kind := valueKind
 	var err error
 
-	if node.Value().Kind == ast.InlineTable {
+	value := node.Value()
+
+	switch value.Kind {
+	case ast.InlineTable:
 		kind = tableKind
-		err = s.checkInlineTable(parentIdx, node.Value())
+		err = s.checkInlineTable(parentIdx, value)
+	case ast.Array:
+		err = s.checkArray(parentIdx, value)
 	}
 
 	s.entries[parentIdx].kind = kind
 
 	return err
+}
+
+func (s *SeenTracker) checkArray(parentIdx int, node *ast.Node) error {
+	set := false
+	it := node.Children()
+	for it.Next() {
+		if set {
+			s.clear(parentIdx)
+		}
+		n := it.Node()
+		switch n.Kind {
+		case ast.InlineTable:
+			err := s.checkInlineTable(parentIdx, n)
+			if err != nil {
+				return err
+			}
+			set = true
+		case ast.Array:
+			err := s.checkArray(parentIdx, n)
+			if err != nil {
+				return err
+			}
+			set = true
+		}
+	}
+	return nil
 }
 
 func (s *SeenTracker) checkInlineTable(parentIdx int, node *ast.Node) error {
