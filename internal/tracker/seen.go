@@ -216,16 +216,19 @@ func (s *SeenTracker) checkKeyValue(parentIdx int, node *ast.Node) error {
 
 		idx := s.find(parentIdx, k)
 
-		if idx >= 0 {
-			if s.entries[idx].kind != tableKind {
-				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), s.entries[idx].kind)
-			}
-			if s.entries[idx].explicit {
+		if idx < 0 {
+			idx = s.create(parentIdx, k, tableKind, false)
+		} else {
+			entry := s.entries[idx]
+			if it.IsLast() {
+				return fmt.Errorf("toml: key %s is already defined", string(k))
+			} else if entry.kind != tableKind {
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
+			} else if entry.explicit {
 				return fmt.Errorf("toml: cannot redefine table %s that has already been explicitly defined", string(k))
 			}
-		} else {
-			idx = s.create(parentIdx, k, tableKind, false)
 		}
+
 		parentIdx = idx
 	}
 
