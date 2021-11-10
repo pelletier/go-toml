@@ -16,6 +16,66 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ExampleDecoder_SetStrict() {
+	type S struct {
+		Key1 string
+		Key3 string
+	}
+	doc := `
+key1 = "value1"
+key2 = "value2"
+key3 = "value3"
+`
+	r := strings.NewReader(doc)
+	d := toml.NewDecoder(r)
+	d.SetStrict(true)
+	s := S{}
+	err := d.Decode(&s)
+
+	fmt.Println(err.Error())
+
+	var details *toml.StrictMissingError
+	if !errors.As(err, &details) {
+		panic(fmt.Sprintf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err))
+	}
+
+	fmt.Println(details.String())
+	// Output:
+	// strict mode: fields in the document are missing in the target struct
+	// 2| key1 = "value1"
+	// 3| key2 = "value2"
+	//  | ~~~~ missing field
+	// 4| key3 = "value3"
+}
+
+func ExampleUnmarshal() {
+	type MyConfig struct {
+		Version int
+		Name    string
+		Tags    []string
+	}
+
+	doc := `
+	version = 2
+	name = "go-toml"
+	tags = ["go", "toml"]
+	`
+
+	var cfg MyConfig
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("version:", cfg.Version)
+	fmt.Println("name:", cfg.Name)
+	fmt.Println("tags:", cfg.Tags)
+
+	// Output:
+	// version: 2
+	// name: go-toml
+	// tags: [go toml]
+}
+
 type badReader struct{}
 
 func (r *badReader) Read([]byte) (int, error) {
@@ -1723,6 +1783,174 @@ func TestUnmarshalFloat32(t *testing.T) {
 	})
 }
 
+func TestDecoderStrict(t *testing.T) {
+	examples := []struct {
+		desc     string
+		input    string
+		expected string
+		target   interface{}
+	}{
+		{
+			desc: "multiple missing root keys",
+			input: `
+key1 = "value1"
+key2 = "missing2"
+key3 = "missing3"
+key4 = "value4"
+`,
+			expected: `
+2| key1 = "value1"
+3| key2 = "missing2"
+ | ~~~~ missing field
+4| key3 = "missing3"
+5| key4 = "value4"
+---
+2| key1 = "value1"
+3| key2 = "missing2"
+4| key3 = "missing3"
+ | ~~~~ missing field
+5| key4 = "value4"
+`,
+			target: &struct {
+				Key1 string
+				Key4 string
+			}{},
+		},
+		{
+			desc:  "multi-part key",
+			input: `a.short.key="foo"`,
+			expected: `
+1| a.short.key="foo"
+ | ~~~~~~~~~~~ missing field
+`,
+		},
+		{
+			desc: "missing table",
+			input: `
+[foo]
+bar = 42
+`,
+			expected: `
+2| [foo]
+ |  ~~~ missing table
+3| bar = 42
+`,
+		},
+
+		{
+			desc: "missing array table",
+			input: `
+[[foo]]
+bar = 42
+`,
+			expected: `
+2| [[foo]]
+ |   ~~~ missing table
+3| bar = 42
+`,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			t.Run("strict", func(t *testing.T) {
+				r := strings.NewReader(e.input)
+				d := toml.NewDecoder(r)
+				d.SetStrict(true)
+				x := e.target
+				if x == nil {
+					x = &struct{}{}
+				}
+				err := d.Decode(x)
+
+				var tsm *toml.StrictMissingError
+				if errors.As(err, &tsm) {
+					equalStringsIgnoreNewlines(t, e.expected, tsm.String())
+				} else {
+					t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
+				}
+			})
+
+			t.Run("default", func(t *testing.T) {
+				r := strings.NewReader(e.input)
+				d := toml.NewDecoder(r)
+				d.SetStrict(false)
+				x := e.target
+				if x == nil {
+					x = &struct{}{}
+				}
+				err := d.Decode(x)
+				require.NoError(t, err)
+			})
+		})
+	}
+}
+
+func TestIssue252(t *testing.T) {
+	type config struct {
+		Val1 string `toml:"val1"`
+		Val2 string `toml:"val2"`
+	}
+
+	configFile := []byte(
+		`
+val1 = "test1"
+`)
+
+	cfg := &config{
+		Val2: "test2",
+	}
+
+	err := toml.Unmarshal(configFile, cfg)
+	require.NoError(t, err)
+	require.Equal(t, "test2", cfg.Val2)
+}
+
+func TestIssue287(t *testing.T) {
+	b := `y=[[{}]]`
+	v := map[string]interface{}{}
+	err := toml.Unmarshal([]byte(b), &v)
+	require.NoError(t, err)
+
+	expected := map[string]interface{}{
+		"y": []interface{}{
+			[]interface{}{
+				map[string]interface{}{},
+			},
+		},
+	}
+	require.Equal(t, expected, v)
+}
+
+type (
+	Map458   map[string]interface{}
+	Slice458 []interface{}
+)
+
+func (m Map458) A(s string) Slice458 {
+	return m[s].([]interface{})
+}
+
+func TestIssue458(t *testing.T) {
+	s := []byte(`[[package]]
+dependencies = ["regex"]
+name = "decode"
+version = "0.1.0"`)
+	m := Map458{}
+	err := toml.Unmarshal(s, &m)
+	require.NoError(t, err)
+	a := m.A("package")
+	expected := Slice458{
+		map[string]interface{}{
+			"dependencies": []interface{}{"regex"},
+			"name":         "decode",
+			"version":      "0.1.0",
+		},
+	}
+	assert.Equal(t, expected, a)
+}
+
 type Integer484 struct {
 	Value int
 }
@@ -1756,54 +1984,6 @@ func TestIssue484(t *testing.T) {
 	}, cfg)
 }
 
-type (
-	Map458   map[string]interface{}
-	Slice458 []interface{}
-)
-
-func (m Map458) A(s string) Slice458 {
-	return m[s].([]interface{})
-}
-
-func TestIssue458(t *testing.T) {
-	s := []byte(`[[package]]
-dependencies = ["regex"]
-name = "decode"
-version = "0.1.0"`)
-	m := Map458{}
-	err := toml.Unmarshal(s, &m)
-	require.NoError(t, err)
-	a := m.A("package")
-	expected := Slice458{
-		map[string]interface{}{
-			"dependencies": []interface{}{"regex"},
-			"name":         "decode",
-			"version":      "0.1.0",
-		},
-	}
-	assert.Equal(t, expected, a)
-}
-
-func TestIssue252(t *testing.T) {
-	type config struct {
-		Val1 string `toml:"val1"`
-		Val2 string `toml:"val2"`
-	}
-
-	configFile := []byte(
-		`
-val1 = "test1"
-`)
-
-	cfg := &config{
-		Val2: "test2",
-	}
-
-	err := toml.Unmarshal(configFile, cfg)
-	require.NoError(t, err)
-	require.Equal(t, "test2", cfg.Val2)
-}
-
 func TestIssue494(t *testing.T) {
 	data := `
 foo = 2021-04-08
@@ -1819,11 +1999,106 @@ bar = 2021-04-08
 	require.NoError(t, err)
 }
 
+func TestIssue508(t *testing.T) {
+	type head struct {
+		Title string `toml:"title"`
+	}
+
+	type text struct {
+		head
+	}
+
+	b := []byte(`title = "This is a title"`)
+
+	t1 := text{}
+	err := toml.Unmarshal(b, &t1)
+	require.NoError(t, err)
+	require.Equal(t, "This is a title", t1.head.Title)
+}
+
 func TestIssue507(t *testing.T) {
 	data := []byte{'0', '=', '\n', '0', 'a', 'm', 'e'}
 	m := map[string]interface{}{}
 	err := toml.Unmarshal(data, &m)
 	require.Error(t, err)
+}
+
+type uuid [16]byte
+
+func (u *uuid) UnmarshalText(text []byte) (err error) {
+	// Note: the original reported issue had a more complex implementation
+	// of this function. But the important part is to verify that a
+	// non-struct type implementing UnmarshalText works with the unmarshal
+	// process.
+	placeholder := bytes.Repeat([]byte{0xAA}, 16)
+	copy(u[:], placeholder)
+	return nil
+}
+
+func TestIssue564(t *testing.T) {
+	type Config struct {
+		ID uuid
+	}
+
+	var config Config
+
+	err := toml.Unmarshal([]byte(`id = "0818a52b97b94768941ba1172c76cf6c"`), &config)
+	require.NoError(t, err)
+	require.Equal(t, uuid{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}, config.ID)
+}
+
+func TestIssue575(t *testing.T) {
+	b := []byte(`
+[pkg.cargo]
+version = "0.55.0 (5ae8d74b3 2021-06-22)"
+git_commit_hash = "a178d0322ce20e33eac124758e837cbd80a6f633"
+[pkg.cargo.target.aarch64-apple-darwin]
+available = true
+url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.gz"
+hash = "7bac3901d8eb6a4191ffeebe75b29c78bcb270158ec901addb31f588d965d35d"
+xz_url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz"
+xz_hash = "5207644fd6379f3e5b8ae60016b854efa55a381b0c363bff7f9b2f25bfccc430"
+
+[pkg.cargo.target.aarch64-pc-windows-msvc]
+available = true
+url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.gz"
+hash = "eb8ccd9b1f6312b06dc749c17896fa4e9c163661c273dcb61cd7a48376227f6d"
+xz_url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.xz"
+xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
+`)
+
+	type target struct {
+		XZ_URL string
+	}
+
+	type pkg struct {
+		Target map[string]target
+	}
+
+	type doc struct {
+		Pkg map[string]pkg
+	}
+
+	var dist doc
+	err := toml.Unmarshal(b, &dist)
+	require.NoError(t, err)
+
+	expected := doc{
+		Pkg: map[string]pkg{
+			"cargo": pkg{
+				Target: map[string]target{
+					"aarch64-apple-darwin": {
+						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz",
+					},
+					"aarch64-pc-windows-msvc": {
+						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.xz",
+					},
+				},
+			},
+		},
+	}
+
+	require.Equal(t, expected, dist)
 }
 
 func TestIssue579(t *testing.T) {
@@ -1838,6 +2113,12 @@ func TestIssue581(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue585(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte(`a=1979-05127T 0`), &v)
+	require.Error(t, err)
+}
+
 func TestIssue586(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a={ `), &v)
@@ -1847,12 +2128,6 @@ func TestIssue586(t *testing.T) {
 func TestIssue588(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a=[1#`), &v)
-	require.Error(t, err)
-}
-
-func TestIssue585(t *testing.T) {
-	var v interface{}
-	err := toml.Unmarshal([]byte(`a=1979-05127T 0`), &v)
 	require.Error(t, err)
 }
 
@@ -1891,28 +2166,10 @@ foo = "bar"`
 	require.Error(t, err)
 }
 
-type uuid [16]byte
-
-func (u *uuid) UnmarshalText(text []byte) (err error) {
-	// Note: the original reported issue had a more complex implementation
-	// of this function. But the important part is to verify that a
-	// non-struct type implementing UnmarshalText works with the unmarshal
-	// process.
-	placeholder := bytes.Repeat([]byte{0xAA}, 16)
-	copy(u[:], placeholder)
-	return nil
-}
-
-func TestIssue564(t *testing.T) {
-	type Config struct {
-		ID uuid
-	}
-
-	var config Config
-
-	err := toml.Unmarshal([]byte(`id = "0818a52b97b94768941ba1172c76cf6c"`), &config)
-	require.NoError(t, err)
-	require.Equal(t, uuid{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}, config.ID)
+func TestIssue631(t *testing.T) {
+	v := map[string]interface{}{}
+	err := toml.Unmarshal([]byte("\"\\b\u007f\"= 2"), &v)
+	require.Error(t, err)
 }
 
 func TestIssue658(t *testing.T) {
@@ -1924,6 +2181,12 @@ func TestIssue658(t *testing.T) {
 func TestIssue662(t *testing.T) {
 	var v map[string]interface{}
 	err := toml.Unmarshal([]byte("a=[{b=1,b=2}]"), &v)
+	require.Error(t, err)
+}
+
+func TestIssue666(t *testing.T) {
+	var v map[string]interface{}
+	err := toml.Unmarshal([]byte("a={}\na={}"), &v)
 	require.Error(t, err)
 }
 
@@ -2458,205 +2721,6 @@ func TestLocalDateTime(t *testing.T) {
 	}
 }
 
-func TestIssue287(t *testing.T) {
-	b := `y=[[{}]]`
-	v := map[string]interface{}{}
-	err := toml.Unmarshal([]byte(b), &v)
-	require.NoError(t, err)
-
-	expected := map[string]interface{}{
-		"y": []interface{}{
-			[]interface{}{
-				map[string]interface{}{},
-			},
-		},
-	}
-	require.Equal(t, expected, v)
-}
-
-func TestIssue508(t *testing.T) {
-	type head struct {
-		Title string `toml:"title"`
-	}
-
-	type text struct {
-		head
-	}
-
-	b := []byte(`title = "This is a title"`)
-
-	t1 := text{}
-	err := toml.Unmarshal(b, &t1)
-	require.NoError(t, err)
-	require.Equal(t, "This is a title", t1.head.Title)
-}
-
-func TestIssue575(t *testing.T) {
-	b := []byte(`
-[pkg.cargo]
-version = "0.55.0 (5ae8d74b3 2021-06-22)"
-git_commit_hash = "a178d0322ce20e33eac124758e837cbd80a6f633"
-[pkg.cargo.target.aarch64-apple-darwin]
-available = true
-url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.gz"
-hash = "7bac3901d8eb6a4191ffeebe75b29c78bcb270158ec901addb31f588d965d35d"
-xz_url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz"
-xz_hash = "5207644fd6379f3e5b8ae60016b854efa55a381b0c363bff7f9b2f25bfccc430"
-
-[pkg.cargo.target.aarch64-pc-windows-msvc]
-available = true
-url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.gz"
-hash = "eb8ccd9b1f6312b06dc749c17896fa4e9c163661c273dcb61cd7a48376227f6d"
-xz_url = "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.xz"
-xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
-`)
-
-	type target struct {
-		XZ_URL string
-	}
-
-	type pkg struct {
-		Target map[string]target
-	}
-
-	type doc struct {
-		Pkg map[string]pkg
-	}
-
-	var dist doc
-	err := toml.Unmarshal(b, &dist)
-	require.NoError(t, err)
-
-	expected := doc{
-		Pkg: map[string]pkg{
-			"cargo": pkg{
-				Target: map[string]target{
-					"aarch64-apple-darwin": {
-						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz",
-					},
-					"aarch64-pc-windows-msvc": {
-						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-pc-windows-msvc.tar.xz",
-					},
-				},
-			},
-		},
-	}
-
-	require.Equal(t, expected, dist)
-}
-
-func TestIssue631(t *testing.T) {
-	v := map[string]interface{}{}
-
-	err := toml.Unmarshal([]byte("\"\\b\u007f\"= 2"), &v)
-	require.Error(t, err)
-}
-
-//nolint:funlen
-func TestDecoderStrict(t *testing.T) {
-	examples := []struct {
-		desc     string
-		input    string
-		expected string
-		target   interface{}
-	}{
-		{
-			desc: "multiple missing root keys",
-			input: `
-key1 = "value1"
-key2 = "missing2"
-key3 = "missing3"
-key4 = "value4"
-`,
-			expected: `
-2| key1 = "value1"
-3| key2 = "missing2"
- | ~~~~ missing field
-4| key3 = "missing3"
-5| key4 = "value4"
----
-2| key1 = "value1"
-3| key2 = "missing2"
-4| key3 = "missing3"
- | ~~~~ missing field
-5| key4 = "value4"
-`,
-			target: &struct {
-				Key1 string
-				Key4 string
-			}{},
-		},
-		{
-			desc:  "multi-part key",
-			input: `a.short.key="foo"`,
-			expected: `
-1| a.short.key="foo"
- | ~~~~~~~~~~~ missing field
-`,
-		},
-		{
-			desc: "missing table",
-			input: `
-[foo]
-bar = 42
-`,
-			expected: `
-2| [foo]
- |  ~~~ missing table
-3| bar = 42
-`,
-		},
-
-		{
-			desc: "missing array table",
-			input: `
-[[foo]]
-bar = 42
-`,
-			expected: `
-2| [[foo]]
- |   ~~~ missing table
-3| bar = 42
-`,
-		},
-	}
-
-	for _, e := range examples {
-		e := e
-		t.Run(e.desc, func(t *testing.T) {
-			t.Run("strict", func(t *testing.T) {
-				r := strings.NewReader(e.input)
-				d := toml.NewDecoder(r)
-				d.SetStrict(true)
-				x := e.target
-				if x == nil {
-					x = &struct{}{}
-				}
-				err := d.Decode(x)
-
-				var tsm *toml.StrictMissingError
-				if errors.As(err, &tsm) {
-					equalStringsIgnoreNewlines(t, e.expected, tsm.String())
-				} else {
-					t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
-				}
-			})
-
-			t.Run("default", func(t *testing.T) {
-				r := strings.NewReader(e.input)
-				d := toml.NewDecoder(r)
-				d.SetStrict(false)
-				x := e.target
-				if x == nil {
-					x = &struct{}{}
-				}
-				err := d.Decode(x)
-				require.NoError(t, err)
-			})
-		})
-	}
-}
-
 func TestUnmarshal_RecursiveTable(t *testing.T) {
 	type Foo struct {
 		I int
@@ -2826,64 +2890,4 @@ func TestUnmarshal_RecursiveTableArray(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ExampleDecoder_SetStrict() {
-	type S struct {
-		Key1 string
-		Key3 string
-	}
-	doc := `
-key1 = "value1"
-key2 = "value2"
-key3 = "value3"
-`
-	r := strings.NewReader(doc)
-	d := toml.NewDecoder(r)
-	d.SetStrict(true)
-	s := S{}
-	err := d.Decode(&s)
-
-	fmt.Println(err.Error())
-
-	var details *toml.StrictMissingError
-	if !errors.As(err, &details) {
-		panic(fmt.Sprintf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err))
-	}
-
-	fmt.Println(details.String())
-	// Output:
-	// strict mode: fields in the document are missing in the target struct
-	// 2| key1 = "value1"
-	// 3| key2 = "value2"
-	//  | ~~~~ missing field
-	// 4| key3 = "value3"
-}
-
-func ExampleUnmarshal() {
-	type MyConfig struct {
-		Version int
-		Name    string
-		Tags    []string
-	}
-
-	doc := `
-	version = 2
-	name = "go-toml"
-	tags = ["go", "toml"]
-	`
-
-	var cfg MyConfig
-	err := toml.Unmarshal([]byte(doc), &cfg)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("version:", cfg.Version)
-	fmt.Println("name:", cfg.Name)
-	fmt.Println("tags:", cfg.Tags)
-
-	// Output:
-	// version: 2
-	// name: go-toml
-	// tags: [go toml]
 }
