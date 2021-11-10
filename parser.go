@@ -968,7 +968,7 @@ byteLoop:
 func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 	i := 0
 
-	if len(b) > 2 && b[0] == '0' && b[1] != '.' && b[1] != 'e' {
+	if len(b) > 2 && b[0] == '0' && b[1] != '.' && b[1] != 'e' && b[1] != 'E' {
 		var isValidRune validRuneFn
 
 		switch b[1] {
