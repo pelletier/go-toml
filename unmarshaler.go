@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 	"github.com/pelletier/go-toml/v2/internal/danger"
@@ -620,15 +621,57 @@ func (d *decoder) handleValue(value *ast.Node, v reflect.Value) error {
 	}
 }
 
+func (d *decoder) unmarshalArrayFastSliceInterface(array *ast.Node, v reflect.Value) error {
+	ifaceType := v.Type().Elem()
+
+	sp := (*[]interface{})(unsafe.Pointer(v.UnsafeAddr()))
+	s := *sp
+
+	if s == nil {
+		s = make([]interface{}, 0, 16)
+	} else {
+		s = s[:0]
+	}
+
+	var x interface{}
+
+	it := array.Children()
+	for it.Next() {
+		n := it.Node()
+
+		idx := len(s)
+		s = append(s, x)
+
+		datap := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&s)).Data)
+		elemP := danger.Stride(datap, unsafe.Sizeof(x), idx)
+		elem := reflect.NewAt(ifaceType, elemP).Elem()
+
+		err := d.handleValue(n, elem)
+		if err != nil {
+			return err
+		}
+	}
+
+	*sp = s
+
+	return nil
+}
+
 func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
+	var vt reflect.Type
 	switch v.Kind() {
 	case reflect.Slice:
+		vt = v.Type()
+		if vt == sliceInterfaceType {
+			return d.unmarshalArrayFastSliceInterface(array, v)
+		}
 		if v.IsNil() {
 			v.Set(reflect.MakeSlice(v.Type(), 0, 16))
 		} else {
 			v.SetLen(0)
 		}
 	case reflect.Array:
+		vt = v.Type()
 		// arrays are always initialized
 	case reflect.Interface:
 		elem := v.Elem()
@@ -658,7 +701,7 @@ func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
 		return fmt.Errorf("toml: cannot store array in Go type %s", v.Kind())
 	}
 
-	elemType := v.Type().Elem()
+	elemType := vt.Elem()
 
 	it := array.Children()
 	idx := 0
