@@ -625,7 +625,7 @@ type unmarshalArrayFn func(d *decoder, array *ast.Node, v reflect.Value) error
 
 var globalUnmarshalArrayFnCache atomic.Value // map[danger.TypeID]unmarshalArrayFn
 
-func unmarshalArrayFnFor(vt reflect.Type) unmarshalArrayFn {
+func unmarshalArrayFnForSlice(vt reflect.Type) unmarshalArrayFn {
 	tid := danger.MakeTypeID(vt)
 
 	cache, _ := globalUnmarshalArrayFnCache.Load().(map[danger.TypeID]unmarshalArrayFn)
@@ -693,7 +693,7 @@ func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Slice:
 		vt = v.Type()
-		fn := unmarshalArrayFnFor(vt)
+		fn := unmarshalArrayFnForSlice(vt)
 		return fn(d, array, v)
 	case reflect.Array:
 		vt = v.Type()
@@ -701,8 +701,8 @@ func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
 	case reflect.Interface:
 		elem := v.Elem()
 		if !elem.IsValid() {
-			elem = reflect.New(sliceInterfaceType).Elem()
-			elem.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+			s := make([]interface{}, 0, 16)
+			elem = reflect.ValueOf(&s).Elem()
 		} else if elem.Kind() == reflect.Slice {
 			if elem.Type() != sliceInterfaceType {
 				elem = reflect.New(sliceInterfaceType).Elem()
