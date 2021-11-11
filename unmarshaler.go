@@ -621,45 +621,71 @@ func (d *decoder) handleValue(value *ast.Node, v reflect.Value) error {
 	}
 }
 
-func (d *decoder) unmarshalArrayFastSliceInterface(array *ast.Node, v reflect.Value) error {
-	vt := v.Type()
+type unmarshalArrayFn func(d *decoder, array *ast.Node, v reflect.Value) error
+
+var globalUnmarshalArrayFnCache atomic.Value // map[danger.TypeID]unmarshalArrayFn
+
+func unmarshalArrayFnFor(vt reflect.Type) unmarshalArrayFn {
+	tid := danger.MakeTypeID(vt)
+
+	cache, _ := globalUnmarshalArrayFnCache.Load().(map[danger.TypeID]unmarshalArrayFn)
+	fn, ok := cache[tid]
+
+	if ok {
+		return fn
+	}
 
 	elemType := vt.Elem()
 	elemSize := elemType.Size()
 
-	sp := (*danger.Slice)(unsafe.Pointer(v.UnsafeAddr()))
+	fn = func(d *decoder, array *ast.Node, v reflect.Value) error {
+		sp := (*danger.Slice)(unsafe.Pointer(v.UnsafeAddr()))
 
-	sp.Len = 0
+		sp.Len = 0
 
-	it := array.Children()
-	for it.Next() {
-		n := it.Node()
+		it := array.Children()
+		for it.Next() {
+			n := it.Node()
 
-		idx := sp.Len
+			idx := sp.Len
 
-		if sp.Len == sp.Cap {
-			c := sp.Cap
-			if c == 0 {
-				c = 10
-			} else {
-				c *= 2
+			if sp.Len == sp.Cap {
+				c := sp.Cap
+				if c == 0 {
+					c = 16
+				} else {
+					c *= 2
+				}
+				*sp = danger.ExtendSlice(vt, sp, c)
 			}
-			*sp = danger.ExtendSlice(vt, sp, c)
+
+			datap := unsafe.Pointer(sp.Data)
+			elemp := danger.Stride(datap, elemSize, idx)
+			elem := reflect.NewAt(elemType, elemp).Elem()
+
+			err := d.handleValue(n, elem)
+			if err != nil {
+				return err
+			}
+
+			sp.Len++
 		}
 
-		datap := unsafe.Pointer(sp.Data)
-		elemp := danger.Stride(datap, elemSize, idx)
-		elem := reflect.NewAt(elemType, elemp).Elem()
-
-		err := d.handleValue(n, elem)
-		if err != nil {
-			return err
+		if sp.Data == nil {
+			*sp = danger.ExtendSlice(vt, sp, 0)
 		}
 
-		sp.Len++
+		return nil
 	}
 
-	return nil
+	newCache := make(map[danger.TypeID]unmarshalArrayFn, len(cache)+1)
+	newCache[tid] = fn
+	for k, v := range cache {
+		newCache[k] = v
+	}
+	globalUnmarshalArrayFnCache.Store(newCache)
+
+	return fn
 }
 
 func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
@@ -667,14 +693,8 @@ func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Slice:
 		vt = v.Type()
-		if vt == sliceInterfaceType {
-			return d.unmarshalArrayFastSliceInterface(array, v)
-		}
-		if v.IsNil() {
-			v.Set(reflect.MakeSlice(v.Type(), 0, 16))
-		} else {
-			v.SetLen(0)
-		}
+		fn := unmarshalArrayFnFor(vt)
+		return fn(d, array, v)
 	case reflect.Array:
 		vt = v.Type()
 		// arrays are always initialized
@@ -1126,9 +1146,10 @@ var globalFieldPathsCache atomic.Value // map[danger.TypeID]fieldPathsMap
 
 func structField(v reflect.Value, name string) (reflect.Value, bool) {
 	t := v.Type()
+	tid := danger.MakeTypeID(t)
 
 	cache, _ := globalFieldPathsCache.Load().(map[danger.TypeID]fieldPathsMap)
-	fieldPaths, ok := cache[danger.MakeTypeID(t)]
+	fieldPaths, ok := cache[tid]
 
 	if !ok {
 		fieldPaths = map[string][]int{}
@@ -1140,7 +1161,7 @@ func structField(v reflect.Value, name string) (reflect.Value, bool) {
 		})
 
 		newCache := make(map[danger.TypeID]fieldPathsMap, len(cache)+1)
-		newCache[danger.MakeTypeID(t)] = fieldPaths
+		newCache[tid] = fieldPaths
 		for k, v := range cache {
 			newCache[k] = v
 		}

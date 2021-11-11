@@ -321,7 +321,6 @@ type benchmarkDoc struct {
 		Key1 []int64
 		Key2 []string
 		Key3 [][]int64
-		// TODO: Key4 not supported by go-toml's Unmarshal
 		Key4 []interface{}
 		Key5 []int64
 		Key6 []int64
