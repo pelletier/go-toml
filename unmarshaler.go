@@ -705,11 +705,11 @@ func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
 			elem = reflect.ValueOf(&s).Elem()
 		} else if elem.Kind() == reflect.Slice {
 			if elem.Type() != sliceInterfaceType {
-				elem = reflect.New(sliceInterfaceType).Elem()
-				elem.Set(reflect.MakeSlice(sliceInterfaceType, 0, 16))
+				s := make([]interface{}, 0, 16)
+				elem = reflect.ValueOf(&s).Elem()
 			} else if !elem.CanSet() {
-				nelem := reflect.New(sliceInterfaceType).Elem()
-				nelem.Set(reflect.MakeSlice(sliceInterfaceType, elem.Len(), elem.Cap()))
+				s := make([]interface{}, elem.Len(), elem.Cap())
+				nelem := reflect.ValueOf(&s).Elem()
 				reflect.Copy(nelem, elem)
 				elem = nelem
 			}
