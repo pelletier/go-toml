@@ -622,37 +622,42 @@ func (d *decoder) handleValue(value *ast.Node, v reflect.Value) error {
 }
 
 func (d *decoder) unmarshalArrayFastSliceInterface(array *ast.Node, v reflect.Value) error {
-	ifaceType := v.Type().Elem()
+	vt := v.Type()
 
-	sp := (*[]interface{})(unsafe.Pointer(v.UnsafeAddr()))
-	s := *sp
+	elemType := vt.Elem()
+	elemSize := elemType.Size()
 
-	if s == nil {
-		s = make([]interface{}, 0, 16)
-	} else {
-		s = s[:0]
-	}
+	sp := (*danger.Slice)(unsafe.Pointer(v.UnsafeAddr()))
 
-	var x interface{}
+	sp.Len = 0
 
 	it := array.Children()
 	for it.Next() {
 		n := it.Node()
 
-		idx := len(s)
-		s = append(s, x)
+		idx := sp.Len
 
-		datap := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&s)).Data)
-		elemP := danger.Stride(datap, unsafe.Sizeof(x), idx)
-		elem := reflect.NewAt(ifaceType, elemP).Elem()
+		if sp.Len == sp.Cap {
+			c := sp.Cap
+			if c == 0 {
+				c = 10
+			} else {
+				c *= 2
+			}
+			*sp = danger.ExtendSlice(vt, sp, c)
+		}
+
+		datap := unsafe.Pointer(sp.Data)
+		elemp := danger.Stride(datap, elemSize, idx)
+		elem := reflect.NewAt(elemType, elemp).Elem()
 
 		err := d.handleValue(n, elem)
 		if err != nil {
 			return err
 		}
-	}
 
-	*sp = s
+		sp.Len++
+	}
 
 	return nil
 }

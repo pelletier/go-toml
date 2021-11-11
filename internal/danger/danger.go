@@ -63,3 +63,14 @@ func Stride(ptr unsafe.Pointer, size uintptr, offset int) unsafe.Pointer {
 	//   https://github.com/golang/go/issues/40481
 	return unsafe.Pointer(uintptr(ptr) + uintptr(int(size)*offset))
 }
+
+type Slice struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
+}
+
+type iface struct {
+	typ unsafe.Pointer
+	ptr unsafe.Pointer
+}
