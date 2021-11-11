@@ -688,62 +688,61 @@ func unmarshalArrayFnForSlice(vt reflect.Type) unmarshalArrayFn {
 	return fn
 }
 
-func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
-	var vt reflect.Type
-	switch v.Kind() {
-	case reflect.Slice:
-		vt = v.Type()
-		fn := unmarshalArrayFnForSlice(vt)
-		return fn(d, array, v)
-	case reflect.Array:
-		vt = v.Type()
-		// arrays are always initialized
-	case reflect.Interface:
-		elem := v.Elem()
-		if !elem.IsValid() {
-			s := make([]interface{}, 0, 16)
-			elem = reflect.ValueOf(&s).Elem()
-		} else if elem.Kind() == reflect.Slice {
-			if elem.Type() != sliceInterfaceType {
-				s := make([]interface{}, 0, 16)
-				elem = reflect.ValueOf(&s).Elem()
-			} else if !elem.CanSet() {
-				s := make([]interface{}, elem.Len(), elem.Cap())
-				nelem := reflect.ValueOf(&s).Elem()
-				reflect.Copy(nelem, elem)
-				elem = nelem
-			}
-		}
-		err := d.unmarshalArray(array, elem)
-		if err != nil {
-			return err
-		}
-		v.Set(elem)
-		return nil
-	default:
-		// TODO: use newDecodeError, but first the parser needs to fill
-		//   array.Data.
-		return fmt.Errorf("toml: cannot store array in Go type %s", v.Kind())
-	}
+func unmarshalArraySliceInterface(d *decoder, array *ast.Node, v reflect.Value) error {
+	sp := (*danger.Slice)(unsafe.Pointer(v.UnsafeAddr()))
 
-	elemType := vt.Elem()
+	sp.Len = 0
+
+	var x interface{}
 
 	it := array.Children()
-	idx := 0
 	for it.Next() {
 		n := it.Node()
 
-		// TODO: optimize
-		if v.Kind() == reflect.Slice {
-			elem := reflect.New(elemType).Elem()
+		idx := sp.Len
 
-			err := d.handleValue(n, elem)
-			if err != nil {
-				return err
+		if sp.Len == sp.Cap {
+			c := sp.Cap
+			if c == 0 {
+				c = 16
+			} else {
+				c *= 2
 			}
+			*sp = danger.ExtendSlice(sliceInterfaceType, sp, c)
+		}
 
-			v.Set(reflect.Append(v, elem))
-		} else { // array
+		datap := unsafe.Pointer(sp.Data)
+		elemp := danger.Stride(datap, unsafe.Sizeof(x), idx)
+		elem := reflect.NewAt(sliceInterfaceType.Elem(), elemp).Elem()
+
+		err := d.handleValue(n, elem)
+		if err != nil {
+			return err
+		}
+
+		sp.Len++
+	}
+
+	if sp.Data == nil {
+		*sp = danger.ExtendSlice(sliceInterfaceType, sp, 0)
+	}
+
+	return nil
+}
+
+func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
+	switch v.Kind() {
+	case reflect.Slice:
+		fn := unmarshalArrayFnForSlice(v.Type())
+		return fn(d, array, v)
+	case reflect.Array:
+		// arrays are always initialized
+
+		it := array.Children()
+		idx := 0
+		for it.Next() {
+			n := it.Node()
+
 			if idx >= v.Len() {
 				return nil
 			}
@@ -754,6 +753,39 @@ func (d *decoder) unmarshalArray(array *ast.Node, v reflect.Value) error {
 			}
 			idx++
 		}
+	case reflect.Interface:
+		elemIsSliceInterface := false
+		elem := v.Elem()
+		if !elem.IsValid() {
+			s := make([]interface{}, 0, 16)
+			elem = reflect.ValueOf(&s).Elem()
+			elemIsSliceInterface = true
+		} else if elem.Kind() == reflect.Slice {
+			if elem.Type() != sliceInterfaceType {
+				s := make([]interface{}, 0, 16)
+				elem = reflect.ValueOf(&s).Elem()
+			} else if !elem.CanSet() {
+				s := make([]interface{}, elem.Len(), elem.Cap())
+				nelem := reflect.ValueOf(&s).Elem()
+				reflect.Copy(nelem, elem)
+				elem = nelem
+			}
+			elemIsSliceInterface = true
+		}
+
+		var err error
+		if elemIsSliceInterface {
+			err = unmarshalArraySliceInterface(d, array, elem)
+		} else {
+			err = d.unmarshalArray(array, elem)
+		}
+
+		v.Set(elem)
+		return err
+	default:
+		// TODO: use newDecodeError, but first the parser needs to fill
+		//   array.Data.
+		return fmt.Errorf("toml: cannot store array in Go type %s", v.Kind())
 	}
 
 	return nil
