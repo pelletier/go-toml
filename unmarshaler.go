@@ -48,8 +48,9 @@ func NewDecoder(r io.Reader) *Decoder {
 // that could not be set on the target value. In that case, the decoder returns
 // a StrictMissingError that can be used to retrieve the individual errors as
 // well as generate a human readable description of the missing fields.
-func (d *Decoder) SetStrict(strict bool) {
+func (d *Decoder) SetStrict(strict bool) *Decoder {
 	d.strict = strict
+	return d
 }
 
 // Decode the whole content of r into v.

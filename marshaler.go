@@ -54,8 +54,9 @@ func NewEncoder(w io.Writer) *Encoder {
 // inline tag:
 //
 //   MyField `inline:"true"`
-func (enc *Encoder) SetTablesInline(inline bool) {
+func (enc *Encoder) SetTablesInline(inline bool) *Encoder {
 	enc.tablesInline = inline
+	return enc
 }
 
 // SetArraysMultiline forces the encoder to emit all arrays with one element per
@@ -64,20 +65,23 @@ func (enc *Encoder) SetTablesInline(inline bool) {
 // This behavior can be controlled on an individual struct field basis with the multiline tag:
 //
 //   MyField `multiline:"true"`
-func (enc *Encoder) SetArraysMultiline(multiline bool) {
+func (enc *Encoder) SetArraysMultiline(multiline bool) *Encoder {
 	enc.arraysMultiline = multiline
+	return enc
 }
 
 // SetIndentSymbol defines the string that should be used for indentation. The
 // provided string is repeated for each indentation level. Defaults to two
 // spaces.
-func (enc *Encoder) SetIndentSymbol(s string) {
+func (enc *Encoder) SetIndentSymbol(s string) *Encoder {
 	enc.indentSymbol = s
+	return enc
 }
 
 // SetIndentTables forces the encoder to intent tables and array tables.
-func (enc *Encoder) SetIndentTables(indent bool) {
+func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 	enc.indentTables = indent
+	return enc
 }
 
 // Encode writes a TOML representation of v to the stream.
