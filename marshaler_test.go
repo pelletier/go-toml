@@ -551,7 +551,7 @@ K = 42`,
 
 type flagsSetters []struct {
 	name string
-	f    func(enc *toml.Encoder, flag bool)
+	f    func(enc *toml.Encoder, flag bool) *toml.Encoder
 }
 
 var allFlags = flagsSetters{
