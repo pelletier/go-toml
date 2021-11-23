@@ -53,7 +53,7 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 		switch b[i] {
 		case '\'':
 			return b[:i+1], b[i+1:], nil
-		case '\n':
+		case '\n', '\r':
 			return nil, nil, newDecodeError(b[i:i+1], "literal strings cannot have new lines")
 		}
 		size := utf8ValidNext(b[i:])
