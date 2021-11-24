@@ -462,7 +462,7 @@ func checkAndRemoveUnderscoresFloats(b []byte) ([]byte, error) {
 
 // isValidDate checks if a provided date is a date that exists.
 func isValidDate(year int, month int, day int) bool {
-	return day <= daysIn(month, year)
+	return month > 0 && month < 13 && day > 0 && day <= daysIn(month, year)
 }
 
 // daysBefore[m] counts the number of days in a non-leap year
