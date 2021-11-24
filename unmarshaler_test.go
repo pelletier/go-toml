@@ -2220,6 +2220,42 @@ func TestIssue666(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue677(t *testing.T) {
+	doc := `
+[Build]
+Name = "publication build"
+
+[[Build.Dependencies]]
+Name = "command"
+Program = "hugo"
+`
+
+	type _tomlJob struct {
+		Dependencies []map[string]interface{}
+	}
+
+	type tomlParser struct {
+		Build *_tomlJob
+	}
+
+	p := tomlParser{}
+
+	err := toml.Unmarshal([]byte(doc), &p)
+	require.NoError(t, err)
+
+	expected := tomlParser{
+		Build: &_tomlJob{
+			Dependencies: []map[string]interface{}{
+				{
+					"Name":    "command",
+					"Program": "hugo",
+				},
+			},
+		},
+	}
+	require.Equal(t, expected, p)
+}
+
 //nolint:funlen
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
