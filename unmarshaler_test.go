@@ -2571,6 +2571,14 @@ world'`,
 			data: `a=2021-0--29`,
 		},
 		{
+			desc: `zero is an invalid day`,
+			data: `a=2021-11-00`,
+		},
+		{
+			desc: `zero is an invalid month`,
+			data: `a=2021-00-11`,
+		},
+		{
 			desc: `carriage return inside basic key`,
 			data: "\"\r\"=42",
 		},
