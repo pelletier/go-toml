@@ -345,7 +345,9 @@ func (d *decoder) handleArrayTableCollection(key ast.Iterator, v reflect.Value) 
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		v.Elem().Set(elem)
+		if elem.IsValid() {
+			v.Elem().Set(elem)
+		}
 
 		return v, nil
 	case reflect.Slice:
