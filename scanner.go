@@ -242,6 +242,14 @@ func scanMultilineBasicString(b []byte) ([]byte, bool, []byte, error) {
 			}
 			escaped = true
 			i++ // skip the next character
+		case '\r':
+			if len(b) < i+2 {
+				return nil, escaped, nil, newDecodeError(b[len(b):], `need a \n after \r`)
+			}
+			if b[i+1] != '\n' {
+				return nil, escaped, nil, newDecodeError(b[i:i+2], `need a \n after \r`)
+			}
+			i++ // skip the \n
 		}
 	}
 

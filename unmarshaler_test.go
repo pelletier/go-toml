@@ -2591,6 +2591,14 @@ world'`,
 			data: "A = \"\r\"",
 		},
 		{
+			desc: `carriage return inside basic multiline string`,
+			data: "a=\"\"\"\r\"\"\"",
+		},
+		{
+			desc: `carriage return at the trail of basic multiline string`,
+			data: "a=\"\"\"\r",
+		},
+		{
 			desc: `carriage return inside literal string`,
 			data: "A = '\r'",
 		},
