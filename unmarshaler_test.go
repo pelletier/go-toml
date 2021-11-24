@@ -2545,8 +2545,16 @@ world'`,
 			data: "\"\r\"=42",
 		},
 		{
+			desc: `carriage return inside literal key`,
+			data: "'\r'=42",
+		},
+		{
 			desc: `carriage return inside basic string`,
 			data: "A = \"\r\"",
+		},
+		{
+			desc: `carriage return inside literal string`,
+			data: "A = '\r'",
 		},
 		{
 			desc: `carriage return in comment`,
