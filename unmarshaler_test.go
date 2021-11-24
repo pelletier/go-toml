@@ -665,6 +665,36 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "long string array into []string",
+			input: `A = ["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"]`,
+			gen: func() test {
+				type doc struct {
+					A []string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"}},
+				}
+			},
+		},
+		{
+			desc: "long string array into []interface{}",
+			input: `A = ["0","1","2","3","4","5","6","7","8","9","10","11","12","13","14",
+"15","16","17"]`,
+			gen: func() test {
+				type doc struct {
+					A []interface{}
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{A: []interface{}{"0", "1", "2", "3", "4", "5", "6",
+						"7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"}},
+				}
+			},
+		},
+		{
 			desc: "standard table",
 			input: `[A]
 B = "data"`,

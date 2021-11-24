@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -798,6 +799,48 @@ func TestIssue590(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestIssue571(t *testing.T) {
+	type Foo struct {
+		Float32 float32
+		Float64 float64
+	}
+
+	const closeEnough = 1e-9
+
+	foo := Foo{
+		Float32: 42,
+		Float64: 43,
+	}
+	b, err := toml.Marshal(foo)
+	require.NoError(t, err)
+
+	var foo2 Foo
+	err = toml.Unmarshal(b, &foo2)
+	require.NoError(t, err)
+
+	assert.InDelta(t, 42, foo2.Float32, closeEnough)
+	assert.InDelta(t, 43, foo2.Float64, closeEnough)
+}
+
+func TestIssue678(t *testing.T) {
+	type Config struct {
+		BigInt big.Int
+	}
+
+	cfg := &Config{
+		BigInt: *big.NewInt(123),
+	}
+
+	out, err := toml.Marshal(cfg)
+	require.NoError(t, err)
+	equalStringsIgnoreNewlines(t, "BigInt = '123'", string(out))
+
+	cfg2 := &Config{}
+	err = toml.Unmarshal(out, cfg2)
+	require.NoError(t, err)
+	require.Equal(t, cfg, cfg2)
+}
+
 func ExampleMarshal() {
 	type MyConfig struct {
 		Version int
@@ -821,27 +864,4 @@ func ExampleMarshal() {
 	// Version = 2
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
-}
-
-func TestIssue571(t *testing.T) {
-	type Foo struct {
-		Float32 float32
-		Float64 float64
-	}
-
-	const closeEnough = 1e-9
-
-	foo := Foo{
-		Float32: 42,
-		Float64: 43,
-	}
-	b, err := toml.Marshal(foo)
-	require.NoError(t, err)
-
-	var foo2 Foo
-	err = toml.Unmarshal(b, &foo2)
-	require.NoError(t, err)
-
-	assert.InDelta(t, 42, foo2.Float32, closeEnough)
-	assert.InDelta(t, 43, foo2.Float64, closeEnough)
 }
