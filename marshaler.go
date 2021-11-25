@@ -115,7 +115,9 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 // basis:
 //
 //   toml:"foo"
-//     Changes the name of the key to use for the field to foo.
+//     Changes the name of the key to use for the field to foo. By default, all
+//     public fields are encoded. If you want to prevent a public field from
+//     being exported, you can use the special field name "-".
 //
 //   multiline:"true"
 //     When the field contains a string, it will be emitted as a quoted
