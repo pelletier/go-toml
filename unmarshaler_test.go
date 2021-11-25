@@ -1790,6 +1790,20 @@ func TestUnmarshalOverflows(t *testing.T) {
 	}
 }
 
+func TestUnmarshalErrors(t *testing.T) {
+	type mystruct struct {
+		Bar string
+	}
+
+	data := `bar = 42`
+
+	s := mystruct{}
+	err := toml.Unmarshal([]byte(data), &s)
+	require.Error(t, err)
+
+	require.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.mystruct.Bar of type string", err.Error())
+}
+
 func TestUnmarshalInvalidTarget(t *testing.T) {
 	x := "foo"
 	err := toml.Unmarshal([]byte{}, x)
