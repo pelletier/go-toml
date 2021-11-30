@@ -18,7 +18,7 @@ func TestMarshal(t *testing.T) {
 	someInt := 42
 
 	type structInline struct {
-		A interface{} `inline:"true"`
+		A interface{} `toml:",inline"`
 	}
 
 	examples := []struct {
@@ -243,7 +243,7 @@ name = 'Alice'
 		{
 			desc: "multi-line forced",
 			v: struct {
-				A string `multiline:"true"`
+				A string `toml:",multiline"`
 			}{
 				A: "hello\nworld",
 			},
@@ -254,7 +254,7 @@ world"""`,
 		{
 			desc: "inline field",
 			v: struct {
-				A map[string]string `inline:"true"`
+				A map[string]string `toml:",inline"`
 				B map[string]string
 			}{
 				A: map[string]string{
@@ -273,7 +273,7 @@ isinline = 'no'
 		{
 			desc: "mutiline array int",
 			v: struct {
-				A []int `multiline:"true"`
+				A []int `toml:",multiline"`
 				B []int
 			}{
 				A: []int{1, 2, 3, 4},
@@ -292,7 +292,7 @@ B = [1, 2, 3, 4]
 		{
 			desc: "mutiline array in array",
 			v: struct {
-				A [][]int `multiline:"true"`
+				A [][]int `toml:",multiline"`
 			}{
 				A: [][]int{{1, 2}, {3, 4}},
 			},

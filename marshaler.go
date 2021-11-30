@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Marshal serializes a Go value as a TOML document.
@@ -111,21 +112,19 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 //
 // Struct tags
 //
-// The following struct tags are available to tweak encoding on a per-field
-// basis:
+// The encoding of each public struct field can be customized by the
+// format string in the "toml" key of the struct field's tag. This
+// follows encoding/json's convention. The format string starts with
+// the name of the field, optionally followed by a comma-separated
+// list of options. The name may be empty in order to provide options
+// without overriding the default name.
 //
-//   toml:"foo"
-//     Changes the name of the key to use for the field to foo. By default, all
-//     public fields are encoded. If you want to prevent a public field from
-//     being exported, you can use the special field name "-".
+// The "multiline" option emits strings as quoted multi-line TOML
+// strings. It has no effect on fields that would not be encoded as
+// strings.
 //
-//   multiline:"true"
-//     When the field contains a string, it will be emitted as a quoted
-//     multi-line TOML string.
-//
-//   inline:"true"
-//     When the field would normally be encoded as a table, it is instead
-//     encoded as an inline table.
+// The "inline" option turns fields that would be emitted as tables
+// into inline tables instead. It has no effect on other fields.
 func (enc *Encoder) Encode(v interface{}) error {
 	var (
 		b   []byte
@@ -532,7 +531,6 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	var t table
 
-	//nolint:godox
 	// TODO: cache this?
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
@@ -543,14 +541,18 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			continue
 		}
 
-		k, ok := fieldType.Tag.Lookup("toml")
-		if !ok {
-			k = fieldType.Name
-		}
+		k := fieldType.Name
+
+		tag := fieldType.Tag.Get("toml")
 
 		// special field name to skip field
-		if k == "-" {
+		if tag == "-" {
 			continue
+		}
+
+		name, opts := parseTag(tag)
+		if isValidName(name) {
+			k = name
 		}
 
 		f := v.Field(i)
@@ -560,12 +562,10 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 		}
 
 		options := valueOptions{
-			multiline: fieldBoolTag(fieldType, "multiline"),
+			multiline: opts.multiline,
 		}
 
-		inline := fieldBoolTag(fieldType, "inline")
-
-		if inline || !willConvertToTableOrArrayTable(ctx, f) {
+		if opts.inline || !willConvertToTableOrArrayTable(ctx, f) {
 			t.pushKV(k, f, options)
 		} else {
 			t.pushTable(k, f, options)
@@ -573,6 +573,53 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 	}
 
 	return enc.encodeTable(b, ctx, t)
+}
+
+func isValidName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		switch {
+		case strings.ContainsRune("!#$%&()*+-./:;<=>?@[]^_{|}~ ", c):
+			// Backslash and quote chars are reserved, but
+			// otherwise any punctuation chars are allowed
+			// in a tag name.
+		case !unicode.IsLetter(c) && !unicode.IsDigit(c):
+			return false
+		}
+	}
+	return true
+}
+
+type tagOptions struct {
+	multiline bool
+	inline    bool
+}
+
+func parseTag(tag string) (string, tagOptions) {
+	opts := tagOptions{}
+	if idx := strings.Index(tag, ","); idx != -1 {
+		raw := tag[idx+1:]
+		tag = string(tag[:idx])
+		for raw != "" {
+			var o string
+			i := strings.Index(raw, ",")
+			if i >= 0 {
+				o, raw = raw[:i], raw[i+1:]
+			} else {
+				o, raw = raw, ""
+			}
+			switch o {
+			case "multiline":
+				opts.multiline = true
+			case "inline":
+				opts.inline = true
+			}
+		}
+
+	}
+	return tag, opts
 }
 
 func fieldBoolTag(field reflect.StructField, tag string) bool {
