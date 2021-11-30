@@ -2629,6 +2629,10 @@ world'`,
 			data: `a=2021-00-11`,
 		},
 		{
+			desc: `invalid number of seconds digits with trailling digit`,
+			data: `a=0000-01-01 00:00:000000Z3`,
+		},
+		{
 			desc: `carriage return inside basic key`,
 			data: "\"\r\"=42",
 		},

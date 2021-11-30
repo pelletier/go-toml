@@ -99,9 +99,14 @@ func parseDateTime(b []byte) (time.Time, error) {
 		if len(b) != dateTimeByteLen {
 			return time.Time{}, newDecodeError(b, "invalid date-time timezone")
 		}
-		direction := 1
-		if b[0] == '-' {
+		var direction int
+		switch b[0] {
+		case '-':
 			direction = -1
+		case '+':
+			direction = +1
+		default:
+			return time.Time{}, newDecodeError(b[:1], "invalid timezone offset character")
 		}
 
 		hours := digitsToInt(b[1:3])
@@ -202,26 +207,26 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	}
 
 	if t.Second > 59 {
-		return t, nil, newDecodeError(b[3:5], "seconds cannot be greater 59")
+		return t, nil, newDecodeError(b[6:8], "seconds cannot be greater 59")
 	}
 
-	const minLengthWithFrac = 9
-	if len(b) >= minLengthWithFrac && b[minLengthWithFrac-1] == '.' {
+	b = b[8:]
+
+	if len(b) >= 1 && b[0] == '.' {
 		frac := 0
 		digits := 0
 
-		for i, c := range b[minLengthWithFrac:] {
+		for i, c := range b[1:] {
 			if !isDigit(c) {
 				if i == 0 {
-					return t, nil, newDecodeError(b[i:i+1], "need at least one digit after fraction point")
+					return t, nil, newDecodeError(b[0:1], "need at least one digit after fraction point")
 				}
-
 				break
 			}
 
 			const maxFracPrecision = 9
 			if i >= maxFracPrecision {
-				return t, nil, newDecodeError(b[i:i+1], "maximum precision for date time is nanosecond")
+				return t, nil, newDecodeError(b[i-1:i], "maximum precision for date time is nanosecond")
 			}
 
 			frac *= 10
@@ -230,16 +235,15 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		}
 
 		if digits == 0 {
-			return t, nil, newDecodeError(b[minLengthWithFrac-1:minLengthWithFrac], "nanoseconds need at least one digit")
+			return t, nil, newDecodeError(b[:1], "nanoseconds need at least one digit")
 		}
 
 		t.Nanosecond = frac * nspow[digits]
 		t.Precision = digits
 
-		return t, b[9+digits:], nil
+		return t, b[1+digits:], nil
 	}
-
-	return t, b[8:], nil
+	return t, b, nil
 }
 
 //nolint:cyclop
