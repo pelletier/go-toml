@@ -862,7 +862,6 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		return p.scanIntOrFloat(b)
 	}
 
-	//nolint:gomnd
 	if len(b) < 3 {
 		return p.scanIntOrFloat(b)
 	}
