@@ -571,7 +571,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			desc:  "multiline basic string with windows newline",
-			input: "A = \"\"\"\r\nTest\"\"\"",
+			input: "A = \"\"\"\r\nTe\r\nst\"\"\"",
 			gen: func() test {
 				type doc struct {
 					A string
@@ -579,7 +579,7 @@ func TestUnmarshal(t *testing.T) {
 
 				return test{
 					target:   &doc{},
-					expected: &doc{A: "Test"},
+					expected: &doc{A: "Te\r\nst"},
 				}
 			},
 		},
@@ -2651,6 +2651,14 @@ world'`,
 		{
 			desc: `carriage return inside literal string`,
 			data: "A = '\r'",
+		},
+		{
+			desc: `carriage return inside multiline literal string`,
+			data: "a='''\r'''",
+		},
+		{
+			desc: `carriage return at trail of multiline literal string`,
+			data: "a='''\r",
 		},
 		{
 			desc: `carriage return in comment`,

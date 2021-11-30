@@ -76,30 +76,42 @@ func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	// mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
 	// mll-quotes = 1*2apostrophe
 	for i := 3; i < len(b); {
-		if scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
-			i += 3
+		switch b[i] {
+		case '\'':
+			if scanFollowsMultilineLiteralStringDelimiter(b[i:]) {
+				i += 3
 
-			// At that point we found 3 apostrophe, and i is the
-			// index of the byte after the third one. The scanner
-			// needs to be eager, because there can be an extra 2
-			// apostrophe that can be accepted at the end of the
-			// string.
+				// At that point we found 3 apostrophe, and i is the
+				// index of the byte after the third one. The scanner
+				// needs to be eager, because there can be an extra 2
+				// apostrophe that can be accepted at the end of the
+				// string.
 
-			if i >= len(b) || b[i] != '\'' {
+				if i >= len(b) || b[i] != '\'' {
+					return b[:i], b[i:], nil
+				}
+				i++
+
+				if i >= len(b) || b[i] != '\'' {
+					return b[:i], b[i:], nil
+				}
+				i++
+
+				if i < len(b) && b[i] == '\'' {
+					return nil, nil, newDecodeError(b[i-3:i+1], "''' not allowed in multiline literal string")
+				}
+
 				return b[:i], b[i:], nil
 			}
-			i++
-
-			if i >= len(b) || b[i] != '\'' {
-				return b[:i], b[i:], nil
+		case '\r':
+			if len(b) < i+2 {
+				return nil, nil, newDecodeError(b[len(b):], `need a \n after \r`)
 			}
-			i++
-
-			if i < len(b) && b[i] == '\'' {
-				return nil, nil, newDecodeError(b[i-3:i+1], "''' not allowed in multiline literal string")
+			if b[i+1] != '\n' {
+				return nil, nil, newDecodeError(b[i:i+2], `need a \n after \r`)
 			}
-
-			return b[:i], b[i:], nil
+			i += 2 // skip the \n
+			continue
 		}
 		size := utf8ValidNext(b[i:])
 		if size == 0 {
