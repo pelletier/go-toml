@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:funlen
 func TestMarshal(t *testing.T) {
 	someInt := 42
 
@@ -733,6 +732,37 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 [parent]
 >>>hello = 'world'`
 	equalStringsIgnoreNewlines(t, expected, w.String())
+}
+
+func TestEncoderOmitempty(t *testing.T) {
+
+	type doc struct {
+		String string            `toml:",omitempty"`
+		Bool   bool              `toml:",omitempty"`
+		Int    int               `toml:",omitempty"`
+		Int8   int8              `toml:",omitempty"`
+		Int16  int16             `toml:",omitempty"`
+		Int32  int32             `toml:",omitempty"`
+		Int64  int64             `toml:",omitempty"`
+		Uint   uint              `toml:",omitempty"`
+		Uint8  uint8             `toml:",omitempty"`
+		Uint16 uint16            `toml:",omitempty"`
+		Uint32 uint32            `toml:",omitempty"`
+		Uint64 uint64            `toml:",omitempty"`
+		MapNil map[string]string `toml:",omitempty"`
+		Slice  []string          `toml:",omitempty"`
+		Ptr    *string           `toml:",omitempty"`
+		Iface  interface{}       `toml:",omitempty"`
+	}
+
+	d := doc{}
+
+	b, err := toml.Marshal(d)
+	require.NoError(t, err)
+
+	expected := ``
+
+	equalStringsIgnoreNewlines(t, expected, string(b))
 }
 
 func TestIssue436(t *testing.T) {

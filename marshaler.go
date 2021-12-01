@@ -125,6 +125,9 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 //
 // The "inline" option turns fields that would be emitted as tables
 // into inline tables instead. It has no effect on other fields.
+//
+// The "omitempty" option prevents empty values or groups from being
+// emitted.
 func (enc *Encoder) Encode(v interface{}) error {
 	var (
 		b   []byte
@@ -152,6 +155,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 
 type valueOptions struct {
 	multiline bool
+	omitempty bool
 }
 
 type encoderCtx struct {
@@ -298,6 +302,11 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 	if !ctx.hasKey {
 		panic("caller of encodeKv should have set the key in the context")
 	}
+
+	if (ctx.options.omitempty || options.omitempty) && isEmptyValue(v) {
+		return b, nil
+	}
+
 	b = enc.indent(ctx.indent, b)
 
 	b, err = enc.encodeKey(b, ctx.key)
@@ -320,6 +329,24 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 	}
 
 	return b, nil
+}
+
+func isEmptyValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
+		return v.Len() == 0
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Interface, reflect.Ptr:
+		return v.IsNil()
+	}
+	return false
 }
 
 const literalQuote = '\''
@@ -531,7 +558,7 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	var t table
 
-	// TODO: cache this?
+	// TODO: cache this
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
 		fieldType := typ.Field(i)
@@ -563,6 +590,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 
 		options := valueOptions{
 			multiline: opts.multiline,
+			omitempty: opts.omitempty,
 		}
 
 		if opts.inline || !willConvertToTableOrArrayTable(ctx, f) {
@@ -595,30 +623,37 @@ func isValidName(s string) bool {
 type tagOptions struct {
 	multiline bool
 	inline    bool
+	omitempty bool
 }
 
 func parseTag(tag string) (string, tagOptions) {
 	opts := tagOptions{}
-	if idx := strings.Index(tag, ","); idx != -1 {
-		raw := tag[idx+1:]
-		tag = string(tag[:idx])
-		for raw != "" {
-			var o string
-			i := strings.Index(raw, ",")
-			if i >= 0 {
-				o, raw = raw[:i], raw[i+1:]
-			} else {
-				o, raw = raw, ""
-			}
-			switch o {
-			case "multiline":
-				opts.multiline = true
-			case "inline":
-				opts.inline = true
-			}
-		}
 
+	idx := strings.Index(tag, ",")
+	if idx == -1 {
+		return tag, opts
 	}
+
+	raw := tag[idx+1:]
+	tag = string(tag[:idx])
+	for raw != "" {
+		var o string
+		i := strings.Index(raw, ",")
+		if i >= 0 {
+			o, raw = raw[:i], raw[i+1:]
+		} else {
+			o, raw = raw, ""
+		}
+		switch o {
+		case "multiline":
+			opts.multiline = true
+		case "inline":
+			opts.inline = true
+		case "omitempty":
+			opts.omitempty = true
+		}
+	}
+
 	return tag, opts
 }
 
