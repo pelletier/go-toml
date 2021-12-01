@@ -2633,6 +2633,10 @@ world'`,
 			data: `a=0000-01-01 00:00:000000Z3`,
 		},
 		{
+			desc: `invalid number of seconds`,
+			data: `a=0000-01-01 00:00:00+27000`,
+		},
+		{
 			desc: `carriage return inside basic key`,
 			data: "\"\r\"=42",
 		},
