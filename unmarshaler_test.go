@@ -2698,6 +2698,34 @@ world'`,
 	}
 }
 
+func TesUnmarshaltTags(t *testing.T) {
+	type doc struct {
+		Dash   string `toml:"-,"`
+		Ignore string `toml:"-"`
+		A      string `toml:"hello"`
+		B      string `toml:"comma,omitempty"`
+	}
+
+	data := `
+'-' = "dash"
+Ignore = 'me'
+hello = 'content'
+comma = 'ok'
+`
+
+	d := doc{}
+	expected := doc{
+		Dash:   "dash",
+		Ignore: "me",
+		A:      "content",
+		B:      "ok",
+	}
+
+	err := toml.Unmarshal([]byte(data), &d)
+	require.NoError(t, err)
+	require.Equal(t, expected, d)
+}
+
 func TestASCIIControlCharacters(t *testing.T) {
 	invalidCharacters := []byte{0x7F}
 	for c := byte(0x0); c <= 0x08; c++ {
