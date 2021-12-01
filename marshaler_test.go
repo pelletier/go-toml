@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
@@ -193,9 +194,9 @@ name = 'Alice'
 		{
 			desc: "string escapes",
 			v: map[string]interface{}{
-				"a": `'"\`,
+				"a": "'\b\f\r\t\"\\",
 			},
-			expected: `a = "'\"\\"`,
+			expected: `a = "'\b\f\r\t\"\\"`,
 		},
 		{
 			desc: "string utf8 low",
@@ -470,6 +471,28 @@ hello = 'world'`,
 			err: true,
 		},
 		{
+			desc: "time",
+			v: struct {
+				T time.Time
+			}{
+				T: time.Time{},
+			},
+			expected: `T = '0001-01-01T00:00:00Z'`,
+		},
+		{
+			desc: "bool",
+			v: struct {
+				A bool
+				B bool
+			}{
+				A: false,
+				B: true,
+			},
+			expected: `
+A = false
+B = true`,
+		},
+		{
 			desc: "numbers",
 			v: struct {
 				A float32
@@ -483,6 +506,7 @@ hello = 'world'`,
 				I int16
 				J int8
 				K int
+				L float64
 			}{
 				A: 1.1,
 				B: 42,
@@ -495,6 +519,7 @@ hello = 'world'`,
 				I: 42,
 				J: 42,
 				K: 42,
+				L: 2.2,
 			},
 			expected: `
 A = 1.1
@@ -507,7 +532,8 @@ G = 42
 H = 42
 I = 42
 J = 42
-K = 42`,
+K = 42
+L = 2.2`,
 		},
 	}
 

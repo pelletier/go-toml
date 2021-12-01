@@ -205,7 +205,6 @@ func (ctx *encoderCtx) isRoot() bool {
 	return len(ctx.parentKey) == 0 && !ctx.hasKey
 }
 
-//nolint:cyclop,funlen
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	if !v.IsZero() {
 		i, ok := v.Interface().(time.Time)
