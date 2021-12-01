@@ -735,24 +735,26 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 }
 
 func TestEncoderOmitempty(t *testing.T) {
-
 	type doc struct {
-		String string            `toml:",omitempty"`
-		Bool   bool              `toml:",omitempty"`
-		Int    int               `toml:",omitempty"`
-		Int8   int8              `toml:",omitempty"`
-		Int16  int16             `toml:",omitempty"`
-		Int32  int32             `toml:",omitempty"`
-		Int64  int64             `toml:",omitempty"`
-		Uint   uint              `toml:",omitempty"`
-		Uint8  uint8             `toml:",omitempty"`
-		Uint16 uint16            `toml:",omitempty"`
-		Uint32 uint32            `toml:",omitempty"`
-		Uint64 uint64            `toml:",omitempty"`
-		MapNil map[string]string `toml:",omitempty"`
-		Slice  []string          `toml:",omitempty"`
-		Ptr    *string           `toml:",omitempty"`
-		Iface  interface{}       `toml:",omitempty"`
+		String  string            `toml:",omitempty,multiline"`
+		Bool    bool              `toml:",omitempty,multiline"`
+		Int     int               `toml:",omitempty,multiline"`
+		Int8    int8              `toml:",omitempty,multiline"`
+		Int16   int16             `toml:",omitempty,multiline"`
+		Int32   int32             `toml:",omitempty,multiline"`
+		Int64   int64             `toml:",omitempty,multiline"`
+		Uint    uint              `toml:",omitempty,multiline"`
+		Uint8   uint8             `toml:",omitempty,multiline"`
+		Uint16  uint16            `toml:",omitempty,multiline"`
+		Uint32  uint32            `toml:",omitempty,multiline"`
+		Uint64  uint64            `toml:",omitempty,multiline"`
+		Float32 float32           `toml:",omitempty,multiline"`
+		Float64 float64           `toml:",omitempty,multiline"`
+		MapNil  map[string]string `toml:",omitempty,multiline"`
+		Slice   []string          `toml:",omitempty,multiline"`
+		Ptr     *string           `toml:",omitempty,multiline"`
+		Iface   interface{}       `toml:",omitempty,multiline"`
+		Struct  struct{}          `toml:",omitempty,multiline"`
 	}
 
 	d := doc{}
@@ -760,7 +762,28 @@ func TestEncoderOmitempty(t *testing.T) {
 	b, err := toml.Marshal(d)
 	require.NoError(t, err)
 
-	expected := ``
+	expected := `[Struct]`
+
+	equalStringsIgnoreNewlines(t, expected, string(b))
+}
+
+func TestEncoderTagFieldName(t *testing.T) {
+	type doc struct {
+		String string `toml:"hello"`
+		OkSym  string `toml:"#"`
+		Bad    string `toml:"\"`
+	}
+
+	d := doc{String: "world"}
+
+	b, err := toml.Marshal(d)
+	require.NoError(t, err)
+
+	expected := `
+hello = 'world'
+'#' = ''
+Bad = ''
+`
 
 	equalStringsIgnoreNewlines(t, expected, string(b))
 }

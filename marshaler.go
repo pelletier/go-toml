@@ -657,13 +657,6 @@ func parseTag(tag string) (string, tagOptions) {
 	return tag, opts
 }
 
-func fieldBoolTag(field reflect.StructField, tag string) bool {
-	x, ok := field.Tag.Lookup(tag)
-
-	return ok && x == "true"
-}
-
-//nolint:cyclop
 func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
