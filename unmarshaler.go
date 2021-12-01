@@ -1163,8 +1163,15 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 			continue
 		}
 
-		name, ok := f.Tag.Lookup("toml")
-		if !ok {
+		name := f.Tag.Get("toml")
+		if name == "-" {
+			continue
+		}
+
+		if i := strings.IndexByte(name, ','); i >= 0 {
+			name = name[:i]
+		}
+		if name == "" {
 			name = f.Name
 		}
 
