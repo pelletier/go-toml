@@ -109,6 +109,10 @@ func parseDateTime(b []byte) (time.Time, error) {
 			return time.Time{}, newDecodeError(b[:1], "invalid timezone offset character")
 		}
 
+		if b[3] != ':' {
+			return time.Time{}, newDecodeError(b[3:4], "expected a : separator")
+		}
+
 		hours := digitsToInt(b[1:3])
 		minutes := digitsToInt(b[4:6])
 		seconds := direction * (hours*3600 + minutes*60)
