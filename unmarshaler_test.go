@@ -2698,7 +2698,7 @@ world'`,
 	}
 }
 
-func TesUnmarshaltTags(t *testing.T) {
+func TestUnmarshalTags(t *testing.T) {
 	type doc struct {
 		Dash   string `toml:"-,"`
 		Ignore string `toml:"-"`
@@ -2716,7 +2716,7 @@ comma = 'ok'
 	d := doc{}
 	expected := doc{
 		Dash:   "dash",
-		Ignore: "me",
+		Ignore: "",
 		A:      "content",
 		B:      "ok",
 	}
