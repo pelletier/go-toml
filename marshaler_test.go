@@ -7,18 +7,18 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:funlen
 func TestMarshal(t *testing.T) {
 	someInt := 42
 
 	type structInline struct {
-		A interface{} `inline:"true"`
+		A interface{} `toml:",inline"`
 	}
 
 	examples := []struct {
@@ -194,9 +194,9 @@ name = 'Alice'
 		{
 			desc: "string escapes",
 			v: map[string]interface{}{
-				"a": `'"\`,
+				"a": "'\b\f\r\t\"\\",
 			},
-			expected: `a = "'\"\\"`,
+			expected: `a = "'\b\f\r\t\"\\"`,
 		},
 		{
 			desc: "string utf8 low",
@@ -243,7 +243,7 @@ name = 'Alice'
 		{
 			desc: "multi-line forced",
 			v: struct {
-				A string `multiline:"true"`
+				A string `toml:",multiline"`
 			}{
 				A: "hello\nworld",
 			},
@@ -254,7 +254,7 @@ world"""`,
 		{
 			desc: "inline field",
 			v: struct {
-				A map[string]string `inline:"true"`
+				A map[string]string `toml:",inline"`
 				B map[string]string
 			}{
 				A: map[string]string{
@@ -273,7 +273,7 @@ isinline = 'no'
 		{
 			desc: "mutiline array int",
 			v: struct {
-				A []int `multiline:"true"`
+				A []int `toml:",multiline"`
 				B []int
 			}{
 				A: []int{1, 2, 3, 4},
@@ -292,7 +292,7 @@ B = [1, 2, 3, 4]
 		{
 			desc: "mutiline array in array",
 			v: struct {
-				A [][]int `multiline:"true"`
+				A [][]int `toml:",multiline"`
 			}{
 				A: [][]int{{1, 2}, {3, 4}},
 			},
@@ -471,6 +471,28 @@ hello = 'world'`,
 			err: true,
 		},
 		{
+			desc: "time",
+			v: struct {
+				T time.Time
+			}{
+				T: time.Time{},
+			},
+			expected: `T = '0001-01-01T00:00:00Z'`,
+		},
+		{
+			desc: "bool",
+			v: struct {
+				A bool
+				B bool
+			}{
+				A: false,
+				B: true,
+			},
+			expected: `
+A = false
+B = true`,
+		},
+		{
 			desc: "numbers",
 			v: struct {
 				A float32
@@ -484,6 +506,7 @@ hello = 'world'`,
 				I int16
 				J int8
 				K int
+				L float64
 			}{
 				A: 1.1,
 				B: 42,
@@ -496,6 +519,7 @@ hello = 'world'`,
 				I: 42,
 				J: 42,
 				K: 42,
+				L: 2.2,
 			},
 			expected: `
 A = 1.1
@@ -508,7 +532,8 @@ G = 42
 H = 42
 I = 42
 J = 42
-K = 42`,
+K = 42
+L = 2.2`,
 		},
 	}
 
@@ -733,6 +758,60 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 [parent]
 >>>hello = 'world'`
 	equalStringsIgnoreNewlines(t, expected, w.String())
+}
+
+func TestEncoderOmitempty(t *testing.T) {
+	type doc struct {
+		String  string            `toml:",omitempty,multiline"`
+		Bool    bool              `toml:",omitempty,multiline"`
+		Int     int               `toml:",omitempty,multiline"`
+		Int8    int8              `toml:",omitempty,multiline"`
+		Int16   int16             `toml:",omitempty,multiline"`
+		Int32   int32             `toml:",omitempty,multiline"`
+		Int64   int64             `toml:",omitempty,multiline"`
+		Uint    uint              `toml:",omitempty,multiline"`
+		Uint8   uint8             `toml:",omitempty,multiline"`
+		Uint16  uint16            `toml:",omitempty,multiline"`
+		Uint32  uint32            `toml:",omitempty,multiline"`
+		Uint64  uint64            `toml:",omitempty,multiline"`
+		Float32 float32           `toml:",omitempty,multiline"`
+		Float64 float64           `toml:",omitempty,multiline"`
+		MapNil  map[string]string `toml:",omitempty,multiline"`
+		Slice   []string          `toml:",omitempty,multiline"`
+		Ptr     *string           `toml:",omitempty,multiline"`
+		Iface   interface{}       `toml:",omitempty,multiline"`
+		Struct  struct{}          `toml:",omitempty,multiline"`
+	}
+
+	d := doc{}
+
+	b, err := toml.Marshal(d)
+	require.NoError(t, err)
+
+	expected := `[Struct]`
+
+	equalStringsIgnoreNewlines(t, expected, string(b))
+}
+
+func TestEncoderTagFieldName(t *testing.T) {
+	type doc struct {
+		String string `toml:"hello"`
+		OkSym  string `toml:"#"`
+		Bad    string `toml:"\"`
+	}
+
+	d := doc{String: "world"}
+
+	b, err := toml.Marshal(d)
+	require.NoError(t, err)
+
+	expected := `
+hello = 'world'
+'#' = ''
+Bad = ''
+`
+
+	equalStringsIgnoreNewlines(t, expected, string(b))
 }
 
 func TestIssue436(t *testing.T) {
