@@ -2633,6 +2633,14 @@ world'`,
 			data: `a=0000-01-01 00:00:000000Z3`,
 		},
 		{
+			desc: `invalid character in zone offset hours`,
+			data: `a=0000-01-01 00:00:00+0Z:00`,
+		},
+		{
+			desc: `invalid character in zone offset minutes`,
+			data: `a=0000-01-01 00:00:00+00:0Z`,
+		},
+		{
 			desc: `invalid number of seconds`,
 			data: `a=0000-01-01 00:00:00+27000`,
 		},
