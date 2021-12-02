@@ -886,18 +886,6 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 	return p.scanIntOrFloat(b)
 }
 
-func digitsToInt(b []byte) int {
-	x := 0
-
-	for _, d := range b {
-		x *= 10
-		x += int(d - '0')
-	}
-
-	return x
-}
-
-//nolint:gocognit,cyclop
 func (p *parser) scanDateTime(b []byte) (ast.Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.

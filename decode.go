@@ -113,8 +113,15 @@ func parseDateTime(b []byte) (time.Time, error) {
 			return time.Time{}, newDecodeError(b[3:4], "expected a : separator")
 		}
 
-		hours := digitsToInt(b[1:3])
-		minutes := digitsToInt(b[4:6])
+		hours, err := parseDecimalDigits(b[1:3])
+		if err != nil {
+			return time.Time{}, err
+		}
+		minutes, err := parseDecimalDigits(b[4:6])
+		if err != nil {
+			return time.Time{}, err
+		}
+
 		seconds := direction * (hours*3600 + minutes*60)
 		zone = time.FixedZone("", seconds)
 		b = b[dateTimeByteLen:]
