@@ -117,9 +117,16 @@ func parseDateTime(b []byte) (time.Time, error) {
 		if err != nil {
 			return time.Time{}, err
 		}
+		if hours > 24 {
+			return time.Time{}, newDecodeError(b[:1], "invalid timezone offset hours")
+		}
+
 		minutes, err := parseDecimalDigits(b[4:6])
 		if err != nil {
 			return time.Time{}, err
+		}
+		if minutes > 60 {
+			return time.Time{}, newDecodeError(b[:1], "invalid timezone offset minutes")
 		}
 
 		seconds := direction * (hours*3600 + minutes*60)
