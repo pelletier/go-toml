@@ -2306,8 +2306,16 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 			data: `flt8 = 224_617.445_991__228`,
 		},
 		{
-			desc: "float with double _",
+			desc: "float with double .",
 			data: `flt8 = 1..2`,
+		},
+		{
+			desc: "number with plus sign and leading underscore",
+			data: `a = +_0`,
+		},
+		{
+			desc: "number with negative sign and leading underscore",
+			data: `a = -_0`,
 		},
 		{
 			desc: "int with wrong base",
