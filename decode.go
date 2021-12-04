@@ -386,8 +386,13 @@ func parseIntDec(b []byte) (int64, error) {
 }
 
 func checkAndRemoveUnderscoresIntegers(b []byte) ([]byte, error) {
-	if b[0] == '_' {
-		return nil, newDecodeError(b[0:1], "number cannot start with underscore")
+	start := 0
+	if b[start] == '+' || b[start] == '-' {
+		start++
+	}
+
+	if b[start] == '_' {
+		return nil, newDecodeError(b[start:start+1], "number cannot start with underscore")
 	}
 
 	if b[len(b)-1] == '_' {
