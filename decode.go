@@ -224,8 +224,8 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		return t, nil, err
 	}
 
-	if t.Second > 59 {
-		return t, nil, newDecodeError(b[6:8], "seconds cannot be greater 59")
+	if t.Second > 60 {
+		return t, nil, newDecodeError(b[6:8], "seconds cannot be greater 60")
 	}
 
 	b = b[8:]
