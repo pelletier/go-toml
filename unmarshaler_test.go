@@ -2318,6 +2318,14 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 			data: `a = -_0`,
 		},
 		{
+			desc: "exponent with plus sign and leading underscore",
+			data: `a = 0e+_0`,
+		},
+		{
+			desc: "exponent with negative sign and leading underscore",
+			data: `a = 0e-_0`,
+		},
+		{
 			desc: "int with wrong base",
 			data: `a = 0f2`,
 		},
