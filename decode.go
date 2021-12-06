@@ -465,6 +465,10 @@ func checkAndRemoveUnderscoresFloats(b []byte) ([]byte, error) {
 				return nil, newDecodeError(b[i+1:i+2], "cannot have underscore before exponent")
 			}
 			before = false
+		case '+', '-':
+			// signed exponents
+			cleaned = append(cleaned, c)
+			before = false
 		case 'e', 'E':
 			if i < len(b)-1 && b[i+1] == '_' {
 				return nil, newDecodeError(b[i+1:i+2], "cannot have underscore after exponent")
