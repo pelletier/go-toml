@@ -2424,7 +2424,7 @@ world'`,
 		{
 			desc: "invalid seconds value",
 			data: `a=1979-05-27T12:45:99`,
-			msg:  `seconds cannot be greater 59`,
+			msg:  `seconds cannot be greater 60`,
 		},
 		{
 			desc: `binary with invalid digit`,
