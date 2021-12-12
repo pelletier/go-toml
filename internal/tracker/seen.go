@@ -145,6 +145,11 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 
 		if idx < 0 {
 			idx = s.create(parentIdx, k, tableKind, false)
+		} else {
+			entry := s.entries[idx]
+			if entry.kind == valueKind {
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
+			}
 		}
 		parentIdx = idx
 	}
@@ -186,7 +191,13 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 
 		if idx < 0 {
 			idx = s.create(parentIdx, k, tableKind, false)
+		} else {
+			entry := s.entries[idx]
+			if entry.kind == valueKind {
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
+			}
 		}
+
 		parentIdx = idx
 	}
 
@@ -281,6 +292,14 @@ func (s *SeenTracker) checkInlineTable(parentIdx int, node *ast.Node) error {
 			return err
 		}
 	}
+
+	// As inline tables are self-contained, the tracker does not
+	// need to retain the details of what they contain. The
+	// keyValue element that creates the inline table is kept to
+	// mark the presence of the inline table and prevent
+	// redefinition of its keys: check* functions cannot walk into
+	// a value.
+	s.clear(parentIdx)
 	return nil
 }
 

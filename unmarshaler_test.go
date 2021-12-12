@@ -2270,7 +2270,34 @@ Program = "hugo"
 	require.Equal(t, expected, p)
 }
 
-//nolint:funlen
+func TestIssue701(t *testing.T) {
+	// Expected behavior:
+	// Return an error since a cannot be modified. From the TOML spec:
+	//
+	// > Inline tables are fully self-contained and define all
+	// keys and sub-tables within them. Keys and sub-tables cannot
+	// be added outside the braces.
+
+	docs := []string{
+		`
+a={}
+[a.b]
+z=0
+`,
+		`
+a={}
+[[a.b]]
+z=0
+`,
+	}
+
+	for _, doc := range docs {
+		var v interface{}
+		err := toml.Unmarshal([]byte(doc), &v)
+		assert.Error(t, err)
+	}
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
