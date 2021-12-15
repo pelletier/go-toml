@@ -3,6 +3,7 @@ package tracker
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/pelletier/go-toml/v2/internal/ast"
 )
@@ -58,6 +59,19 @@ type SeenTracker struct {
 	nextID     int
 }
 
+var pool sync.Pool
+
+func (s *SeenTracker) reset() {
+	// Skip ID = 0 to remove the confusion between nodes whose
+	// parent has id 0 and root nodes (parent id is 0 because it's
+	// the zero value).
+	s.nextID = 1
+	// Start unscoped, so idx is negative.
+	s.currentIdx = -1
+	s.lastIdx = -1
+	s.entries = s.entries[:0]
+}
+
 type entry struct {
 	id       int
 	parent   int
@@ -109,17 +123,11 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 // consistent.
 func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 	if s.entries == nil {
-		// Skip ID = 0 to remove the confusion between nodes whose
-		// parent has id 0 and root nodes (parent id is 0 because it's
-		// the zero value).
-		s.nextID = 1
-		// Start unscoped, so idx is negative.
-		s.currentIdx = -1
-		s.lastIdx = -1
+		s.reset()
 	}
 	switch node.Kind {
 	case ast.KeyValue:
-		return s.checkKeyValue(s.currentIdx, node)
+		return s.checkKeyValue(node)
 	case ast.Table:
 		return s.checkTable(node)
 	case ast.ArrayTable:
@@ -247,7 +255,8 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 	return nil
 }
 
-func (s *SeenTracker) checkKeyValue(parentIdx int, node *ast.Node) error {
+func (s *SeenTracker) checkKeyValue(node *ast.Node) error {
+	parentIdx := s.currentIdx
 	it := node.Key()
 
 	for it.Next() {
@@ -277,45 +286,48 @@ func (s *SeenTracker) checkKeyValue(parentIdx int, node *ast.Node) error {
 
 	switch value.Kind {
 	case ast.InlineTable:
-		return s.checkInlineTable(parentIdx, value)
+		return s.checkInlineTable(value)
 	case ast.Array:
-		return s.checkArray(parentIdx, value)
+		return s.checkArray(value)
 	}
 
 	return nil
 }
 
-func (s *SeenTracker) checkArray(parentIdx int, node *ast.Node) error {
-	set := false
+func (s *SeenTracker) checkArray(node *ast.Node) error {
 	it := node.Children()
 	for it.Next() {
-		if set {
-			s.clear(parentIdx)
-		}
 		n := it.Node()
 		switch n.Kind {
 		case ast.InlineTable:
-			err := s.checkInlineTable(parentIdx, n)
+			err := s.checkInlineTable(n)
 			if err != nil {
 				return err
 			}
-			set = true
 		case ast.Array:
-			err := s.checkArray(parentIdx, n)
+			err := s.checkArray(n)
 			if err != nil {
 				return err
 			}
-			set = true
 		}
 	}
 	return nil
 }
 
-func (s *SeenTracker) checkInlineTable(parentIdx int, node *ast.Node) error {
+func (s *SeenTracker) checkInlineTable(node *ast.Node) error {
+	if pool.New == nil {
+		pool.New = func() interface{} {
+			return &SeenTracker{}
+		}
+	}
+
+	s = pool.Get().(*SeenTracker)
+	s.reset()
+
 	it := node.Children()
 	for it.Next() {
 		n := it.Node()
-		err := s.checkKeyValue(parentIdx, n)
+		err := s.checkKeyValue(n)
 		if err != nil {
 			return err
 		}
@@ -327,7 +339,7 @@ func (s *SeenTracker) checkInlineTable(parentIdx int, node *ast.Node) error {
 	// mark the presence of the inline table and prevent
 	// redefinition of its keys: check* functions cannot walk into
 	// a value.
-	s.clear(parentIdx)
+	pool.Put(s)
 	return nil
 }
 
