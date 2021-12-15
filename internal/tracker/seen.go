@@ -99,11 +99,11 @@ func (s *SeenTracker) clear(idx int) {
 	}
 
 	for i := s.entries[idx].child; i >= 0; {
-		//s.entries[i].name = nil // TODO: helpful for gc?
 		next := s.entries[i].next
 		n := s.entries[0].next
 		s.entries[0].next = i
 		s.entries[i].next = n
+		s.entries[i].name = nil
 		s.clear(i)
 		i = next
 	}
