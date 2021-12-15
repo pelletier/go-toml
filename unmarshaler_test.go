@@ -2129,7 +2129,7 @@ xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
 
 	expected := doc{
 		Pkg: map[string]pkg{
-			"cargo": pkg{
+			"cargo": {
 				Target: map[string]target{
 					"aarch64-apple-darwin": {
 						XZ_URL: "https://static.rust-lang.org/dist/2021-07-29/cargo-1.54.0-aarch64-apple-darwin.tar.xz",
@@ -2296,6 +2296,12 @@ z=0
 		err := toml.Unmarshal([]byte(doc), &v)
 		assert.Error(t, err)
 	}
+}
+
+func TestIssue703(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte("[a]\nx.y=0\n[a.x]"), &v)
+	require.Error(t, err)
 }
 
 func TestUnmarshalDecodeErrors(t *testing.T) {
