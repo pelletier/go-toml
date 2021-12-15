@@ -54,24 +54,44 @@ func (k keyKind) String() string {
 // This results in more copies in that case.
 type SeenTracker struct {
 	entries    []entry
+	free       []int
 	currentIdx int
-	lastIdx    int
 }
 
 var pool sync.Pool
 
 func (s *SeenTracker) reset() {
-	// Start unscoped, so idx is negative.
-	s.currentIdx = -1
-	s.lastIdx = -1
-	s.entries = s.entries[:0]
+	// Always contains a root element at index 0.
+	s.currentIdx = 0
+	if len(s.entries) == 0 {
+		s.entries = make([]entry, 1, 2)
+	} else {
+		s.entries = s.entries[:1]
+	}
+	s.entries[0].child = -1
+	s.entries[0].next = -1
+	s.free = s.free[:0]
 }
 
 type entry struct {
-	parent   int
+	// Use -1 to indicate no child or no sibling.
+	child int
+	next  int
+
 	name     []byte
 	kind     keyKind
 	explicit bool
+}
+
+// Find the index of the child of parentIdx with key k. Returns -1 if
+// it does not exist.
+func (s *SeenTracker) find(parentIdx int, k []byte) int {
+	for i := s.entries[parentIdx].child; i >= 0; i = s.entries[i].next {
+		if bytes.Equal(s.entries[i].name, k) {
+			return i
+		}
+	}
+	return -1
 }
 
 // Remove all descendants of node at position idx.
@@ -79,27 +99,45 @@ func (s *SeenTracker) clear(idx int) {
 	if idx >= len(s.entries) {
 		return
 	}
-	for i := idx + 1; i < len(s.entries); i++ {
-		if s.entries[i].parent == idx {
-			s.entries[i].explicit = false
-			s.entries[i].parent = -1
-			s.entries[i].name = nil
-			s.entries[i].kind = invalidKind
-			s.clear(i)
-		}
+
+	for i := s.entries[idx].child; i >= 0; i = s.entries[i].next {
+		//s.entries[i].name = nil // TODO: helpful for gc?
+		s.free = append(s.free, i)
+		s.clear(i)
 	}
+
+	s.entries[idx].child = -1
 }
 
 func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit bool) int {
-	idx := len(s.entries)
-	s.entries = append(s.entries, entry{
-		parent:   parentIdx,
+	e := entry{
+		child: -1,
+		next:  s.entries[parentIdx].child,
+
 		name:     name,
 		kind:     kind,
 		explicit: explicit,
-	})
-	s.lastIdx = idx
+	}
+	var idx int
+	if len(s.free) > 0 {
+		idx = s.free[len(s.free)-1]
+		s.free = s.free[:len(s.free)-1]
+		s.entries[idx] = e
+	} else {
+		idx = len(s.entries)
+		s.entries = append(s.entries, e)
+	}
+
+	s.entries[parentIdx].child = idx
+
 	return idx
+}
+
+func (s *SeenTracker) setExplicitFlag(parentIdx int) {
+	for i := s.entries[parentIdx].child; i >= 0; i = s.entries[i].next {
+		s.entries[i].explicit = true
+		s.setExplicitFlag(i)
+	}
 }
 
 // CheckExpression takes a top-level node and checks that it does not contain
@@ -121,19 +159,6 @@ func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 	}
 }
 
-func (s *SeenTracker) setExplicitFlag(parentIdx int) {
-	offset := parentIdx + 1
-	for idx, e := range s.entries[offset:] {
-		if offset+idx > s.lastIdx {
-			return
-		}
-		if e.parent == parentIdx {
-			s.entries[offset+idx].explicit = true
-			s.setExplicitFlag(offset + idx)
-		}
-	}
-}
-
 func (s *SeenTracker) checkTable(node *ast.Node) error {
 	if s.currentIdx >= 0 {
 		s.setExplicitFlag(s.currentIdx)
@@ -141,7 +166,7 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 
 	it := node.Key()
 
-	parentIdx := -1
+	parentIdx := 0
 
 	// This code is duplicated in checkArrayTable. This is because factoring
 	// it in a function requires to copy the iterator, or allocate it to the
@@ -183,7 +208,6 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 	}
 
 	s.currentIdx = idx
-	s.lastIdx = idx
 
 	return nil
 }
@@ -195,7 +219,7 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 
 	it := node.Key()
 
-	parentIdx := -1
+	parentIdx := 0
 
 	for it.Next() {
 		if it.IsLast() {
@@ -232,7 +256,6 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 	}
 
 	s.currentIdx = idx
-	s.lastIdx = idx
 
 	return nil
 }
@@ -323,14 +346,4 @@ func (s *SeenTracker) checkInlineTable(node *ast.Node) error {
 	// a value.
 	pool.Put(s)
 	return nil
-}
-
-func (s *SeenTracker) find(parentIdx int, k []byte) int {
-	for i := parentIdx + 1; i < len(s.entries); i++ {
-		if s.entries[i].parent == parentIdx && bytes.Equal(s.entries[i].name, k) {
-			return i
-		}
-	}
-
-	return -1
 }
