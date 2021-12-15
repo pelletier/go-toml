@@ -54,6 +54,7 @@ func (k keyKind) String() string {
 type SeenTracker struct {
 	entries    []entry
 	currentIdx int
+	lastIdx    int
 	nextID     int
 }
 
@@ -99,6 +100,7 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 		explicit: explicit,
 	})
 	s.nextID++
+	s.lastIdx = idx
 	return idx
 }
 
@@ -113,6 +115,7 @@ func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 		s.nextID = 1
 		// Start unscoped, so idx is negative.
 		s.currentIdx = -1
+		s.lastIdx = -1
 	}
 	switch node.Kind {
 	case ast.KeyValue:
@@ -129,10 +132,14 @@ func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 func (s *SeenTracker) setExplicitFlag(parentIdx int) {
 	entry := s.entries[parentIdx]
 	parentId := entry.id
-	for idx, e := range s.entries[parentIdx+1:] {
+	offset := parentIdx + 1
+	for idx, e := range s.entries[offset:] {
+		if offset+idx > s.lastIdx {
+			return
+		}
 		if e.parent == parentId {
-			s.entries[parentIdx+1+idx].explicit = true
-			s.setExplicitFlag(parentIdx + 1 + idx)
+			s.entries[offset+idx].explicit = true
+			s.setExplicitFlag(offset + idx)
 		}
 	}
 }
@@ -186,6 +193,7 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 	}
 
 	s.currentIdx = idx
+	s.lastIdx = idx
 
 	return nil
 }
@@ -234,6 +242,7 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 	}
 
 	s.currentIdx = idx
+	s.lastIdx = idx
 
 	return nil
 }
