@@ -54,7 +54,6 @@ func (k keyKind) String() string {
 // This results in more copies in that case.
 type SeenTracker struct {
 	entries    []entry
-	free       []int
 	currentIdx int
 }
 
@@ -70,7 +69,6 @@ func (s *SeenTracker) reset() {
 	}
 	s.entries[0].child = -1
 	s.entries[0].next = -1
-	s.free = s.free[:0]
 }
 
 type entry struct {
@@ -100,10 +98,14 @@ func (s *SeenTracker) clear(idx int) {
 		return
 	}
 
-	for i := s.entries[idx].child; i >= 0; i = s.entries[i].next {
+	for i := s.entries[idx].child; i >= 0; {
 		//s.entries[i].name = nil // TODO: helpful for gc?
-		s.free = append(s.free, i)
+		next := s.entries[i].next
+		n := s.entries[0].next
+		s.entries[0].next = i
+		s.entries[i].next = n
 		s.clear(i)
+		i = next
 	}
 
 	s.entries[idx].child = -1
@@ -119,9 +121,9 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 		explicit: explicit,
 	}
 	var idx int
-	if len(s.free) > 0 {
-		idx = s.free[len(s.free)-1]
-		s.free = s.free[:len(s.free)-1]
+	if s.entries[0].next >= 0 {
+		idx = s.entries[0].next
+		s.entries[0].next = s.entries[idx].next
 		s.entries[idx] = e
 	} else {
 		idx = len(s.entries)
