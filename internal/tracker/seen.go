@@ -56,16 +56,11 @@ type SeenTracker struct {
 	entries    []entry
 	currentIdx int
 	lastIdx    int
-	nextID     int
 }
 
 var pool sync.Pool
 
 func (s *SeenTracker) reset() {
-	// Skip ID = 0 to remove the confusion between nodes whose
-	// parent has id 0 and root nodes (parent id is 0 because it's
-	// the zero value).
-	s.nextID = 1
 	// Start unscoped, so idx is negative.
 	s.currentIdx = -1
 	s.lastIdx = -1
@@ -73,7 +68,6 @@ func (s *SeenTracker) reset() {
 }
 
 type entry struct {
-	id       int
 	parent   int
 	name     []byte
 	kind     keyKind
@@ -82,38 +76,28 @@ type entry struct {
 
 // Remove all descendants of node at position idx.
 func (s *SeenTracker) clear(idx int) {
-	p := s.entries[idx].id
-	rest := clear(p, s.entries[idx+1:])
-	s.entries = s.entries[:idx+1+len(rest)]
-}
-
-func clear(parentID int, entries []entry) []entry {
-	for i := 0; i < len(entries); {
-		if entries[i].parent == parentID {
-			id := entries[i].id
-			copy(entries[i:], entries[i+1:])
-			entries = entries[:len(entries)-1]
-			rest := clear(id, entries[i:])
-			entries = entries[:i+len(rest)]
-		} else {
-			i++
+	if idx >= len(s.entries) {
+		return
+	}
+	for i := idx + 1; i < len(s.entries); i++ {
+		if s.entries[i].parent == idx {
+			s.entries[i].explicit = false
+			s.entries[i].parent = -1
+			s.entries[i].name = nil
+			s.entries[i].kind = invalidKind
+			s.clear(i)
 		}
 	}
-	return entries
 }
 
 func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit bool) int {
-	parentID := s.id(parentIdx)
-
 	idx := len(s.entries)
 	s.entries = append(s.entries, entry{
-		id:       s.nextID,
-		parent:   parentID,
+		parent:   parentIdx,
 		name:     name,
 		kind:     kind,
 		explicit: explicit,
 	})
-	s.nextID++
 	s.lastIdx = idx
 	return idx
 }
@@ -138,14 +122,12 @@ func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 }
 
 func (s *SeenTracker) setExplicitFlag(parentIdx int) {
-	entry := s.entries[parentIdx]
-	parentId := entry.id
 	offset := parentIdx + 1
 	for idx, e := range s.entries[offset:] {
 		if offset+idx > s.lastIdx {
 			return
 		}
-		if e.parent == parentId {
+		if e.parent == parentIdx {
 			s.entries[offset+idx].explicit = true
 			s.setExplicitFlag(offset + idx)
 		}
@@ -343,18 +325,9 @@ func (s *SeenTracker) checkInlineTable(node *ast.Node) error {
 	return nil
 }
 
-func (s *SeenTracker) id(idx int) int {
-	if idx >= 0 {
-		return s.entries[idx].id
-	}
-	return 0
-}
-
 func (s *SeenTracker) find(parentIdx int, k []byte) int {
-	parentID := s.id(parentIdx)
-
 	for i := parentIdx + 1; i < len(s.entries); i++ {
-		if s.entries[i].parent == parentID && bytes.Equal(s.entries[i].name, k) {
+		if s.entries[i].parent == parentIdx && bytes.Equal(s.entries[i].name, k) {
 			return i
 		}
 	}
