@@ -126,7 +126,22 @@ func (s *SeenTracker) CheckExpression(node *ast.Node) error {
 	}
 }
 
+func (s *SeenTracker) setExplicitFlag(parentIdx int) {
+	entry := s.entries[parentIdx]
+	parentId := entry.id
+	for idx, e := range s.entries[parentIdx+1:] {
+		if e.parent == parentId {
+			s.entries[parentIdx+1+idx].explicit = true
+			s.setExplicitFlag(parentIdx + 1 + idx)
+		}
+	}
+}
+
 func (s *SeenTracker) checkTable(node *ast.Node) error {
+	if s.currentIdx >= 0 {
+		s.setExplicitFlag(s.currentIdx)
+	}
+
 	it := node.Key()
 
 	parentIdx := -1
@@ -176,6 +191,10 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 }
 
 func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
+	if s.currentIdx >= 0 {
+		s.setExplicitFlag(s.currentIdx)
+	}
+
 	it := node.Key()
 
 	parentIdx := -1
