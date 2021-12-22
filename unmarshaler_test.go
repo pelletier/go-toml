@@ -2683,11 +2683,11 @@ world'`,
 		},
 		{
 			desc: `invalid zone offset hours`,
-			data: `a=0000-01-01 00:00:00+25:00`,
+			data: `a=0000-01-01 00:00:00+24:00`,
 		},
 		{
 			desc: `invalid zone offset minutes`,
-			data: `a=0000-01-01 00:00:00+00:61`,
+			data: `a=0000-01-01 00:00:00+00:60`,
 		},
 		{
 			desc: `invalid character in zone offset hours`,

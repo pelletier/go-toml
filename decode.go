@@ -117,7 +117,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 		if err != nil {
 			return time.Time{}, err
 		}
-		if hours > 24 {
+		if hours > 23 {
 			return time.Time{}, newDecodeError(b[:1], "invalid timezone offset hours")
 		}
 
@@ -125,7 +125,7 @@ func parseDateTime(b []byte) (time.Time, error) {
 		if err != nil {
 			return time.Time{}, err
 		}
-		if minutes > 60 {
+		if minutes > 59 {
 			return time.Time{}, newDecodeError(b[:1], "invalid timezone offset minutes")
 		}
 
