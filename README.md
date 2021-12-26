@@ -431,7 +431,9 @@ fmt.Println("v2 Encoder:\n" + string(buf.Bytes()))
 
 V1 always uses double quotes (`"`) around strings and keys that cannot be
 represented bare (unquoted). V2 uses single quotes instead by default (`'`),
-unless a character cannot be represented, then falls back to double quotes.
+unless a character cannot be represented, then falls back to double quotes. As a
+result of this change, `Encoder.QuoteMapKeys` has been removed, as it is not
+useful anymore.
 
 There is no way to make v2 encoder behave like v1.
 
