@@ -324,6 +324,29 @@ The recommended replacement is pre-filling the struct before unmarshaling.
 
 [go-defaults]: https://github.com/mcuadros/go-defaults
 
+#### `toml.Tree` replacement
+
+This structure was the initial attempt at providing a document model for
+go-toml. It allows manipulating the structure of any document, encoding and
+decoding from their TOML representation. While a more robust feature was
+initially planned in go-toml v2, this has been ultimately [removed from
+scope][v2] of this library, with no plan to add it back at the moment. The
+closest equivalent at the moment would be to unmarshal into an `interface{}` and
+use type assertions and/or reflection to manipulate the arbitrary
+structure. However this would fall short of providing all of the TOML features
+such as adding comments and be specific about whitespace.
+
+
+#### `toml.Position` are not retrievable anymore
+
+The API for retrieving the position (line, column) of a specific TOML element do
+not exist anymore. This was done to minimize the amount of concepts introduced
+by the library (query path), and avoid the performance hit related to storing
+positions in the absence of a document model, for a feature that seemed to have
+little use. Errors however have gained more detailed position
+information. Position retrieval seems better fitted for a document model, which
+has been [removed from the scope][nodoc] of go-toml v2 at the moment.
+
 ### Encoding / Marshal
 
 #### Default struct fields order
@@ -359,7 +382,8 @@ fmt.Println("v2:\n" + string(b))
 ```
 
 There is no way to make v2 encoder behave like v1. A workaround could be to
-manually sort the fields alphabetically in the struct definition.
+manually sort the fields alphabetically in the struct definition, or generate
+struct types using `reflect.StructOf`.
 
 #### No indentation by default
 
@@ -421,6 +445,27 @@ root object.
 There is no way to make v2 encoder behave like v1.
 
 [tm]: https://golang.org/pkg/encoding/#TextMarshaler
+
+#### `Encoder.CompactComments` has been removed
+
+Emitting compact comments is now the default behavior of go-toml. This option
+is not necessary anymore.
+
+#### `commented` tag has been removed
+
+There is no replacement for the `commented` tag. This feature would be better
+suited in a proper document model for go-toml v2, which has been [cut from
+scope][nodoc] at the moment.
+
+#### `Encoder.ArraysWithOneElementPerLine` has been renamed
+
+The new name is `Encoder.SetArraysMultiline`. The behavior should be the same.
+
+#### `Encoder.Indentation` has been renamed
+
+The new name is `Encoder.SetIndentSymbol`. The behavior should be the same.
+
+[nodoc]: https://github.com/pelletier/go-toml/discussions/506#discussioncomment-1526038
 
 ## License
 
