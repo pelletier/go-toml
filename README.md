@@ -330,7 +330,7 @@ This structure was the initial attempt at providing a document model for
 go-toml. It allows manipulating the structure of any document, encoding and
 decoding from their TOML representation. While a more robust feature was
 initially planned in go-toml v2, this has been ultimately [removed from
-scope][v2] of this library, with no plan to add it back at the moment. The
+scope][nodoc] of this library, with no plan to add it back at the moment. The
 closest equivalent at the moment would be to unmarshal into an `interface{}` and
 use type assertions and/or reflection to manipulate the arbitrary
 structure. However this would fall short of providing all of the TOML features
