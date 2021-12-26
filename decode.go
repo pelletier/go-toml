@@ -232,6 +232,7 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 	if len(b) >= 1 && b[0] == '.' {
 		frac := 0
+		precision := 0
 		digits := 0
 
 		for i, c := range b[1:] {
@@ -241,23 +242,31 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 				}
 				break
 			}
+			digits++
 
 			const maxFracPrecision = 9
 			if i >= maxFracPrecision {
-				return t, nil, newDecodeError(b[i-1:i], "maximum precision for date time is nanosecond")
+				// go-toml allows decoding fractional seconds
+				// beyond the supported precision of 9
+				// digits. It truncates the fractional component
+				// to the supported precision and ignores the
+				// remaining digits.
+				//
+				// https://github.com/pelletier/go-toml/discussions/707
+				continue
 			}
 
 			frac *= 10
 			frac += int(c - '0')
-			digits++
+			precision++
 		}
 
-		if digits == 0 {
+		if precision == 0 {
 			return t, nil, newDecodeError(b[:1], "nanoseconds need at least one digit")
 		}
 
-		t.Nanosecond = frac * nspow[digits]
-		t.Precision = digits
+		t.Nanosecond = frac * nspow[precision]
+		t.Precision = precision
 
 		return t, b[1+digits:], nil
 	}

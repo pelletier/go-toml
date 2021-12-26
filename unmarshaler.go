@@ -60,7 +60,8 @@ func (d *Decoder) SetStrict(strict bool) *Decoder {
 //
 // When a TOML local date, time, or date-time is decoded into a time.Time, its
 // value is represented in time.Local timezone. Otherwise the approriate Local*
-// structure is used.
+// structure is used. For time values, precision up to the nanosecond is
+// supported by truncating extra digits.
 //
 // Empty tables decoded in an interface{} create an empty initialized
 // map[string]interface{}.
