@@ -453,6 +453,23 @@ There is no way to make v2 encoder behave like v1.
 Emitting compact comments is now the default behavior of go-toml. This option
 is not necessary anymore.
 
+#### Struct tags have been merged
+
+V1 used to provide multiple struct tags: `comment`, `commented`, `multiline`, `toml`, and `omitempty`. To behave more like the standard library, v2 has merged `toml`, `multiline`, and `omitempty`. For example:
+
+```go
+type doc struct {
+	// v1
+	F string `toml:"field" multiline:"true" omitempty:"true"`
+	// v2
+	F string `toml:"field,multiline,omitempty"`
+}
+```
+
+Has a result, the `Encoder.SetTag*` methods have been removed, as there is just
+one tag now.
+
+
 #### `commented` tag has been removed
 
 There is no replacement for the `commented` tag. This feature would be better
