@@ -2304,6 +2304,13 @@ func TestIssue703(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue708(t *testing.T) {
+	v := map[string]string{}
+	err := toml.Unmarshal([]byte("0=\"\"\"\\\r\n\"\"\""), &v)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"0": ""}, v)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string

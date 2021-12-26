@@ -578,6 +578,10 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 				switch token[i+j] {
 				case ' ', '\t':
 					continue
+				case '\r':
+					if token[i+j+1] == '\n' {
+						continue
+					}
 				case '\n':
 					isLastNonWhitespaceOnLine = true
 				}
