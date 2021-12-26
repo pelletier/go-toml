@@ -2311,6 +2311,21 @@ func TestIssue708(t *testing.T) {
 	require.Equal(t, map[string]string{"0": ""}, v)
 }
 
+func TestIssue710(t *testing.T) {
+	v := map[string]toml.LocalTime{}
+	err := toml.Unmarshal([]byte(`0=00:00:00.0000000000`), &v)
+	require.NoError(t, err)
+	require.Equal(t, map[string]toml.LocalTime{"0": {Precision: 9}}, v)
+	v1 := map[string]toml.LocalTime{}
+	err = toml.Unmarshal([]byte(`0=00:00:00.0000000001`), &v1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]toml.LocalTime{"0": {Precision: 9}}, v1)
+	v2 := map[string]toml.LocalTime{}
+	err = toml.Unmarshal([]byte(`0=00:00:00.1111111119`), &v2)
+	require.NoError(t, err)
+	require.Equal(t, map[string]toml.LocalTime{"0": {Nanosecond: 111111111, Precision: 9}}, v2)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
@@ -2326,16 +2341,8 @@ func TestUnmarshalDecodeErrors(t *testing.T) {
 			data: `a = 11:22:33.x`,
 		},
 		{
-			desc: "local time frac precision too large",
-			data: `a = 2021-05-09T11:22:33.99999999999`,
-		},
-		{
 			desc: "wrong time offset separator",
 			data: `a = 1979-05-27T00:32:00.-07:00`,
-		},
-		{
-			desc: "missing fractional with tz",
-			data: `a = 2021-05-09T11:22:33.99999999999`,
 		},
 		{
 			desc: "wrong time offset separator",
