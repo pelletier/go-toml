@@ -73,6 +73,11 @@ func (d *Decoder) SetStrict(strict bool) *Decoder {
 // bounds for the target type (which includes negative numbers when decoding
 // into an unsigned int).
 //
+// If an error occurs while decoding the content of the document, this function
+// returns a toml.DecodeError, providing context about the issue. When using
+// strict mode and a field is missing, a `toml.StrictMissingError` is
+// returned. In any other case, this function returns a standard Go error.
+//
 // Type mapping
 //
 // List of supported TOML types and their associated accepted Go types:

@@ -55,8 +55,9 @@ to check for typos. [See example in the documentation][strict].
 
 ### Contextualized errors
 
-When decoding errors occur, go-toml returns [`DecodeError`][decode-err]), which
-contains a human readable contextualized version of the error. For example:
+When most decoding errors occur, go-toml returns [`DecodeError`][decode-err]),
+which contains a human readable contextualized version of the error. For
+example:
 
 ```
 2| key1 = "value1"
