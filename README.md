@@ -455,7 +455,9 @@ is not necessary anymore.
 
 #### Struct tags have been merged
 
-V1 used to provide multiple struct tags: `comment`, `commented`, `multiline`, `toml`, and `omitempty`. To behave more like the standard library, v2 has merged `toml`, `multiline`, and `omitempty`. For example:
+V1 used to provide multiple struct tags: `comment`, `commented`, `multiline`,
+`toml`, and `omitempty`. To behave more like the standard library, v2 has merged
+`toml`, `multiline`, and `omitempty`. For example:
 
 ```go
 type doc struct {
