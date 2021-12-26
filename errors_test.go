@@ -212,12 +212,12 @@ func ExampleDecodeError() {
 
 	fmt.Println(err)
 
-	//nolint:errorlint
-	de := err.(*DecodeError)
-	fmt.Println(de.String())
-
-	row, col := de.Position()
-	fmt.Println("error occurred at row", row, "column", col)
+	var derr *DecodeError
+	if errors.As(err, &derr) {
+		fmt.Println(derr.String())
+		row, col := derr.Position()
+		fmt.Println("error occurred at row", row, "column", col)
+	}
 	// Output:
 	// toml: number must have at least one digit between underscores
 	// 1| name = 123__456
