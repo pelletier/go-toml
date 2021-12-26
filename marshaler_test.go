@@ -21,6 +21,12 @@ func TestMarshal(t *testing.T) {
 		A interface{} `toml:",inline"`
 	}
 
+	type comments struct {
+		One   int
+		Two   int   `comment:"Before kv"`
+		Three []int `comment:"Before array"`
+	}
+
 	examples := []struct {
 		desc     string
 		v        interface{}
@@ -534,6 +540,27 @@ I = 42
 J = 42
 K = 42
 L = 2.2`,
+		},
+		{
+			desc: "comments",
+			v: struct {
+				Table comments `comment:"Before table"`
+			}{
+				Table: comments{
+					One:   1,
+					Two:   2,
+					Three: []int{1, 2, 3},
+				},
+			},
+			expected: `
+# Before table
+[Table]
+One = 1
+# Before kv
+Two = 2
+# Before array
+Three = [1, 2, 3]
+`,
 		},
 	}
 
