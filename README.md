@@ -324,6 +324,29 @@ The recommended replacement is pre-filling the struct before unmarshaling.
 
 [go-defaults]: https://github.com/mcuadros/go-defaults
 
+#### `toml.Tree` replacement
+
+This structure was the initial attempt at providing a document model for
+go-toml. It allows manipulating the structure of any document, encoding and
+decoding from their TOML representation. While a more robust feature was
+initially planned in go-toml v2, this has been ultimately [removed from
+scope][v2] of this library, with no plan to add it back at the moment. The
+closest equivalent at the moment would be to unmarshal into an `interface{}` and
+use type assertions and/or reflection to manipulate the arbitrary
+structure. However this would fall short of providing all of the TOML features
+such as adding comments and be specific about whitespace.
+
+
+#### `toml.Position` are not retrievable anymore
+
+The API for retrieving the position (line, column) of a specific TOML element do
+not exist anymore. This was done to minimize the amount of concepts introduced
+by the library (query path), and avoid the performance hit related to storing
+positions in the absence of a document model, for a feature that seemed to have
+little use. Errors however have gained more detailed position
+information. Position retrieval seems better fitted for a document model, which
+has been [removed from the scope][nodoc] of go-toml v2 at the moment.
+
 ### Encoding / Marshal
 
 #### Default struct fields order
@@ -359,7 +382,8 @@ fmt.Println("v2:\n" + string(b))
 ```
 
 There is no way to make v2 encoder behave like v1. A workaround could be to
-manually sort the fields alphabetically in the struct definition.
+manually sort the fields alphabetically in the struct definition, or generate
+struct types using `reflect.StructOf`.
 
 #### No indentation by default
 
@@ -407,7 +431,9 @@ fmt.Println("v2 Encoder:\n" + string(buf.Bytes()))
 
 V1 always uses double quotes (`"`) around strings and keys that cannot be
 represented bare (unquoted). V2 uses single quotes instead by default (`'`),
-unless a character cannot be represented, then falls back to double quotes.
+unless a character cannot be represented, then falls back to double quotes. As a
+result of this change, `Encoder.QuoteMapKeys` has been removed, as it is not
+useful anymore.
 
 There is no way to make v2 encoder behave like v1.
 
@@ -421,6 +447,84 @@ root object.
 There is no way to make v2 encoder behave like v1.
 
 [tm]: https://golang.org/pkg/encoding/#TextMarshaler
+
+#### `Encoder.CompactComments` has been removed
+
+Emitting compact comments is now the default behavior of go-toml. This option
+is not necessary anymore.
+
+#### Struct tags have been merged
+
+V1 used to provide multiple struct tags: `comment`, `commented`, `multiline`,
+`toml`, and `omitempty`. To behave more like the standard library, v2 has merged
+`toml`, `multiline`, and `omitempty`. For example:
+
+```go
+type doc struct {
+	// v1
+	F string `toml:"field" multiline:"true" omitempty:"true"`
+	// v2
+	F string `toml:"field,multiline,omitempty"`
+}
+```
+
+Has a result, the `Encoder.SetTag*` methods have been removed, as there is just
+one tag now.
+
+
+#### `commented` tag has been removed
+
+There is no replacement for the `commented` tag. This feature would be better
+suited in a proper document model for go-toml v2, which has been [cut from
+scope][nodoc] at the moment.
+
+#### `Encoder.ArraysWithOneElementPerLine` has been renamed
+
+The new name is `Encoder.SetArraysMultiline`. The behavior should be the same.
+
+#### `Encoder.Indentation` has been renamed
+
+The new name is `Encoder.SetIndentSymbol`. The behavior should be the same.
+
+
+#### Embedded structs are tables
+
+V1 defaults to merging embedded struct fields into the embedding struct. This
+behavior was unexpected because it does not follow the standard library. To
+avoid breaking backward compatibility, the `Encoder.PromoteAnonymous` method was
+added to make the encoder behave correctly. Given backward compatibility is not
+a problem anymore, v2 does the right thing by default. There is no way to revert
+to the old behavior, and `Encoder.PromoteAnonymous` has been removed.
+
+```go
+type Embedded struct {
+	Value string `toml:"value"`
+}
+
+type Doc struct {
+	Embedded
+}
+
+d := Doc{}
+
+fmt.Println("v1:")
+b, err := v1.Marshal(d)
+fmt.Println(string(b))
+
+fmt.Println("v2:")
+b, err = v2.Marshal(d)
+fmt.Println(string(b))
+
+// Output:
+// v1:
+// value = ""
+//
+// v2:
+// [Embedded]
+// value = ''
+```
+
+[nodoc]: https://github.com/pelletier/go-toml/discussions/506#discussioncomment-1526038
 
 ## License
 
