@@ -104,30 +104,31 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 // Intermediate tables are always printed.
 //
 // By default, strings are encoded as literal string, unless they contain either
-// a newline character or a single quote. In that case they are emitted as quoted
-// strings.
+// a newline character or a single quote. In that case they are emitted as
+// quoted strings.
 //
 // When encoding structs, fields are encoded in order of definition, with their
 // exact name.
 //
 // Struct tags
 //
-// The encoding of each public struct field can be customized by the
-// format string in the "toml" key of the struct field's tag. This
-// follows encoding/json's convention. The format string starts with
-// the name of the field, optionally followed by a comma-separated
-// list of options. The name may be empty in order to provide options
-// without overriding the default name.
+// The encoding of each public struct field can be customized by the format
+// string in the "toml" key of the struct field's tag. This follows
+// encoding/json's convention. The format string starts with the name of the
+// field, optionally followed by a comma-separated list of options. The name may
+// be empty in order to provide options without overriding the default name.
 //
-// The "multiline" option emits strings as quoted multi-line TOML
-// strings. It has no effect on fields that would not be encoded as
-// strings.
+// The "multiline" option emits strings as quoted multi-line TOML strings. It
+// has no effect on fields that would not be encoded as strings.
 //
-// The "inline" option turns fields that would be emitted as tables
-// into inline tables instead. It has no effect on other fields.
+// The "inline" option turns fields that would be emitted as tables into inline
+// tables instead. It has no effect on other fields.
 //
-// The "omitempty" option prevents empty values or groups from being
-// emitted.
+// The "omitempty" option prevents empty values or groups from being emitted.
+//
+// In addition to the "toml" tag struct tag, a "comment" tag can be used to emit
+// a TOML comment before the value being annotated. Comments are ignored inside
+// inline tables.
 func (enc *Encoder) Encode(v interface{}) error {
 	var (
 		b   []byte
@@ -156,6 +157,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 type valueOptions struct {
 	multiline bool
 	omitempty bool
+	comment   string
 }
 
 type encoderCtx struct {
@@ -306,6 +308,10 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 		return b, nil
 	}
 
+	if !ctx.inline {
+		b = enc.encodeComment(ctx.indent, options.comment, b)
+	}
+
 	b = enc.indent(ctx.indent, b)
 
 	b, err = enc.encodeKey(b, ctx.key)
@@ -440,6 +446,8 @@ func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) 
 	if len(ctx.parentKey) == 0 {
 		return b, nil
 	}
+
+	b = enc.encodeComment(ctx.indent, ctx.options.comment, b)
 
 	b = enc.indent(ctx.indent, b)
 
@@ -590,6 +598,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 		options := valueOptions{
 			multiline: opts.multiline,
 			omitempty: opts.omitempty,
+			comment:   fieldType.Tag.Get("comment"),
 		}
 
 		if opts.inline || !willConvertToTableOrArrayTable(ctx, f) {
@@ -600,6 +609,16 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 	}
 
 	return enc.encodeTable(b, ctx, t)
+}
+
+func (enc *Encoder) encodeComment(indent int, comment string, b []byte) []byte {
+	if comment != "" {
+		b = enc.indent(indent, b)
+		b = append(b, "# "...)
+		b = append(b, comment...)
+		b = append(b, '\n')
+	}
+	return b
 }
 
 func isValidName(s string) bool {
