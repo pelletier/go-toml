@@ -693,6 +693,10 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 }
 
 func (p *parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
+	if len(b) == 0 {
+		return nil, nil, nil, newDecodeError(b, "expected key but found none")
+	}
+
 	// simple-key = quoted-key / unquoted-key
 	// unquoted-key = 1*( ALPHA / DIGIT / %x2D / %x5F ) ; A-Z / a-z / 0-9 / - / _
 	// quoted-key = basic-string / literal-string
