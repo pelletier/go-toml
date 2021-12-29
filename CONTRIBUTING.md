@@ -188,8 +188,7 @@ $ gh api -X POST \
 [issues-tracker]: https://github.com/pelletier/go-toml/issues
 [bug-report]: https://github.com/pelletier/go-toml/issues/new?template=bug_report.md
 [pkg.go.dev]: https://pkg.go.dev/github.com/pelletier/go-toml
-[readme]: ./README.mdPaste the generated change log. Look for "Other change
-
+[readme]: ./README.md
 [fork]: https://help.github.com/articles/fork-a-repo
 [pull-request]: https://help.github.com/en/articles/creating-a-pull-request
 [new-release]: https://github.com/pelletier/go-toml/releases/new
