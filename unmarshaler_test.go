@@ -2338,6 +2338,15 @@ func TestIssue715(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue714(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte("0."), &v)
+	require.Error(t, err)
+
+	err = toml.Unmarshal([]byte("0={0=0,"), &v)
+	require.Error(t, err)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
