@@ -2326,6 +2326,18 @@ func TestIssue710(t *testing.T) {
 	require.Equal(t, map[string]toml.LocalTime{"0": {Nanosecond: 111111111, Precision: 9}}, v2)
 }
 
+func TestIssue715(t *testing.T) {
+	var v interface{}
+	err := toml.Unmarshal([]byte("0=+"), &v)
+	require.Error(t, err)
+
+	err = toml.Unmarshal([]byte("0=-"), &v)
+	require.Error(t, err)
+
+	err = toml.Unmarshal([]byte("0=+A"), &v)
+	require.Error(t, err)
+}
+
 func TestIssue714(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte("0."), &v)
