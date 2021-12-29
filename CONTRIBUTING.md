@@ -181,14 +181,15 @@ $ gh api -X POST \
 4. [Draft new release][new-release].
 5. Fill tag and target with the same value used to generate the changelog.
 6. Set title to the new tag value.
-7. Check "create discussion", in the "Releases" category.
-8. Check pre-release if new version is an alpha or beta.
-9. Paste the generated change log. Look for "Other change
+7. Paste the generated changelog.
+8. Check "create discussion", in the "Releases" category.
+9. Check pre-release if new version is an alpha or beta.
 
 [issues-tracker]: https://github.com/pelletier/go-toml/issues
 [bug-report]: https://github.com/pelletier/go-toml/issues/new?template=bug_report.md
 [pkg.go.dev]: https://pkg.go.dev/github.com/pelletier/go-toml
-[readme]: ./README.md
+[readme]: ./README.mdPaste the generated change log. Look for "Other change
+
 [fork]: https://help.github.com/articles/fork-a-repo
 [pull-request]: https://help.github.com/en/articles/creating-a-pull-request
 [new-release]: https://github.com/pelletier/go-toml/releases/new
