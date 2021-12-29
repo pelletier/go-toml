@@ -155,6 +155,8 @@ Checklist:
 - Does not introduce backward-incompatible changes (unless discussed).
 - Has relevant doc changes.
 - Benchstat does not show performance regression.
+- Pull request is [labeled appropriately][pr-labels].
+- Title will be understandable in the changelog.
 
 1. Merge using "squash and merge".
 2. Make sure to edit the commit message to keep all the useful information
@@ -163,13 +165,25 @@ Checklist:
 
 ### New release
 
-1. Go to [releases][releases]. Click on "X commits to master since this
-   release".
-2. Make note of all the changes. Look for backward incompatible changes,
-   new features, and bug fixes.
-3. Pick the new version using the above and semver.
-4. Create a [new release][new-release].
-5. Follow the same format as [1.1.0][release-110].
+1. Decide on the next version number. Use semver.
+2. Generate release notes using [`gh`][gh]. Example:
+```
+$ gh api -X POST \
+  -F tag_name='v2.0.0-beta.5' \
+  -F target_commitish='v2' \
+  -F previous_tag_name='v2.0.0-beta.4' \
+  --jq '.body' \
+  repos/pelletier/go-toml/releases/generate-notes
+```
+3. Look for "Other changes". That would indicate a pull request not labeled
+   properly. Tweak labels and pull request titles until changelog looks good for
+   users.
+4. [Draft new release][new-release].
+5. Fill tag and target with the same value used to generate the changelog.
+6. Set title to the new tag value.
+7. Check "create discussion", in the "Releases" category.
+8. Check pre-release if new version is an alpha or beta.
+9. Paste the generated change log. Look for "Other change
 
 [issues-tracker]: https://github.com/pelletier/go-toml/issues
 [bug-report]: https://github.com/pelletier/go-toml/issues/new?template=bug_report.md
@@ -177,6 +191,6 @@ Checklist:
 [readme]: ./README.md
 [fork]: https://help.github.com/articles/fork-a-repo
 [pull-request]: https://help.github.com/en/articles/creating-a-pull-request
-[releases]: https://github.com/pelletier/go-toml/releases
 [new-release]: https://github.com/pelletier/go-toml/releases/new
-[release-110]: https://github.com/pelletier/go-toml/releases/tag/v1.1.0
+[gh]: https://github.com/cli/cli
+[pr-labels]: https://github.com/pelletier/go-toml/blob/v2/.github/release.yml
