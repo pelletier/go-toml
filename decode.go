@@ -400,6 +400,10 @@ func checkAndRemoveUnderscoresIntegers(b []byte) ([]byte, error) {
 		start++
 	}
 
+	if len(b) == start {
+		return b, nil
+	}
+
 	if b[start] == '_' {
 		return nil, newDecodeError(b[start:start+1], "number cannot start with underscore")
 	}
