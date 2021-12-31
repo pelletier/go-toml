@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -32,7 +33,14 @@ Reading from a file:
 func processMain(files []string, input io.Reader, output, error io.Writer) int {
 	err := run(files, input, output)
 	if err != nil {
-		fmt.Fprintln(error, err.Error())
+		var derr *toml.DecodeError
+		if errors.As(err, &derr) {
+			fmt.Fprintln(error, derr.String())
+			row, col := derr.Position()
+			fmt.Fprintln(error, "error occurred at row", row, "column", col)
+		} else {
+			fmt.Fprintln(error, err.Error())
+		}
 		return -1
 	}
 	return 0
