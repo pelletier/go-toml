@@ -7,6 +7,7 @@ ENV GOARCH=amd64
 RUN go install ./...
 
 FROM scratch
-COPY --from=builder /go/bin/tomll /usr/bin/tomll
-COPY --from=builder /go/bin/tomljson /usr/bin/tomljson
-COPY --from=builder /go/bin/jsontoml /usr/bin/jsontoml
+ENV PATH "$PATH:/bin"
+COPY --from=builder /go/bin/linux_amd64/tomll /bin/tomll
+COPY --from=builder /go/bin/linux_amd64/tomljson /bin/tomljson
+COPY --from=builder /go/bin/linux_amd64/jsontoml /bin/jsontoml
