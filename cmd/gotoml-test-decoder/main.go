@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/pelletier/go-toml/v2/testsuite"
+	"github.com/pelletier/go-toml/v2/internal/testsuite"
 )
 
 func main() {
