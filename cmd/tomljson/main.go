@@ -16,16 +16,21 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-func main() {
-	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, `tomljson can be used in two ways:
+func usage() {
+	fmt.Fprint(os.Stderr, `tomljson can be used in two ways:
 Reading from stdin:
   cat file.toml | tomljson > file.json
 
 Reading from a file:
   tomljson file.toml > file.json
 `)
-	}
+}
+
+func init() {
+	flag.Usage = usage
+}
+
+func main() {
 	flag.Parse()
 	os.Exit(processMain(flag.Args(), os.Stdin, os.Stdout, os.Stderr))
 }

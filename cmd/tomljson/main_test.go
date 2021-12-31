@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -114,4 +115,40 @@ func TestProcessMainReadFromMissingFile(t *testing.T) {
 	}
 
 	expect(t, ``, []string{"/this/file/does/not/exist"}, -1, ``, expectedError)
+}
+
+func TestMainUsage(t *testing.T) {
+	out := doAndCaptureStderr(usage)
+	require.NotEmpty(t, out)
+}
+
+func doAndCaptureStderr(f func()) string {
+	orig := os.Stderr
+	defer func() { os.Stderr = orig }()
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		panic(err)
+	}
+
+	b := new(bytes.Buffer)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, err := io.Copy(b, r)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	os.Stderr = w
+
+	f()
+
+	w.Close()
+	wg.Wait()
+
+	return b.String()
 }
