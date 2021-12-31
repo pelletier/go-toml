@@ -29,43 +29,38 @@ Reading from a file:
 	os.Exit(processMain(flag.Args(), os.Stdin, os.Stdout, os.Stderr))
 }
 
-func processMain(files []string, defaultInput io.Reader, output io.Writer, errorOutput io.Writer) int {
-	// read from stdin and print to stdout
-	inputReader := defaultInput
-
-	if len(files) > 0 {
-		var err error
-		inputReader, err = os.Open(files[0])
-		if err != nil {
-			printError(err, errorOutput)
-			return -1
-		}
-	}
-	s, err := reader(inputReader)
+func processMain(files []string, input io.Reader, output, error io.Writer) int {
+	err := run(files, input, output)
 	if err != nil {
-		printError(err, errorOutput)
+		fmt.Fprintln(error, err.Error())
 		return -1
 	}
-	io.WriteString(output, s+"\n")
 	return 0
 }
 
-func printError(err error, output io.Writer) {
-	io.WriteString(output, err.Error()+"\n")
+func run(files []string, input io.Reader, output io.Writer) error {
+	if len(files) > 0 {
+		f, err := os.Open(files[0])
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		input = f
+	}
+
+	return convert(input, output)
 }
 
-func reader(r io.Reader) (string, error) {
+func convert(r io.Reader, w io.Writer) error {
 	var v interface{}
 
 	d := toml.NewDecoder(r)
 	err := d.Decode(&v)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	b, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	return e.Encode(v)
 }
