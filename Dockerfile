@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine as builder
+FROM golang:1.17.5-alpine3.15 as builder
 WORKDIR /go/src/github.com/pelletier/go-toml
 COPY . .
 ENV CGO_ENABLED=0
