@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/pelletier/go-toml/v2/testsuite"
+	"github.com/pelletier/go-toml/v2/internal/testsuite"
 	"github.com/stretchr/testify/require"
 )
 
