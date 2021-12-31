@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -19,18 +20,23 @@ func expectBufferEquality(t *testing.T, name string, buffer *bytes.Buffer, expec
 	assert.Equal(t, expected, output, fmt.Sprintf("%s does not match", name))
 }
 
-func expectProcessMainResults(t *testing.T, input string, args []string, exitCode int, expectedOutput string, expectedError string) {
+func expectProcessMainResults(t *testing.T, input io.Reader, args []string, exitCode int, expectedOutput string, expectedError string) {
 	t.Helper()
-	inputReader := strings.NewReader(input)
 	outputBuffer := new(bytes.Buffer)
 	errorBuffer := new(bytes.Buffer)
 
-	returnCode := processMain(args, inputReader, outputBuffer, errorBuffer)
+	returnCode := processMain(args, input, outputBuffer, errorBuffer)
 
 	expectBufferEquality(t, "stdout", outputBuffer, expectedOutput)
 	expectBufferEquality(t, "stderr", errorBuffer, expectedError)
 
 	require.Equal(t, exitCode, returnCode, "exit codes should match")
+}
+
+func expect(t *testing.T, input string, args []string, exitCode int, expectedOutput string, expectedError string) {
+	t.Helper()
+	r := strings.NewReader(input)
+	expectProcessMainResults(t, r, args, exitCode, expectedOutput, expectedError)
 }
 
 func TestProcessMainReadFromStdin(t *testing.T) {
@@ -43,10 +49,31 @@ func TestProcessMainReadFromStdin(t *testing.T) {
   }
 }
 `
-	expectedError := ``
-	expectedExitCode := 0
+	expect(t, input, []string{}, 0, expectedOutput, ``)
+}
 
-	expectProcessMainResults(t, input, []string{}, expectedExitCode, expectedOutput, expectedError)
+func TestProcessMainReadInvalidTOML(t *testing.T) {
+	input := `bad = []]`
+	expectedError := `1| bad = []]
+ |         ~ expected newline but got U+005D ']'
+error occurred at row 1 column 9
+`
+
+	expect(t, input, []string{}, -1, ``, expectedError)
+}
+
+type badReader struct{}
+
+func (r *badReader) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("reader failed on purpose")
+}
+
+func TestProcessMainProblemReadingFile(t *testing.T) {
+	expectedError := `toml: reader failed on purpose
+`
+	input := &badReader{}
+
+	expectProcessMainResults(t, input, []string{}, -1, ``, expectedError)
 }
 
 func TestProcessMainReadFromFile(t *testing.T) {
@@ -73,7 +100,7 @@ func TestProcessMainReadFromFile(t *testing.T) {
 	expectedError := ``
 	expectedExitCode := 0
 
-	expectProcessMainResults(t, ``, []string{tmpfile.Name()}, expectedExitCode, expectedOutput, expectedError)
+	expect(t, ``, []string{tmpfile.Name()}, expectedExitCode, expectedOutput, expectedError)
 }
 
 func TestProcessMainReadFromMissingFile(t *testing.T) {
@@ -86,5 +113,5 @@ func TestProcessMainReadFromMissingFile(t *testing.T) {
 `
 	}
 
-	expectProcessMainResults(t, ``, []string{"/this/file/does/not/exist"}, -1, ``, expectedError)
+	expect(t, ``, []string{"/this/file/does/not/exist"}, -1, ``, expectedError)
 }
