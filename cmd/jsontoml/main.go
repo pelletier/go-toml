@@ -13,15 +13,20 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/cli"
 )
 
-func main() {
-	usage := `jsontoml can be used in two ways:
+const usage = `jsontoml can be used in two ways:
 Reading from stdin:
   cat file.json | jsontoml > file.toml
 
 Reading from a file:
   jsontoml file.json > file.toml
 `
-	cli.Execute(usage, convert)
+
+func main() {
+	p := cli.Program{
+		Usage: usage,
+		Fn:    convert,
+	}
+	p.Execute()
 }
 
 func convert(r io.Reader, w io.Writer) error {
