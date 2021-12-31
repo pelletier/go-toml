@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
-	"io"
 	"strings"
 	"testing"
 
@@ -14,37 +12,33 @@ import (
 func TestConvert(t *testing.T) {
 	examples := []struct {
 		name     string
-		input    io.Reader
+		input    string
 		expected string
 		errors   bool
 	}{
 		{
-			name: "valid toml",
-			input: strings.NewReader(`
-[mytoml]
-a = 42`),
-			expected: `{
+			name: "valid json",
+			input: `
+{
   "mytoml": {
     "a": 42
   }
-}
+}`,
+			expected: `[mytoml]
+a = 42.0
+
 `,
 		},
 		{
-			name:   "invalid toml",
-			input:  strings.NewReader(`bad = []]`),
-			errors: true,
-		},
-		{
-			name:   "bad reader",
-			input:  &badReader{},
+			name:   "invalid json",
+			input:  `{ foo`,
 			errors: true,
 		},
 	}
 
 	for _, e := range examples {
 		b := new(bytes.Buffer)
-		err := convert(e.input, b)
+		err := convert(strings.NewReader(e.input), b)
 		if e.errors {
 			require.Error(t, err)
 		} else {
@@ -52,10 +46,4 @@ a = 42`),
 			assert.Equal(t, e.expected, b.String())
 		}
 	}
-}
-
-type badReader struct{}
-
-func (r *badReader) Read([]byte) (int, error) {
-	return 0, fmt.Errorf("reader failed on purpose")
 }

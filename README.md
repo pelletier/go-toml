@@ -209,13 +209,20 @@ In case of trouble: [Go Modules FAQ][mod-faq].
 
 ## Tools
 
-Go-toml provides one handy command line tool:
+Go-toml provides two handy command line tools:
 
  * `tomljson`: Reads a TOML file and outputs its JSON representation.
 
     ```
     $ go install github.com/pelletier/go-toml/v2/cmd/tomljson@latest
     $ tomljson --help
+    ```
+
+ * `jsontoml`: Reads a JSON file and outputs a TOML representation.
+
+    ```
+    $ go install github.com/pelletier/go-toml/v2/cmd/jsontoml@latest
+    $ jsontoml --help
     ```
 
 ## Migrating from v1
