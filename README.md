@@ -207,6 +207,17 @@ In case of trouble: [Go Modules FAQ][mod-faq].
 
 [mod-faq]: https://github.com/golang/go/wiki/Modules#why-does-installing-a-tool-via-go-get-fail-with-error-cannot-find-main-module
 
+## Tools
+
+Go-toml provides one handy command line tool:
+
+ * `tomljson`: Reads a TOML file and outputs its JSON representation.
+
+    ```
+    $ go install github.com/pelletier/go-toml/v2/cmd/tomljson@latest
+    $ tomljson --help
+    ```
+
 ## Migrating from v1
 
 This section describes the differences between v1 and v2, with some pointers on
