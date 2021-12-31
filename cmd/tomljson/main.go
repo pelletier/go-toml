@@ -1,8 +1,20 @@
 // Package tomljson is a program that converts TOML to JSON.
 //
-// Usage:
+// Usage
+//
+// Reading from stdin:
+//
 //   cat file.toml | tomljson > file.json
+//
+// Reading from a file:
+//
 //   tomljson file.toml > file.json
+//
+// Installation
+//
+// Using Go:
+//
+//   go install github.com/pelletier/go-toml/v2/cmd/tomljson@latest
 package main
 
 import (

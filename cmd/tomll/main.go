@@ -1,8 +1,20 @@
-// Tomll is a linter for TOML
+// Package tomll is a linter program for TOML.
 //
-// Usage:
-//   cat file.toml | tomll > file_linted.toml
-//   tomll file1.toml file2.toml # lint the two files in place
+// Usage
+//
+// Reading from stdin, writing to stdout:
+//
+//   cat file.toml | tomll
+//
+// Reading and updating a list of files in place:
+//
+//   tomll a.toml b.toml c.toml
+//
+// Installation
+//
+// Using Go:
+//
+//   go install github.com/pelletier/go-toml/v2/cmd/tomll@latest
 package main
 
 import (

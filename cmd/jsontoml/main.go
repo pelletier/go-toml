@@ -1,8 +1,20 @@
-// Jsontoml reads JSON and converts to TOML.
+// Package jsontoml is a program that converts JSON to TOML.
 //
-// Usage:
-//   cat file.toml | jsontoml > file.json
-//   jsontoml file1.toml > file.json
+// Usage
+//
+// Reading from stdin:
+//
+//   cat file.json | jsontoml > file.toml
+//
+// Reading from a file:
+//
+//   jsontoml file.json > file.toml
+//
+// Installation
+//
+// Using Go:
+//
+//   go install github.com/pelletier/go-toml/v2/cmd/jsontoml@latest
 package main
 
 import (
