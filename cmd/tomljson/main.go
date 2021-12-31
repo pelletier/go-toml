@@ -15,15 +15,20 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/cli"
 )
 
-func main() {
-	usage := `tomljson can be used in two ways:
+const usage = `tomljson can be used in two ways:
 Reading from stdin:
   cat file.toml | tomljson > file.json
 
 Reading from a file:
   tomljson file.toml > file.json
 `
-	cli.Execute(usage, convert)
+
+func main() {
+	p := cli.Program{
+		Usage: usage,
+		Fn:    convert,
+	}
+	p.Execute()
 }
 
 func convert(r io.Reader, w io.Writer) error {
