@@ -232,6 +232,19 @@ Go-toml provides three handy command line tools:
     $ tomll --help
     ```
 
+### Docker image
+
+Those tools are also available as a [Docker image][docker]. For example, to use
+`tomljson`:
+
+```
+docker run -i ghcr.io/pelletier/go-toml:v2 tomljson < example.toml
+```
+
+Multiple versions are availble on [ghcr.io][docker].
+
+[docker]: https://github.com/pelletier/go-toml/pkgs/container/go-toml
+
 ## Migrating from v1
 
 This section describes the differences between v1 and v2, with some pointers on
