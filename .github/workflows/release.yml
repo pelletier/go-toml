@@ -5,7 +5,7 @@ on:
       args:
         description: "Extra arguments to pass goreleaser"
         default: ""
-        require: false
+        required: false
         type: string
 
 jobs:
