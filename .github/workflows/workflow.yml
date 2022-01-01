@@ -17,9 +17,16 @@ jobs:
     name: ${{ matrix.go }}/${{ matrix.os }}
     steps:
       - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
       - name: Setup go ${{ matrix.go }}
         uses: actions/setup-go@master
         with:
           go-version: ${{ matrix.go }}
       - name: Run unit tests
         run: go test -race ./...
+  release-check:
+    if: ${{ github.ref != 'refs/heads/v2' }}
+    uses: pelletier/go-toml/.github/workflows/release.yml@docker
+    with:
+      args: --snapshot
