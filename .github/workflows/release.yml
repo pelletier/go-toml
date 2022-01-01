@@ -1,5 +1,8 @@
 name: release
 on:
+  push:
+    tags:
+      - "v2.*"
   workflow_call:
     inputs:
       args:
