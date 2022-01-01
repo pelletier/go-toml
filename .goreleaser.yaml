@@ -90,9 +90,9 @@ dockers:
       - tomljson
       - tomll
     image_templates:
-      - "grc.io/pelletier/go-toml:latest"
-      - "grc.io/pelletier/go-toml:{{ .Tag }}"
-      - "grc.io/pelletier/go-toml:v{{ .Major }}"
+      - "ghcr.io/pelletier/go-toml:latest"
+      - "ghcr.io/pelletier/go-toml:{{ .Tag }}"
+      - "ghcr.io/pelletier/go-toml:v{{ .Major }}"
     skip_push: false
 checksum:
   name_template: 'sha256sums.txt'
