@@ -27,7 +27,7 @@ type DecodeError struct {
 // corresponding field in the target value. It contains all the missing fields
 // in Errors.
 //
-// Emitted by Decoder when SetStrict(true) was called.
+// Emitted by Decoder when DisallowUnknownFields() was called.
 type StrictMissingError struct {
 	// One error per field that could not be found.
 	Errors []DecodeError

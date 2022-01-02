@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ExampleDecoder_SetStrict() {
+func ExampleDecoder_DisallowUnknownFields() {
 	type S struct {
 		Key1 string
 		Key3 string
@@ -28,7 +28,7 @@ key3 = "value3"
 `
 	r := strings.NewReader(doc)
 	d := toml.NewDecoder(r)
-	d.SetStrict(true)
+	d.DisallowUnknownFields()
 	s := S{}
 	err := d.Decode(&s)
 
@@ -1901,7 +1901,7 @@ bar = 42
 			t.Run("strict", func(t *testing.T) {
 				r := strings.NewReader(e.input)
 				d := toml.NewDecoder(r)
-				d.SetStrict(true)
+				d.DisallowUnknownFields()
 				x := e.target
 				if x == nil {
 					x = &struct{}{}
@@ -1919,7 +1919,6 @@ bar = 42
 			t.Run("default", func(t *testing.T) {
 				r := strings.NewReader(e.input)
 				d := toml.NewDecoder(r)
-				d.SetStrict(false)
 				x := e.target
 				if x == nil {
 					x = &struct{}{}

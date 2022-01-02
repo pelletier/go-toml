@@ -51,7 +51,7 @@ operations should not be shockingly slow. See [benchmarks](#benchmarks).
 the TOML document was not prevent in the target structure. This is a great way
 to check for typos. [See example in the documentation][strict].
 
-[strict]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#example-Decoder.SetStrict
+[strict]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#example-Decoder.DisallowUnknownFields
 
 ### Contextualized errors
 
