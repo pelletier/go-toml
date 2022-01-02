@@ -42,21 +42,22 @@ func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{r: r}
 }
 
-// SetStrict toggles decoding in stict mode.
+// DisallowUnknownFields causes the Decoder to return an error when the
+// destination is a struct and the input contains a key that does not match a
+// non-ignored field.
 //
-// When the decoder is in strict mode, it will record fields from the document
-// that could not be set on the target value. In that case, the decoder returns
-// a StrictMissingError that can be used to retrieve the individual errors as
-// well as generate a human readable description of the missing fields.
-func (d *Decoder) SetStrict(strict bool) *Decoder {
-	d.strict = strict
+// In that case, the Decoder returns a StrictMissingError that can be used to
+// retrieve the individual errors as well as generate a human readable
+// description of the missing fields.
+func (d *Decoder) DisallowUnknownFields() *Decoder {
+	d.strict = true
 	return d
 }
 
 // Decode the whole content of r into v.
 //
 // By default, values in the document that don't exist in the target Go value
-// are ignored. See Decoder.SetStrict() to change this behavior.
+// are ignored. See Decoder.DisallowUnknownFields() to change this behavior.
 //
 // When a TOML local date, time, or date-time is decoded into a time.Time, its
 // value is represented in time.Local timezone. Otherwise the approriate Local*

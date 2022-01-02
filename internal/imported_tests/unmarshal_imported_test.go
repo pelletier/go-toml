@@ -1925,7 +1925,7 @@ func decoder(doc string) *toml.Decoder {
 
 func strictDecoder(doc string) *toml.Decoder {
 	d := decoder(doc)
-	d.SetStrict(true)
+	d.DisallowUnknownFields()
 	return d
 }
 
