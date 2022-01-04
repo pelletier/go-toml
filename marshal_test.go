@@ -4119,3 +4119,13 @@ ErrorField = "foo"
 		t.Fatalf("error was expected")
 	}
 }
+
+func TestGithubIssue732(t *testing.T) {
+	var v interface{}
+	data := []byte("a=\nb=0")
+
+	err := Unmarshal(data, &v)
+	if err == nil {
+		t.Fatalf("error was expected")
+	}
+}
