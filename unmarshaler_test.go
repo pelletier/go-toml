@@ -279,6 +279,11 @@ func TestUnmarshal_Floats(t *testing.T) {
 			input: `1.0_e2`,
 			err:   true,
 		},
+		{
+			desc:  "leading zero in positive float",
+			input: `+0_0.0`,
+			err:   true,
+		},
 	}
 
 	type doc struct {
