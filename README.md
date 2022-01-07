@@ -21,7 +21,8 @@ encouraged to try out this version.
 
 ## Documentation
 
-Full API, examples, and implementation notes are available in the Go documentation.
+Full API, examples, and implementation notes are available in the Go
+documentation.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/pelletier/go-toml/v2.svg)](https://pkg.go.dev/github.com/pelletier/go-toml/v2)
 
@@ -564,6 +565,19 @@ fmt.Println(string(b))
 ```
 
 [nodoc]: https://github.com/pelletier/go-toml/discussions/506#discussioncomment-1526038
+
+### `query`
+
+go-toml v1 provided the [`go-toml/query`][query] package. It allowed to run
+JSONPath-style queries on TOML files. This feature is not available in v2. For a
+replacement, check out [dasel][dasel].
+
+This package has been removed because it was essentially not supported anymore
+(last commit May 2020), increased the complexity of the code base, and more
+complete solutions exist out there.
+
+[query]: https://github.com/pelletier/go-toml/tree/f99d6bbca119636aeafcf351ee52b3d202782627/query
+[dasel]: https://github.com/TomWright/dasel
 
 ## License
 
