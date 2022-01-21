@@ -971,3 +971,74 @@ func ExampleMarshal() {
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
 }
+
+func TestMarshalNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	type Named struct {
+		Value string `toml:"value"`
+	}
+
+	var doc struct {
+		Embedded
+		Named     `toml:"named"`
+		Anonymous struct {
+			Value string `toml:"value"`
+		} `toml:"anonymous"`
+	}
+
+	expected := `value = ''
+[top]
+value = ''
+
+[named]
+value = ''
+
+[anonymous]
+value = ''
+
+`
+
+	result, err := toml.Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
+	}
+}
+
+func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value"`
+		Top   struct {
+			Value string `toml:"value"`
+		} `toml:"top"`
+	}
+
+	var doc struct {
+		Value string `toml:"value"`
+		Embedded
+	}
+	doc.Embedded.Value = "shadowed"
+	doc.Value = "shadows"
+
+	expected := `value = 'shadows'
+[top]
+value = ''
+
+`
+
+	result, err := toml.Marshal(doc)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+	if !bytes.Equal(result, []byte(expected)) {
+		t.Errorf("Bad marshal: expected\n-----\n%s\n-----\ngot\n-----\n%s\n-----\n", expected, string(result))
+	}
+}

@@ -562,13 +562,71 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 	t.tables = append(t.tables, entry{Key: k, Value: v, Options: options})
 }
 
+func flattAnonymousStruct(v reflect.Value) ([]reflect.StructField, []reflect.Value, []string) {
+	fields := make([]reflect.StructField, 0)
+	values := make([]reflect.Value, 0)
+	names := make([]string, 0)
+	typ := v.Type()
+
+	for i := 0; i < typ.NumField(); i++ {
+		f := typ.Field(i)
+
+		tag := f.Tag.Get("toml")
+		kn := f.Name
+		// special field name to skip field
+		if tag == "-" {
+			continue
+		}
+
+		name, _ := parseTag(tag)
+		if isValidName(name) {
+			kn = name
+		}
+
+		if f.Anonymous && !isValidName(name) {
+			fs, vs, ns := flattAnonymousStruct(v.Field(i))
+			for j := 0; j < len(ns); j++ {
+				found := false
+				for k := 0; k < len(names); k++ {
+					if ns[j] == names[k] {
+						found = true
+						break
+					}
+				}
+				if !found {
+					names = append(names, ns[j])
+					fields = append(fields, fs[j])
+					values = append(values, vs[j])
+				}
+			}
+		} else {
+			found := false
+			for j := 0; j < len(names); j++ {
+				if kn == names[j] {
+					found = true
+					fields[j] = f
+					values[j] = v.Field(i)
+					break
+				}
+			}
+			if !found {
+				names = append(names, kn)
+				fields = append(fields, f)
+				values = append(values, v.Field(i))
+			}
+		}
+	}
+
+	return fields, values, names
+}
+
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	var t table
 
 	// TODO: cache this
-	typ := v.Type()
-	for i := 0; i < typ.NumField(); i++ {
-		fieldType := typ.Field(i)
+	fields, values, _ := flattAnonymousStruct(v)
+	for i := 0; i < len(fields); i++ {
+		fieldType := fields[i]
 
 		// only consider exported fields
 		if fieldType.PkgPath != "" {
@@ -589,7 +647,7 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			k = name
 		}
 
-		f := v.Field(i)
+		f := values[i]
 
 		if isNil(f) {
 			continue
