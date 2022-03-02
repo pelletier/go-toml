@@ -927,6 +927,29 @@ func TestUnmarshalMapWithTypedKey(t *testing.T) {
 	}
 }
 
+func TestUnmarshalTypeTableHeader(t *testing.T) {
+	testToml := []byte(`
+		[test]
+		a = 1
+		`)
+
+	type header string
+	var result map[header]map[string]int
+	err := toml.Unmarshal(testToml, &result)
+	if err != nil {
+		t.Errorf("Received unexpected error: %s", err)
+		return
+	}
+
+	expected := map[header]map[string]int{
+		"test": map[string]int{"a": 1},
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Bad unmarshal: expected %v, got %v", expected, result)
+	}
+}
+
 func TestUnmarshalNonPointer(t *testing.T) {
 	a := 1
 	err := toml.Unmarshal([]byte{}, a)
