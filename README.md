@@ -527,42 +527,14 @@ The new name is `Encoder.SetArraysMultiline`. The behavior should be the same.
 The new name is `Encoder.SetIndentSymbol`. The behavior should be the same.
 
 
-#### Embedded structs are tables
+#### Embedded structs behave like stdlib
 
 V1 defaults to merging embedded struct fields into the embedding struct. This
 behavior was unexpected because it does not follow the standard library. To
 avoid breaking backward compatibility, the `Encoder.PromoteAnonymous` method was
 added to make the encoder behave correctly. Given backward compatibility is not
-a problem anymore, v2 does the right thing by default. There is no way to revert
-to the old behavior, and `Encoder.PromoteAnonymous` has been removed.
-
-```go
-type Embedded struct {
-	Value string `toml:"value"`
-}
-
-type Doc struct {
-	Embedded
-}
-
-d := Doc{}
-
-fmt.Println("v1:")
-b, err := v1.Marshal(d)
-fmt.Println(string(b))
-
-fmt.Println("v2:")
-b, err = v2.Marshal(d)
-fmt.Println(string(b))
-
-// Output:
-// v1:
-// value = ""
-//
-// v2:
-// [Embedded]
-// value = ''
-```
+a problem anymore, v2 does the right thing by default: it follows the behavior
+of `encoding/json`. `Encoder.PromoteAnonymous` has been removed.
 
 [nodoc]: https://github.com/pelletier/go-toml/discussions/506#discussioncomment-1526038
 

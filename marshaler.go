@@ -555,16 +555,25 @@ type table struct {
 }
 
 func (t *table) pushKV(k string, v reflect.Value, options valueOptions) {
+	for _, e := range t.kvs {
+		if e.Key == k {
+			return
+		}
+	}
+
 	t.kvs = append(t.kvs, entry{Key: k, Value: v, Options: options})
 }
 
 func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
+	for _, e := range t.tables {
+		if e.Key == k {
+			return
+		}
+	}
 	t.tables = append(t.tables, entry{Key: k, Value: v, Options: options})
 }
 
-func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	var t table
-
+func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 	// TODO: cache this
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
@@ -575,8 +584,6 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			continue
 		}
 
-		k := fieldType.Name
-
 		tag := fieldType.Tag.Get("toml")
 
 		// special field name to skip field
@@ -584,12 +591,21 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			continue
 		}
 
-		name, opts := parseTag(tag)
-		if isValidName(name) {
-			k = name
+		k, opts := parseTag(tag)
+		if !isValidName(k) {
+			k = ""
 		}
 
 		f := v.Field(i)
+
+		if k == "" {
+			if fieldType.Anonymous {
+				walkStruct(ctx, t, f)
+				continue
+			} else {
+				k = fieldType.Name
+			}
+		}
 
 		if isNil(f) {
 			continue
@@ -607,6 +623,12 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 			t.pushTable(k, f, options)
 		}
 	}
+}
+
+func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
+	var t table
+
+	walkStruct(ctx, &t, v)
 
 	return enc.encodeTable(b, ctx, t)
 }
