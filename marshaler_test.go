@@ -947,6 +947,70 @@ func TestIssue678(t *testing.T) {
 	require.Equal(t, cfg, cfg2)
 }
 
+func TestMarshalNestedAnonymousStructs(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value" json:"value"`
+		Top   struct {
+			Value string `toml:"value" json:"value"`
+		} `toml:"top" json:"top"`
+	}
+
+	type Named struct {
+		Value string `toml:"value" json:"value"`
+	}
+
+	var doc struct {
+		Embedded
+		Named     `toml:"named" json:"named"`
+		Anonymous struct {
+			Value string `toml:"value" json:"value"`
+		} `toml:"anonymous" json:"anonymous"`
+	}
+
+	expected := `value = ''
+[top]
+value = ''
+
+[named]
+value = ''
+
+[anonymous]
+value = ''
+
+`
+
+	result, err := toml.Marshal(doc)
+	require.NoError(t, err)
+	require.Equal(t, expected, string(result))
+}
+
+func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
+	type Embedded struct {
+		Value string `toml:"value" json:"value"`
+		Top   struct {
+			Value string `toml:"value" json:"value"`
+		} `toml:"top" json:"top"`
+	}
+
+	var doc struct {
+		Value string `toml:"value" json:"value"`
+		Embedded
+	}
+	doc.Embedded.Value = "shadowed"
+	doc.Value = "shadows"
+
+	expected := `value = 'shadows'
+[top]
+value = ''
+
+`
+
+	result, err := toml.Marshal(doc)
+	require.NoError(t, err)
+	require.NoError(t, err)
+	require.Equal(t, expected, string(result))
+}
+
 func ExampleMarshal() {
 	type MyConfig struct {
 		Version int
