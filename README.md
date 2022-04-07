@@ -526,6 +526,16 @@ The new name is `Encoder.SetArraysMultiline`. The behavior should be the same.
 
 The new name is `Encoder.SetIndentSymbol`. The behavior should be the same.
 
+
+#### Embedded structs behave like stdlib
+
+V1 defaults to merging embedded struct fields into the embedding struct. This
+behavior was unexpected because it does not follow the standard library. To
+avoid breaking backward compatibility, the `Encoder.PromoteAnonymous` method was
+added to make the encoder behave correctly. Given backward compatibility is not
+a problem anymore, v2 does the right thing by default: it follows the behavior
+of `encoding/json`. `Encoder.PromoteAnonymous` has been removed.
+
 [nodoc]: https://github.com/pelletier/go-toml/discussions/506#discussioncomment-1526038
 
 ### `query`
