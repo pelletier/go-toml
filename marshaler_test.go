@@ -486,6 +486,15 @@ hello = 'world'`,
 			expected: `T = '0001-01-01T00:00:00Z'`,
 		},
 		{
+			desc: "time nano",
+			v: struct {
+				T time.Time
+			}{
+				T: time.Date(1979, time.May, 27, 0, 32, 0, 999999000, time.UTC),
+			},
+			expected: `T = 1979-05-27T00:32:00.999999Z`,
+		},
+		{
 			desc: "bool",
 			v: struct {
 				A bool

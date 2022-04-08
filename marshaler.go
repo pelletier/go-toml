@@ -209,9 +209,17 @@ func (ctx *encoderCtx) isRoot() bool {
 
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	if !v.IsZero() {
-		i, ok := v.Interface().(time.Time)
-		if ok {
+		if i, ok := v.Interface().(time.Time); ok {
+			if i.Nanosecond() > 0 {
+				return i.AppendFormat(b, time.RFC3339Nano), nil
+			}
 			return i.AppendFormat(b, time.RFC3339), nil
+		} else if i, ok := v.Interface().(LocalTime); ok {
+			return append(b, i.String()...), nil
+		} else if i, ok := v.Interface().(LocalDate); ok {
+			return append(b, i.String()...), nil
+		} else if i, ok := v.Interface().(LocalDateTime); ok {
+			return append(b, i.String()...), nil
 		}
 	}
 
