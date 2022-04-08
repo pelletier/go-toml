@@ -511,10 +511,6 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 			continue
 		}
 
-		if c == '\n' {
-			return nil, fmt.Errorf("toml: new line characters in keys are not supported")
-		}
-
 		if c == literalQuote {
 			cannotUseLiteral = true
 		}

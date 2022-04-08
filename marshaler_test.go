@@ -45,7 +45,7 @@ func TestMarshal(t *testing.T) {
 			v: map[string]string{
 				"hel\nlo": "world",
 			},
-			err: true,
+			expected: `"hel\nlo" = 'world'`,
 		},
 		{
 			desc: `map with " in key`,
@@ -380,7 +380,8 @@ hello = 'world'`,
 			v: map[string][]map[string]string{
 				"a\n": {{"hello": "world"}},
 			},
-			err: true,
+			expected: `[["a\n"]]
+hello = 'world'`,
 		},
 		{
 			desc: "newline in map in slice",
@@ -440,7 +441,7 @@ hello = 'world'`,
 			v: map[string]interface{}{
 				"hello\nworld": 42,
 			},
-			err: true,
+			expected: `"hello\nworld" = 42`,
 		},
 		{
 			desc: "new line in parent of nested table key",
@@ -449,7 +450,8 @@ hello = 'world'`,
 					"inner": 42,
 				},
 			},
-			err: true,
+			expected: `["hello\nworld"]
+inner = 42`,
 		},
 		{
 			desc: "new line in nested table key",
@@ -460,7 +462,9 @@ hello = 'world'`,
 					},
 				},
 			},
-			err: true,
+			expected: `[parent]
+[parent."in\ner"]
+foo = 42`,
 		},
 		{
 			desc: "invalid map key",
