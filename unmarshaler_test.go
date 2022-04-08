@@ -546,6 +546,35 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc: "issue 739 - table redefinition",
+			input: `
+[foo.bar.baz]
+wibble = 'wobble'
+
+[foo]
+
+[foo.bar]
+huey = 'dewey'			
+			`,
+			gen: func() test {
+				m := map[string]interface{}{}
+
+				return test{
+					target: &m,
+					expected: &map[string]interface{}{
+						`foo`: map[string]interface{}{
+							"bar": map[string]interface{}{
+								"huey": "dewey",
+								"baz": map[string]interface{}{
+									"wibble": "wobble",
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
 			desc: "multiline basic string",
 			input: `A = """\
 					Test"""`,

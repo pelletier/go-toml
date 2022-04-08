@@ -79,6 +79,7 @@ type entry struct {
 	name     []byte
 	kind     keyKind
 	explicit bool
+	kv       bool
 }
 
 // Find the index of the child of parentIdx with key k. Returns -1 if
@@ -111,7 +112,7 @@ func (s *SeenTracker) clear(idx int) {
 	s.entries[idx].child = -1
 }
 
-func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit bool) int {
+func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit bool, kv bool) int {
 	e := entry{
 		child: -1,
 		next:  s.entries[parentIdx].child,
@@ -119,6 +120,7 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 		name:     name,
 		kind:     kind,
 		explicit: explicit,
+		kv:       kv,
 	}
 	var idx int
 	if s.entries[0].next >= 0 {
@@ -137,7 +139,10 @@ func (s *SeenTracker) create(parentIdx int, name []byte, kind keyKind, explicit 
 
 func (s *SeenTracker) setExplicitFlag(parentIdx int) {
 	for i := s.entries[parentIdx].child; i >= 0; i = s.entries[i].next {
-		s.entries[i].explicit = true
+		if s.entries[i].kv {
+			s.entries[i].explicit = true
+			s.entries[i].kv = false
+		}
 		s.setExplicitFlag(i)
 	}
 }
@@ -183,7 +188,7 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 		idx := s.find(parentIdx, k)
 
 		if idx < 0 {
-			idx = s.create(parentIdx, k, tableKind, false)
+			idx = s.create(parentIdx, k, tableKind, false, false)
 		} else {
 			entry := s.entries[idx]
 			if entry.kind == valueKind {
@@ -206,7 +211,7 @@ func (s *SeenTracker) checkTable(node *ast.Node) error {
 		}
 		s.entries[idx].explicit = true
 	} else {
-		idx = s.create(parentIdx, k, tableKind, true)
+		idx = s.create(parentIdx, k, tableKind, true, false)
 	}
 
 	s.currentIdx = idx
@@ -233,7 +238,7 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 		idx := s.find(parentIdx, k)
 
 		if idx < 0 {
-			idx = s.create(parentIdx, k, tableKind, false)
+			idx = s.create(parentIdx, k, tableKind, false, false)
 		} else {
 			entry := s.entries[idx]
 			if entry.kind == valueKind {
@@ -254,7 +259,7 @@ func (s *SeenTracker) checkArrayTable(node *ast.Node) error {
 		}
 		s.clear(idx)
 	} else {
-		idx = s.create(parentIdx, k, arrayTableKind, true)
+		idx = s.create(parentIdx, k, arrayTableKind, true, false)
 	}
 
 	s.currentIdx = idx
@@ -272,7 +277,7 @@ func (s *SeenTracker) checkKeyValue(node *ast.Node) error {
 		idx := s.find(parentIdx, k)
 
 		if idx < 0 {
-			idx = s.create(parentIdx, k, tableKind, false)
+			idx = s.create(parentIdx, k, tableKind, false, true)
 		} else {
 			entry := s.entries[idx]
 			if it.IsLast() {
