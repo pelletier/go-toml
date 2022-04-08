@@ -617,6 +617,8 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 				builder.WriteByte('\r')
 			case 't':
 				builder.WriteByte('\t')
+			case 'e':
+				builder.WriteByte(0x1B)
 			case 'u':
 				x, err := hexToRune(atmost(token[i+1:], 4), 4)
 				if err != nil {
@@ -774,6 +776,8 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 				builder.WriteByte('\r')
 			case 't':
 				builder.WriteByte('\t')
+			case 'e':
+				builder.WriteByte(0x1B)
 			case 'u':
 				x, err := hexToRune(token[i+1:len(token)-1], 4)
 				if err != nil {
