@@ -1,4 +1,5 @@
-//go:build go1.18
+//go:build go1.18 && !windows
+// +build go1.18,!windows
 
 package toml_test
 
