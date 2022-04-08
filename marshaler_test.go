@@ -483,7 +483,7 @@ hello = 'world'`,
 			}{
 				T: time.Time{},
 			},
-			expected: `T = '0001-01-01T00:00:00Z'`,
+			expected: `T = 0001-01-01T00:00:00Z`,
 		},
 		{
 			desc: "time nano",

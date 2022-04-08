@@ -208,19 +208,20 @@ func (ctx *encoderCtx) isRoot() bool {
 }
 
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	if !v.IsZero() {
-		if i, ok := v.Interface().(time.Time); ok {
-			if i.Nanosecond() > 0 {
-				return i.AppendFormat(b, time.RFC3339Nano), nil
-			}
-			return i.AppendFormat(b, time.RFC3339), nil
-		} else if i, ok := v.Interface().(LocalTime); ok {
-			return append(b, i.String()...), nil
-		} else if i, ok := v.Interface().(LocalDate); ok {
-			return append(b, i.String()...), nil
-		} else if i, ok := v.Interface().(LocalDateTime); ok {
-			return append(b, i.String()...), nil
+	i := v.Interface()
+
+	switch x := i.(type) {
+	case time.Time:
+		if x.Nanosecond() > 0 {
+			return x.AppendFormat(b, time.RFC3339Nano), nil
 		}
+		return x.AppendFormat(b, time.RFC3339), nil
+	case LocalTime:
+		return append(b, x.String()...), nil
+	case LocalDate:
+		return append(b, x.String()...), nil
+	case LocalDateTime:
+		return append(b, x.String()...), nil
 	}
 
 	hasTextMarshaler := v.Type().Implements(textMarshalerType)
