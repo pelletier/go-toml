@@ -971,7 +971,7 @@ B = "data"`,
 								"Name": "Hammer",
 								"Sku":  int64(738594937),
 							},
-							map[string]interface{}(nil),
+							map[string]interface{}{},
 							map[string]interface{}{
 								"Name":  "Nail",
 								"Sku":   int64(284758393),
@@ -1505,7 +1505,7 @@ B = "data"`,
 					target: &map[string]interface{}{},
 					expected: &map[string]interface{}{
 						"products": []interface{}{
-							map[string]interface{}(nil),
+							map[string]interface{}{},
 						},
 					},
 				}
