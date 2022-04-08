@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,6 +46,21 @@ func TestProcessMainStdinErr(t *testing.T) {
 	assert.Equal(t, -1, exit)
 	assert.Empty(t, stdout.String())
 	assert.NotEmpty(t, stderr.String())
+}
+
+func TestProcessMainStdinDecodeErr(t *testing.T) {
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	input := strings.NewReader("this is the input")
+
+	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
+		var v interface{}
+		return toml.Unmarshal([]byte(`qwe = 001`), &v)
+	})
+
+	assert.Equal(t, -1, exit)
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "error occurred at")
 }
 
 func TestProcessMainFileExists(t *testing.T) {
