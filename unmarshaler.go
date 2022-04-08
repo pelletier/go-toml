@@ -611,7 +611,7 @@ func (d *decoder) tryTextUnmarshaler(node *ast.Node, v reflect.Value) (bool, err
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, newDecodeError(d.p.Raw(node.Raw), "error calling UnmarshalText: %w", err)
+			return false, newDecodeError(d.p.Raw(node.Raw), "%w", err)
 		}
 
 		return true, nil
