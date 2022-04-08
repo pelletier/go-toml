@@ -374,7 +374,13 @@ func (enc *Encoder) encodeString(b []byte, v string, options valueOptions) []byt
 }
 
 func needsQuoting(v string) bool {
-	return strings.ContainsAny(v, "'\b\f\n\r\t")
+	// TODO: vectorize
+	for _, b := range []byte(v) {
+		if b == '\'' || b == '\r' || b == '\n' || invalidAscii(b) {
+			return true
+		}
+	}
+	return false
 }
 
 // caller should have checked that the string does not contain new lines or ' .
