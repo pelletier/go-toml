@@ -4,6 +4,7 @@ package toml_test
 
 import (
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -18,6 +19,11 @@ func FuzzUnmarshal(f *testing.F) {
 	f.Add(file)
 
 	f.Fuzz(func(t *testing.T, b []byte) {
+		if strings.Contains(string(b), "nan") {
+			// Current limitation of testify.
+			// https://github.com/stretchr/testify/issues/624
+			t.Skip("can't compare NaNs")
+		}
 
 		t.Log("INITIAL DOCUMENT ===========================")
 		t.Log(string(b))
