@@ -514,6 +514,10 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 		needsQuotation = true
 	}
 
+	if needsQuotation && needsQuoting(k) {
+		cannotUseLiteral = true
+	}
+
 	switch {
 	case cannotUseLiteral:
 		return enc.encodeQuotedString(false, b, k), nil
