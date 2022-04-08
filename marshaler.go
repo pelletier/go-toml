@@ -487,6 +487,10 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 	needsQuotation := false
 	cannotUseLiteral := false
 
+	if len(k) == 0 {
+		return append(b, "''"...), nil
+	}
+
 	for _, c := range k {
 		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' {
 			continue
