@@ -947,6 +947,22 @@ func TestIssue678(t *testing.T) {
 	require.Equal(t, cfg, cfg2)
 }
 
+func TestIssue752(t *testing.T) {
+	type Fooer interface {
+		Foo() string
+	}
+
+	type Container struct {
+		Fooer
+	}
+
+	c := Container{}
+
+	out, err := toml.Marshal(c)
+	require.NoError(t, err)
+	require.Equal(t, "", string(out))
+}
+
 func TestMarshalNestedAnonymousStructs(t *testing.T) {
 	type Embedded struct {
 		Value string `toml:"value" json:"value"`
