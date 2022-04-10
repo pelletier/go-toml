@@ -460,7 +460,7 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 	return b
 }
 
-// called should have checked that the string is in A-Z / a-z / 0-9 / - / _ .
+// caller should have checked that the string is in A-Z / a-z / 0-9 / - / _ .
 func (enc *Encoder) encodeUnquotedKey(b []byte, v string) []byte {
 	return append(b, v...)
 }
@@ -830,6 +830,9 @@ func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
 }
 
 func willConvertToTableOrArrayTable(ctx encoderCtx, v reflect.Value) bool {
+	if ctx.insideKv {
+		return false
+	}
 	t := v.Type()
 
 	if t.Kind() == reflect.Interface {
