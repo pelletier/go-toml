@@ -273,6 +273,10 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 
 		if math.IsNaN(f) {
 			b = append(b, "nan"...)
+		} else if f > math.MaxFloat32 {
+			b = append(b, "inf"...)
+		} else if f < -math.MaxFloat32 {
+			b = append(b, "-inf"...)
 		} else if math.Trunc(f) == f {
 			b = strconv.AppendFloat(b, f, 'f', 1, 32)
 		} else {
@@ -282,7 +286,10 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 		f := v.Float()
 		if math.IsNaN(f) {
 			b = append(b, "nan"...)
-
+		} else if f > math.MaxFloat64 {
+			b = append(b, "inf"...)
+		} else if f < -math.MaxFloat64 {
+			b = append(b, "-inf"...)
 		} else if math.Trunc(f) == f {
 			b = strconv.AppendFloat(b, f, 'f', 1, 64)
 		} else {
