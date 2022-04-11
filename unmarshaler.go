@@ -322,10 +322,12 @@ func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Val
 		return v, nil
 	case reflect.Slice:
 		elemType := v.Type().Elem()
+		var elem reflect.Value
 		if elemType.Kind() == reflect.Interface {
-			elemType = mapStringInterfaceType
+			elem = makeMapStringInterface()
+		} else {
+			elem = reflect.New(elemType).Elem()
 		}
-		elem := reflect.New(elemType).Elem()
 		elem2, err := d.handleArrayTable(key, elem)
 		if err != nil {
 			return reflect.Value{}, err

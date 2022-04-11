@@ -130,7 +130,11 @@ func parseDateTime(b []byte) (time.Time, error) {
 		}
 
 		seconds := direction * (hours*3600 + minutes*60)
-		zone = time.FixedZone("", seconds)
+		if seconds == 0 {
+			zone = time.UTC
+		} else {
+			zone = time.FixedZone("", seconds)
+		}
 		b = b[dateTimeByteLen:]
 	}
 

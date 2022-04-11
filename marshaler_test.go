@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -45,7 +46,7 @@ func TestMarshal(t *testing.T) {
 			v: map[string]string{
 				"hel\nlo": "world",
 			},
-			err: true,
+			expected: `"hel\nlo" = 'world'`,
 		},
 		{
 			desc: `map with " in key`,
@@ -380,7 +381,8 @@ hello = 'world'`,
 			v: map[string][]map[string]string{
 				"a\n": {{"hello": "world"}},
 			},
-			err: true,
+			expected: `[["a\n"]]
+hello = 'world'`,
 		},
 		{
 			desc: "newline in map in slice",
@@ -440,7 +442,7 @@ hello = 'world'`,
 			v: map[string]interface{}{
 				"hello\nworld": 42,
 			},
-			err: true,
+			expected: `"hello\nworld" = 42`,
 		},
 		{
 			desc: "new line in parent of nested table key",
@@ -449,7 +451,8 @@ hello = 'world'`,
 					"inner": 42,
 				},
 			},
-			err: true,
+			expected: `["hello\nworld"]
+inner = 42`,
 		},
 		{
 			desc: "new line in nested table key",
@@ -460,7 +463,9 @@ hello = 'world'`,
 					},
 				},
 			},
-			err: true,
+			expected: `[parent]
+[parent."in\ner"]
+foo = 42`,
 		},
 		{
 			desc: "invalid map key",
@@ -483,7 +488,16 @@ hello = 'world'`,
 			}{
 				T: time.Time{},
 			},
-			expected: `T = '0001-01-01T00:00:00Z'`,
+			expected: `T = 0001-01-01T00:00:00Z`,
+		},
+		{
+			desc: "time nano",
+			v: struct {
+				T time.Time
+			}{
+				T: time.Date(1979, time.May, 27, 0, 32, 0, 999999000, time.UTC),
+			},
+			expected: `T = 1979-05-27T00:32:00.999999Z`,
 		},
 		{
 			desc: "bool",
@@ -654,6 +668,33 @@ func equalStringsIgnoreNewlines(t *testing.T, expected string, actual string) {
 	t.Helper()
 	cutset := "\n"
 	assert.Equal(t, strings.Trim(expected, cutset), strings.Trim(actual, cutset))
+}
+
+func TestMarshalFloats(t *testing.T) {
+	v := map[string]float32{
+		"nan":  float32(math.NaN()),
+		"+inf": float32(math.Inf(1)),
+		"-inf": float32(math.Inf(-1)),
+	}
+
+	expected := `'+inf' = inf
+-inf = -inf
+nan = nan
+`
+
+	actual, err := toml.Marshal(v)
+	require.NoError(t, err)
+	require.Equal(t, expected, string(actual))
+
+	v64 := map[string]float64{
+		"nan":  math.NaN(),
+		"+inf": math.Inf(1),
+		"-inf": math.Inf(-1),
+	}
+
+	actual, err = toml.Marshal(v64)
+	require.NoError(t, err)
+	require.Equal(t, expected, string(actual))
 }
 
 //nolint:funlen
@@ -1025,6 +1066,24 @@ value = ''
 	require.NoError(t, err)
 	require.NoError(t, err)
 	require.Equal(t, expected, string(result))
+}
+
+func TestLocalTime(t *testing.T) {
+	v := map[string]toml.LocalTime{
+		"a": toml.LocalTime{
+			Hour:       1,
+			Minute:     2,
+			Second:     3,
+			Nanosecond: 4,
+		},
+	}
+
+	expected := `a = 01:02:03.000000004
+`
+
+	out, err := toml.Marshal(v)
+	require.NoError(t, err)
+	require.Equal(t, expected, string(out))
 }
 
 func ExampleMarshal() {
