@@ -324,10 +324,6 @@ func isNil(v reflect.Value) bool {
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v reflect.Value) ([]byte, error) {
 	var err error
 
-	if !ctx.hasKey {
-		panic("caller of encodeKv should have set the key in the context")
-	}
-
 	if (ctx.options.omitempty || options.omitempty) && isEmptyValue(v) {
 		return b, nil
 	}
@@ -337,12 +333,7 @@ func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v r
 	}
 
 	b = enc.indent(ctx.indent, b)
-
-	b, err = enc.encodeKey(b, ctx.key)
-	if err != nil {
-		return nil, err
-	}
-
+	b = enc.encodeKey(b, ctx.key)
 	b = append(b, " = "...)
 
 	// create a copy of the context because the value of a KV shouldn't
@@ -483,20 +474,11 @@ func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) 
 
 	b = append(b, '[')
 
-	var err error
-
-	b, err = enc.encodeKey(b, ctx.parentKey[0])
-	if err != nil {
-		return nil, err
-	}
+	b = enc.encodeKey(b, ctx.parentKey[0])
 
 	for _, k := range ctx.parentKey[1:] {
 		b = append(b, '.')
-
-		b, err = enc.encodeKey(b, k)
-		if err != nil {
-			return nil, err
-		}
+		b = enc.encodeKey(b, k)
 	}
 
 	b = append(b, "]\n"...)
@@ -505,12 +487,12 @@ func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) 
 }
 
 //nolint:cyclop
-func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
+func (enc *Encoder) encodeKey(b []byte, k string) []byte {
 	needsQuotation := false
 	cannotUseLiteral := false
 
 	if len(k) == 0 {
-		return append(b, "''"...), nil
+		return append(b, "''"...)
 	}
 
 	for _, c := range k {
@@ -531,11 +513,11 @@ func (enc *Encoder) encodeKey(b []byte, k string) ([]byte, error) {
 
 	switch {
 	case cannotUseLiteral:
-		return enc.encodeQuotedString(false, b, k), nil
+		return enc.encodeQuotedString(false, b, k)
 	case needsQuotation:
-		return enc.encodeLiteralString(b, k), nil
+		return enc.encodeLiteralString(b, k)
 	default:
-		return enc.encodeUnquotedKey(b, k), nil
+		return enc.encodeUnquotedKey(b, k)
 	}
 }
 
@@ -885,7 +867,6 @@ func (enc *Encoder) encodeSlice(b []byte, ctx encoderCtx, v reflect.Value) ([]by
 func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	ctx.shiftKey()
 
-	var err error
 	scratch := make([]byte, 0, 64)
 	scratch = append(scratch, "[["...)
 
@@ -894,10 +875,7 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 			scratch = append(scratch, '.')
 		}
 
-		scratch, err = enc.encodeKey(scratch, k)
-		if err != nil {
-			return nil, err
-		}
+		scratch = enc.encodeKey(scratch, k)
 	}
 
 	scratch = append(scratch, "]]\n"...)
@@ -906,6 +884,7 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 	for i := 0; i < v.Len(); i++ {
 		b = append(b, scratch...)
 
+		var err error
 		b, err = enc.encode(b, ctx, v.Index(i))
 		if err != nil {
 			return nil, err
