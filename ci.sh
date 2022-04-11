@@ -104,16 +104,23 @@ coverage() {
 
 	    echo ""
 
-	    target_pct="$(cat ${target_out} |sed -E 's/.*total.*\t([0-9.]+)%/\1/;t;d')"
-	    head_pct="$(cat ${head_out} |sed -E 's/.*total.*\t([0-9.]+)%/\1/;t;d')"
+	    target_pct="$(tail -n2 ${target_out} | head -n1 | sed -E 's/.*total.*\t([0-9.]+)%.*/\1/')"
+	    head_pct="$(tail -n2 ${head_out} | head -n1 | sed -E 's/.*total.*\t([0-9.]+)%/\1/')"
 	    echo "Results: ${target} ${target_pct}% HEAD ${head_pct}%"
 
 	    delta_pct=$(echo "$head_pct - $target_pct" | bc -l)
 	    echo "Delta: ${delta_pct}"
 
 	    if [[ $delta_pct = \-* ]]; then
-		echo "Regression!";
-		return 1
+		    echo "Regression!";
+
+            target_diff="${output_dir}/target.diff.txt"
+            head_diff="${output_dir}/head.diff.txt"
+            cat "${target_out}" | grep -E '^github.com/pelletier/go-toml' | tr -s "\t " | cut -f 2,3 | sort > "${target_diff}"
+            cat "${head_out}" | grep -E '^github.com/pelletier/go-toml' | tr -s "\t " | cut -f 2,3 | sort > "${head_diff}"
+
+            diff --side-by-side --suppress-common-lines "${target_diff}" "${head_diff}"
+		    return 1
 	    fi
 	    return 0
 	    ;;
