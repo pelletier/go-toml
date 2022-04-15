@@ -391,6 +391,44 @@ func (d *decoder) handleArrayTableCollection(key ast.Iterator, v reflect.Value) 
 	return d.handleArrayTable(key, v)
 }
 
+func (d *decoder) handleKeyValuePartMapStringInterface(key ast.Iterator, value *ast.Node, m map[string]interface{}) (reflect.Value, error) {
+	k := string(key.Node().Data)
+
+	newMap := false
+	if m == nil {
+		newMap = true
+		m = make(map[string]interface{}, 8)
+	}
+
+	set := false
+	v, ok := m[k]
+	if !ok || key.IsLast() {
+		set = true
+		v = nil
+	}
+
+	mv := reflect.ValueOf(&v).Elem()
+
+	x, err := d.handleKeyValueInner(key, value, mv)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	if x.IsValid() {
+		mv = x
+		set = true
+	}
+
+	if set {
+		m[k] = mv.Interface()
+	}
+
+	if newMap {
+		return reflect.ValueOf(m), nil
+	}
+
+	return reflect.Value{}, nil
+}
+
 func (d *decoder) handleKeyPartMapStringInterface(key ast.Iterator, m map[string]interface{}, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
 	newMap := false
 
@@ -1035,6 +1073,11 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 	case reflect.Map:
 		vt := v.Type()
 
+		if vt == mapStringInterfaceType {
+			m := v.Interface().(map[string]interface{})
+			return d.handleKeyValuePartMapStringInterface(key, value, m)
+		}
+
 		mk := reflect.ValueOf(string(key.Node().Data))
 		mkt := stringType
 
@@ -1058,12 +1101,10 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 		if !mv.IsValid() {
 			set = true
 			mv = reflect.New(v.Type().Elem()).Elem()
-		} else {
-			if key.IsLast() {
-				var x interface{}
-				mv = reflect.ValueOf(&x).Elem()
-				set = true
-			}
+		} else if key.IsLast() {
+			var x interface{}
+			mv = reflect.ValueOf(&x).Elem()
+			set = true
 		}
 
 		nv, err := d.handleKeyValueInner(key, value, mv)
