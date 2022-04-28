@@ -2,6 +2,19 @@
 
 Go library for the [TOML](https://toml.io/) format.
 
+
+⚠️ This readme is for go-toml v1. As for 2022-04-27,
+[go-toml v2](https://github.com/pelletier/go-toml/tree/v2) has been released.
+
+The new version contains tons of bug fixes, is much faster, and more
+importantly maintained. You are strongly encouraged to use it instead of v1!
+
+[👉 go-toml v2](https://github.com/pelletier/go-toml/tree/v2)
+
+v1 will not receive any updates.
+
+---
+
 This library supports TOML version
 [v1.0.0-rc.3](https://toml.io/en/v1.0.0-rc.3)
 
