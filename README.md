@@ -540,6 +540,13 @@ complete solutions exist out there.
 [query]: https://github.com/pelletier/go-toml/tree/f99d6bbca119636aeafcf351ee52b3d202782627/query
 [dasel]: https://github.com/TomWright/dasel
 
+## Versioning
+
+Go-toml follows [Semantic Versioning](http://semver.org/). The supported version
+of [TOML](https://github.com/toml-lang/toml) is indicated at the beginning of
+this document. The last two major versions of Go are supported
+(see [Go Release Policy](https://golang.org/doc/devel/release.html#policy)).
+
 ## License
 
 The MIT License (MIT). Read [LICENSE](LICENSE).
