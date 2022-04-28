@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.go }}/${{ matrix.os }}
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Setup go ${{ matrix.go }}
