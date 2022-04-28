@@ -4,17 +4,6 @@ Go library for the [TOML](https://toml.io/en/) format.
 
 This library supports [TOML v1.0.0](https://toml.io/en/v1.0.0).
 
-## Development status
-
-This is the upcoming major version of go-toml. It is currently in active
-development. As of release v2.0.0-beta.1, the library has reached feature parity
-with v1, and fixes a lot known bugs and performance issues along the way.
-
-If you do not need the advanced document editing features of v1, you are
-encouraged to try out this version.
-
-[👉 Roadmap for v2](https://github.com/pelletier/go-toml/discussions/506)
-
 [🐞 Bug Reports](https://github.com/pelletier/go-toml/issues)
 
 [💬 Anything else](https://github.com/pelletier/go-toml/discussions)
