@@ -1167,11 +1167,6 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 		fieldPath := append(path, i)
 		fieldPath = fieldPath[:len(fieldPath):len(fieldPath)]
 
-		if f.Anonymous {
-			forEachField(f.Type, fieldPath, do)
-			continue
-		}
-
 		name := f.Tag.Get("toml")
 		if name == "-" {
 			continue
@@ -1180,6 +1175,12 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 		if i := strings.IndexByte(name, ','); i >= 0 {
 			name = name[:i]
 		}
+
+		if f.Anonymous && name == "" {
+			forEachField(f.Type, fieldPath, do)
+			continue
+		}
+
 		if name == "" {
 			name = f.Name
 		}
