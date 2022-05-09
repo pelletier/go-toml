@@ -554,7 +554,7 @@ wibble = 'wobble'
 [foo]
 
 [foo.bar]
-huey = 'dewey'			
+huey = 'dewey'
 			`,
 			gen: func() test {
 				m := map[string]interface{}{}
@@ -2378,6 +2378,25 @@ func TestIssue714(t *testing.T) {
 
 	err = toml.Unmarshal([]byte("0={0=0,"), &v)
 	require.Error(t, err)
+}
+
+func TestIssue772(t *testing.T) {
+	type FileHandling struct {
+		FilePattern string `toml:"pattern"`
+	}
+
+	type Config struct {
+		FileHandling `toml:"filehandling"`
+	}
+
+	var defaultConfigFile = []byte(`
+		[filehandling]
+		pattern = "reach-masterdev-"`)
+
+	config := Config{}
+	err := toml.Unmarshal(defaultConfigFile, &config)
+	require.NoError(t, err)
+	require.Equal(t, "reach-masterdev-", config.FileHandling.FilePattern)
 }
 
 func TestUnmarshalDecodeErrors(t *testing.T) {
