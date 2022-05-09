@@ -38,7 +38,7 @@ operations should not be shockingly slow. See [benchmarks](#benchmarks).
 ### Strict mode
 
 `Decoder` can be set to "strict mode", which makes it error when some parts of
-the TOML document was not prevent in the target structure. This is a great way
+the TOML document was not present in the target structure. This is a great way
 to check for typos. [See example in the documentation][strict].
 
 [strict]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#example-Decoder.DisallowUnknownFields
