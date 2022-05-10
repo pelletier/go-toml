@@ -1004,6 +1004,22 @@ func TestIssue752(t *testing.T) {
 	require.Equal(t, "", string(out))
 }
 
+func TestIssue768(t *testing.T) {
+	type cfg struct {
+		Name string `comment:"This is a multiline comment.\nThis is line 2."`
+	}
+
+	out, err := toml.Marshal(&cfg{})
+	require.NoError(t, err)
+
+	expected := `# This is a multiline comment.
+# This is line 2.
+Name = ''
+`
+
+	require.Equal(t, expected, string(out))
+}
+
 func TestMarshalNestedAnonymousStructs(t *testing.T) {
 	type Embedded struct {
 		Value string `toml:"value" json:"value"`
