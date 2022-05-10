@@ -2399,6 +2399,30 @@ func TestIssue772(t *testing.T) {
 	require.Equal(t, "reach-masterdev-", config.FileHandling.FilePattern)
 }
 
+func TestIssue774(t *testing.T) {
+	type ScpData struct {
+		Host string `json:"host"`
+	}
+
+	type GenConfig struct {
+		SCP []ScpData `toml:"scp" comment:"Array of Secure Copy Configurations"`
+	}
+
+	c := &GenConfig{}
+	c.SCP = []ScpData{{Host: "main.domain.com"}}
+
+	b, err := toml.Marshal(c)
+	require.NoError(t, err)
+
+	expected := `# Array of Secure Copy Configurations
+[[scp]]
+Host = 'main.domain.com'
+
+`
+
+	require.Equal(t, expected, string(b))
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
