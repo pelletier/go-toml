@@ -652,10 +652,19 @@ func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]b
 }
 
 func (enc *Encoder) encodeComment(indent int, comment string, b []byte) []byte {
-	if comment != "" {
+	for len(comment) > 0 {
+		var line string
+		idx := strings.IndexByte(comment, '\n')
+		if idx >= 0 {
+			line = comment[:idx]
+			comment = comment[idx+1:]
+		} else {
+			line = comment
+			comment = ""
+		}
 		b = enc.indent(indent, b)
 		b = append(b, "# "...)
-		b = append(b, comment...)
+		b = append(b, line...)
 		b = append(b, '\n')
 	}
 	return b
