@@ -128,7 +128,8 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 //
 // In addition to the "toml" tag struct tag, a "comment" tag can be used to emit
 // a TOML comment before the value being annotated. Comments are ignored inside
-// inline tables.
+// inline tables. For array tables, the comment is only present before the first
+// element of the array.
 func (enc *Encoder) Encode(v interface{}) error {
 	var (
 		b   []byte
@@ -889,6 +890,8 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 
 	scratch = append(scratch, "]]\n"...)
 	ctx.skipTableHeader = true
+
+	b = enc.encodeComment(ctx.indent, ctx.options.comment, b)
 
 	for i := 0; i < v.Len(); i++ {
 		b = append(b, scratch...)
