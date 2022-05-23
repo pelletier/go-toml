@@ -11,9 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func ExampleDecoder_DisallowUnknownFields() {
@@ -2421,6 +2422,14 @@ Host = 'main.domain.com'
 `
 
 	require.Equal(t, expected, string(b))
+}
+
+func TestIssue781(t *testing.T) {
+	var v struct {
+		Uint64 uint64
+	}
+	assert.NoError(t, toml.Unmarshal([]byte(`Uint64 = 18446744073709551615`), &v))
+	assert.Equal(t, uint64(math.MaxUint64), v.Uint64)
 }
 
 func TestUnmarshalDecodeErrors(t *testing.T) {

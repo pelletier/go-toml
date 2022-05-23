@@ -866,93 +866,86 @@ func (d *decoder) unmarshalFloat(value *ast.Node, v reflect.Value) error {
 	return nil
 }
 
-const (
-	maxInt = int64(^uint(0) >> 1)
-	minInt = -maxInt - 1
-)
-
-// Maximum value of uint for decoding. Currently the decoder parses the integer
-// into an int64. As a result, on architectures where uint is 64 bits, the
-// effective maximum uint we can decode is the maximum of int64. On
-// architectures where uint is 32 bits, the maximum value we can decode is
-// lower: the maximum of uint32. I didn't find a way to figure out this value at
-// compile time, so it is computed during initialization.
-var maxUint int64 = math.MaxInt64
-
-func init() {
-	m := uint64(^uint(0))
-	if m < uint64(maxUint) {
-		maxUint = int64(m)
-	}
-}
-
 func (d *decoder) unmarshalInteger(value *ast.Node, v reflect.Value) error {
-	i, err := parseInteger(value.Data)
-	if err != nil {
-		return err
-	}
-
 	var r reflect.Value
 
-	switch v.Kind() {
-	case reflect.Int64:
-		v.SetInt(i)
-		return nil
-	case reflect.Int32:
-		if i < math.MinInt32 || i > math.MaxInt32 {
-			return fmt.Errorf("toml: number %d does not fit in an int32", i)
+	k := v.Kind()
+	switch k {
+	case reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Int:
+		i, err := parseInteger(value.Data)
+		if err != nil {
+			return err
+		}
+		switch k {
+		case reflect.Int64:
+			v.SetInt(i)
+			return nil
+		case reflect.Int32:
+			if i < math.MinInt32 || i > math.MaxInt32 {
+				return fmt.Errorf("toml: number %d does not fit in an int32", i)
+			}
+
+			r = reflect.ValueOf(int32(i))
+		case reflect.Int16:
+			if i < math.MinInt16 || i > math.MaxInt16 {
+				return fmt.Errorf("toml: number %d does not fit in an int16", i)
+			}
+
+			r = reflect.ValueOf(int16(i))
+		case reflect.Int8:
+			if i < math.MinInt8 || i > math.MaxInt8 {
+				return fmt.Errorf("toml: number %d does not fit in an int8", i)
+			}
+
+			r = reflect.ValueOf(int8(i))
+		case reflect.Int:
+			if i < math.MinInt || i > math.MaxInt {
+				return fmt.Errorf("toml: number %d does not fit in an int", i)
+			}
+
+			r = reflect.ValueOf(int(i))
 		}
 
-		r = reflect.ValueOf(int32(i))
-	case reflect.Int16:
-		if i < math.MinInt16 || i > math.MaxInt16 {
-			return fmt.Errorf("toml: number %d does not fit in an int16", i)
+	case reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8, reflect.Uint:
+		u, err := parseUinteger(value.Data)
+		if err != nil {
+			return err
+		}
+		switch k {
+		case reflect.Uint64:
+			v.SetUint(u)
+			return nil
+		case reflect.Uint32:
+			if u > math.MaxUint32 {
+				return fmt.Errorf("toml: number %d does not fit in an uint32", u)
+			}
+
+			r = reflect.ValueOf(uint32(u))
+		case reflect.Uint16:
+			if u > math.MaxUint16 {
+				return fmt.Errorf("toml: number %d does not fit in an uint16", u)
+			}
+
+			r = reflect.ValueOf(uint16(u))
+		case reflect.Uint8:
+			if u > math.MaxUint8 {
+				return fmt.Errorf("toml: number %d does not fit in an uint8", u)
+			}
+
+			r = reflect.ValueOf(uint8(u))
+		case reflect.Uint:
+			if u > math.MaxUint {
+				return fmt.Errorf("toml: number %d does not fit in an uint", u)
+			}
+
+			r = reflect.ValueOf(uint(u))
 		}
 
-		r = reflect.ValueOf(int16(i))
-	case reflect.Int8:
-		if i < math.MinInt8 || i > math.MaxInt8 {
-			return fmt.Errorf("toml: number %d does not fit in an int8", i)
-		}
-
-		r = reflect.ValueOf(int8(i))
-	case reflect.Int:
-		if i < minInt || i > maxInt {
-			return fmt.Errorf("toml: number %d does not fit in an int", i)
-		}
-
-		r = reflect.ValueOf(int(i))
-	case reflect.Uint64:
-		if i < 0 {
-			return fmt.Errorf("toml: negative number %d does not fit in an uint64", i)
-		}
-
-		r = reflect.ValueOf(uint64(i))
-	case reflect.Uint32:
-		if i < 0 || i > math.MaxUint32 {
-			return fmt.Errorf("toml: negative number %d does not fit in an uint32", i)
-		}
-
-		r = reflect.ValueOf(uint32(i))
-	case reflect.Uint16:
-		if i < 0 || i > math.MaxUint16 {
-			return fmt.Errorf("toml: negative number %d does not fit in an uint16", i)
-		}
-
-		r = reflect.ValueOf(uint16(i))
-	case reflect.Uint8:
-		if i < 0 || i > math.MaxUint8 {
-			return fmt.Errorf("toml: negative number %d does not fit in an uint8", i)
-		}
-
-		r = reflect.ValueOf(uint8(i))
-	case reflect.Uint:
-		if i < 0 || i > maxUint {
-			return fmt.Errorf("toml: negative number %d does not fit in an uint", i)
-		}
-
-		r = reflect.ValueOf(uint(i))
 	case reflect.Interface:
+		i, err := parseInteger(value.Data)
+		if err != nil {
+			return err
+		}
 		r = reflect.ValueOf(i)
 	default:
 		return d.typeMismatchError("integer", v.Type())

@@ -8,20 +8,40 @@ import (
 )
 
 func parseInteger(b []byte) (int64, error) {
+	cleaned, base, err := cleanInteger(b)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(string(cleaned), base, 64)
+}
+
+func parseUinteger(b []byte) (uint64, error) {
+	cleaned, base, err := cleanInteger(b)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(string(cleaned), base, 64)
+}
+
+func cleanInteger(b []byte) (cleaned []byte, base int, err error) {
 	if len(b) > 2 && b[0] == '0' {
 		switch b[1] {
 		case 'x':
-			return parseIntHex(b)
+			base = 16
 		case 'b':
-			return parseIntBin(b)
+			base = 2
 		case 'o':
-			return parseIntOct(b)
+			base = 8
 		default:
 			panic(fmt.Errorf("invalid base '%c', should have been checked by scanIntOrFloat", b[1]))
 		}
+		cleaned, err = checkAndRemoveUnderscoresIntegers(b[2:])
+		return
 	}
 
-	return parseIntDec(b)
+	base = 10
+	cleaned, err = cleanIntDec(b)
+	return
 }
 
 func parseLocalDate(b []byte) (LocalDate, error) {
@@ -328,56 +348,14 @@ func parseFloat(b []byte) (float64, error) {
 	return f, nil
 }
 
-func parseIntHex(b []byte) (int64, error) {
-	cleaned, err := checkAndRemoveUnderscoresIntegers(b[2:])
-	if err != nil {
-		return 0, err
-	}
-
-	i, err := strconv.ParseInt(string(cleaned), 16, 64)
-	if err != nil {
-		return 0, newDecodeError(b, "couldn't parse hexadecimal number: %w", err)
-	}
-
-	return i, nil
-}
-
-func parseIntOct(b []byte) (int64, error) {
-	cleaned, err := checkAndRemoveUnderscoresIntegers(b[2:])
-	if err != nil {
-		return 0, err
-	}
-
-	i, err := strconv.ParseInt(string(cleaned), 8, 64)
-	if err != nil {
-		return 0, newDecodeError(b, "couldn't parse octal number: %w", err)
-	}
-
-	return i, nil
-}
-
-func parseIntBin(b []byte) (int64, error) {
-	cleaned, err := checkAndRemoveUnderscoresIntegers(b[2:])
-	if err != nil {
-		return 0, err
-	}
-
-	i, err := strconv.ParseInt(string(cleaned), 2, 64)
-	if err != nil {
-		return 0, newDecodeError(b, "couldn't parse binary number: %w", err)
-	}
-
-	return i, nil
-}
-
 func isSign(b byte) bool {
 	return b == '+' || b == '-'
 }
 
-func parseIntDec(b []byte) (int64, error) {
+func cleanIntDec(b []byte) ([]byte, error) {
 	cleaned, err := checkAndRemoveUnderscoresIntegers(b)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	startIdx := 0
@@ -387,15 +365,10 @@ func parseIntDec(b []byte) (int64, error) {
 	}
 
 	if len(cleaned) > startIdx+1 && cleaned[startIdx] == '0' {
-		return 0, newDecodeError(b, "leading zero not allowed on decimal number")
+		return nil, newDecodeError(b, "leading zero not allowed on decimal number")
 	}
 
-	i, err := strconv.ParseInt(string(cleaned), 10, 64)
-	if err != nil {
-		return 0, newDecodeError(b, "couldn't parse decimal number: %w", err)
-	}
-
-	return i, nil
+	return cleaned, nil
 }
 
 func checkAndRemoveUnderscoresIntegers(b []byte) ([]byte, error) {
