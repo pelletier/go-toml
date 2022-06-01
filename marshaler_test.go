@@ -1102,6 +1102,19 @@ func TestLocalTime(t *testing.T) {
 	require.Equal(t, expected, string(out))
 }
 
+func TestMarshalUint64Overflow(t *testing.T) {
+	// The TOML spec only requires implementation to provide support for the
+	// int64 range. To avoid generating TOML documents that would not be
+	// supported by standard-compliant parsers, uint64 > max int64 cannot be
+	// marshaled.
+	x := map[string]interface{}{
+		"foo": uint64(math.MaxInt64) + 1,
+	}
+
+	_, err := toml.Marshal(x)
+	require.Error(t, err)
+}
+
 func ExampleMarshal() {
 	type MyConfig struct {
 		Version int
