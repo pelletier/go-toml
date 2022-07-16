@@ -39,21 +39,21 @@ func TestMarshal(t *testing.T) {
 			v: map[string]string{
 				"hello": "world",
 			},
-			expected: "hello = 'world'",
+			expected: "hello = 'world'\n",
 		},
 		{
 			desc: "map with new line in key",
 			v: map[string]string{
 				"hel\nlo": "world",
 			},
-			expected: `"hel\nlo" = 'world'`,
+			expected: "\"hel\\nlo\" = 'world'\n",
 		},
 		{
 			desc: `map with " in key`,
 			v: map[string]string{
 				`hel"lo`: "world",
 			},
-			expected: `'hel"lo' = 'world'`,
+			expected: "'hel\"lo' = 'world'\n",
 		},
 		{
 			desc: "map in map and string",
@@ -62,9 +62,9 @@ func TestMarshal(t *testing.T) {
 					"hello": "world",
 				},
 			},
-			expected: `
-[table]
-hello = 'world'`,
+			expected: `[table]
+hello = 'world'
+`,
 		},
 		{
 			desc: "map in map in map and string",
@@ -75,10 +75,10 @@ hello = 'world'`,
 					},
 				},
 			},
-			expected: `
-[this]
+			expected: `[this]
 [this.is]
-a = 'test'`,
+a = 'test'
+`,
 		},
 		{
 			desc: "map in map in map and string with values",
@@ -90,18 +90,20 @@ a = 'test'`,
 					"also": "that",
 				},
 			},
-			expected: `
-[this]
+			expected: `[this]
 also = 'that'
+
 [this.is]
-a = 'test'`,
+a = 'test'
+`,
 		},
 		{
 			desc: "simple string array",
 			v: map[string][]string{
 				"array": {"one", "two", "three"},
 			},
-			expected: `array = ['one', 'two', 'three']`,
+			expected: `array = ['one', 'two', 'three']
+`,
 		},
 		{
 			desc:     "empty string array",
@@ -118,14 +120,16 @@ a = 'test'`,
 			v: map[string][][]string{
 				"array": {{"one", "two"}, {"three"}},
 			},
-			expected: `array = [['one', 'two'], ['three']]`,
+			expected: `array = [['one', 'two'], ['three']]
+`,
 		},
 		{
 			desc: "mixed strings and nested string arrays",
 			v: map[string][]interface{}{
 				"array": {"a string", []string{"one", "two"}, "last"},
 			},
-			expected: `array = ['a string', ['one', 'two'], 'last']`,
+			expected: `array = ['a string', ['one', 'two'], 'last']
+`,
 		},
 		{
 			desc: "array of maps",
@@ -135,9 +139,9 @@ a = 'test'`,
 					{"map2.1": "v2.1"},
 				},
 			},
-			expected: `
-[[top]]
+			expected: `[[top]]
 'map1.1' = 'v1.1'
+
 [[top]]
 'map2.1' = 'v2.1'
 `,
@@ -148,9 +152,9 @@ a = 'test'`,
 				"key1": "value1",
 				"key2": "value2",
 			},
-			expected: `
-key1 = 'value1'
-key2 = 'value2'`,
+			expected: `key1 = 'value1'
+key2 = 'value2'
+`,
 		},
 		{
 			desc: "simple struct",
@@ -159,7 +163,8 @@ key2 = 'value2'`,
 			}{
 				A: "foo",
 			},
-			expected: `A = 'foo'`,
+			expected: `A = 'foo'
+`,
 		},
 		{
 			desc: "one level of structs within structs",
@@ -174,8 +179,7 @@ key2 = 'value2'`,
 					K2: "v2",
 				},
 			},
-			expected: `
-[A]
+			expected: `[A]
 K1 = 'v1'
 K2 = 'v2'
 `,
@@ -190,10 +194,10 @@ K2 = 'v2'
 					},
 				},
 			},
-			expected: `
-[root]
+			expected: `[root]
 [[root.nested]]
 name = 'Bob'
+
 [[root.nested]]
 name = 'Alice'
 `,
@@ -203,49 +207,53 @@ name = 'Alice'
 			v: map[string]interface{}{
 				"a": "'\b\f\r\t\"\\",
 			},
-			expected: `a = "'\b\f\r\t\"\\"`,
+			expected: `a = "'\b\f\r\t\"\\"
+`,
 		},
 		{
 			desc: "string utf8 low",
 			v: map[string]interface{}{
 				"a": "'Ę",
 			},
-			expected: `a = "'Ę"`,
+			expected: `a = "'Ę"
+`,
 		},
 		{
 			desc: "string utf8 low 2",
 			v: map[string]interface{}{
 				"a": "'\u10A85",
 			},
-			expected: "a = \"'\u10A85\"",
+			expected: "a = \"'\u10A85\"\n",
 		},
 		{
 			desc: "string utf8 low 2",
 			v: map[string]interface{}{
 				"a": "'\u10A85",
 			},
-			expected: "a = \"'\u10A85\"",
+			expected: "a = \"'\u10A85\"\n",
 		},
 		{
 			desc: "emoji",
 			v: map[string]interface{}{
 				"a": "'😀",
 			},
-			expected: "a = \"'😀\"",
+			expected: "a = \"'😀\"\n",
 		},
 		{
 			desc: "control char",
 			v: map[string]interface{}{
 				"a": "'\u001A",
 			},
-			expected: `a = "'\u001A"`,
+			expected: `a = "'\u001A"
+`,
 		},
 		{
 			desc: "multi-line string",
 			v: map[string]interface{}{
 				"a": "hello\nworld",
 			},
-			expected: `a = "hello\nworld"`,
+			expected: `a = "hello\nworld"
+`,
 		},
 		{
 			desc: "multi-line forced",
@@ -256,7 +264,8 @@ name = 'Alice'
 			},
 			expected: `A = """
 hello
-world"""`,
+world"""
+`,
 		},
 		{
 			desc: "inline field",
@@ -271,8 +280,8 @@ world"""`,
 					"isinline": "no",
 				},
 			},
-			expected: `
-A = {isinline = 'yes'}
+			expected: `A = {isinline = 'yes'}
+
 [B]
 isinline = 'no'
 `,
@@ -286,8 +295,7 @@ isinline = 'no'
 				A: []int{1, 2, 3, 4},
 				B: []int{1, 2, 3, 4},
 			},
-			expected: `
-A = [
+			expected: `A = [
   1,
   2,
   3,
@@ -303,8 +311,7 @@ B = [1, 2, 3, 4]
 			}{
 				A: [][]int{{1, 2}, {3, 4}},
 			},
-			expected: `
-A = [
+			expected: `A = [
   [1, 2],
   [3, 4]
 ]
@@ -329,7 +336,8 @@ A = [
 			}{
 				A: []*int{nil},
 			},
-			expected: `A = [0]`,
+			expected: `A = [0]
+`,
 		},
 		{
 			desc: "nil pointer in slice uses zero value",
@@ -338,7 +346,8 @@ A = [
 			}{
 				A: []*int{nil},
 			},
-			expected: `A = [0]`,
+			expected: `A = [0]
+`,
 		},
 		{
 			desc: "pointer in slice",
@@ -347,7 +356,8 @@ A = [
 			}{
 				A: []*int{&someInt},
 			},
-			expected: `A = [42]`,
+			expected: `A = [42]
+`,
 		},
 		{
 			desc: "inline table in inline table",
@@ -358,23 +368,25 @@ A = [
 					},
 				},
 			},
-			expected: `A = {A = {A = 'hello'}}`,
+			expected: `A = {A = {A = 'hello'}}
+`,
 		},
 		{
 			desc: "empty slice in map",
 			v: map[string][]string{
 				"a": {},
 			},
-			expected: `a = []`,
+			expected: `a = []
+`,
 		},
 		{
 			desc: "map in slice",
 			v: map[string][]map[string]string{
 				"a": {{"hello": "world"}},
 			},
-			expected: `
-[[a]]
-hello = 'world'`,
+			expected: `[[a]]
+hello = 'world'
+`,
 		},
 		{
 			desc: "newline in map in slice",
@@ -382,7 +394,8 @@ hello = 'world'`,
 				"a\n": {{"hello": "world"}},
 			},
 			expected: `[["a\n"]]
-hello = 'world'`,
+hello = 'world'
+`,
 		},
 		{
 			desc: "newline in map in slice",
@@ -398,7 +411,8 @@ hello = 'world'`,
 			}{
 				A: []struct{}{},
 			},
-			expected: `A = []`,
+			expected: `A = []
+`,
 		},
 		{
 			desc: "nil field is ignored",
@@ -418,7 +432,8 @@ hello = 'world'`,
 				Public:  "shown",
 				private: "hidden",
 			},
-			expected: `Public = 'shown'`,
+			expected: `Public = 'shown'
+`,
 		},
 		{
 			desc: "fields tagged - are ignored",
@@ -442,7 +457,8 @@ hello = 'world'`,
 			v: map[string]interface{}{
 				"hello\nworld": 42,
 			},
-			expected: `"hello\nworld" = 42`,
+			expected: `"hello\nworld" = 42
+`,
 		},
 		{
 			desc: "new line in parent of nested table key",
@@ -452,7 +468,8 @@ hello = 'world'`,
 				},
 			},
 			expected: `["hello\nworld"]
-inner = 42`,
+inner = 42
+`,
 		},
 		{
 			desc: "new line in nested table key",
@@ -465,7 +482,8 @@ inner = 42`,
 			},
 			expected: `[parent]
 [parent."in\ner"]
-foo = 42`,
+foo = 42
+`,
 		},
 		{
 			desc: "invalid map key",
@@ -488,7 +506,8 @@ foo = 42`,
 			}{
 				T: time.Time{},
 			},
-			expected: `T = 0001-01-01T00:00:00Z`,
+			expected: `T = 0001-01-01T00:00:00Z
+`,
 		},
 		{
 			desc: "time nano",
@@ -497,7 +516,8 @@ foo = 42`,
 			}{
 				T: time.Date(1979, time.May, 27, 0, 32, 0, 999999000, time.UTC),
 			},
-			expected: `T = 1979-05-27T00:32:00.999999Z`,
+			expected: `T = 1979-05-27T00:32:00.999999Z
+`,
 		},
 		{
 			desc: "bool",
@@ -508,9 +528,9 @@ foo = 42`,
 				A: false,
 				B: true,
 			},
-			expected: `
-A = false
-B = true`,
+			expected: `A = false
+B = true
+`,
 		},
 		{
 			desc: "numbers",
@@ -541,8 +561,7 @@ B = true`,
 				K: 42,
 				L: 2.2,
 			},
-			expected: `
-A = 1.1
+			expected: `A = 1.1
 B = 42
 C = 42
 D = 42
@@ -553,7 +572,8 @@ H = 42
 I = 42
 J = 42
 K = 42
-L = 2.2`,
+L = 2.2
+`,
 		},
 		{
 			desc: "comments",
@@ -566,8 +586,7 @@ L = 2.2`,
 					Three: []int{1, 2, 3},
 				},
 			},
-			expected: `
-# Before table
+			expected: `# Before table
 [Table]
 One = 1
 # Before kv
@@ -589,7 +608,7 @@ Three = [1, 2, 3]
 			}
 
 			require.NoError(t, err)
-			equalStringsIgnoreNewlines(t, e.expected, string(b))
+			assert.Equal(t, e.expected, string(b))
 
 			// make sure the output is always valid TOML
 			defaultMap := map[string]interface{}{}
@@ -664,12 +683,6 @@ func testWithFlags(t *testing.T, flags int, setters flagsSetters, testfn func(t 
 	}
 }
 
-func equalStringsIgnoreNewlines(t *testing.T, expected string, actual string) {
-	t.Helper()
-	cutset := "\n"
-	assert.Equal(t, strings.Trim(expected, cutset), strings.Trim(actual, cutset))
-}
-
 func TestMarshalFloats(t *testing.T) {
 	v := map[string]float32{
 		"nan":  float32(math.NaN()),
@@ -709,7 +722,8 @@ func TestMarshalIndentTables(t *testing.T) {
 			v: map[string]interface{}{
 				"foo": "bar",
 			},
-			expected: `foo = 'bar'`,
+			expected: `foo = 'bar'
+`,
 		},
 		{
 			desc: "one level table",
@@ -719,8 +733,7 @@ func TestMarshalIndentTables(t *testing.T) {
 					"two": "value2",
 				},
 			},
-			expected: `
-[foo]
+			expected: `[foo]
   one = 'value1'
   two = 'value2'
 `,
@@ -736,10 +749,11 @@ func TestMarshalIndentTables(t *testing.T) {
 					},
 				},
 			},
-			expected: `
-root = 'value0'
+			expected: `root = 'value0'
+
 [level1]
   one = 'value1'
+
   [level1.level2]
     two = 'value2'
 `,
@@ -754,7 +768,7 @@ root = 'value0'
 			enc.SetIndentTables(true)
 			err := enc.Encode(e.v)
 			require.NoError(t, err)
-			equalStringsIgnoreNewlines(t, e.expected, buf.String())
+			assert.Equal(t, e.expected, buf.String())
 		})
 	}
 }
@@ -799,7 +813,7 @@ func TestMarshalTextMarshaler(t *testing.T) {
 	m := map[string]interface{}{"a": &customTextMarshaler{value: 2}}
 	r, err := toml.Marshal(m)
 	require.NoError(t, err)
-	equalStringsIgnoreNewlines(t, "a = '::2'", string(r))
+	assert.Equal(t, "a = '::2'\n", string(r))
 }
 
 type brokenWriter struct{}
@@ -822,10 +836,10 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 	enc.SetIndentSymbol(">>>")
 	err := enc.Encode(map[string]map[string]string{"parent": {"hello": "world"}})
 	require.NoError(t, err)
-	expected := `
-[parent]
->>>hello = 'world'`
-	equalStringsIgnoreNewlines(t, expected, w.String())
+	expected := `[parent]
+>>>hello = 'world'
+`
+	assert.Equal(t, expected, w.String())
 }
 
 func TestEncoderOmitempty(t *testing.T) {
@@ -856,9 +870,9 @@ func TestEncoderOmitempty(t *testing.T) {
 	b, err := toml.Marshal(d)
 	require.NoError(t, err)
 
-	expected := `[Struct]`
+	expected := ``
 
-	equalStringsIgnoreNewlines(t, expected, string(b))
+	assert.Equal(t, expected, string(b))
 }
 
 func TestEncoderTagFieldName(t *testing.T) {
@@ -873,13 +887,12 @@ func TestEncoderTagFieldName(t *testing.T) {
 	b, err := toml.Marshal(d)
 	require.NoError(t, err)
 
-	expected := `
-hello = 'world'
+	expected := `hello = 'world'
 '#' = ''
 Bad = ''
 `
 
-	equalStringsIgnoreNewlines(t, expected, string(b))
+	assert.Equal(t, expected, string(b))
 }
 
 func TestIssue436(t *testing.T) {
@@ -893,12 +906,11 @@ func TestIssue436(t *testing.T) {
 	err = toml.NewEncoder(&buf).Encode(v)
 	require.NoError(t, err)
 
-	expected := `
-[[a]]
+	expected := `[[a]]
 [a.b]
 c = 'd'
 `
-	equalStringsIgnoreNewlines(t, expected, buf.String())
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestIssue424(t *testing.T) {
@@ -980,7 +992,7 @@ func TestIssue678(t *testing.T) {
 
 	out, err := toml.Marshal(cfg)
 	require.NoError(t, err)
-	equalStringsIgnoreNewlines(t, "BigInt = '123'", string(out))
+	assert.Equal(t, "BigInt = '123'\n", string(out))
 
 	cfg2 := &Config{}
 	err = toml.Unmarshal(out, cfg2)
@@ -1020,6 +1032,24 @@ Name = ''
 	require.Equal(t, expected, string(out))
 }
 
+func TestIssue786(t *testing.T) {
+	type Dependencies struct {
+		Dependencies         []string `toml:"dependencies,multiline,omitempty"`
+		BuildDependencies    []string `toml:"buildDependencies,multiline,omitempty"`
+		OptionalDependencies []string `toml:"optionalDependencies,multiline,omitempty"`
+	}
+
+	type Test struct {
+		Dependencies Dependencies `toml:"dependencies,omitempty"`
+	}
+
+	x := Test{}
+	b, err := toml.Marshal(x)
+	require.NoError(t, err)
+
+	require.Equal(t, "", string(b))
+}
+
 func TestMarshalNestedAnonymousStructs(t *testing.T) {
 	type Embedded struct {
 		Value string `toml:"value" json:"value"`
@@ -1041,6 +1071,7 @@ func TestMarshalNestedAnonymousStructs(t *testing.T) {
 	}
 
 	expected := `value = ''
+
 [top]
 value = ''
 
@@ -1049,7 +1080,6 @@ value = ''
 
 [anonymous]
 value = ''
-
 `
 
 	result, err := toml.Marshal(doc)
@@ -1073,9 +1103,9 @@ func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
 	doc.Value = "shadows"
 
 	expected := `value = 'shadows'
+
 [top]
 value = ''
-
 `
 
 	result, err := toml.Marshal(doc)
@@ -1086,7 +1116,7 @@ value = ''
 
 func TestLocalTime(t *testing.T) {
 	v := map[string]toml.LocalTime{
-		"a": toml.LocalTime{
+		"a": {
 			Hour:       1,
 			Minute:     2,
 			Second:     3,

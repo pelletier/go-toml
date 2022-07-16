@@ -67,6 +67,7 @@ func TestDocMarshal(t *testing.T) {
 	}
 
 	marshalTestToml := `title = 'TOML Marshal Testing'
+
 [basic_lists]
 floats = [12.3, 45.6, 78.9]
 bools = [true, false, true]
@@ -89,7 +90,6 @@ name = 'Second'
 [subdoc.first]
 name = 'First'
 
-
 [basic]
 uint = 5001
 bool = true
@@ -101,9 +101,9 @@ date = 1979-05-27T07:32:00Z
 
 [[subdoclist]]
 name = 'List.First'
+
 [[subdoclist]]
 name = 'List.Second'
-
 `
 
 	result, err := toml.Marshal(docData)
@@ -117,14 +117,15 @@ func TestBasicMarshalQuotedKey(t *testing.T) {
 
 	expected := `'Z.string-àéù' = 'Hello'
 'Yfloat-𝟘' = 3.5
+
 ['Xsubdoc-àéù']
 String2 = 'One'
 
 [['W.sublist-𝟘']]
 String2 = 'Two'
+
 [['W.sublist-𝟘']]
 String2 = 'Three'
-
 `
 
 	require.Equal(t, string(expected), string(result))
@@ -159,8 +160,8 @@ bool = false
 int = 0
 string = ''
 stringlist = []
-[map]
 
+[map]
 `
 
 	require.Equal(t, string(expected), string(result))
