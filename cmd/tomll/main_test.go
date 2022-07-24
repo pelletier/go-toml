@@ -23,7 +23,6 @@ mytoml.a = 42.0
 `,
 			expected: `[mytoml]
 a = 42.0
-
 `,
 		},
 		{

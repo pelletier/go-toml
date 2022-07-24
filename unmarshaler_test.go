@@ -1876,8 +1876,7 @@ key2 = "missing2"
 key3 = "missing3"
 key4 = "value4"
 `,
-			expected: `
-2| key1 = "value1"
+			expected: `2| key1 = "value1"
 3| key2 = "missing2"
  | ~~~~ missing field
 4| key3 = "missing3"
@@ -1887,8 +1886,7 @@ key4 = "value4"
 3| key2 = "missing2"
 4| key3 = "missing3"
  | ~~~~ missing field
-5| key4 = "value4"
-`,
+5| key4 = "value4"`,
 			target: &struct {
 				Key1 string
 				Key4 string
@@ -1897,10 +1895,8 @@ key4 = "value4"
 		{
 			desc:  "multi-part key",
 			input: `a.short.key="foo"`,
-			expected: `
-1| a.short.key="foo"
- | ~~~~~~~~~~~ missing field
-`,
+			expected: `1| a.short.key="foo"
+ | ~~~~~~~~~~~ missing field`,
 		},
 		{
 			desc: "missing table",
@@ -1908,24 +1904,19 @@ key4 = "value4"
 [foo]
 bar = 42
 `,
-			expected: `
-2| [foo]
+			expected: `2| [foo]
  |  ~~~ missing table
-3| bar = 42
-`,
+3| bar = 42`,
 		},
 
 		{
 			desc: "missing array table",
 			input: `
 [[foo]]
-bar = 42
-`,
-			expected: `
-2| [[foo]]
+bar = 42`,
+			expected: `2| [[foo]]
  |   ~~~ missing table
-3| bar = 42
-`,
+3| bar = 42`,
 		},
 	}
 
@@ -1944,7 +1935,7 @@ bar = 42
 
 				var tsm *toml.StrictMissingError
 				if errors.As(err, &tsm) {
-					equalStringsIgnoreNewlines(t, e.expected, tsm.String())
+					assert.Equal(t, e.expected, tsm.String())
 				} else {
 					t.Fatalf("err should have been a *toml.StrictMissingError, but got %s (%T)", err, err)
 				}
@@ -2417,7 +2408,6 @@ func TestIssue774(t *testing.T) {
 	expected := `# Array of Secure Copy Configurations
 [[scp]]
 Host = 'main.domain.com'
-
 `
 
 	require.Equal(t, expected, string(b))
@@ -2872,6 +2862,36 @@ world'`,
 			}
 		})
 	}
+}
+
+func TestOmitEmpty(t *testing.T) {
+	type inner struct {
+		private string
+		Skip    string `toml:"-"`
+		V       string
+	}
+
+	type elem struct {
+		Foo   string `toml:",omitempty"`
+		Bar   string `toml:",omitempty"`
+		Inner inner  `toml:",omitempty"`
+	}
+
+	type doc struct {
+		X []elem `toml:",inline"`
+	}
+
+	d := doc{X: []elem{elem{
+		Foo: "test",
+		Inner: inner{
+			V: "alue",
+		},
+	}}}
+
+	b, err := toml.Marshal(d)
+	require.NoError(t, err)
+
+	require.Equal(t, "X = [{Foo = 'test', Inner = {V = 'alue'}}]\n", string(b))
 }
 
 func TestUnmarshalTags(t *testing.T) {

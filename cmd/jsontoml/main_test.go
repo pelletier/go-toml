@@ -26,7 +26,6 @@ func TestConvert(t *testing.T) {
 }`,
 			expected: `[mytoml]
 a = 42.0
-
 `,
 		},
 		{
