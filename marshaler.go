@@ -54,7 +54,7 @@ func NewEncoder(w io.Writer) *Encoder {
 // This behavior can be controlled on an individual struct field basis with the
 // inline tag:
 //
-//   MyField `inline:"true"`
+//   MyField `toml:",inline"`
 func (enc *Encoder) SetTablesInline(inline bool) *Encoder {
 	enc.tablesInline = inline
 	return enc
@@ -869,7 +869,7 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	}
 
 	if len(t.tables) > 0 {
-		panic("inline table cannot contain nested tables, online key-values")
+		panic("inline table cannot contain nested tables, only key-values")
 	}
 
 	b = append(b, "}"...)

@@ -2864,6 +2864,36 @@ world'`,
 	}
 }
 
+func TestOmitEmpty(t *testing.T) {
+	type inner struct {
+		private string
+		Skip    string `toml:"-"`
+		V       string
+	}
+
+	type elem struct {
+		Foo   string `toml:",omitempty"`
+		Bar   string `toml:",omitempty"`
+		Inner inner  `toml:",omitempty"`
+	}
+
+	type doc struct {
+		X []elem `toml:",inline"`
+	}
+
+	d := doc{X: []elem{elem{
+		Foo: "test",
+		Inner: inner{
+			V: "alue",
+		},
+	}}}
+
+	b, err := toml.Marshal(d)
+	require.NoError(t, err)
+
+	require.Equal(t, "X = [{Foo = 'test', Inner = {V = 'alue'}}]\n", string(b))
+}
+
 func TestUnmarshalTags(t *testing.T) {
 	type doc struct {
 		Dash   string `toml:"-,"`
