@@ -3,7 +3,7 @@
 //
 // Within the go-toml package, run `go generate`.  Otherwise, use:
 //
-//     go run github.com/pelletier/go-toml/cmd/tomltestgen -o toml_testgen_test.go
+//	go run github.com/pelletier/go-toml/cmd/tomltestgen -o toml_testgen_test.go
 package main
 
 import (

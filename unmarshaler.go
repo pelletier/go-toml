@@ -79,22 +79,22 @@ func (d *Decoder) DisallowUnknownFields() *Decoder {
 // strict mode and a field is missing, a `toml.StrictMissingError` is
 // returned. In any other case, this function returns a standard Go error.
 //
-// Type mapping
+// # Type mapping
 //
 // List of supported TOML types and their associated accepted Go types:
 //
-//   String           -> string
-//   Integer          -> uint*, int*, depending on size
-//   Float            -> float*, depending on size
-//   Boolean          -> bool
-//   Offset Date-Time -> time.Time
-//   Local Date-time  -> LocalDateTime, time.Time
-//   Local Date       -> LocalDate, time.Time
-//   Local Time       -> LocalTime, time.Time
-//   Array            -> slice and array, depending on elements types
-//   Table            -> map and struct
-//   Inline Table     -> same as Table
-//   Array of Tables  -> same as Array and Table
+//	String           -> string
+//	Integer          -> uint*, int*, depending on size
+//	Float            -> float*, depending on size
+//	Boolean          -> bool
+//	Offset Date-Time -> time.Time
+//	Local Date-time  -> LocalDateTime, time.Time
+//	Local Date       -> LocalDate, time.Time
+//	Local Time       -> LocalTime, time.Time
+//	Array            -> slice and array, depending on elements types
+//	Table            -> map and struct
+//	Inline Table     -> same as Table
+//	Array of Tables  -> same as Array and Table
 func (d *Decoder) Decode(v interface{}) error {
 	b, err := ioutil.ReadAll(d.r)
 	if err != nil {
