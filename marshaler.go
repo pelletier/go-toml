@@ -346,8 +346,8 @@ func isNil(v reflect.Value) bool {
 	}
 }
 
-func shouldOmitEmpty(ctx encoderCtx, options valueOptions, v reflect.Value) bool {
-	return (ctx.options.omitempty || options.omitempty) && isEmptyValue(v)
+func shouldOmitEmpty(options valueOptions, v reflect.Value) bool {
+	return options.omitempty && isEmptyValue(v)
 }
 
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v reflect.Value) ([]byte, error) {
@@ -801,7 +801,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 
 	hasNonEmptyKV := false
 	for _, kv := range t.kvs {
-		if shouldOmitEmpty(ctx, kv.Options, kv.Value) {
+		if shouldOmitEmpty(kv.Options, kv.Value) {
 			continue
 		}
 		hasNonEmptyKV = true
@@ -818,7 +818,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 
 	first := true
 	for _, table := range t.tables {
-		if shouldOmitEmpty(ctx, table.Options, table.Value) {
+		if shouldOmitEmpty(table.Options, table.Value) {
 			continue
 		}
 		if first {
@@ -850,7 +850,7 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 
 	first := true
 	for _, kv := range t.kvs {
-		if shouldOmitEmpty(ctx, kv.Options, kv.Value) {
+		if shouldOmitEmpty(kv.Options, kv.Value) {
 			continue
 		}
 
