@@ -2413,6 +2413,22 @@ Host = 'main.domain.com'
 	require.Equal(t, expected, string(b))
 }
 
+func TestIssue799(t *testing.T) {
+	const testTOML = `
+# notice the double brackets
+[[test]]
+answer = 42
+`
+
+	var s struct {
+		// should be []map[string]int
+		Test map[string]int `toml:"test"`
+	}
+
+	err := toml.Unmarshal([]byte(testTOML), &s)
+	require.Error(t, err)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
