@@ -1735,6 +1735,28 @@ B = "data"`,
 				}
 			},
 		},
+		{
+			desc:  "kv that points to a slice",
+			input: "a.b.c = 'foo'",
+			gen: func() test {
+				doc := map[string][]string{}
+				return test{
+					target: &doc,
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "kv that points to a pointer to a slice",
+			input: "a.b.c = 'foo'",
+			gen: func() test {
+				doc := map[string]*[]string{}
+				return test{
+					target: &doc,
+					err:    true,
+				}
+			},
+		},
 	}
 
 	for _, e := range examples {
