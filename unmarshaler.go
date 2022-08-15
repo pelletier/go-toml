@@ -344,9 +344,9 @@ func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Val
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
 		return v, err
+	default:
+		return reflect.Value{}, fmt.Errorf("toml: cannot decode array table into a %s", v.Type())
 	}
-
-	return d.handleArrayTable(key, v)
 }
 
 // When parsing an array table expression, each part of the key needs to be
