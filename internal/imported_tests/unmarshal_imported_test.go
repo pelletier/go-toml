@@ -151,6 +151,7 @@ type quotedKeyMarshalTestStruct struct {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	String:  "Hello",
@@ -160,6 +161,7 @@ var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
 "Z.string-àéù" = "Hello"
@@ -272,6 +274,7 @@ var docData = testDoc{
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var mapTestDoc = testMapDoc{
 	Title: "TOML Marshal Testing",
@@ -559,10 +562,12 @@ func (c customMarshaler) MarshalTOML() ([]byte, error) {
 var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var customMarshalerToml = []byte(`Sally Fields`)
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var nestedCustomMarshalerData = customMarshalerParent{
 	Self:    customMarshaler{FirstName: "Maiku", LastName: "Suteda"},
@@ -570,6 +575,7 @@ var nestedCustomMarshalerData = customMarshalerParent{
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
 me = "Maiku Suteda"
@@ -611,6 +617,7 @@ func TestUnmarshalTextMarshaler(t *testing.T) {
 }
 
 // TODO: Remove nolint once type and methods are used by a test
+//
 //nolint:unused
 type precedentMarshaler struct {
 	FirstName string
@@ -629,6 +636,7 @@ func (m precedentMarshaler) MarshalTOML() ([]byte, error) {
 }
 
 // TODO: Remove nolint once type and method are used by a test
+//
 //nolint:unused
 type customPointerMarshaler struct {
 	FirstName string
@@ -641,6 +649,7 @@ func (m *customPointerMarshaler) MarshalTOML() ([]byte, error) {
 }
 
 // TODO: Remove nolint once type and method are used by a test
+//
 //nolint:unused
 type textPointerMarshaler struct {
 	FirstName string
@@ -653,6 +662,7 @@ func (m *textPointerMarshaler) MarshalText() ([]byte, error) {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var commentTestToml = []byte(`
 # it's a comment on type
@@ -690,6 +700,7 @@ type mapsTestStruct struct {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var mapsTestData = mapsTestStruct{
 	Simple: map[string]string{
@@ -713,6 +724,7 @@ var mapsTestData = mapsTestStruct{
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var mapsTestToml = []byte(`
 [Other]
@@ -735,6 +747,7 @@ var mapsTestToml = []byte(`
 `)
 
 // TODO: Remove nolint once type is used by a test
+//
 //nolint:deadcode,unused
 type structArrayNoTag struct {
 	A struct {
@@ -744,6 +757,7 @@ type structArrayNoTag struct {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var customTagTestToml = []byte(`
 [postgres]
@@ -758,6 +772,7 @@ var customTagTestToml = []byte(`
 `)
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var customCommentTagTestToml = []byte(`
 # db connection
@@ -771,6 +786,7 @@ var customCommentTagTestToml = []byte(`
 `)
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var customCommentedTagTestToml = []byte(`
 [postgres]
@@ -825,6 +841,7 @@ func TestUnmarshalTabInStringAndQuotedKey(t *testing.T) {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var customMultilineTagTestToml = []byte(`int_slice = [
   1,
@@ -834,6 +851,7 @@ var customMultilineTagTestToml = []byte(`int_slice = [
 `)
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var testDocBasicToml = []byte(`
 [document]
@@ -846,12 +864,14 @@ var testDocBasicToml = []byte(`
 `)
 
 // TODO: Remove nolint once type is used by a test
+//
 //nolint:deadcode
 type testDocCustomTag struct {
 	Doc testDocBasicsCustomTag `file:"document"`
 }
 
 // TODO: Remove nolint once type is used by a test
+//
 //nolint:deadcode
 type testDocBasicsCustomTag struct {
 	Bool       bool      `file:"bool_val"`
@@ -864,6 +884,7 @@ type testDocBasicsCustomTag struct {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,varcheck
 var testDocCustomTagData = testDocCustomTag{
 	Doc: testDocBasicsCustomTag{
@@ -966,6 +987,7 @@ func TestUnmarshalInvalidPointerKind(t *testing.T) {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused
 type testDuration struct {
 	Nanosec   time.Duration  `toml:"nanosec"`
@@ -980,6 +1002,7 @@ type testDuration struct {
 }
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var testDurationToml = []byte(`
 nanosec = "1ns"
@@ -994,6 +1017,7 @@ a_string = "15s"
 `)
 
 // TODO: Remove nolint once var is used by a test
+//
 //nolint:deadcode,unused,varcheck
 var testDurationToml2 = []byte(`a_string = "15s"
 hour = "1h0m0s"
@@ -1007,6 +1031,7 @@ sec = "1s"
 `)
 
 // TODO: Remove nolint once type is used by a test
+//
 //nolint:deadcode,unused
 type testBadDuration struct {
 	Val time.Duration `toml:"val"`

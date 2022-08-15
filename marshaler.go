@@ -54,7 +54,7 @@ func NewEncoder(w io.Writer) *Encoder {
 // This behavior can be controlled on an individual struct field basis with the
 // inline tag:
 //
-//   MyField `toml:",inline"`
+//	MyField `toml:",inline"`
 func (enc *Encoder) SetTablesInline(inline bool) *Encoder {
 	enc.tablesInline = inline
 	return enc
@@ -65,7 +65,7 @@ func (enc *Encoder) SetTablesInline(inline bool) *Encoder {
 //
 // This behavior can be controlled on an individual struct field basis with the multiline tag:
 //
-//   MyField `multiline:"true"`
+//	MyField `multiline:"true"`
 func (enc *Encoder) SetArraysMultiline(multiline bool) *Encoder {
 	enc.arraysMultiline = multiline
 	return enc
@@ -89,7 +89,7 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 //
 // If v cannot be represented to TOML it returns an error.
 //
-// Encoding rules
+// # Encoding rules
 //
 // A top level slice containing only maps or structs is encoded as [[table
 // array]].
@@ -120,17 +120,17 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 // Tables and array tables are separated by empty lines. However, consecutive
 // subtables definitions are not. For example:
 //
-//   [top1]
+//	[top1]
 //
-//   [top2]
-//   [top2.child1]
+//	[top2]
+//	[top2.child1]
 //
-//   [[array]]
+//	[[array]]
 //
-//   [[array]]
-//   [array.child2]
+//	[[array]]
+//	[array.child2]
 //
-// Struct tags
+// # Struct tags
 //
 // The encoding of each public struct field can be customized by the format
 // string in the "toml" key of the struct field's tag. This follows
