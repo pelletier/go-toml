@@ -1048,6 +1048,51 @@ func TestIssue786(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "", string(b))
+
+	type General struct {
+		From      string `toml:"from,omitempty" json:"from,omitempty" comment:"from in graphite-web format, the local TZ is used"`
+		Randomize bool   `toml:"randomize" json:"randomize" comment:"randomize starting time with [0,step)"`
+	}
+
+	type Custom struct {
+		Name string `toml:"name" json:"name,omitempty" comment:"names for generator, braces are expanded like in shell"`
+		Type string `toml:"type,omitempty" json:"type,omitempty" comment:"type of generator"`
+		General
+	}
+	type Config struct {
+		General
+		Custom []Custom `toml:"custom,omitempty" json:"custom,omitempty" comment:"generators with custom parameters can be specified separately"`
+	}
+
+	buf := new(bytes.Buffer)
+	config := &Config{General: General{From: "-2d", Randomize: true}}
+	config.Custom = []Custom{{Name: "omit", General: General{Randomize: false}}}
+	config.Custom = append(config.Custom, Custom{Name: "present", General: General{From: "-2d", Randomize: true}})
+	encoder := toml.NewEncoder(buf)
+	encoder.Encode(config)
+
+	expected := `# from in graphite-web format, the local TZ is used
+from = '-2d'
+# randomize starting time with [0,step)
+randomize = true
+
+# generators with custom parameters can be specified separately
+[[custom]]
+# names for generator, braces are expanded like in shell
+name = 'omit'
+# randomize starting time with [0,step)
+randomize = false
+
+[[custom]]
+# names for generator, braces are expanded like in shell
+name = 'present'
+# from in graphite-web format, the local TZ is used
+from = '-2d'
+# randomize starting time with [0,step)
+randomize = true
+`
+
+	require.Equal(t, expected, buf.String())
 }
 
 func TestMarshalNestedAnonymousStructs(t *testing.T) {
