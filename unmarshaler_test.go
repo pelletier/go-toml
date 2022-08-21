@@ -2451,6 +2451,21 @@ answer = 42
 	require.Error(t, err)
 }
 
+func TestIssue807(t *testing.T) {
+	type A struct {
+		Name string `toml:"name"`
+	}
+
+	type M struct {
+		*A
+	}
+
+	var m M
+	err := toml.Unmarshal([]byte(`name = 'foo'`), &m)
+	require.NoError(t, err)
+	require.Equal(t, "foo", m.Name)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
