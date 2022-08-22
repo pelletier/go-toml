@@ -28,6 +28,11 @@ func (p *parser) Raw(raw ast.Range) []byte {
 	return p.data[raw.Offset : raw.Offset+raw.Length]
 }
 
+func (p *parser) SetRaw(ref ast.Reference, from []byte, to []byte) {
+	b := danger.BytesRange(from, to)
+	p.builder.NodeAt(ref).Raw = p.Range(b)
+}
+
 func (p *parser) Reset(b []byte) {
 	p.builder.Reset()
 	p.ref = ast.InvalidReference
@@ -152,12 +157,14 @@ func (p *parser) parseArrayTable(b []byte) (ast.Reference, []byte, error) {
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.ArrayTable,
 	})
+	start := b
 
 	b = b[2:]
 	b = p.parseWhitespace(b)
 
 	k, b, err := p.parseKey(b)
 	if err != nil {
+		p.SetRaw(ref, start, b)
 		return ref, nil, err
 	}
 
@@ -166,11 +173,12 @@ func (p *parser) parseArrayTable(b []byte) (ast.Reference, []byte, error) {
 
 	b, err = expect(']', b)
 	if err != nil {
+		p.SetRaw(ref, start, b)
 		return ref, nil, err
 	}
 
 	b, err = expect(']', b)
-
+	p.SetRaw(ref, start, b)
 	return ref, b, err
 }
 
@@ -181,12 +189,14 @@ func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.Table,
 	})
+	start := b
 
 	b = b[1:]
 	b = p.parseWhitespace(b)
 
 	key, b, err := p.parseKey(b)
 	if err != nil {
+		p.SetRaw(ref, start, b)
 		return ref, nil, err
 	}
 
@@ -196,6 +206,7 @@ func (p *parser) parseStdTable(b []byte) (ast.Reference, []byte, error) {
 
 	b, err = expect(']', b)
 
+	p.SetRaw(ref, start, b)
 	return ref, b, err
 }
 
@@ -204,10 +215,12 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	ref := p.builder.Push(ast.Node{
 		Kind: ast.KeyValue,
 	})
+	start := b
 
 	key, b, err := p.parseKey(b)
 	if err != nil {
-		return ast.InvalidReference, nil, err
+		p.SetRaw(ref, start, b)
+		return ast.InvalidReference, b, err
 	}
 
 	// keyval-sep = ws %x3D ws ; =
@@ -215,24 +228,28 @@ func (p *parser) parseKeyval(b []byte) (ast.Reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) == 0 {
-		return ast.InvalidReference, nil, newDecodeError(b, "expected = after a key, but the document ends there")
+		p.SetRaw(ref, start, b)
+		return ast.InvalidReference, b, newDecodeError(b, "expected = after a key, but the document ends there")
 	}
 
 	b, err = expect('=', b)
 	if err != nil {
-		return ast.InvalidReference, nil, err
+		p.SetRaw(ref, start, b)
+		return ast.InvalidReference, b, err
 	}
 
 	b = p.parseWhitespace(b)
 
 	valRef, b, err := p.parseVal(b)
 	if err != nil {
+		p.SetRaw(ref, start, b)
 		return ref, b, err
 	}
 
 	p.builder.Chain(valRef, key)
 	p.builder.AttachChild(ref, valRef)
 
+	p.SetRaw(ref, start, b)
 	return ref, b, err
 }
 
@@ -242,7 +259,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 	ref := ast.InvalidReference
 
 	if len(b) == 0 {
-		return ref, nil, newDecodeError(b, "expected value, not eof")
+		return ref, b, newDecodeError(b, "expected value, not eof")
 	}
 
 	var err error
@@ -287,7 +304,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		return ref, b, err
 	case 't':
 		if !scanFollowsTrue(b) {
-			return ref, nil, newDecodeError(atmost(b, 4), "expected 'true'")
+			return ref, b, newDecodeError(atmost(b, 4), "expected 'true'")
 		}
 
 		ref = p.builder.Push(ast.Node{
@@ -298,7 +315,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		return ref, b[4:], nil
 	case 'f':
 		if !scanFollowsFalse(b) {
-			return ref, nil, newDecodeError(atmost(b, 5), "expected 'false'")
+			return ref, b, newDecodeError(atmost(b, 5), "expected 'false'")
 		}
 
 		ref = p.builder.Push(ast.Node{
@@ -356,7 +373,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 		b = p.parseWhitespace(b)
 
 		if len(b) == 0 {
-			return parent, nil, newDecodeError(previousB[:1], "inline table is incomplete")
+			return parent, b, newDecodeError(previousB[:1], "inline table is incomplete")
 		}
 
 		if b[0] == '}' {
@@ -366,7 +383,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 		if !first {
 			b, err = expect(',', b)
 			if err != nil {
-				return parent, nil, err
+				return parent, b, err
 			}
 			b = p.parseWhitespace(b)
 		}
@@ -375,7 +392,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
-			return parent, nil, err
+			return parent, b, err
 		}
 
 		if first {
@@ -417,11 +434,11 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	for len(b) > 0 {
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
-			return parent, nil, err
+			return parent, b, err
 		}
 
 		if len(b) == 0 {
-			return parent, nil, newDecodeError(arrayStart[:1], "array is incomplete")
+			return parent, b, newDecodeError(arrayStart[:1], "array is incomplete")
 		}
 
 		if b[0] == ']' {
@@ -430,16 +447,16 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		if b[0] == ',' {
 			if first {
-				return parent, nil, newDecodeError(b[0:1], "array cannot start with comma")
+				return parent, b, newDecodeError(b[0:1], "array cannot start with comma")
 			}
 			b = b[1:]
 
 			b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
-				return parent, nil, err
+				return parent, b, err
 			}
 		} else if !first {
-			return parent, nil, newDecodeError(b[0:1], "array elements must be separated by commas")
+			return parent, b, newDecodeError(b[0:1], "array elements must be separated by commas")
 		}
 
 		// TOML allows trailing commas in arrays.
@@ -450,7 +467,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		var valueRef ast.Reference
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
-			return parent, nil, err
+			return parent, b, err
 		}
 
 		if first {
@@ -462,7 +479,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
-			return parent, nil, err
+			return parent, b, err
 		}
 		first = false
 	}
@@ -854,7 +871,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
-			return ast.InvalidReference, nil, newDecodeError(atmost(b, 3), "expected 'inf'")
+			return ast.InvalidReference, b, newDecodeError(atmost(b, 3), "expected 'inf'")
 		}
 
 		return p.builder.Push(ast.Node{
@@ -863,7 +880,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
-			return ast.InvalidReference, nil, newDecodeError(atmost(b, 3), "expected 'nan'")
+			return ast.InvalidReference, b, newDecodeError(atmost(b, 3), "expected 'nan'")
 		}
 
 		return p.builder.Push(ast.Node{
@@ -1019,7 +1036,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return ast.InvalidReference, nil, newDecodeError(b[i:i+1], "unexpected character 'i' while scanning for a number")
+			return ast.InvalidReference, b[i:], newDecodeError(b[i:i+1], "unexpected character 'i' while scanning for a number")
 		}
 
 		if c == 'n' {
@@ -1030,7 +1047,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return ast.InvalidReference, nil, newDecodeError(b[i:i+1], "unexpected character 'n' while scanning for a number")
+			return ast.InvalidReference, b[i:], newDecodeError(b[i:i+1], "unexpected character 'n' while scanning for a number")
 		}
 
 		break
@@ -1075,11 +1092,11 @@ func isValidBinaryRune(r byte) bool {
 
 func expect(x byte, b []byte) ([]byte, error) {
 	if len(b) == 0 {
-		return nil, newDecodeError(b, "expected character %c but the document ended here", x)
+		return b, newDecodeError(b, "expected character %c but the document ended here", x)
 	}
 
 	if b[0] != x {
-		return nil, newDecodeError(b[0:1], "expected character %c", x)
+		return b, newDecodeError(b[0:1], "expected character %c", x)
 	}
 
 	return b[1:], nil
