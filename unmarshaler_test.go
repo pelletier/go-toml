@@ -3288,3 +3288,16 @@ func TestUnmarshal_RecursiveTableArray(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalEmbedNonString(t *testing.T) {
+	type Foo []byte
+	type doc struct {
+		Foo
+	}
+
+	d := doc{}
+
+	err := toml.Unmarshal([]byte(`foo = 'bar'`), &d)
+	require.NoError(t, err)
+	require.Nil(t, d.Foo)
+}

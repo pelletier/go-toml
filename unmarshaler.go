@@ -1211,7 +1211,10 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 			if t2.Kind() == reflect.Pointer {
 				t2 = t2.Elem()
 			}
-			forEachField(t2, fieldPath, do)
+
+			if t2.Kind() == reflect.Struct {
+				forEachField(t2, fieldPath, do)
+			}
 			continue
 		}
 
