@@ -310,6 +310,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		ref = p.builder.Push(ast.Node{
 			Kind: ast.Bool,
 			Data: b[:4],
+			Raw:  p.Range(b[:4]),
 		})
 
 		return ref, b[4:], nil
@@ -321,6 +322,7 @@ func (p *parser) parseVal(b []byte) (ast.Reference, []byte, error) {
 		ref = p.builder.Push(ast.Node{
 			Kind: ast.Bool,
 			Data: b[:5],
+			Raw:  p.Range(b[:5]),
 		})
 
 		return ref, b[5:], nil
@@ -344,7 +346,7 @@ func atmost(b []byte, n int) []byte {
 func (p *parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	v, rest, err := scanLiteralString(b)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, rest, err
 	}
 
 	return v, v[1 : len(v)-1], rest, nil
@@ -359,6 +361,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 	parent := p.builder.Push(ast.Node{
 		Kind: ast.InlineTable,
 	})
+	start := b
 
 	first := true
 
@@ -373,6 +376,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 		b = p.parseWhitespace(b)
 
 		if len(b) == 0 {
+			p.SetRaw(parent, start, b)
 			return parent, b, newDecodeError(previousB[:1], "inline table is incomplete")
 		}
 
@@ -383,6 +387,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 		if !first {
 			b, err = expect(',', b)
 			if err != nil {
+				p.SetRaw(parent, start, b)
 				return parent, b, err
 			}
 			b = p.parseWhitespace(b)
@@ -392,6 +397,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
+			p.SetRaw(parent, start, b)
 			return parent, b, err
 		}
 
@@ -407,6 +413,7 @@ func (p *parser) parseInlineTable(b []byte) (ast.Reference, []byte, error) {
 
 	rest, err := expect('}', b)
 
+	p.SetRaw(parent, start, b)
 	return parent, rest, err
 }
 
@@ -420,6 +427,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	// array-sep = %x2C  ; , Comma
 	// ws-comment-newline = *( wschar / [ comment ] newline )
 	arrayStart := b
+	start := b
 	b = b[1:]
 
 	parent := p.builder.Push(ast.Node{
@@ -434,10 +442,12 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 	for len(b) > 0 {
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
+			p.SetRaw(parent, start, b)
 			return parent, b, err
 		}
 
 		if len(b) == 0 {
+			p.SetRaw(parent, start, b)
 			return parent, b, newDecodeError(arrayStart[:1], "array is incomplete")
 		}
 
@@ -447,15 +457,18 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		if b[0] == ',' {
 			if first {
+				p.SetRaw(parent, start, b)
 				return parent, b, newDecodeError(b[0:1], "array cannot start with comma")
 			}
 			b = b[1:]
 
 			b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
+				p.SetRaw(parent, start, b)
 				return parent, b, err
 			}
 		} else if !first {
+			p.SetRaw(parent, start, b)
 			return parent, b, newDecodeError(b[0:1], "array elements must be separated by commas")
 		}
 
@@ -467,6 +480,7 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 		var valueRef ast.Reference
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
+			p.SetRaw(parent, start, b)
 			return parent, b, err
 		}
 
@@ -479,12 +493,15 @@ func (p *parser) parseValArray(b []byte) (ast.Reference, []byte, error) {
 
 		b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
+			p.SetRaw(parent, start, b)
 			return parent, b, err
 		}
 		first = false
 	}
 
 	rest, err := expect(']', b)
+
+	p.SetRaw(parent, start, rest)
 
 	return parent, rest, err
 }
@@ -497,7 +514,7 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 		if len(b) > 0 && b[0] == '#' {
 			_, b, err = scanComment(b)
 			if err != nil {
-				return nil, err
+				return b, err
 			}
 		}
 
@@ -508,7 +525,7 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 		if b[0] == '\n' || b[0] == '\r' {
 			b, err = p.parseNewline(b)
 			if err != nil {
-				return nil, err
+				return b, err
 			}
 		} else {
 			break
@@ -521,7 +538,7 @@ func (p *parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 func (p *parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	token, rest, err := scanMultilineLiteralString(b)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, rest, err
 	}
 
 	i := 3
@@ -550,7 +567,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	// mlb-escaped-nl = escape ws newline *( wschar / newline )
 	token, escaped, rest, err := scanMultilineBasicString(b)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, rest, err
 	}
 
 	i := 3
@@ -572,7 +589,7 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 		if verr.Zero() {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, rest, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
 	var builder bytes.Buffer
@@ -639,26 +656,26 @@ func (p *parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 			case 'u':
 				x, err := hexToRune(atmost(token[i+1:], 4), 4)
 				if err != nil {
-					return nil, nil, nil, err
+					return nil, nil, rest, err
 				}
 				builder.WriteRune(x)
 				i += 4
 			case 'U':
 				x, err := hexToRune(atmost(token[i+1:], 8), 8)
 				if err != nil {
-					return nil, nil, nil, err
+					return nil, nil, rest, err
 				}
 
 				builder.WriteRune(x)
 				i += 8
 			default:
-				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
+				return nil, nil, rest, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
 			i++
 		} else {
 			size := utf8ValidNext(token[i:])
 			if size == 0 {
-				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid character %#U", c)
+				return nil, nil, rest, newDecodeError(token[i:i+1], "invalid character %#U", c)
 			}
 			builder.Write(token[i : i+size])
 			i += size
@@ -679,7 +696,7 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 	// dot-sep   = ws %x2E ws  ; . Period
 	raw, key, b, err := p.parseSimpleKey(b)
 	if err != nil {
-		return ast.InvalidReference, nil, err
+		return ast.InvalidReference, b, err
 	}
 
 	ref := p.builder.Push(ast.Node{
@@ -695,7 +712,7 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 
 			raw, key, b, err = p.parseSimpleKey(b)
 			if err != nil {
-				return ref, nil, err
+				return ref, b, err
 			}
 
 			p.builder.PushAndChain(ast.Node{
@@ -713,7 +730,7 @@ func (p *parser) parseKey(b []byte) (ast.Reference, []byte, error) {
 
 func (p *parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 	if len(b) == 0 {
-		return nil, nil, nil, newDecodeError(b, "expected key but found none")
+		return nil, nil, b, newDecodeError(b, "expected key but found none")
 	}
 
 	// simple-key = quoted-key / unquoted-key
@@ -728,7 +745,7 @@ func (p *parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 		key, rest = scanUnquotedKey(b)
 		return key, key, rest, nil
 	default:
-		return nil, nil, nil, newDecodeError(b[0:1], "invalid character at start of key: %c", b[0])
+		return nil, nil, b[1:], newDecodeError(b[0:1], "invalid character at start of key: %c", b[0])
 	}
 }
 
@@ -750,7 +767,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// escape-seq-char =/ %x55 8HEXDIG ; UXXXXXXXX            U+XXXXXXXX
 	token, escaped, rest, err := scanBasicString(b)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, rest, err
 	}
 
 	startIdx := len(`"`)
@@ -765,7 +782,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 		if verr.Zero() {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, rest, newDecodeError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
 	}
 
 	i := startIdx
@@ -798,7 +815,7 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 			case 'u':
 				x, err := hexToRune(token[i+1:len(token)-1], 4)
 				if err != nil {
-					return nil, nil, nil, err
+					return nil, nil, rest, err
 				}
 
 				builder.WriteRune(x)
@@ -806,19 +823,19 @@ func (p *parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 			case 'U':
 				x, err := hexToRune(token[i+1:len(token)-1], 8)
 				if err != nil {
-					return nil, nil, nil, err
+					return nil, nil, rest, err
 				}
 
 				builder.WriteRune(x)
 				i += 8
 			default:
-				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
+				return nil, nil, rest, newDecodeError(token[i:i+1], "invalid escaped character %#U", c)
 			}
 			i++
 		} else {
 			size := utf8ValidNext(token[i:])
 			if size == 0 {
-				return nil, nil, nil, newDecodeError(token[i:i+1], "invalid character %#U", c)
+				return nil, nil, rest, newDecodeError(token[i:i+1], "invalid character %#U", c)
 			}
 			builder.Write(token[i : i+size])
 			i += size
@@ -877,6 +894,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		return p.builder.Push(ast.Node{
 			Kind: ast.Float,
 			Data: b[:3],
+			Raw:  p.Range(b[:3]),
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
@@ -886,6 +904,7 @@ func (p *parser) parseIntOrFloatOrDateTime(b []byte) (ast.Reference, []byte, err
 		return p.builder.Push(ast.Node{
 			Kind: ast.Float,
 			Data: b[:3],
+			Raw:  p.Range(b[:3]),
 		}), b[3:], nil
 	case '+', '-':
 		return p.scanIntOrFloat(b)
@@ -977,6 +996,7 @@ byteLoop:
 	return p.builder.Push(ast.Node{
 		Kind: kind,
 		Data: b[:i],
+		Raw:  p.Range(b[:i]),
 	}), b[i:], nil
 }
 
@@ -1010,6 +1030,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 		return p.builder.Push(ast.Node{
 			Kind: ast.Integer,
 			Data: b[:i],
+			Raw:  p.Range(b[:i]),
 		}), b[i:], nil
 	}
 
@@ -1033,6 +1054,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				return p.builder.Push(ast.Node{
 					Kind: ast.Float,
 					Data: b[:i+3],
+					Raw:  p.Range(b[:i+3]),
 				}), b[i+3:], nil
 			}
 
@@ -1044,6 +1066,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 				return p.builder.Push(ast.Node{
 					Kind: ast.Float,
 					Data: b[:i+3],
+					Raw:  p.Range(b[:i+3]),
 				}), b[i+3:], nil
 			}
 
@@ -1066,6 +1089,7 @@ func (p *parser) scanIntOrFloat(b []byte) (ast.Reference, []byte, error) {
 	return p.builder.Push(ast.Node{
 		Kind: kind,
 		Data: b[:i],
+		Raw:  p.Range(b[:i]),
 	}), b[i:], nil
 }
 
