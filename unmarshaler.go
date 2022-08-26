@@ -1140,7 +1140,7 @@ func fieldByIndex(v reflect.Value, path []int) reflect.Value {
 	for i, x := range path {
 		v = v.Field(x)
 
-		if i < len(path)-1 && v.Kind() == reflect.Pointer {
+		if i < len(path)-1 && v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				v.Set(reflect.New(v.Type().Elem()))
 			}
@@ -1208,7 +1208,7 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 
 		if f.Anonymous && name == "" {
 			t2 := f.Type
-			if t2.Kind() == reflect.Pointer {
+			if t2.Kind() == reflect.Ptr {
 				t2 = t2.Elem()
 			}
 
