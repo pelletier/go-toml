@@ -2,10 +2,11 @@ package danger
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"unsafe"
 )
+
+const maxInt = uintptr(int(^uint(0) >> 1))
 
 func SubsliceOffset(data []byte, subslice []byte) int {
 	datap := (*reflect.SliceHeader)(unsafe.Pointer(&data))
@@ -16,7 +17,7 @@ func SubsliceOffset(data []byte, subslice []byte) int {
 	}
 	offset := hlp.Data - datap.Data
 
-	if offset > math.MaxInt {
+	if offset > maxInt {
 		panic(fmt.Errorf("slice offset larger than int (%d)", offset))
 	}
 
