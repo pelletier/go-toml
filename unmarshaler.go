@@ -230,15 +230,6 @@ func (d *decoder) fromParser(root reflect.Value) error {
 	return d.p.Error()
 }
 
-/*
-Rules for the unmarshal code:
-
-- The stack is used to keep track of which values need to be set where.
-- handle* functions <=> switch on a given ast.Kind.
-- unmarshalX* functions need to unmarshal a node of kind X.
-- An "object" is either a struct or a map.
-*/
-
 func (d *decoder) handleRootExpression(expr *ast.Node, v reflect.Value) error {
 	var x reflect.Value
 	var err error
@@ -400,6 +391,84 @@ func (d *decoder) handleArrayTableCollection(key ast.Iterator, v reflect.Value) 
 	return d.handleArrayTable(key, v)
 }
 
+func (d *decoder) handleKeyValuePartMapStringInterface(key ast.Iterator, value *ast.Node, m map[string]interface{}) (reflect.Value, error) {
+	k := string(key.Node().Data)
+
+	newMap := false
+	if m == nil {
+		newMap = true
+		m = make(map[string]interface{}, 8)
+	}
+
+	set := false
+	v, ok := m[k]
+	if !ok || key.IsLast() {
+		set = true
+		v = nil
+	}
+
+	mv := reflect.ValueOf(&v).Elem()
+
+	x, err := d.handleKeyValueInner(key, value, mv)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	if x.IsValid() {
+		mv = x
+		set = true
+	}
+
+	if set {
+		m[k] = mv.Interface()
+	}
+
+	if newMap {
+		return reflect.ValueOf(m), nil
+	}
+
+	return reflect.Value{}, nil
+}
+
+func (d *decoder) handleKeyPartMapStringInterface(key ast.Iterator, m map[string]interface{}, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
+	newMap := false
+
+	k := string(key.Node().Data)
+	if m == nil {
+		newMap = true
+		m = make(map[string]interface{}, 8)
+	}
+
+	v, ok := m[k]
+	set := false
+
+	if !ok || v == nil {
+		set = true
+		v = makeFn().Interface()
+	}
+
+	mv := reflect.ValueOf(v)
+
+	x, err := nextFn(key, mv)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	if x.IsValid() {
+		mv = x
+		set = true
+	}
+
+	if set {
+		m[k] = mv.Interface()
+	}
+
+	if newMap {
+		return reflect.ValueOf(m), nil
+	}
+
+	return reflect.Value{}, nil
+}
+
 func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
 	var rv reflect.Value
 
@@ -415,6 +484,11 @@ func (d *decoder) handleKeyPart(key ast.Iterator, v reflect.Value, nextFn handle
 		return d.handleKeyPart(key, elem, nextFn, makeFn)
 	case reflect.Map:
 		vt := v.Type()
+
+		if vt == mapStringInterfaceType {
+			m := v.Interface().(map[string]interface{})
+			return d.handleKeyPartMapStringInterface(key, m, nextFn, makeFn)
+		}
 
 		// Create the key for the map element. Convert to key type.
 		mk := reflect.ValueOf(string(key.Node().Data)).Convert(vt.Key())
@@ -1014,6 +1088,11 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 	case reflect.Map:
 		vt := v.Type()
 
+		if vt == mapStringInterfaceType {
+			m := v.Interface().(map[string]interface{})
+			return d.handleKeyValuePartMapStringInterface(key, value, m)
+		}
+
 		mk := reflect.ValueOf(string(key.Node().Data))
 		mkt := stringType
 
@@ -1037,12 +1116,10 @@ func (d *decoder) handleKeyValuePart(key ast.Iterator, value *ast.Node, v reflec
 		if !mv.IsValid() {
 			set = true
 			mv = reflect.New(v.Type().Elem()).Elem()
-		} else {
-			if key.IsLast() {
-				var x interface{}
-				mv = reflect.ValueOf(&x).Elem()
-				set = true
-			}
+		} else if key.IsLast() {
+			var x interface{}
+			mv = reflect.ValueOf(&x).Elem()
+			set = true
 		}
 
 		nv, err := d.handleKeyValueInner(key, value, mv)
