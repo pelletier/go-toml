@@ -339,13 +339,13 @@ func (d *decoder) handleArrayTableCollectionLast(key ast.Iterator, v reflect.Val
 	case reflect.Array:
 		idx := d.arrayIndex(true, v)
 		if idx >= v.Len() {
-			return v, fmt.Errorf("toml: cannot decode array table into %s at position %d", v.Type(), idx)
+			return v, fmt.Errorf("%s at position %d", d.typeMismatchError("array table", v.Type()), idx)
 		}
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
 		return v, err
 	default:
-		return reflect.Value{}, fmt.Errorf("toml: cannot decode array table into a %s", v.Type())
+		return reflect.Value{}, d.typeMismatchError("array table", v.Type())
 	}
 }
 
@@ -390,7 +390,7 @@ func (d *decoder) handleArrayTableCollection(key ast.Iterator, v reflect.Value) 
 	case reflect.Array:
 		idx := d.arrayIndex(false, v)
 		if idx >= v.Len() {
-			return v, fmt.Errorf("toml: cannot decode array table into %s at position %d", v.Type(), idx)
+			return v, fmt.Errorf("%s at position %d", d.typeMismatchError("array table", v.Type()), idx)
 		}
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
