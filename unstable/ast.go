@@ -1,4 +1,4 @@
-package ast
+package unstable
 
 import (
 	"fmt"
@@ -42,26 +42,6 @@ func (c *Iterator) Node() *Node {
 	return c.node
 }
 
-// Root contains a full AST.
-//
-// It is immutable once constructed with Builder.
-type Root struct {
-	nodes []Node
-}
-
-// Iterator over the top level nodes.
-func (r *Root) Iterator() Iterator {
-	it := Iterator{}
-	if len(r.nodes) > 0 {
-		it.node = &r.nodes[0]
-	}
-	return it
-}
-
-func (r *Root) at(idx Reference) *Node {
-	return &r.nodes[idx]
-}
-
 // Arrays have one child per element in the array.  InlineTables have
 // one child per key-value pair in the table.  KeyValues have at least
 // two children. The first one is the value. The rest make a
@@ -85,8 +65,7 @@ type Range struct {
 	Length uint32
 }
 
-// Next returns a copy of the next node, or an invalid Node if there
-// is no next node.
+// Next returns a pointer to the next node, or nil if there is no next node.
 func (n *Node) Next() *Node {
 	if n.next == 0 {
 		return nil
