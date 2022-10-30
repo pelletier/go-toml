@@ -20,8 +20,8 @@ type ParserError struct {
 }
 
 // Error is the implementation of the error interface.
-func (pe *ParserError) Error() string {
-	return pe.Message
+func (e *ParserError) Error() string {
+	return e.Message
 }
 
 // NewParserError is a convenience function to create a ParserError
@@ -35,6 +35,22 @@ func NewParserError(highlight []byte, format string, args ...interface{}) error 
 	}
 }
 
+// Parser scans over a TOML-encoded document and generates an iterative AST.
+//
+// To prime the Parser, first reset it with the contents of a TOML document.
+// Then, process all top-level expressions sequentially. See Example.
+//
+// Don't forget to check Error() after you're done parsing.
+//
+// Each top-level expression needs to be fully processed before calling
+// NextExpression() again. Otherwise, calls to various Node methods may panic if
+// the parser has moved on the next expression.
+//
+// For performance reasons, go-toml doesn't make a copy of the input bytes to
+// the parser. Make sure to copy all the bytes you need to outlive the slice
+// given to the parser.
+//
+// The parser doesn't provide nodes for comments yet, nor for whitespace.
 type Parser struct {
 	data    []byte
 	builder builder
@@ -44,10 +60,14 @@ type Parser struct {
 	first   bool
 }
 
+// Data returns the slice provided to the last call to Reset.
 func (p *Parser) Data() []byte {
 	return p.data
 }
 
+// Range returns a range description that corresponds to a given slice of the
+// input. If the argument is not a subslice of the parser input, this function
+// panics.
 func (p *Parser) Range(b []byte) Range {
 	return Range{
 		Offset: uint32(danger.SubsliceOffset(p.data, b)),
@@ -55,10 +75,13 @@ func (p *Parser) Range(b []byte) Range {
 	}
 }
 
+// Raw returns the slice corresponding to the bytes in the given range.
 func (p *Parser) Raw(raw Range) []byte {
 	return p.data[raw.Offset : raw.Offset+raw.Length]
 }
 
+// Reset brings the parser to its initial state for a given input. It wipes an
+// reuses internal storage to reduce allocation.
 func (p *Parser) Reset(b []byte) {
 	p.builder.Reset()
 	p.ref = invalidReference
@@ -68,6 +91,11 @@ func (p *Parser) Reset(b []byte) {
 	p.first = true
 }
 
+// NextExpression parses the next top-level expression. If an expression was
+// successfully parsed, it returns true. If the parser is at the end of the
+// document or an error occurred, it returns false.
+//
+// Retrieve the parsed expression with Expression().
 func (p *Parser) NextExpression() bool {
 	if len(p.left) == 0 || p.err != nil {
 		return false
@@ -103,10 +131,13 @@ func (p *Parser) NextExpression() bool {
 	}
 }
 
+// Expression returns a pointer to the node representing the last successfully
+// parsed expresion.
 func (p *Parser) Expression() *Node {
 	return p.builder.NodeAt(p.ref)
 }
 
+// Error returns any error that has occured during parsing.
 func (p *Parser) Error() error {
 	return p.err
 }

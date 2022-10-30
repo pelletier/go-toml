@@ -1,6 +1,7 @@
 package unstable
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -445,4 +446,27 @@ func TestParser_AST_DateTimes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func ExampleParser() {
+	doc := `
+	hello = "world"
+	value = 42
+	`
+	p := Parser{}
+	p.Reset([]byte(doc))
+	for p.NextExpression() {
+		e := p.Expression()
+		fmt.Printf("Expression: %s\n", e.Kind)
+		value := e.Value()
+		it := e.Key()
+		k := it.Node() // shortcut: we know there is no dotted key in the example
+		fmt.Printf("%s -> (%s) %s\n", k.Data, value.Kind, value.Data)
+	}
+
+	// Output:
+	// Expression: KeyValue
+	// hello -> (String) world
+	// Expression: KeyValue
+	// value -> (Integer) 42
 }
