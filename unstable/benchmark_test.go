@@ -1,4 +1,4 @@
-package toml
+package unstable
 
 import (
 	"bytes"
@@ -55,7 +55,7 @@ func BenchmarkParseLiteralStringValid(b *testing.B) {
 
 	for name, input := range inputs {
 		b.Run(name, func(b *testing.B) {
-			p := parser{}
+			p := Parser{}
 			b.SetBytes(int64(len(input)))
 			b.ReportAllocs()
 			b.ResetTimer()

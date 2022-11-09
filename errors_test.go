@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2/unstable"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -170,9 +171,9 @@ line 5`,
 			doc := b.Bytes()
 			hl := doc[start:end]
 
-			err := wrapDecodeError(doc, &decodeError{
-				highlight: hl,
-				message:   e.msg,
+			err := wrapDecodeError(doc, &unstable.ParserError{
+				Highlight: hl,
+				Message:   e.msg,
 			})
 
 			var derr *DecodeError
