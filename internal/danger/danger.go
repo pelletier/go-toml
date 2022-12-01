@@ -21,17 +21,15 @@ func SubsliceOffset(data []byte, subslice []byte) int {
 		panic(fmt.Errorf("slice offset larger than int (%d)", offset))
 	}
 
-	intoffset := int(offset)
-
-	if intoffset > datap.Len {
-		panic(fmt.Errorf("slice offset (%d) is farther than data length (%d)", intoffset, datap.Len))
+	if sizeType(offset) > datap.Len {
+		panic(fmt.Errorf("slice offset (%d) is farther than data length (%d)", offset, datap.Len))
 	}
 
-	if intoffset+hlp.Len > datap.Len {
-		panic(fmt.Errorf("slice ends (%d+%d) is farther than data length (%d)", intoffset, hlp.Len, datap.Len))
+	if sizeType(offset)+hlp.Len > datap.Len {
+		panic(fmt.Errorf("slice ends (%d+%d) is farther than data length (%d)", offset, hlp.Len, datap.Len))
 	}
 
-	return intoffset
+	return int(offset)
 }
 
 func BytesRange(start []byte, end []byte) []byte {
@@ -46,7 +44,7 @@ func BytesRange(start []byte, end []byte) []byte {
 	}
 
 	l := startp.Len
-	endLen := int(endp.Data-startp.Data) + endp.Len
+	endLen := sizeType(endp.Data-startp.Data) + endp.Len
 	if endLen > l {
 		l = endLen
 	}
