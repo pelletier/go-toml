@@ -1190,6 +1190,27 @@ func TestMarshalUint64Overflow(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIndentWithInlineTable(t *testing.T) {
+	x := map[string][]map[string]string{
+		"one": []map[string]string{
+			{"0": "0"},
+			{"1": "1"},
+		},
+	}
+	expected := `one = [
+  {0 = '0'},
+  {1 = '1'}
+]
+`
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetIndentTables(true)
+	enc.SetTablesInline(true)
+	enc.SetArraysMultiline(true)
+	require.NoError(t, enc.Encode(x))
+	assert.Equal(t, expected, buf.String())
+}
+
 func ExampleMarshal() {
 	type MyConfig struct {
 		Version int
