@@ -36,7 +36,7 @@ a = 42.0
 
 	for _, e := range examples {
 		b := new(bytes.Buffer)
-		err := convert(strings.NewReader(e.input), b, cli.Options{})
+		err := convert(strings.NewReader(e.input), b, cli.Options{"multiLineArray": false})
 		if e.errors {
 			require.Error(t, err)
 		} else {
