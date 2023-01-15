@@ -12,7 +12,9 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type ConvertFn func(r io.Reader, w io.Writer) error
+type Options map[string]interface{}
+
+type ConvertFn func(r io.Reader, w io.Writer, options Options) error
 
 type Program struct {
 	Usage string
@@ -20,6 +22,7 @@ type Program struct {
 	// Inplace allows the command to take more than one file as argument and
 	// perform convertion in place on each provided file.
 	Inplace bool
+	Opts Options
 }
 
 func (p *Program) Execute() {
@@ -58,7 +61,7 @@ func (p *Program) run(files []string, input io.Reader, output io.Writer) error {
 		defer f.Close()
 		input = f
 	}
-	return p.Fn(input, output)
+	return p.Fn(input, output, p.Opts)
 }
 
 func (p *Program) runAllFilesInPlace(files []string) error {
@@ -79,7 +82,7 @@ func (p *Program) runFileInPlace(path string) error {
 
 	out := new(bytes.Buffer)
 
-	err = p.Fn(bytes.NewReader(in), out)
+	err = p.Fn(bytes.NewReader(in), out, p.Opts)
 	if err != nil {
 		return err
 	}

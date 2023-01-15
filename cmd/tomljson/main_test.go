@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2/internal/cli"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +46,7 @@ a = 42`),
 
 	for _, e := range examples {
 		b := new(bytes.Buffer)
-		err := convert(e.input, b)
+		err := convert(e.input, b, cli.Options{})
 		if e.errors {
 			require.Error(t, err)
 		} else {

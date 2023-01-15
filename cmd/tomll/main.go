@@ -44,7 +44,7 @@ func main() {
 	p.Execute()
 }
 
-func convert(r io.Reader, w io.Writer) error {
+func convert(r io.Reader, w io.Writer, o cli.Options) error {
 	var v interface{}
 
 	d := toml.NewDecoder(r)
