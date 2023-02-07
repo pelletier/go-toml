@@ -952,6 +952,10 @@ func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error 
 		}
 
 		r = reflect.ValueOf(uint(i))
+	case reflect.Float32:
+		r = reflect.ValueOf(float32(i))
+	case reflect.Float64:
+		r = reflect.ValueOf(float64(i))
 	case reflect.Interface:
 		r = reflect.ValueOf(i)
 	default:

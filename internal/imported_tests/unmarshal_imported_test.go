@@ -1085,10 +1085,6 @@ func TestUnmarshalCheckConversionFloatInt(t *testing.T) {
 			desc:  "int",
 			input: `I = 1e300`,
 		},
-		{
-			desc:  "float",
-			input: `F = 9223372036854775806`,
-		},
 	}
 
 	for _, test := range testCases {
