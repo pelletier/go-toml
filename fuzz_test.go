@@ -1,5 +1,5 @@
-//go:build go1.18 || go1.19
-// +build go1.18 go1.19
+//go:build go1.18 || go1.19 || go1.20
+// +build go1.18 go1.19 go1.20
 
 package toml_test
 
