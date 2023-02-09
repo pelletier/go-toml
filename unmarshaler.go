@@ -887,6 +887,11 @@ func init() {
 }
 
 func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error {
+	kind := v.Kind()
+	if kind == reflect.Float32 || kind == reflect.Float64 {
+		return d.unmarshalFloat(value, v)
+	}
+
 	i, err := parseInteger(value.Data)
 	if err != nil {
 		return err
@@ -894,7 +899,7 @@ func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error 
 
 	var r reflect.Value
 
-	switch v.Kind() {
+	switch kind {
 	case reflect.Int64:
 		v.SetInt(i)
 		return nil

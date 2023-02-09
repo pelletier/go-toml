@@ -7,11 +7,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFastSimple(t *testing.T) {
+func TestFastSimpleInt(t *testing.T) {
 	m := map[string]int64{}
 	err := toml.Unmarshal([]byte(`a = 42`), &m)
 	require.NoError(t, err)
 	require.Equal(t, map[string]int64{"a": 42}, m)
+}
+
+func TestFastSimpleFloat(t *testing.T) {
+	m := map[string]float64{}
+	err := toml.Unmarshal([]byte("a = 42\nb = 1.1\nc = 12341234123412341234123412341234"), &m)
+	require.NoError(t, err)
+	require.Equal(t, map[string]float64{"a": 42, "b": 1.1, "c": 1.2341234123412342e+31}, m)
 }
 
 func TestFastSimpleString(t *testing.T) {
