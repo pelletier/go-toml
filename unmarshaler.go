@@ -60,7 +60,7 @@ func (d *Decoder) DisallowUnknownFields() *Decoder {
 // are ignored. See Decoder.DisallowUnknownFields() to change this behavior.
 //
 // When a TOML local date, time, or date-time is decoded into a time.Time, its
-// value is represented in time.Local timezone. Otherwise the approriate Local*
+// value is represented in time.Local timezone. Otherwise the appropriate Local*
 // structure is used. For time values, precision up to the nanosecond is
 // supported by truncating extra digits.
 //

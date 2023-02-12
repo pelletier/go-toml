@@ -18,7 +18,7 @@ type Program struct {
 	Usage string
 	Fn    ConvertFn
 	// Inplace allows the command to take more than one file as argument and
-	// perform convertion in place on each provided file.
+	// perform conversion in place on each provided file.
 	Inplace bool
 }
 
