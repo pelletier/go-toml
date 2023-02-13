@@ -2742,7 +2742,7 @@ world'`,
 			data: "a = \"aaaa\xE2\x80\x00\"",
 		},
 		{
-			desc: "invalid 4rd byte of 4-byte utf8 character in string with no escape sequence",
+			desc: "invalid 4th byte of 4-byte utf8 character in string with no escape sequence",
 			data: "a = \"aaaa\xF2\x81\x81\x00\"",
 		},
 		{
@@ -2758,7 +2758,7 @@ world'`,
 			data: "a = 'aaaa\xE2\x80\x00'",
 		},
 		{
-			desc: "invalid 4rd byte of 4-byte utf8 character in literal string",
+			desc: "invalid 4th byte of 4-byte utf8 character in literal string",
 			data: "a = 'aaaa\xF2\x81\x81\x00'",
 		},
 		{
