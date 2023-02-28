@@ -2466,6 +2466,12 @@ func TestIssue807(t *testing.T) {
 	require.Equal(t, "foo", m.Name)
 }
 
+func TestIssue850(t *testing.T) {
+	data := make(map[string]string)
+	err := toml.Unmarshal([]byte("foo = {}"), &data)
+	require.Error(t, err)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
