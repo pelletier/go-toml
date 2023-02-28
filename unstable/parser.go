@@ -402,6 +402,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 	parent := p.builder.Push(Node{
 		Kind: InlineTable,
+		Raw:  p.Range(b[:1]),
 	})
 
 	first := true

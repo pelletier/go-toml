@@ -746,7 +746,7 @@ func (d *decoder) unmarshalInlineTable(itable *unstable.Node, v reflect.Value) e
 		}
 		return d.unmarshalInlineTable(itable, elem)
 	default:
-		return unstable.NewParserError(itable.Data, "cannot store inline table in Go type %s", v.Kind())
+		return unstable.NewParserError(d.p.Raw(itable.Raw), "cannot store inline table in Go type %s", v.Kind())
 	}
 
 	it := itable.Children()
