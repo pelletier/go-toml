@@ -1039,15 +1039,9 @@ func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node
 
 		mv := v.MapIndex(mk)
 		set := false
-		if !mv.IsValid() {
+		if !mv.IsValid() || key.IsLast() {
 			set = true
 			mv = reflect.New(v.Type().Elem()).Elem()
-		} else {
-			if key.IsLast() {
-				var x interface{}
-				mv = reflect.ValueOf(&x).Elem()
-				set = true
-			}
 		}
 
 		nv, err := d.handleKeyValueInner(key, value, mv)
