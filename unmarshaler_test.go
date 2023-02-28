@@ -2472,6 +2472,21 @@ func TestIssue850(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIssue851(t *testing.T) {
+	type Target struct {
+		Params map[string]string `toml:"params"`
+	}
+
+	content := "params = {a=\"1\",b=\"2\"}"
+	var target Target
+	err := toml.Unmarshal([]byte(content), &target)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
+	err = toml.Unmarshal([]byte(content), &target)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
