@@ -979,11 +979,17 @@ func (d *decoder) unmarshalString(value *unstable.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
+		ctx := d.errorContext
+		if ctx != nil && ctx.Struct != nil {
+			f := ctx.Struct.FieldByIndex(ctx.Field)
+			return unstable.NewParserErrorWithContext(d.p.Raw(value.Raw), "cannot store TOML string into struct field %s.%s of type %s", f.Name, f.Type, v.Kind())
+		}
 		return unstable.NewParserError(d.p.Raw(value.Raw), "cannot store TOML string into a Go %s", v.Kind())
 	}
 
 	return nil
 }
+
 
 func (d *decoder) handleKeyValue(expr *unstable.Node, v reflect.Value) (reflect.Value, error) {
 	d.strict.EnterKeyValue(expr)
