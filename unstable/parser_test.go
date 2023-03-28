@@ -496,21 +496,23 @@ key5 = [ # Next to start of inline array.
 # After array table.
 `
 
-	var printGeneric func(indent int, e *Node)
-	printGeneric = func(indent int, e *Node) {
+	var printGeneric func(*Parser, int, *Node)
+	printGeneric = func(p *Parser, indent int, e *Node) {
 		if e == nil {
 			return
 		}
-		fmt.Printf("%s%s", strings.Repeat(" ", indent), fmt.Sprintf("%s [%s]\n", e.Kind, e.Data))
-		printGeneric(indent+1, e.Child())
-		printGeneric(indent, e.Next())
+		s := p.Shape(e.Raw)
+		x := fmt.Sprintf("%d:%d->%d:%d (%d->%d)", s.Start.Line, s.Start.Column, s.End.Line, s.End.Column, s.Start.Offset, s.End.Offset)
+		fmt.Printf("%-25s | %s%s [%s]\n", x, strings.Repeat("  ", indent), e.Kind, e.Data)
+		printGeneric(p, indent+1, e.Child())
+		printGeneric(p, indent, e.Next())
 	}
 
 	printTree := func(p *Parser) {
 		for p.NextExpression() {
 			e := p.Expression()
 			fmt.Println("---")
-			printGeneric(0, e)
+			printGeneric(p, 0, e)
 		}
 		if err := p.Error(); err != nil {
 			panic(err)
@@ -525,82 +527,82 @@ key5 = [ # Next to start of inline array.
 
 	// Output:
 	// ---
-	// Comment [# Top of the document comment.]
+	// 1:1->1:31 (0->30)         | Comment [# Top of the document comment.]
 	// ---
-	// Comment [# Optional, any amount of lines.]
+	// 2:1->2:33 (31->63)        | Comment [# Optional, any amount of lines.]
 	// ---
-	// Comment [# Above table.]
+	// 4:1->4:15 (65->79)        | Comment [# Above table.]
 	// ---
-	// Table []
-	//  Key [table]
-	// Comment [# Next to table.]
+	// 1:1->1:1 (0->0)           | Table []
+	// 5:2->5:7 (81->86)         |   Key [table]
+	// 5:9->5:25 (88->104)       | Comment [# Next to table.]
 	// ---
-	// Comment [# Above simple value.]
+	// 6:1->6:22 (105->126)      | Comment [# Above simple value.]
 	// ---
-	// KeyValue []
-	//  String [value]
-	//  Key [key]
-	// Comment [# Next to simple value.]
+	// 1:1->1:1 (0->0)           | KeyValue []
+	// 7:7->7:14 (133->140)      |   String [value]
+	// 7:1->7:4 (127->130)       |   Key [key]
+	// 7:15->7:38 (141->164)     | Comment [# Next to simple value.]
 	// ---
-	// Comment [# Below simple value.]
+	// 8:1->8:22 (165->186)      | Comment [# Below simple value.]
 	// ---
-	// Comment [# Some comment alone.]
+	// 10:1->10:22 (188->209)    | Comment [# Some comment alone.]
 	// ---
-	// Comment [# Multiple comments, on multiple lines.]
+	// 12:1->12:40 (211->250)    | Comment [# Multiple comments, on multiple lines.]
 	// ---
-	// Comment [# Above inline table.]
+	// 14:1->14:22 (252->273)    | Comment [# Above inline table.]
 	// ---
-	// KeyValue []
-	//  InlineTable []
-	//   KeyValue []
-	//    String [Tom]
-	//    Key [first]
-	//   KeyValue []
-	//    String [Preston-Werner]
-	//    Key [last]
-	//  Key [name]
-	// Comment [# Next to inline table.]
+	// 1:1->1:1 (0->0)           | KeyValue []
+	// 15:8->15:9 (281->282)     |   InlineTable []
+	// 1:1->1:1 (0->0)           |     KeyValue []
+	// 15:18->15:23 (291->296)   |       String [Tom]
+	// 15:10->15:15 (283->288)   |       Key [first]
+	// 1:1->1:1 (0->0)           |     KeyValue []
+	// 15:32->15:48 (305->321)   |       String [Preston-Werner]
+	// 15:25->15:29 (298->302)   |       Key [last]
+	// 15:1->15:5 (274->278)     |   Key [name]
+	// 15:51->15:74 (324->347)   | Comment [# Next to inline table.]
 	// ---
-	// Comment [# Below inline table.]
+	// 16:1->16:22 (348->369)    | Comment [# Below inline table.]
 	// ---
-	// Comment [# Above array.]
+	// 18:1->18:15 (371->385)    | Comment [# Above array.]
 	// ---
-	// KeyValue []
-	//  Array []
-	//   Integer [1]
-	//   Integer [2]
-	//   Integer [3]
-	//  Key [array]
-	// Comment [# Next to one-line array.]
+	// 1:1->1:1 (0->0)           | KeyValue []
+	// 1:1->1:1 (0->0)           |   Array []
+	// 1:1->1:1 (0->0)           |     Integer [1]
+	// 1:1->1:1 (0->0)           |     Integer [2]
+	// 1:1->1:1 (0->0)           |     Integer [3]
+	// 19:1->19:6 (386->391)     |   Key [array]
+	// 19:21->19:46 (406->431)   | Comment [# Next to one-line array.]
 	// ---
-	// Comment [# Below array.]
+	// 20:1->20:15 (432->446)    | Comment [# Below array.]
 	// ---
-	// Comment [# Above multi-line array.]
+	// 22:1->22:26 (448->473)    | Comment [# Above multi-line array.]
 	// ---
-	// KeyValue []
-	//  Array []
-	//   Comment [# Next to start of inline array.]
-	//    Comment [# Second line before array content.]
-	//   Integer [1]
-	//   Comment [# Next to first element.]
-	//    Comment [# After first element.]
-	//    Comment [# Before second element.]
-	//   Integer [2]
-	//   Integer [3]
-	//   Comment [# Next to last element]
-	//    Comment [# After last element.]
-	//  Key [key5]
-	// Comment [# Next to end of array.]
+	// 1:1->1:1 (0->0)           | KeyValue []
+	// 1:1->1:1 (0->0)           |   Array []
+	// 23:10->23:42 (483->515)   |     Comment [# Next to start of inline array.]
+	// 24:3->24:38 (518->553)    |       Comment [# Second line before array content.]
+	// 1:1->1:1 (0->0)           |     Integer [1]
+	// 25:6->25:30 (559->583)    |     Comment [# Next to first element.]
+	// 26:3->26:25 (586->608)    |       Comment [# After first element.]
+	// 27:3->27:27 (611->635)    |       Comment [# Before second element.]
+	// 1:1->1:1 (0->0)           |     Integer [2]
+	// 1:1->1:1 (0->0)           |     Integer [3]
+	// 29:6->29:28 (646->668)    |     Comment [# Next to last element]
+	// 30:3->30:24 (671->692)    |       Comment [# After last element.]
+	// 23:1->23:5 (474->478)     |   Key [key5]
+	// 31:3->31:26 (695->718)    | Comment [# Next to end of array.]
 	// ---
-	// Comment [# Below multi-line array.]
+	// 32:1->32:26 (719->744)    | Comment [# Below multi-line array.]
 	// ---
-	// Comment [# Before array table.]
+	// 34:1->34:22 (746->767)    | Comment [# Before array table.]
 	// ---
-	// ArrayTable []
-	//  Key [products]
-	// Comment [# Next to array table.]
+	// 1:1->1:1 (0->0)           | ArrayTable []
+	// 35:3->35:11 (770->778)    |   Key [products]
+	// 35:14->35:36 (781->803)   | Comment [# Next to array table.]
 	// ---
-	// Comment [# After array table.]
+	// 36:1->36:21 (804->824)    | Comment [# After array table.]
 }
 
 func ExampleParser() {

@@ -142,6 +142,44 @@ func (p *Parser) Error() error {
 	return p.err
 }
 
+// Position describes a position in the input.
+type Position struct {
+	// Number of bytes from the beginning of the input.
+	Offset int
+	// Line number, starting at 1.
+	Line int
+	// Column number, starting at 1.
+	Column int
+}
+
+// Shape describes the position of a range in the input.
+type Shape struct {
+	Start Position
+	End   Position
+}
+
+func (p *Parser) position(b []byte) Position {
+	offset := danger.SubsliceOffset(p.data, b)
+
+	lead := p.data[:offset]
+
+	return Position{
+		Offset: offset,
+		Line:   bytes.Count(lead, []byte{'\n'}) + 1,
+		Column: len(lead) - bytes.LastIndex(lead, []byte{'\n'}),
+	}
+}
+
+// Shape returns the shape of the given range in the input.  Will
+// panic if the range is not a subslice of the input.
+func (p *Parser) Shape(r Range) Shape {
+	raw := p.Raw(r)
+	return Shape{
+		Start: p.position(raw),
+		End:   p.position(raw[r.Length:]),
+	}
+}
+
 func (p *Parser) parseNewline(b []byte) ([]byte, error) {
 	if b[0] == '\n' {
 		return b[1:], nil
