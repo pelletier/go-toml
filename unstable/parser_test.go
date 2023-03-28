@@ -448,7 +448,7 @@ func TestParser_AST_DateTimes(t *testing.T) {
 	}
 }
 
-func ExampleParserAllComments() {
+func ExampleParser_comments() {
 	doc := `# Top of the document comment.
 # Optional, any amount of lines.
 
@@ -475,6 +475,7 @@ key5 = [ # Next to start of inline array.
   # Second line before array content.
   1, # Next to first element.
   # After first element.
+  # Before second element.
   2,
   3, # Next to last element
   # After last element.
@@ -486,12 +487,90 @@ key5 = [ # Next to start of inline array.
 # After array table.
 `
 
-	p := &Parser{}
+	p := &Parser{
+		KeepComments: true,
+	}
 	p.Reset([]byte(doc))
 	printTree(p)
 
 	// Output:
-	// yo
+	// ---
+	// Comment [# Top of the document comment.]
+	// ---
+	// Comment [# Optional, any amount of lines.]
+	// ---
+	// Comment [# Above table.]
+	// ---
+	// Table []
+	//  Key [table]
+	// Comment [# Next to table.]
+	// ---
+	// Comment [# Above simple value.]
+	// ---
+	// KeyValue []
+	//  String [value]
+	//  Key [key]
+	// Comment [# Next to simple value.]
+	// ---
+	// Comment [# Below simple value.]
+	// ---
+	// Comment [# Some comment alone.]
+	// ---
+	// Comment [# Multiple comments, on multiple lines.]
+	// ---
+	// Comment [# Above inline table.]
+	// ---
+	// KeyValue []
+	//  InlineTable []
+	//   KeyValue []
+	//    String [Tom]
+	//    Key [first]
+	//   KeyValue []
+	//    String [Preston-Werner]
+	//    Key [last]
+	//  Key [name]
+	// Comment [# Next to inline table.]
+	// ---
+	// Comment [# Below inline table.]
+	// ---
+	// Comment [# Above array.]
+	// ---
+	// KeyValue []
+	//  Array []
+	//   Integer [1]
+	//   Integer [2]
+	//   Integer [3]
+	//  Key [array]
+	// Comment [# Next to one-line array.]
+	// ---
+	// Comment [# Below array.]
+	// ---
+	// Comment [# Above multi-line array.]
+	// ---
+	// KeyValue []
+	//  Array []
+	//   Comment [# Next to start of inline array.]
+	//    Comment [# Second line before array content.]
+	//   Integer [1]
+	//   Comment [# Next to first element.]
+	//    Comment [# After first element.]
+	//    Comment [# Before second element.]
+	//   Integer [2]
+	//   Integer [3]
+	//   Comment [# Next to last element]
+	//    Comment [# After last element.]
+	//  Key [key5]
+	// Comment [# Next to end of array.]
+	// ---
+	// Comment [# Below multi-line array.]
+	// ---
+	// Comment [# Before array table.]
+	// ---
+	// ArrayTable []
+	//  Key [products]
+	// Comment [# Next to array table.]
+	// ---
+	// Comment [# After array table.]
 }
 
 func printIndentf(i int, format string, args ...interface{}) {

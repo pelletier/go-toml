@@ -155,6 +155,19 @@ func (p *Parser) parseNewline(b []byte) ([]byte, error) {
 	return nil, NewParserError(b[0:1], "expected newline but got %#U", b[0])
 }
 
+func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
+	ref := invalidReference
+	data, rest, err := scanComment(b)
+	if p.KeepComments && err == nil {
+		ref = p.builder.Push(Node{
+			Kind: Comment,
+			Raw:  p.Range(data),
+			Data: data,
+		})
+	}
+	return ref, rest, err
+}
+
 func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
@@ -168,7 +181,7 @@ func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	}
 
 	if b[0] == '#' {
-		_, rest, err := scanComment(b)
+		ref, rest, err := p.parseComment(b)
 		return ref, rest, err
 	}
 
@@ -190,7 +203,8 @@ func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) > 0 && b[0] == '#' {
-		_, rest, err := scanComment(b)
+		cref, rest, err := p.parseComment(b)
+		p.builder.Chain(ref, cref)
 		return ref, rest, err
 	}
 
@@ -471,15 +485,31 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		Kind: Array,
 	})
 
+	// First indicates whether the parser is looking for the first element
+	// (non-comment) of the array.
 	first := true
 
-	var lastChild reference
+	lastChild := invalidReference
+
+	addChild := func(valueRef reference) {
+		if lastChild == invalidReference {
+			p.builder.AttachChild(parent, valueRef)
+		} else {
+			p.builder.Chain(lastChild, valueRef)
+		}
+		lastChild = valueRef
+	}
 
 	var err error
 	for len(b) > 0 {
-		b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		cref := invalidReference
+		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
+		}
+
+		if cref != invalidReference {
+			addChild(cref)
 		}
 
 		if len(b) == 0 {
@@ -496,9 +526,12 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			}
 			b = b[1:]
 
-			b, err = p.parseOptionalWhitespaceCommentNewline(b)
+			cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
 				return parent, nil, err
+			}
+			if cref != invalidReference {
+				addChild(cref)
 			}
 		} else if !first {
 			return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
@@ -515,17 +548,16 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			return parent, nil, err
 		}
 
-		if first {
-			p.builder.AttachChild(parent, valueRef)
-		} else {
-			p.builder.Chain(lastChild, valueRef)
-		}
-		lastChild = valueRef
+		addChild(valueRef)
 
-		b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
 		}
+		if cref != invalidReference {
+			addChild(cref)
+		}
+
 		first = false
 	}
 
@@ -534,15 +566,34 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error) {
+func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []byte, error) {
+	rootCommentRef := invalidReference
+	latestCommentRef := invalidReference
+
+	addComment := func(ref reference) {
+		if rootCommentRef == invalidReference {
+			rootCommentRef = ref
+		} else if latestCommentRef == invalidReference {
+			p.builder.AttachChild(rootCommentRef, ref)
+			latestCommentRef = ref
+		} else {
+			p.builder.Chain(latestCommentRef, ref)
+			latestCommentRef = ref
+		}
+	}
+
 	for len(b) > 0 {
 		var err error
 		b = p.parseWhitespace(b)
 
 		if len(b) > 0 && b[0] == '#' {
-			_, b, err = scanComment(b)
+			var ref reference
+			ref, b, err = p.parseComment(b)
 			if err != nil {
-				return nil, err
+				return invalidReference, nil, err
+			}
+			if ref != invalidReference {
+				addComment(ref)
 			}
 		}
 
@@ -553,14 +604,14 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) ([]byte, error)
 		if b[0] == '\n' || b[0] == '\r' {
 			b, err = p.parseNewline(b)
 			if err != nil {
-				return nil, err
+				return invalidReference, nil, err
 			}
 		} else {
 			break
 		}
 	}
 
-	return b, nil
+	return rootCommentRef, b, nil
 }
 
 func (p *Parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, error) {
