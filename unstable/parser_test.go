@@ -448,6 +448,76 @@ func TestParser_AST_DateTimes(t *testing.T) {
 	}
 }
 
+func ExampleParserAllComments() {
+	doc := `# Top of the document comment.
+# Optional, any amount of lines.
+
+# Above table.
+[table] # Next to table.
+# Above simple value.
+key = "value" # Next to simple value.
+# Below simple value.
+
+# Some comment alone.
+
+# Multiple comments, on multiple lines.
+
+# Above inline table.
+name = { first = "Tom", last = "Preston-Werner" } # Next to inline table.
+# Below inline table.
+
+# Above array.
+array = [ 1, 2, 3 ] # Next to one-line array.
+# Below array.
+
+# Above multi-line array.
+key5 = [ # Next to start of inline array.
+  # Second line before array content.
+  1, # Next to first element.
+  # After first element.
+  2,
+  3, # Next to last element
+  # After last element.
+] # Next to end of array.
+# Below multi-line array.
+
+# Before array table.
+[[products]] # Next to array table.
+# After array table.
+`
+
+	p := &Parser{}
+	p.Reset([]byte(doc))
+	printTree(p)
+
+	// Output:
+	// yo
+}
+
+func printIndentf(i int, format string, args ...interface{}) {
+	fmt.Printf("%s%s", strings.Repeat(" ", i), fmt.Sprintf(format, args...))
+}
+
+func printGeneric(indent int, e *Node) {
+	if e == nil {
+		return
+	}
+	printIndentf(indent, "%s [%s]\n", e.Kind, e.Data)
+	printGeneric(indent+1, e.Child())
+	printGeneric(indent, e.Next())
+}
+
+func printTree(p *Parser) {
+	for p.NextExpression() {
+		e := p.Expression()
+		fmt.Println("---")
+		printGeneric(0, e)
+	}
+	if err := p.Error(); err != nil {
+		panic(err)
+	}
+}
+
 func ExampleParser() {
 	doc := `
 	hello = "world"

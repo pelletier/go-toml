@@ -49,8 +49,6 @@ func NewParserError(highlight []byte, format string, args ...interface{}) error 
 // For performance reasons, go-toml doesn't make a copy of the input bytes to
 // the parser. Make sure to copy all the bytes you need to outlive the slice
 // given to the parser.
-//
-// The parser doesn't provide nodes for comments yet, nor for whitespace.
 type Parser struct {
 	data    []byte
 	builder builder
@@ -58,6 +56,8 @@ type Parser struct {
 	left    []byte
 	err     error
 	first   bool
+
+	KeepComments bool
 }
 
 // Data returns the slice provided to the last call to Reset.
