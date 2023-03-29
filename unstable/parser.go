@@ -242,7 +242,9 @@ func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 
 	if len(b) > 0 && b[0] == '#' {
 		cref, rest, err := p.parseComment(b)
-		p.builder.Chain(ref, cref)
+		if cref != invalidReference {
+			p.builder.Chain(ref, cref)
+		}
 		return ref, rest, err
 	}
 
