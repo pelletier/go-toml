@@ -26,17 +26,17 @@ func FuzzToml(data []byte) int {
 
 	encoded, err := Marshal(v)
 	if err != nil {
-		return 0
+		panic(fmt.Sprintf("failed to marshal unmarshaled document: %s", err))
 	}
 
 	var v2 interface{}
 	err = Unmarshal(encoded, &v2)
 	if err != nil {
-		panic(fmt.Sprintf("Failed round trip: %s", err))
+		panic(fmt.Sprintf("failed round trip: %s", err))
 	}
 
 	if !reflect.DeepEqual(v, v2) {
-		panic(fmt.Sprintf("Not equal: %#+v %#+v", v, v2))
+		panic(fmt.Sprintf("not equal: %#+v %#+v", v, v2))
 	}
 
 	return 1
