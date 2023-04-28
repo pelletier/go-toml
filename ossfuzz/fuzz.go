@@ -1,12 +1,14 @@
 //go:build go1.18 || go1.19 || go1.20
 // +build go1.18 go1.19 go1.20
 
-package toml
+package ossfuzz
 
 import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func FuzzToml(data []byte) int {
@@ -19,18 +21,18 @@ func FuzzToml(data []byte) int {
 	}
 
 	var v interface{}
-	err := Unmarshal(data, &v)
+	err := toml.Unmarshal(data, &v)
 	if err != nil {
 		return 0
 	}
 
-	encoded, err := Marshal(v)
+	encoded, err := toml.Marshal(v)
 	if err != nil {
 		panic(fmt.Sprintf("failed to marshal unmarshaled document: %s", err))
 	}
 
 	var v2 interface{}
-	err = Unmarshal(encoded, &v2)
+	err = toml.Unmarshal(encoded, &v2)
 	if err != nil {
 		panic(fmt.Sprintf("failed round trip: %s", err))
 	}
