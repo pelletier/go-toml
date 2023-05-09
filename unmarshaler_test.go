@@ -16,6 +16,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type unmarshalTextKey struct {
+	A string
+	B string
+}
+
+func (k *unmarshalTextKey) UnmarshalText(text []byte) error {
+	parts := strings.Split(string(text), "-")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid text key: %s", text)
+	}
+	k.A = parts[0]
+	k.B = parts[1]
+	return nil
+}
+
+type unmarshalBadTextKey struct{}
+
+func (k *unmarshalBadTextKey) UnmarshalText(text []byte) error {
+	return fmt.Errorf("error")
+}
+
 func ExampleDecoder_DisallowUnknownFields() {
 	type S struct {
 		Key1 string
@@ -315,6 +336,7 @@ func TestUnmarshal(t *testing.T) {
 		target   interface{}
 		expected interface{}
 		err      bool
+		assert   func(t *testing.T, test test)
 	}
 	examples := []struct {
 		skip  bool
@@ -347,6 +369,96 @@ func TestUnmarshal(t *testing.T) {
 				return test{
 					target:   &doc{},
 					expected: &doc{A: "foo 🙂 "},
+				}
+			},
+		},
+		{
+			desc:  "kv text key",
+			input: `a-1 = "foo"`,
+			gen: func() test {
+				type doc = map[unmarshalTextKey]string
+
+				return test{
+					target:   &doc{},
+					expected: &doc{{A: "a", B: "1"}: "foo"},
+				}
+			},
+		},
+		{
+			desc: "table text key",
+			input: `["a-1"]
+foo = "bar"`,
+			gen: func() test {
+				type doc = map[unmarshalTextKey]map[string]string
+
+				return test{
+					target:   &doc{},
+					expected: &doc{{A: "a", B: "1"}: map[string]string{"foo": "bar"}},
+				}
+			},
+		},
+		{
+			desc:  "kv ptr text key",
+			input: `a-1 = "foo"`,
+			gen: func() test {
+				type doc = map[*unmarshalTextKey]string
+
+				return test{
+					target:   &doc{},
+					expected: &doc{{A: "a", B: "1"}: "foo"},
+					assert: func(t *testing.T, test test) {
+						// Despite the documentation:
+						//     Pointer variable equality is determined based on the equality of the
+						// 		 referenced values (as opposed to the memory addresses).
+						// assert.Equal does not work properly with maps with pointer keys
+						// https://github.com/stretchr/testify/issues/1143
+						expected := make(map[unmarshalTextKey]string)
+						for k, v := range *(test.expected.(*doc)) {
+							expected[*k] = v
+						}
+						got := make(map[unmarshalTextKey]string)
+						for k, v := range *(test.target.(*doc)) {
+							got[*k] = v
+						}
+						assert.Equal(t, expected, got)
+					},
+				}
+			},
+		},
+		{
+			desc:  "kv bad text key",
+			input: `a-1 = "foo"`,
+			gen: func() test {
+				type doc = map[unmarshalBadTextKey]string
+
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "kv bad ptr text key",
+			input: `a-1 = "foo"`,
+			gen: func() test {
+				type doc = map[*unmarshalBadTextKey]string
+
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc: "table bad text key",
+			input: `["a-1"]
+foo = "bar"`,
+			gen: func() test {
+				type doc = map[unmarshalBadTextKey]map[string]string
+
+				return test{
+					target: &doc{},
+					err:    true,
 				}
 			},
 		},
@@ -1522,6 +1634,16 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "empty map into map with invalid key type",
+			input: ``,
+			gen: func() test {
+				return test{
+					target:   &map[int]string{},
+					expected: &map[int]string{},
+				}
+			},
+		},
+		{
 			desc:  "into map with convertible key type",
 			input: `A = "hello"`,
 			gen: func() test {
@@ -1777,7 +1899,11 @@ B = "data"`,
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, test.expected, test.target)
+				if test.assert != nil {
+					test.assert(t, test)
+				} else {
+					assert.Equal(t, test.expected, test.target)
+				}
 			}
 		})
 	}

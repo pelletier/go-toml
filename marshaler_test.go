@@ -15,6 +15,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type marshalTextKey struct {
+	A string
+	B string
+}
+
+func (k marshalTextKey) MarshalText() ([]byte, error) {
+	return []byte(k.A + "-" + k.B), nil
+}
+
+type marshalBadTextKey struct{}
+
+func (k marshalBadTextKey) MarshalText() ([]byte, error) {
+	return nil, fmt.Errorf("error")
+}
+
 func TestMarshal(t *testing.T) {
 	someInt := 42
 
@@ -96,6 +111,53 @@ also = 'that'
 [this.is]
 a = 'test'
 `,
+		},
+		{
+			desc: `map with text key`,
+			v: map[marshalTextKey]string{
+				{A: "a", B: "1"}: "value 1",
+				{A: "a", B: "2"}: "value 2",
+				{A: "b", B: "1"}: "value 3",
+			},
+			expected: `a-1 = 'value 1'
+a-2 = 'value 2'
+b-1 = 'value 3'
+`,
+		},
+		{
+			desc: `table with text key`,
+			v: map[marshalTextKey]map[string]string{
+				{A: "a", B: "1"}: {"value": "foo"},
+			},
+			expected: `[a-1]
+value = 'foo'
+`,
+		},
+		{
+			desc: `map with ptr text key`,
+			v: map[*marshalTextKey]string{
+				{A: "a", B: "1"}: "value 1",
+				{A: "a", B: "2"}: "value 2",
+				{A: "b", B: "1"}: "value 3",
+			},
+			expected: `a-1 = 'value 1'
+a-2 = 'value 2'
+b-1 = 'value 3'
+`,
+		},
+		{
+			desc: `map with bad text key`,
+			v: map[marshalBadTextKey]string{
+				{}: "value 1",
+			},
+			err: true,
+		},
+		{
+			desc: `map with bad ptr text key`,
+			v: map[*marshalBadTextKey]string{
+				{}: "value 1",
+			},
+			err: true,
 		},
 		{
 			desc: "simple string array",
@@ -487,8 +549,13 @@ foo = 42
 		},
 		{
 			desc: "invalid map key",
-			v:    map[int]interface{}{},
+			v:    map[int]interface{}{1: "a"},
 			err:  true,
+		},
+		{
+			desc:     "invalid map key but empty",
+			v:        map[int]interface{}{},
+			expected: "",
 		},
 		{
 			desc: "unhandled type",
