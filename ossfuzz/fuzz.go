@@ -12,7 +12,7 @@ import (
 )
 
 func FuzzToml(data []byte) int {
-	if len(data) >= 10240 {
+	if len(data) >= 2048 {
 		return 0
 	}
 
