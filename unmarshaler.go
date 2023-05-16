@@ -1092,6 +1092,19 @@ func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node
 		d.errorContext.Field = path
 
 		f := fieldByIndex(v, path)
+
+		if !f.CanSet() {
+			// If the field is not settable, need to take a slower path and make a copy of
+			// the struct itself to a new location.
+			nvp := reflect.New(v.Type())
+			nvp.Elem().Set(v)
+			v = nvp.Elem()
+			_, err := d.handleKeyValuePart(key, value, v)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			return nvp.Elem(), nil
+		}
 		x, err := d.handleKeyValueInner(key, value, f)
 		if err != nil {
 			return reflect.Value{}, err

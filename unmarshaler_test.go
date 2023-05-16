@@ -2613,6 +2613,70 @@ func TestIssue851(t *testing.T) {
 	require.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
 }
 
+func TestIssue866(t *testing.T) {
+	type Pipeline struct {
+		Mapping map[string]struct {
+			Req [][]string `toml:"req"`
+			Res [][]string `toml:"res"`
+		} `toml:"mapping"`
+	}
+
+	type Pipelines struct {
+		PipelineMapping map[string]*Pipeline `toml:"pipelines"`
+	}
+
+	var badToml = `
+[pipelines.register]
+mapping.inst.req = [
+    ["param1", "value1"],
+]
+mapping.inst.res = [
+    ["param2", "value2"],
+]
+`
+
+	pipelines := new(Pipelines)
+	if err := toml.NewDecoder(bytes.NewBufferString(badToml)).DisallowUnknownFields().Decode(pipelines); err != nil {
+		t.Fatal(err)
+	}
+	if pipelines.PipelineMapping["register"].Mapping["inst"].Req[0][0] != "param1" {
+		t.Fatal("unmarshal failed with mismatch value")
+	}
+
+	var goodTooToml = `
+[pipelines.register]
+mapping.inst.req = [
+    ["param1", "value1"],
+]
+`
+
+	pipelines = new(Pipelines)
+	if err := toml.NewDecoder(bytes.NewBufferString(goodTooToml)).DisallowUnknownFields().Decode(pipelines); err != nil {
+		t.Fatal(err)
+	}
+	if pipelines.PipelineMapping["register"].Mapping["inst"].Req[0][0] != "param1" {
+		t.Fatal("unmarshal failed with mismatch value")
+	}
+
+	var goodToml = `
+[pipelines.register.mapping.inst]
+req = [
+    ["param1", "value1"],
+]
+res = [
+    ["param2", "value2"],
+]
+`
+
+	pipelines = new(Pipelines)
+	if err := toml.NewDecoder(bytes.NewBufferString(goodToml)).DisallowUnknownFields().Decode(pipelines); err != nil {
+		t.Fatal(err)
+	}
+	if pipelines.PipelineMapping["register"].Mapping["inst"].Req[0][0] != "param1" {
+		t.Fatal("unmarshal failed with mismatch value")
+	}
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
