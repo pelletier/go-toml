@@ -23,7 +23,7 @@ type doc struct {
 	Value customInt
 }
 
-func Example_textUnmarshal() {
+func ExampleUnmarshal_textUnmarshal() {
 	var x doc
 
 	data := []byte(`value  = "42"`)
