@@ -90,7 +90,6 @@ func ExampleUnmarshal() {
 	fmt.Println("version:", cfg.Version)
 	fmt.Println("name:", cfg.Name)
 	fmt.Println("tags:", cfg.Tags)
-
 	// Output:
 	// version: 2
 	// name: go-toml
