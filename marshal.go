@@ -1017,6 +1017,15 @@ func (d *Decoder) valueFromToml(mtype reflect.Type, tval interface{}, mval1 *ref
 		return reflect.ValueOf(nil), fmt.Errorf("Can't convert %v(%T) to trees", tval, tval)
 	case []interface{}:
 		d.visitor.visit()
+
+		// Check if pointer to value implements the Unmarshaler interface.
+		if mvalPtr := reflect.New(mtype); isCustomUnmarshaler(mvalPtr.Type()) {
+			if err := callCustomUnmarshaler(mvalPtr, tval); err != nil {
+				return reflect.ValueOf(nil), fmt.Errorf("unmarshal toml: %v", err)
+			}
+			return mvalPtr.Elem(), nil
+		}
+
 		if isOtherSequence(mtype) {
 			return d.valueFromOtherSlice(mtype, t)
 		}

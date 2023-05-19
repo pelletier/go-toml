@@ -3864,6 +3864,49 @@ func TestCustomUnmarshalError(t *testing.T) {
 	}
 }
 
+type laxStringArray []string
+
+func (c *laxStringArray) UnmarshalTOML(v interface{}) error {
+	switch val := v.(type) {
+	case []interface{}:
+		for _, v := range val {
+			switch v.(type) {
+			case string:
+				*c = append(*c, v.(string))
+			case int64:
+				*c = append(*c, strconv.FormatInt(v.(int64), 10))
+			default:
+				return fmt.Errorf("type assertion error: want string or int64, have %T", v)
+			}
+		}
+		return nil
+	}
+
+	return fmt.Errorf("type assertion error: want []interface{}, have %T", v)
+}
+
+type laxStringArrayStruct struct {
+	Array        laxStringArray
+	ArrayPointer *laxStringArray
+}
+
+func TestCustomUnmarshalArray(t *testing.T) {
+	input := `
+Array = [1]
+ArrayPointer = [1]
+`
+	var d laxStringArrayStruct
+	if err := Unmarshal([]byte(input), &d); err != nil {
+		t.Fatalf("unexpected err: %s", err.Error())
+	}
+	if len(d.Array) != 1 || d.Array[0] != "1" {
+		t.Errorf("Bad unmarshal: expected [1], got %v", d.Array)
+	}
+	if d.ArrayPointer == nil || len(*d.ArrayPointer) != 1 || (*d.ArrayPointer)[0] != "1" {
+		t.Errorf("Bad unmarshal: expected [1], got %v", d.ArrayPointer)
+	}
+}
+
 type intWrapper struct {
 	Value int
 }
