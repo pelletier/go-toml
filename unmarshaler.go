@@ -1027,7 +1027,7 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 		}
 		return mk, nil
 
-	case reflect.PointerTo(keyType).Implements(textUnmarshalerType):
+	case reflect.PtrTo(keyType).Implements(textUnmarshalerType):
 		mk := reflect.New(keyType)
 		if err := mk.Interface().(encoding.TextUnmarshaler).UnmarshalText(data); err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error unmarshalling key type %s from text: %w", stringType, err)
