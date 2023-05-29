@@ -209,6 +209,45 @@ b-1 = 'value 3'
 `,
 		},
 		{
+			desc: "fixed size string array",
+			v: map[string][3]string{
+				"array": {"one", "two", "three"},
+			},
+			expected: `array = ['one', 'two', 'three']
+`,
+		},
+		{
+			desc: "fixed size nested string arrays",
+			v: map[string][2][2]string{
+				"array": {{"one", "two"}, {"three"}},
+			},
+			expected: `array = [['one', 'two'], ['three', '']]
+`,
+		},
+		{
+			desc: "mixed strings and fixed size nested string arrays",
+			v: map[string][]interface{}{
+				"array": {"a string", [2]string{"one", "two"}, "last"},
+			},
+			expected: `array = ['a string', ['one', 'two'], 'last']
+`,
+		},
+		{
+			desc: "fixed size array of maps",
+			v: map[string][2]map[string]string{
+				"ftop": {
+					{"map1.1": "v1.1"},
+					{"map2.1": "v2.1"},
+				},
+			},
+			expected: `[[ftop]]
+'map1.1' = 'v1.1'
+
+[[ftop]]
+'map2.1' = 'v2.1'
+`,
+		},
+		{
 			desc: "map with two keys",
 			v: map[string]string{
 				"key1": "value1",
