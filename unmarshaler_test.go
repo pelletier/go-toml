@@ -3511,3 +3511,47 @@ func TestUnmarshalEmbedNonString(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, d.Foo)
 }
+
+func TestUnmarshal_Nil(t *testing.T) {
+	type Foo struct {
+		Foo *Foo `toml:"foo,omitempty"`
+		Bar *Foo `toml:"bar,omitempty"`
+	}
+
+	examples := []struct {
+		desc     string
+		input    string
+		expected string
+		err      bool
+	}{
+		{
+			desc:     "empty",
+			input:    ``,
+			expected: ``,
+		},
+		{
+			desc: "simplest",
+			input: `
+            [foo]
+            [foo.foo]
+            `,
+			expected: "[foo]\n[foo.foo]\n",
+		},
+	}
+
+	for _, ex := range examples {
+		e := ex
+		t.Run(e.desc, func(t *testing.T) {
+			foo := Foo{}
+			err := toml.Unmarshal([]byte(e.input), &foo)
+			if e.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				j, err := toml.Marshal(foo)
+				require.NoError(t, err)
+				assert.Equal(t, e.expected, string(j))
+			}
+		})
+	}
+}
