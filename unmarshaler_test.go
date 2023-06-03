@@ -11,9 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 type unmarshalTextKey struct {
@@ -3510,4 +3511,15 @@ func TestUnmarshalEmbedNonString(t *testing.T) {
 	err := toml.Unmarshal([]byte(`foo = 'bar'`), &d)
 	require.NoError(t, err)
 	require.Nil(t, d.Foo)
+}
+
+func TestUnmarshalArrayOfTables(t *testing.T) {
+	m := struct {
+		A []struct {
+			B struct{}
+		}
+	}{}
+	require.NotPanics(t, func() {
+		require.Error(t, toml.Unmarshal([]byte(`[[A.B]]`), &m))
+	})
 }

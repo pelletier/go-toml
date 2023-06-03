@@ -377,7 +377,11 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 
 		return v, nil
 	case reflect.Slice:
-		elem := v.Index(v.Len() - 1)
+		idx := v.Len() - 1
+		if idx < 0 {
+			return v, fmt.Errorf("TODO uninitialized array table")
+		}
+		elem := v.Index(idx)
 		x, err := d.handleArrayTable(key, elem)
 		if err != nil || d.skipUntilTable {
 			return reflect.Value{}, err
