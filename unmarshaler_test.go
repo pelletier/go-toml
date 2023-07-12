@@ -1278,6 +1278,64 @@ B = "data"`,
 			},
 		},
 		{
+			desc: "array table into maps with pointer on last key",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo **[]interface{}
+				}
+				x := &[]interface{}{
+					map[string]interface{}{
+						"bar": "hello",
+					},
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &x,
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into maps with pointer on intermediate key",
+			input: `[[foo.foo2]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo **map[string]interface{}
+				}
+				x := &map[string]interface{}{
+					"foo2": []interface{}{
+						map[string]interface{}{
+							"bar": "hello",
+						},
+					},
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &x,
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into maps with pointer on last key with invalid leaf type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo **[]map[string]int
+				}
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc:  "unexported struct fields are ignored",
 			input: `foo = "bar"`,
 			gen: func() test {
@@ -3510,4 +3568,48 @@ func TestUnmarshalEmbedNonString(t *testing.T) {
 	err := toml.Unmarshal([]byte(`foo = 'bar'`), &d)
 	require.NoError(t, err)
 	require.Nil(t, d.Foo)
+}
+
+func TestUnmarshal_Nil(t *testing.T) {
+	type Foo struct {
+		Foo *Foo `toml:"foo,omitempty"`
+		Bar *Foo `toml:"bar,omitempty"`
+	}
+
+	examples := []struct {
+		desc     string
+		input    string
+		expected string
+		err      bool
+	}{
+		{
+			desc:     "empty",
+			input:    ``,
+			expected: ``,
+		},
+		{
+			desc: "simplest",
+			input: `
+            [foo]
+            [foo.foo]
+            `,
+			expected: "[foo]\n[foo.foo]\n",
+		},
+	}
+
+	for _, ex := range examples {
+		e := ex
+		t.Run(e.desc, func(t *testing.T) {
+			foo := Foo{}
+			err := toml.Unmarshal([]byte(e.input), &foo)
+			if e.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				j, err := toml.Marshal(foo)
+				require.NoError(t, err)
+				assert.Equal(t, e.expected, string(j))
+			}
+		})
+	}
 }
