@@ -1278,6 +1278,64 @@ B = "data"`,
 			},
 		},
 		{
+			desc: "array table into maps with pointer on last key",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo **[]interface{}
+				}
+				x := &[]interface{}{
+					map[string]interface{}{
+						"bar": "hello",
+					},
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &x,
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into maps with pointer on intermediate key",
+			input: `[[foo.foo2]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo **map[string]interface{}
+				}
+				x := &map[string]interface{}{
+					"foo2": []interface{}{
+						map[string]interface{}{
+							"bar": "hello",
+						},
+					},
+				}
+				return test{
+					target: &doc{},
+					expected: &doc{
+						Foo: &x,
+					},
+				}
+			},
+		},
+		{
+			desc: "array table into maps with pointer on last key with invalid leaf type",
+			input: `[[foo]]
+			bar = "hello"`,
+			gen: func() test {
+				type doc struct {
+					Foo **[]map[string]int
+				}
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc:  "unexported struct fields are ignored",
 			input: `foo = "bar"`,
 			gen: func() test {
