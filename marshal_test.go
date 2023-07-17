@@ -12,6 +12,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type basicMarshalTestStruct struct {
@@ -4128,4 +4131,56 @@ func TestGithubIssue732(t *testing.T) {
 	if err == nil {
 		t.Fatalf("error was expected")
 	}
+}
+
+func TestMarshalOrder(t *testing.T) {
+	type included struct {
+		Inc int `comment:"Included"`
+	}
+	type order struct {
+		One   int        `comment:"Before array"`
+		Two   []included `comment:"Array"`
+		Three map[string]time.Duration
+		Four  bool `comment:"Order check"`
+		Five  []int
+	}
+
+	doc := order{
+		One: 1, Two: []included{{4}, {2}}, Three: map[string]time.Duration{"3": time.Second}, Four: true, Five: []int{5, 2},
+	}
+
+	expected := `
+# Before array
+One = 1
+
+# Order check
+Four = true
+Five = [5, 2]
+
+[[Two]]
+
+ # Included
+ Inc = 4
+
+[[Two]]
+
+ # Included
+ Inc = 2
+
+[Three]
+ 3 = "1s"
+`
+
+	var resultDoc order
+
+	result := new(bytes.Buffer)
+	encoder := NewEncoder(result).Indentation(" ").Order(OrderPreserve)
+	err := encoder.Encode(doc)
+	require.NoError(t, err)
+
+	err = Unmarshal(result.Bytes(), &resultDoc)
+	assert.NoError(t, err)
+
+	require.Equal(t, expected, result.String())
+	require.Equal(t, doc, resultDoc)
 }
