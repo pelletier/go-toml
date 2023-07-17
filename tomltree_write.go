@@ -237,16 +237,19 @@ func getTreeArrayLine(trees []*Tree) (line int) {
 	return
 }
 
+type sortLine struct {
+	line int
+	node sortNode
+}
+
 func sortByLines(t *Tree) (vals []sortNode) {
 	var (
-		line  int
-		lines []int
-		tv    *Tree
-		tom   *tomlValue
-		node  sortNode
+		line int
+		tv   *Tree
+		tom  *tomlValue
+		node sortNode
 	)
-	vals = make([]sortNode, 0)
-	m := make(map[int]sortNode)
+	lines := make([]sortLine, 0, 16)
 
 	for k := range t.values {
 		v := t.values[k]
@@ -263,14 +266,19 @@ func sortByLines(t *Tree) (vals []sortNode) {
 			line = tom.position.Line
 			node = sortNode{key: k, complexity: valueSimple}
 		}
-		lines = append(lines, line)
-		vals = append(vals, node)
-		m[line] = node
+		lines = append(lines, sortLine{line: line, node: node})
 	}
-	sort.Ints(lines)
+	sort.Slice(lines, func(i, j int) bool {
+		if lines[i].node.complexity == lines[j].node.complexity {
+			return lines[i].line < lines[j].line
+		}
+		return lines[i].node.complexity < lines[j].node.complexity
+	})
+
+	vals = make([]sortNode, len(lines))
 
 	for i, line := range lines {
-		vals[i] = m[line]
+		vals[i] = line.node
 	}
 
 	return vals
@@ -505,14 +513,14 @@ func (t *Tree) String() string {
 // ToMap recursively generates a representation of the tree using Go built-in structures.
 // The following types are used:
 //
-//	* bool
-//	* float64
-//	* int64
-//	* string
-//	* uint64
-//	* time.Time
-//	* map[string]interface{} (where interface{} is any of this list)
-//	* []interface{} (where interface{} is any of this list)
+//   - bool
+//   - float64
+//   - int64
+//   - string
+//   - uint64
+//   - time.Time
+//   - map[string]interface{} (where interface{} is any of this list)
+//   - []interface{} (where interface{} is any of this list)
 func (t *Tree) ToMap() map[string]interface{} {
 	result := map[string]interface{}{}
 
