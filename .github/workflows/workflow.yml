@@ -11,8 +11,8 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ 'ubuntu-latest', 'windows-latest', 'macos-latest']
-        go: [ '1.19', '1.20' ]
+        os: [ 'ubuntu-latest', 'windows-latest', 'macos-latest' ]
+        go: [ '1.20', '1.21' ]
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.go }}/${{ matrix.os }}
     steps:
