@@ -983,6 +983,10 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 	scratch = append(scratch, "]]\n"...)
 	ctx.skipTableHeader = true
 
+	if enc.indentTables {
+		ctx.indent++
+	}
+
 	b = enc.encodeComment(ctx.indent, ctx.options.comment, b)
 
 	for i := 0; i < v.Len(); i++ {

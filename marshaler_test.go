@@ -1201,6 +1201,44 @@ randomize = true
 	require.Equal(t, expected, buf.String())
 }
 
+func TestMarhsalIssue888(t *testing.T) {
+	type Thing struct {
+		FieldA string `comment:"my field A"`
+		FieldB string `comment:"my field B"`
+	}
+
+	type Cfg struct {
+		Custom []Thing
+	}
+
+	buf := new(bytes.Buffer)
+
+	config := Cfg{
+		Custom: []Thing{
+			{FieldA: "field a 1", FieldB: "field b 1"},
+			{FieldA: "field a 2", FieldB: "field b 2"},
+		},
+	}
+
+	encoder := toml.NewEncoder(buf).SetIndentTables(true)
+	encoder.Encode(config)
+
+	expected := `[[Custom]]
+  # my field A
+  FieldA = 'field a 1'
+  # my field B
+  FieldB = 'field b 1'
+
+[[Custom]]
+  # my field A
+  FieldA = 'field a 2'
+  # my field B
+  FieldB = 'field b 2'
+`
+
+	require.Equal(t, expected, buf.String())
+}
+
 func TestMarshalNestedAnonymousStructs(t *testing.T) {
 	type Embedded struct {
 		Value string `toml:"value" json:"value"`
