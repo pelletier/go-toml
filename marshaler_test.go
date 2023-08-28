@@ -1208,7 +1208,7 @@ func TestMarhsalIssue888(t *testing.T) {
 	}
 
 	type Cfg struct {
-		Custom []Thing
+		Custom []Thing `comment:"custom config"`
 	}
 
 	buf := new(bytes.Buffer)
@@ -1223,7 +1223,8 @@ func TestMarhsalIssue888(t *testing.T) {
 	encoder := toml.NewEncoder(buf).SetIndentTables(true)
 	encoder.Encode(config)
 
-	expected := `[[Custom]]
+	expected := `# custom config
+[[Custom]]
   # my field A
   FieldA = 'field a 1'
   # my field B
