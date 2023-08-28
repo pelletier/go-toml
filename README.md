@@ -497,26 +497,19 @@ is not necessary anymore.
 
 V1 used to provide multiple struct tags: `comment`, `commented`, `multiline`,
 `toml`, and `omitempty`. To behave more like the standard library, v2 has merged
-`toml`, `multiline`, and `omitempty`. For example:
+`toml`, `multiline`, `commented`, and `omitempty`. For example:
 
 ```go
 type doc struct {
 	// v1
-	F string `toml:"field" multiline:"true" omitempty:"true"`
+	F string `toml:"field" multiline:"true" omitempty:"true" commented:"true"`
 	// v2
-	F string `toml:"field,multiline,omitempty"`
+	F string `toml:"field,multiline,omitempty,commented"`
 }
 ```
 
 Has a result, the `Encoder.SetTag*` methods have been removed, as there is just
 one tag now.
-
-
-#### `commented` tag has been removed
-
-There is no replacement for the `commented` tag. This feature would be better
-suited in a proper document model for go-toml v2, which has been [cut from
-scope][nodoc] at the moment.
 
 #### `Encoder.ArraysWithOneElementPerLine` has been renamed
 

@@ -1337,7 +1337,7 @@ func TestMarshalUint64Overflow(t *testing.T) {
 
 func TestIndentWithInlineTable(t *testing.T) {
 	x := map[string][]map[string]string{
-		"one": []map[string]string{
+		"one": {
 			{"0": "0"},
 			{"1": "1"},
 		},
@@ -1354,6 +1354,94 @@ func TestIndentWithInlineTable(t *testing.T) {
 	enc.SetArraysMultiline(true)
 	require.NoError(t, enc.Encode(x))
 	assert.Equal(t, expected, buf.String())
+}
+
+type C3 struct {
+	Value  int   `toml:",commented"`
+	Values []int `toml:",commented"`
+}
+
+type C2 struct {
+	Int       int64
+	String    string
+	ArrayInts []int
+	Structs   []C3
+}
+
+type C1 struct {
+	Int       int64  `toml:",commented"`
+	String    string `toml:",commented"`
+	ArrayInts []int  `toml:",commented"`
+	Structs   []C3   `toml:",commented"`
+}
+
+type Commented struct {
+	Int    int64  `toml:",commented"`
+	String string `toml:",commented"`
+
+	C1 C1
+	C2 C2 `toml:",commented"` // same as C1, but commented at top level
+}
+
+func TestMarshalCommented(t *testing.T) {
+	c := Commented{
+		Int:    42,
+		String: "root",
+
+		C1: C1{
+			Int:       11,
+			String:    "C1",
+			ArrayInts: []int{1, 2, 3},
+			Structs: []C3{
+				{Value: 100},
+				{Values: []int{4, 5, 6}},
+			},
+		},
+		C2: C2{
+			Int:       22,
+			String:    "C2",
+			ArrayInts: []int{1, 2, 3},
+			Structs: []C3{
+				{Value: 100},
+				{Values: []int{4, 5, 6}},
+			},
+		},
+	}
+
+	out, err := toml.Marshal(c)
+	require.NoError(t, err)
+
+	expected := `# Int = 42
+# String = 'root'
+
+[C1]
+# Int = 11
+# String = 'C1'
+# ArrayInts = [1, 2, 3]
+
+# [[C1.Structs]]
+# Value = 100
+# Values = []
+
+# [[C1.Structs]]
+# Value = 0
+# Values = [4, 5, 6]
+
+# [C2]
+# Int = 22
+# String = 'C2'
+# ArrayInts = [1, 2, 3]
+
+# [[C2.Structs]]
+# Value = 100
+# Values = []
+
+# [[C2.Structs]]
+# Value = 0
+# Values = [4, 5, 6]
+`
+
+	require.Equal(t, expected, string(out))
 }
 
 func ExampleMarshal() {
@@ -1379,4 +1467,128 @@ func ExampleMarshal() {
 	// Version = 2
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
+}
+
+// Example that uses the 'commented' field tag option to generate an example
+// configuration file that has commented out sections (example from
+// go-graphite/graphite-clickhouse).
+func ExampleMarshal_commented() {
+
+	type Common struct {
+		Listen               string        `toml:"listen"                     comment:"general listener"`
+		PprofListen          string        `toml:"pprof-listen"               comment:"listener to serve /debug/pprof requests. '-pprof' argument overrides it"`
+		MaxMetricsPerTarget  int           `toml:"max-metrics-per-target"     comment:"limit numbers of queried metrics per target in /render requests, 0 or negative = unlimited"`
+		MemoryReturnInterval time.Duration `toml:"memory-return-interval"     comment:"daemon will return the freed memory to the OS when it>0"`
+	}
+
+	type Costs struct {
+		Cost       *int           `toml:"cost"        comment:"default cost (for wildcarded equalence or matched with regex, or if no value cost set)"`
+		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equalence without wildcards) (additional tuning, usually not needed)"`
+	}
+
+	type ClickHouse struct {
+		URL string `toml:"url" comment:"default url, see https://clickhouse.tech/docs/en/interfaces/http. Can be overwritten with query-params"`
+
+		RenderMaxQueries        int               `toml:"render-max-queries" comment:"Max queries to render queiries"`
+		RenderConcurrentQueries int               `toml:"render-concurrent-queries" comment:"Concurrent queries to render queiries"`
+		TaggedCosts             map[string]*Costs `toml:"tagged-costs,commented"`
+		TreeTable               string            `toml:"tree-table,commented"`
+		ReverseTreeTable        string            `toml:"reverse-tree-table,commented"`
+		DateTreeTable           string            `toml:"date-tree-table,commented"`
+		DateTreeTableVersion    int               `toml:"date-tree-table-version,commented"`
+		TreeTimeout             time.Duration     `toml:"tree-timeout,commented"`
+		TagTable                string            `toml:"tag-table,commented"`
+		ExtraPrefix             string            `toml:"extra-prefix"             comment:"add extra prefix (directory in graphite) for all metrics, w/o trailing dot"`
+		ConnectTimeout          time.Duration     `toml:"connect-timeout"          comment:"TCP connection timeout"`
+		DataTableLegacy         string            `toml:"data-table,commented"`
+		RollupConfLegacy        string            `toml:"rollup-conf,commented"`
+		MaxDataPoints           int               `toml:"max-data-points"          comment:"max points per metric when internal-aggregation=true"`
+		InternalAggregation     bool              `toml:"internal-aggregation"     comment:"ClickHouse-side aggregation, see doc/aggregation.md"`
+	}
+
+	type Tags struct {
+		Rules      string `toml:"rules"`
+		Date       string `toml:"date"`
+		ExtraWhere string `toml:"extra-where"`
+		InputFile  string `toml:"input-file"`
+		OutputFile string `toml:"output-file"`
+	}
+
+	type Config struct {
+		Common     Common     `toml:"common"`
+		ClickHouse ClickHouse `toml:"clickhouse"`
+		Tags       Tags       `toml:"tags,commented"`
+	}
+
+	cfg := &Config{
+		Common: Common{
+			Listen:               ":9090",
+			PprofListen:          "",
+			MaxMetricsPerTarget:  15000, // This is arbitrary value to protect CH from overload
+			MemoryReturnInterval: 0,
+		},
+		ClickHouse: ClickHouse{
+			URL:                 "http://localhost:8123?cancel_http_readonly_queries_on_client_close=1",
+			ExtraPrefix:         "",
+			ConnectTimeout:      time.Second,
+			DataTableLegacy:     "",
+			RollupConfLegacy:    "auto",
+			MaxDataPoints:       1048576,
+			InternalAggregation: true,
+		},
+		Tags: Tags{},
+	}
+
+	out, err := toml.Marshal(cfg)
+	if err != nil {
+		panic(err)
+	}
+	err = toml.Unmarshal(out, &cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(out))
+
+	// Output:
+	// [common]
+	// # general listener
+	// listen = ':9090'
+	// # listener to serve /debug/pprof requests. '-pprof' argument overrides it
+	// pprof-listen = ''
+	// # limit numbers of queried metrics per target in /render requests, 0 or negative = unlimited
+	// max-metrics-per-target = 15000
+	// # daemon will return the freed memory to the OS when it>0
+	// memory-return-interval = 0
+	//
+	// [clickhouse]
+	// # default url, see https://clickhouse.tech/docs/en/interfaces/http. Can be overwritten with query-params
+	// url = 'http://localhost:8123?cancel_http_readonly_queries_on_client_close=1'
+	// # Max queries to render queiries
+	// render-max-queries = 0
+	// # Concurrent queries to render queiries
+	// render-concurrent-queries = 0
+	// # tree-table = ''
+	// # reverse-tree-table = ''
+	// # date-tree-table = ''
+	// # date-tree-table-version = 0
+	// # tree-timeout = 0
+	// # tag-table = ''
+	// # add extra prefix (directory in graphite) for all metrics, w/o trailing dot
+	// extra-prefix = ''
+	// # TCP connection timeout
+	// connect-timeout = 1000000000
+	// # data-table = ''
+	// # rollup-conf = 'auto'
+	// # max points per metric when internal-aggregation=true
+	// max-data-points = 1048576
+	// # ClickHouse-side aggregation, see doc/aggregation.md
+	// internal-aggregation = true
+	//
+	// # [tags]
+	// # rules = ''
+	// # date = ''
+	// # extra-where = ''
+	// # input-file = ''
+	// # output-file = ''
 }
