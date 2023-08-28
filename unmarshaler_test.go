@@ -2048,6 +2048,68 @@ func TestUnmarshalErrors(t *testing.T) {
 	require.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.mystruct.Bar of type string", err.Error())
 }
 
+func TestUnmarshalStringInvalidStructField(t *testing.T) {
+	type Server struct {
+		Path string
+		Port int
+	}
+
+	type Cfg struct {
+		Server Server
+	}
+
+	var cfg Cfg
+
+	data := `[server]
+path = "/my/path"
+port = "bad"
+`
+
+	file := strings.NewReader(data)
+	err := toml.NewDecoder(file).Decode(&cfg)
+	require.Error(t, err)
+
+	x := err.(*toml.DecodeError)
+	require.Equal(t, "toml: cannot decode TOML string into struct field toml_test.Server.Port of type int", x.Error())
+	expected := `1| [server]
+2| path = "/my/path"
+3| port = "bad"
+ |        ~~~~~ cannot decode TOML string into struct field toml_test.Server.Port of type int`
+
+	require.Equal(t, expected, x.String())
+}
+
+func TestUnmarshalIntegerInvalidStructField(t *testing.T) {
+	type Server struct {
+		Path string
+		Port int
+	}
+
+	type Cfg struct {
+		Server Server
+	}
+
+	var cfg Cfg
+
+	data := `[server]
+path = 100
+port = 50
+`
+
+	file := strings.NewReader(data)
+	err := toml.NewDecoder(file).Decode(&cfg)
+	require.Error(t, err)
+
+	x := err.(*toml.DecodeError)
+	require.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.Server.Path of type string", x.Error())
+	expected := `1| [server]
+2| path = 100
+ |        ~~~ cannot decode TOML integer into struct field toml_test.Server.Path of type string
+3| port = 50`
+
+	require.Equal(t, expected, x.String())
+}
+
 func TestUnmarshalInvalidTarget(t *testing.T) {
 	x := "foo"
 	err := toml.Unmarshal([]byte{}, x)
