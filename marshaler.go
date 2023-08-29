@@ -541,6 +541,8 @@ func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) 
 
 	b = enc.encodeComment(ctx.indent, ctx.options.comment, b)
 
+	b = enc.commented(ctx.commented, b)
+
 	b = enc.indent(ctx.indent, b)
 
 	b = append(b, '[')
@@ -825,7 +827,6 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	}
 
 	if !ctx.skipTableHeader {
-		b = enc.commented(ctx.commented, b)
 		b, err = enc.encodeTableHeader(ctx, b)
 		if err != nil {
 			return nil, err

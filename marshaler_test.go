@@ -1592,3 +1592,37 @@ func ExampleMarshal_commented() {
 	// # input-file = ''
 	// # output-file = ''
 }
+
+func TestReadmeComments(t *testing.T) {
+	type TLS struct {
+		Cipher  string `toml:"cipher"`
+		Version string `toml:"version"`
+	}
+	type Config struct {
+		Host string `toml:"host" comment:"Host IP to connect to."`
+		Port int    `toml:"port" comment:"Port of the remote server."`
+		Tls  TLS    `toml:"TLS,commented" comment:"Encryption parameters (optional)"`
+	}
+	example := Config{
+		Host: "127.0.0.1",
+		Port: 4242,
+		Tls: TLS{
+			Cipher:  "AEAD-AES128-GCM-SHA256",
+			Version: "TLS 1.3",
+		},
+	}
+	out, err := toml.Marshal(example)
+	require.NoError(t, err)
+
+	expected := `# Host IP to connect to.
+host = '127.0.0.1'
+# Port of the remote server.
+port = 4242
+
+# Encryption parameters (optional)
+# [TLS]
+# cipher = 'AEAD-AES128-GCM-SHA256'
+# version = 'TLS 1.3'
+`
+	require.Equal(t, expected, string(out))
+}
