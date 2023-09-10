@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"go/format"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -72,7 +71,7 @@ func downloadTmpFile(url string) string {
 	}
 	defer resp.Body.Close()
 
-	tmpfile, err := ioutil.TempFile("", "toml-test-*.zip")
+	tmpfile, err := os.CreateTemp("", "toml-test-*.zip")
 	if err != nil {
 		panic(err)
 	}
@@ -113,7 +112,7 @@ func readFileFromZip(f *zip.File) string {
 		panic(err)
 	}
 	defer reader.Close()
-	bytes, err := ioutil.ReadAll(reader)
+	bytes, err := io.ReadAll(reader)
 	if err != nil {
 		panic(err)
 	}

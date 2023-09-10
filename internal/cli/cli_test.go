@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -64,7 +63,7 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 }
 
 func TestProcessMainFileExists(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "example")
+	tmpfile, err := os.CreateTemp("", "example")
 	require.NoError(t, err)
 	defer os.Remove(tmpfile.Name())
 	_, err = tmpfile.Write([]byte(`some data`))
@@ -96,16 +95,14 @@ func TestProcessMainFileDoesNotExist(t *testing.T) {
 }
 
 func TestProcessMainFilesInPlace(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	path1 := path.Join(dir, "file1")
 	path2 := path.Join(dir, "file2")
 
-	err = ioutil.WriteFile(path1, []byte("content 1"), 0600)
+	err := os.WriteFile(path1, []byte("content 1"), 0600)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(path2, []byte("content 2"), 0600)
+	err = os.WriteFile(path2, []byte("content 2"), 0600)
 	require.NoError(t, err)
 
 	p := Program{
@@ -117,11 +114,11 @@ func TestProcessMainFilesInPlace(t *testing.T) {
 
 	require.Equal(t, 0, exit)
 
-	v1, err := ioutil.ReadFile(path1)
+	v1, err := os.ReadFile(path1)
 	require.NoError(t, err)
 	require.Equal(t, "1", string(v1))
 
-	v2, err := ioutil.ReadFile(path2)
+	v2, err := os.ReadFile(path2)
 	require.NoError(t, err)
 	require.Equal(t, "2", string(v2))
 }
@@ -138,13 +135,11 @@ func TestProcessMainFilesInPlaceErrRead(t *testing.T) {
 }
 
 func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	path1 := path.Join(dir, "file1")
 
-	err = ioutil.WriteFile(path1, []byte("content 1"), 0600)
+	err := os.WriteFile(path1, []byte("content 1"), 0600)
 	require.NoError(t, err)
 
 	p := Program{
@@ -156,13 +151,13 @@ func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 
 	require.Equal(t, -1, exit)
 
-	v1, err := ioutil.ReadFile(path1)
+	v1, err := os.ReadFile(path1)
 	require.NoError(t, err)
 	require.Equal(t, "content 1", string(v1))
 }
 
 func dummyFileFn(r io.Reader, w io.Writer) error {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
