@@ -161,9 +161,9 @@ bench() {
 }
 
 fmktemp() {
-    if mktemp --version 2>/dev/null; then
+    if mktemp --version &> /dev/null; then
 	# GNU
-        mktemp --suffix=-$1;
+        mktemp --suffix=-$1
     else
 	# BSD
 	mktemp -t $1
