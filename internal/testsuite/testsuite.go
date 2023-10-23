@@ -48,3 +48,21 @@ func DecodeStdin() error {
 
 	return nil
 }
+
+// EncodeStdin is a helper function for the toml-test binary interface.  Tagged
+// JSON is read from STDIN and a resulting TOML representation is written to
+// STDOUT.
+func EncodeStdin() error {
+	var j interface{}
+	err := json.NewDecoder(os.Stdin).Decode(&j)
+	if err != nil {
+		return err
+	}
+
+	rm, err := rmTag(j)
+	if err != nil {
+		return fmt.Errorf("removing tags: %w", err)
+	}
+
+	return toml.NewEncoder(os.Stdout).Encode(rm)
+}

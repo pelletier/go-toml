@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // Remove JSON tags to a data structure as returned by toml-test.
@@ -76,14 +78,31 @@ func untag(typed map[string]interface{}) (interface{}, error) {
 			return nil, fmt.Errorf("untag: %w", err)
 		}
 		return f, nil
+
+		//toml.LocalDate{Year:2020, Month:12, Day:12}
 	case "datetime":
-		return parseTime(v, "2006-01-02T15:04:05.999999999Z07:00", false)
+		return time.Parse("2006-01-02T15:04:05.999999999Z07:00", v)
 	case "datetime-local":
-		return parseTime(v, "2006-01-02T15:04:05.999999999", true)
+		var t toml.LocalDateTime
+		err := t.UnmarshalText([]byte(v))
+		if err != nil {
+			return nil, fmt.Errorf("untag: %w", err)
+		}
+		return t, nil
 	case "date-local":
-		return parseTime(v, "2006-01-02", true)
+		var t toml.LocalDate
+		err := t.UnmarshalText([]byte(v))
+		if err != nil {
+			return nil, fmt.Errorf("untag: %w", err)
+		}
+		return t, nil
 	case "time-local":
-		return parseTime(v, "15:04:05.999999999", true)
+		var t toml.LocalTime
+		err := t.UnmarshalText([]byte(v))
+		if err != nil {
+			return nil, fmt.Errorf("untag: %w", err)
+		}
+		return t, nil
 	case "bool":
 		switch v {
 		case "true":
