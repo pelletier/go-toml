@@ -2,7 +2,7 @@ package benchmark_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -59,7 +59,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 	})
 
 	b.Run("ReferenceFile", func(b *testing.B) {
-		bytes, err := ioutil.ReadFile("benchmark.toml")
+		bytes, err := os.ReadFile("benchmark.toml")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -165,7 +165,7 @@ func BenchmarkMarshal(b *testing.B) {
 	})
 
 	b.Run("ReferenceFile", func(b *testing.B) {
-		bytes, err := ioutil.ReadFile("benchmark.toml")
+		bytes, err := os.ReadFile("benchmark.toml")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -344,7 +344,7 @@ type benchmarkDoc struct {
 }
 
 func TestUnmarshalReferenceFile(t *testing.T) {
-	bytes, err := ioutil.ReadFile("benchmark.toml")
+	bytes, err := os.ReadFile("benchmark.toml")
 	require.NoError(t, err)
 	d := benchmarkDoc{}
 	err = toml.Unmarshal(bytes, &d)

@@ -4,7 +4,7 @@
 package toml_test
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,7 +13,7 @@ import (
 )
 
 func FuzzUnmarshal(f *testing.F) {
-	file, err := ioutil.ReadFile("benchmark/benchmark.toml")
+	file, err := os.ReadFile("benchmark/benchmark.toml")
 	if err != nil {
 		panic(err)
 	}

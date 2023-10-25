@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/pelletier/go-toml/v2"
@@ -72,7 +71,7 @@ func (p *Program) runAllFilesInPlace(files []string) error {
 }
 
 func (p *Program) runFileInPlace(path string) error {
-	in, err := ioutil.ReadFile(path)
+	in, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -84,5 +83,5 @@ func (p *Program) runFileInPlace(path string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, out.Bytes(), 0600)
+	return os.WriteFile(path, out.Bytes(), 0o600)
 }
