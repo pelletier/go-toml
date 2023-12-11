@@ -1098,8 +1098,8 @@ func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node
 		f := fieldByIndex(v, path)
 
 		if !f.CanAddr() {
-			// If the field is not settable, need to take a slower path and make a copy of
-			// the struct itself to a new location.
+			// If the field is not addressable, need to take a slower path and
+			// make a copy of the struct itself to a new location.
 			nvp := reflect.New(v.Type())
 			nvp.Elem().Set(v)
 			v = nvp.Elem()
