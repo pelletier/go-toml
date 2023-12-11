@@ -2801,6 +2801,28 @@ res = [
 	}
 }
 
+func TestIssue915(t *testing.T) {
+	type blah struct {
+		A string `toml:"a"`
+	}
+
+	type config struct {
+		Fizz string `toml:"fizz"`
+		blah `toml:"blah"`
+	}
+
+	b := []byte(`
+fizz = "abc"
+blah.a = "def"`)
+	var cfg config
+	err := toml.Unmarshal(b, &cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, "abc", cfg.Fizz)
+	require.Equal(t, "def", cfg.blah.A)
+	require.Equal(t, "def", cfg.A)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
