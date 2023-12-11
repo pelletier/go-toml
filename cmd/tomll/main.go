@@ -18,6 +18,7 @@
 package main
 
 import (
+	"flag"
 	"io"
 
 	"github.com/pelletier/go-toml/v2"
@@ -33,19 +34,26 @@ Reading and updating a list of files in place:
   tomll a.toml b.toml c.toml
 
 When given a list of files, tomll will modify all files in place without asking.
+
+Flags:
+-multiLineArray      sets up the linter to encode arrays with more than one element on multiple lines instead of one.
 `
 
 func main() {
+	multiLineArray := flag.Bool("multiLineArray", false, "sets up the linter to encode arrays with more than one element on multiple lines insteadof one.")
 	p := cli.Program{
 		Usage:   usage,
 		Fn:      convert,
 		Inplace: true,
+		Opts: cli.Options{"multiLineArray": multiLineArray},
 	}
 	p.Execute()
 }
 
-func convert(r io.Reader, w io.Writer) error {
+func convert(r io.Reader, w io.Writer, o cli.Options) error {
 	var v interface{}
+
+	multiLineArray := o["multiLineArray"].(bool)
 
 	d := toml.NewDecoder(r)
 	err := d.Decode(&v)
@@ -54,5 +62,5 @@ func convert(r io.Reader, w io.Writer) error {
 	}
 
 	e := toml.NewEncoder(w)
-	return e.Encode(v)
+	return e.SetArraysMultiline(multiLineArray).Encode(v)
 }

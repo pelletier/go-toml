@@ -25,7 +25,7 @@ func TestProcessMainStdin(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	input := strings.NewReader("this is the input")
 
-	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer, o Options) error {
 		return nil
 	})
 
@@ -39,7 +39,7 @@ func TestProcessMainStdinErr(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	input := strings.NewReader("this is the input")
 
-	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer, o Options) error {
 		return fmt.Errorf("something bad")
 	})
 
@@ -53,7 +53,7 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	input := strings.NewReader("this is the input")
 
-	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer, o Options) error {
 		var v interface{}
 		return toml.Unmarshal([]byte(`qwe = 001`), &v)
 	})
@@ -73,7 +73,7 @@ func TestProcessMainFileExists(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	exit := processMain([]string{tmpfile.Name()}, nil, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{tmpfile.Name()}, nil, stdout, stderr, func(r io.Reader, w io.Writer, o Options) error {
 		return nil
 	})
 
@@ -86,7 +86,7 @@ func TestProcessMainFileDoesNotExist(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	exit := processMain([]string{"/lets/hope/this/does/not/exist"}, nil, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{"/lets/hope/this/does/not/exist"}, nil, stdout, stderr, func(r io.Reader, w io.Writer, o Options) error {
 		return nil
 	})
 
@@ -148,7 +148,7 @@ func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 	require.NoError(t, err)
 
 	p := Program{
-		Fn:      func(io.Reader, io.Writer) error { return fmt.Errorf("oh no") },
+		Fn:      func(io.Reader, io.Writer, Options) error { return fmt.Errorf("oh no") },
 		Inplace: true,
 	}
 
@@ -161,7 +161,7 @@ func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 	require.Equal(t, "content 1", string(v1))
 }
 
-func dummyFileFn(r io.Reader, w io.Writer) error {
+func dummyFileFn(r io.Reader, w io.Writer, o Options) error {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
