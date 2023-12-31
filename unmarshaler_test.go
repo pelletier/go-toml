@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pelletier/go-toml/v2/unstable"
 	"math"
 	"strconv"
 	"strings"
@@ -3768,6 +3769,85 @@ func TestUnmarshal_Nil(t *testing.T) {
 				j, err := toml.Marshal(foo)
 				require.NoError(t, err)
 				assert.Equal(t, e.expected, string(j))
+			}
+		})
+	}
+}
+
+type CustomUnmarshalerKey struct {
+	A int64
+}
+
+func (k *CustomUnmarshalerKey) UnmarshalTOML(value *unstable.Node) error {
+	item, err := strconv.ParseInt(string(value.Data), 10, 64)
+	if err != nil {
+		return fmt.Errorf("error converting to int64, %v", err)
+	}
+	k.A = item
+	return nil
+
+}
+
+func TestUnmarshal_CustomUnmarshaler(t *testing.T) {
+	type MyConfig struct {
+		Unmarshalers []CustomUnmarshalerKey `toml:"unmarshalers"`
+		Foo          *string                `toml:"foo,omitempty"`
+	}
+
+	examples := []struct {
+		desc     string
+		input    string
+		expected MyConfig
+		err      bool
+	}{
+		{
+			desc:     "empty",
+			input:    ``,
+			expected: MyConfig{Unmarshalers: []CustomUnmarshalerKey{}, Foo: nil},
+		},
+		{
+			desc:  "simple",
+			input: `unmarshalers = [1,2,3]`,
+			expected: MyConfig{
+				Unmarshalers: []CustomUnmarshalerKey{
+					{A: 1},
+					{A: 2},
+					{A: 3},
+				},
+				Foo: nil,
+			},
+		},
+		{
+			desc: "unmarshal string and custom unmarshaler",
+			input: `unmarshalers = [1,2,3]
+foo = "bar"`,
+			expected: MyConfig{
+				Unmarshalers: []CustomUnmarshalerKey{
+					{A: 1},
+					{A: 2},
+					{A: 3},
+				},
+				Foo: func(v string) *string {
+					return &v
+				}("bar"),
+			},
+		},
+	}
+
+	for _, ex := range examples {
+		e := ex
+		t.Run(e.desc, func(t *testing.T) {
+			foo := MyConfig{}
+			err := toml.Unmarshal([]byte(e.input), &foo)
+			if e.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(foo.Unmarshalers), len(e.expected.Unmarshalers))
+				for i := 0; i < len(foo.Unmarshalers); i++ {
+					require.Equal(t, foo.Unmarshalers[i], e.expected.Unmarshalers[i])
+				}
+				require.Equal(t, foo.Foo, e.expected.Foo)
 			}
 		})
 	}
