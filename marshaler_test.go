@@ -682,6 +682,31 @@ L = 2.2
 `,
 		},
 		{
+			desc: "json numbers",
+			v: struct {
+				A json.Number
+				B json.Number
+				C json.Number
+				D json.Number
+				E json.Number
+				F json.Number
+			}{
+				A: "1.1",
+				B: "42e-3",
+				C: "42",
+				D: "0",
+				E: "0.0",
+				F: "",
+			},
+			expected: `A = 1.1
+B = 0.042
+C = 42
+D = 0
+E = 0.0
+F = 0
+`,
+		},
+		{
 			desc: "comments",
 			v: struct {
 				Table comments `comment:"Before table"`
