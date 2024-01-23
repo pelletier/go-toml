@@ -1304,6 +1304,38 @@ value = ''
 	require.Equal(t, expected, string(result))
 }
 
+func TestMarshalNestedAnonymousStructs_PointerEmbedded(t *testing.T) {
+	type Embedded struct {
+		Value   string  `toml:"value" json:"value"`
+		Omitted string  `toml:"omitted,omitempty"`
+		Ptr     *string `toml:"ptr"`
+	}
+
+	type Named struct {
+		Value string `toml:"value" json:"value"`
+	}
+
+	type Doc struct {
+		*Embedded
+		*Named    `toml:"named" json:"named"`
+		Anonymous struct {
+			*Embedded
+			Value *string `toml:"value" json:"value"`
+		} `toml:"anonymous,omitempty" json:"anonymous,omitempty"`
+	}
+
+	doc := &Doc{
+		Embedded: &Embedded{Value: "foo"},
+	}
+
+	expected := `value = 'foo'
+`
+
+	result, err := toml.Marshal(doc)
+	require.NoError(t, err)
+	require.Equal(t, expected, string(result))
+}
+
 func TestLocalTime(t *testing.T) {
 	v := map[string]toml.LocalTime{
 		"a": {

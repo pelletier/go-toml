@@ -707,6 +707,8 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 			if fieldType.Anonymous {
 				if fieldType.Type.Kind() == reflect.Struct {
 					walkStruct(ctx, t, f)
+				} else if fieldType.Type.Kind() == reflect.Pointer && !f.IsNil() && f.Elem().Kind() == reflect.Struct {
+					walkStruct(ctx, t, f.Elem())
 				}
 				continue
 			} else {
