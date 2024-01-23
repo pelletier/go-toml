@@ -42,6 +42,7 @@ type Encoder struct {
 	arraysMultiline bool
 	indentSymbol    string
 	indentTables    bool
+	jsonNumber      bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -85,6 +86,13 @@ func (enc *Encoder) SetIndentSymbol(s string) *Encoder {
 // SetIndentTables forces the encoder to intent tables and array tables.
 func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 	enc.indentTables = indent
+	return enc
+}
+
+// SetJsonNumber forces the encoder to serialize `json.Number` as a float or integer
+// instead of relying on TextMarshaler to emit a string.
+func (enc *Encoder) SetJsonNumber(indent bool) *Encoder {
+	enc.jsonNumber = indent
 	return enc
 }
 
@@ -254,14 +262,16 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case LocalDateTime:
 		return append(b, x.String()...), nil
 	case json.Number:
-		if x == "" { /// Useful zero value.
-			return append(b, "0"...), nil
-		} else if v, err := x.Int64(); err == nil {
-			return enc.encode(b, ctx, reflect.ValueOf(v))
-		} else if f, err := x.Float64(); err == nil {
-			return enc.encode(b, ctx, reflect.ValueOf(f))
-		} else {
-			return nil, fmt.Errorf("toml: unable to convert %q to int64 or float64", x)
+		if enc.jsonNumber {
+			if x == "" { /// Useful zero value.
+				return append(b, "0"...), nil
+			} else if v, err := x.Int64(); err == nil {
+				return enc.encode(b, ctx, reflect.ValueOf(v))
+			} else if f, err := x.Float64(); err == nil {
+				return enc.encode(b, ctx, reflect.ValueOf(f))
+			} else {
+				return nil, fmt.Errorf("toml: unable to convert %q to int64 or float64", x)
+			}
 		}
 	}
 
