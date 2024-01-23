@@ -11,10 +11,11 @@ import (
 
 func TestConvert(t *testing.T) {
 	examples := []struct {
-		name     string
-		input    string
-		expected string
-		errors   bool
+		name      string
+		input     string
+		expected  string
+		errors    bool
+		useNumber bool
 	}{
 		{
 			name: "valid json",
@@ -29,14 +30,32 @@ a = 42.0
 `,
 		},
 		{
+			name:      "use json number",
+			useNumber: true,
+			input: `
+{
+  "mytoml": {
+    "a": 42
+  }
+}`,
+			expected: `[mytoml]
+a = 42
+`,
+		},
+		{
 			name:   "invalid json",
 			input:  `{ foo`,
 			errors: true,
 		},
 	}
 
+	trueValue := true
+
 	for _, e := range examples {
 		b := new(bytes.Buffer)
+		if e.useNumber {
+			useNumber = &trueValue
+		}
 		err := convert(strings.NewReader(e.input), b)
 		if e.errors {
 			require.Error(t, err)
