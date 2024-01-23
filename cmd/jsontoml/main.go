@@ -54,7 +54,7 @@ func convert(r io.Reader, w io.Writer) error {
 
 	if useNumber != nil && *useNumber {
 		d.UseNumber()
-		e.SetJsonNumber(true)
+		e.SetMarshalJsonNumbers(true)
 	}
 
 	err := d.Decode(&v)

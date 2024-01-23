@@ -38,11 +38,11 @@ type Encoder struct {
 	w io.Writer
 
 	// global settings
-	tablesInline    bool
-	arraysMultiline bool
-	indentSymbol    string
-	indentTables    bool
-	jsonNumber      bool
+	tablesInline       bool
+	arraysMultiline    bool
+	indentSymbol       string
+	indentTables       bool
+	marshalJsonNumbers bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -89,10 +89,10 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 	return enc
 }
 
-// SetJsonNumber forces the encoder to serialize `json.Number` as a float or integer
+// SetMarshalJsonNumbers forces the encoder to serialize `json.Number` as a float or integer
 // instead of relying on TextMarshaler to emit a string.
-func (enc *Encoder) SetJsonNumber(indent bool) *Encoder {
-	enc.jsonNumber = indent
+func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder {
+	enc.marshalJsonNumbers = indent
 	return enc
 }
 
@@ -262,7 +262,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case LocalDateTime:
 		return append(b, x.String()...), nil
 	case json.Number:
-		if enc.jsonNumber {
+		if enc.marshalJsonNumbers {
 			if x == "" { /// Useful zero value.
 				return append(b, "0"...), nil
 			} else if v, err := x.Int64(); err == nil {

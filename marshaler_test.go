@@ -951,7 +951,7 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 func TestEncoderSetJsonNumber(t *testing.T) {
 	var w strings.Builder
 	enc := toml.NewEncoder(&w)
-	enc.SetJsonNumber(true)
+	enc.SetMarshalJsonNumbers(true)
 	err := enc.Encode(map[string]interface{}{
 		"A": json.Number("1.1"),
 		"B": json.Number("42e-3"),
