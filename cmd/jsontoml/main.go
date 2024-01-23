@@ -45,6 +45,7 @@ func convert(r io.Reader, w io.Writer) error {
 	var v interface{}
 
 	d := json.NewDecoder(r)
+	d.UseNumber()
 	err := d.Decode(&v)
 	if err != nil {
 		return err
