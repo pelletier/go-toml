@@ -34,11 +34,11 @@ Reading from a file:
   jsontoml file.json > file.toml
 `
 
-var (
-	useNumber = flag.Bool("use-number", false, "Tells the json decoder to unmarshal numbers into json.Number type instead of float64")
-)
+var useJsonNumber bool
 
 func main() {
+	flag.BoolVar(&useJsonNumber, "use-json-number", false, "unmarshal numbers into `json.Number` type instead of as `float64`")
+
 	p := cli.Program{
 		Usage: usage,
 		Fn:    convert,
@@ -52,7 +52,7 @@ func convert(r io.Reader, w io.Writer) error {
 	d := json.NewDecoder(r)
 	e := toml.NewEncoder(w)
 
-	if useNumber != nil && *useNumber {
+	if useJsonNumber {
 		d.UseNumber()
 		e.SetMarshalJsonNumbers(true)
 	}
