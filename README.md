@@ -261,7 +261,7 @@ Those tools are also available as a [Docker image][docker]. For example, to use
 docker run -i ghcr.io/pelletier/go-toml:v2 tomljson < example.toml
 ```
 
-Multiple versions are availble on [ghcr.io][docker].
+Multiple versions are available on [ghcr.io][docker].
 
 [docker]: https://github.com/pelletier/go-toml/pkgs/container/go-toml
 
