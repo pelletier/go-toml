@@ -948,7 +948,7 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 	assert.Equal(t, expected, w.String())
 }
 
-func TestEncoderSetJsonNumber(t *testing.T) {
+func TestEncoderSetMarshalJsonNumbers(t *testing.T) {
 	var w strings.Builder
 	enc := toml.NewEncoder(&w)
 	enc.SetMarshalJsonNumbers(true)
