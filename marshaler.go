@@ -89,8 +89,12 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 	return enc
 }
 
-// SetMarshalJsonNumbers forces the encoder to serialize `json.Number` as a float or integer
-// instead of relying on TextMarshaler to emit a string.
+// SetMarshalJsonNumbers forces the encoder to serialize `json.Number` as a
+// float or integer instead of relying on TextMarshaler to emit a string.
+//
+// *Unstable:* This method does not follow the compatiblity guarnatees of
+// semver. It can be changed or removed without a new major version being
+// issued.
 func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder {
 	enc.marshalJsonNumbers = indent
 	return enc
