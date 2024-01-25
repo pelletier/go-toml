@@ -948,6 +948,29 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 	assert.Equal(t, expected, w.String())
 }
 
+func TestEncoderSetMarshalJsonNumbers(t *testing.T) {
+	var w strings.Builder
+	enc := toml.NewEncoder(&w)
+	enc.SetMarshalJsonNumbers(true)
+	err := enc.Encode(map[string]interface{}{
+		"A": json.Number("1.1"),
+		"B": json.Number("42e-3"),
+		"C": json.Number("42"),
+		"D": json.Number("0"),
+		"E": json.Number("0.0"),
+		"F": json.Number(""),
+	})
+	require.NoError(t, err)
+	expected := `A = 1.1
+B = 0.042
+C = 42
+D = 0
+E = 0.0
+F = 0
+`
+	assert.Equal(t, expected, w.String())
+}
+
 func TestEncoderOmitempty(t *testing.T) {
 	type doc struct {
 		String  string            `toml:",omitempty,multiline"`

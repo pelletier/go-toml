@@ -19,6 +19,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"io"
 
 	"github.com/pelletier/go-toml/v2"
@@ -33,7 +34,11 @@ Reading from a file:
   jsontoml file.json > file.toml
 `
 
+var useJsonNumber bool
+
 func main() {
+	flag.BoolVar(&useJsonNumber, "use-json-number", false, "unmarshal numbers into `json.Number` type instead of as `float64`")
+
 	p := cli.Program{
 		Usage: usage,
 		Fn:    convert,
@@ -45,11 +50,17 @@ func convert(r io.Reader, w io.Writer) error {
 	var v interface{}
 
 	d := json.NewDecoder(r)
+	e := toml.NewEncoder(w)
+
+	if useJsonNumber {
+		d.UseNumber()
+		e.SetMarshalJsonNumbers(true)
+	}
+
 	err := d.Decode(&v)
 	if err != nil {
 		return err
 	}
 
-	e := toml.NewEncoder(w)
 	return e.Encode(v)
 }
