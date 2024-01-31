@@ -98,9 +98,9 @@ Given the following struct, let's see how to read it and write it as TOML:
 
 ```go
 type MyConfig struct {
-	  Version int
-	  Name    string
-	  Tags    []string
+	Version int
+	Name    string
+	Tags    []string
 }
 ```
 
@@ -119,7 +119,7 @@ tags = ["go", "toml"]
 var cfg MyConfig
 err := toml.Unmarshal([]byte(doc), &cfg)
 if err != nil {
-	  panic(err)
+	panic(err)
 }
 fmt.Println("version:", cfg.Version)
 fmt.Println("name:", cfg.Name)
@@ -140,14 +140,14 @@ as a TOML document:
 
 ```go
 cfg := MyConfig{
-	  Version: 2,
-	  Name:    "go-toml",
-	  Tags:    []string{"go", "toml"},
+	Version: 2,
+	Name:    "go-toml",
+	Tags:    []string{"go", "toml"},
 }
 
 b, err := toml.Marshal(cfg)
 if err != nil {
-	  panic(err)
+	panic(err)
 }
 fmt.Println(string(b))
 
@@ -293,16 +293,16 @@ element in the interface to decode the object. For example:
 
 ```go
 type inner struct {
-  B interface{}
+	B interface{}
 }
 type doc struct {
-  A interface{}
+	A interface{}
 }
 
 d := doc{
-  A: inner{
-	B: "Before",
-  },
+	A: inner{
+		B: "Before",
+	},
 }
 
 data := `
@@ -341,7 +341,7 @@ contained in the doc is superior to the capacity of the array. For example:
 
 ```go
 type doc struct {
-  A [2]string
+	A [2]string
 }
 d := doc{}
 err := toml.Unmarshal([]byte(`A = ["one", "two", "many"]`), &d)
