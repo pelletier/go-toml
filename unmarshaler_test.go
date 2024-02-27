@@ -2823,6 +2823,29 @@ blah.a = "def"`)
 	require.Equal(t, "def", cfg.A)
 }
 
+func TestIssue931(t *testing.T) {
+	type item struct {
+		Name string
+	}
+
+	type items struct {
+		Slice []item
+	}
+
+	its := items{[]item{{"a"}, {"b"}}}
+
+	b := []byte(`
+	[[Slice]]
+  Name = 'c'
+
+[[Slice]]
+  Name = 'd'
+	`)
+
+	toml.Unmarshal(b, &its)
+	require.Equal(t, items{[]item{{"c"}, {"d"}}}, its)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string

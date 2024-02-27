@@ -127,6 +127,10 @@ type decoder struct {
 	// need to be skipped.
 	skipUntilTable bool
 
+	// Flag indicating that the current array/slice table should be cleared because
+	// it is the first encounter of an array table.
+	clearArrayTable bool
+
 	// Tracks position in Go arrays.
 	// This is used when decoding [[array tables]] into Go arrays. Given array
 	// tables are separate TOML expression, we need to keep track of where we
@@ -246,9 +250,10 @@ Rules for the unmarshal code:
 func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) error {
 	var x reflect.Value
 	var err error
+	var first bool // used for to clear array tables on first use
 
 	if !(d.skipUntilTable && expr.Kind == unstable.KeyValue) {
-		err = d.seen.CheckExpression(expr)
+		first, err = d.seen.CheckExpression(expr)
 		if err != nil {
 			return err
 		}
@@ -267,6 +272,7 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) err
 	case unstable.ArrayTable:
 		d.skipUntilTable = false
 		d.strict.EnterArrayTable(expr)
+		d.clearArrayTable = first
 		x, err = d.handleArrayTable(expr.Key(), v)
 	default:
 		panic(fmt.Errorf("parser should not permit expression of kind %s at document root", expr.Kind))
@@ -307,6 +313,10 @@ func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflec
 				reflect.Copy(nelem, elem)
 				elem = nelem
 			}
+			if d.clearArrayTable && elem.Len() > 0 {
+				elem.SetLen(0)
+				d.clearArrayTable = false
+			}
 		}
 		return d.handleArrayTableCollectionLast(key, elem)
 	case reflect.Ptr:
@@ -325,6 +335,10 @@ func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflec
 
 		return v, nil
 	case reflect.Slice:
+		if d.clearArrayTable && v.Len() > 0 {
+			v.SetLen(0)
+			d.clearArrayTable = false
+		}
 		elemType := v.Type().Elem()
 		var elem reflect.Value
 		if elemType.Kind() == reflect.Interface {
@@ -576,7 +590,7 @@ func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
 			break
 		}
 
-		err := d.seen.CheckExpression(expr)
+		_, err := d.seen.CheckExpression(expr)
 		if err != nil {
 			return reflect.Value{}, err
 		}
