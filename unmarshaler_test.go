@@ -2823,6 +2823,76 @@ blah.a = "def"`)
 	require.Equal(t, "def", cfg.A)
 }
 
+func TestIssue931(t *testing.T) {
+	type item struct {
+		Name string
+	}
+
+	type items struct {
+		Slice []item
+	}
+
+	its := items{[]item{{"a"}, {"b"}}}
+
+	b := []byte(`
+	[[Slice]]
+  Name = 'c'
+
+[[Slice]]
+  Name = 'd'
+	`)
+
+	toml.Unmarshal(b, &its)
+	require.Equal(t, items{[]item{{"c"}, {"d"}}}, its)
+}
+
+func TestIssue931Interface(t *testing.T) {
+	type items struct {
+		Slice interface{}
+	}
+
+	type item = map[string]interface{}
+
+	its := items{[]interface{}{item{"Name": "a"}, item{"Name": "b"}}}
+
+	b := []byte(`
+	[[Slice]]
+  Name = 'c'
+
+[[Slice]]
+  Name = 'd'
+	`)
+
+	toml.Unmarshal(b, &its)
+	require.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
+}
+
+func TestIssue931SliceInterface(t *testing.T) {
+	type items struct {
+		Slice []interface{}
+	}
+
+	type item = map[string]interface{}
+
+	its := items{
+		[]interface{}{
+			item{"Name": "a"},
+			item{"Name": "b"},
+		},
+	}
+
+	b := []byte(`
+	[[Slice]]
+  Name = 'c'
+
+[[Slice]]
+  Name = 'd'
+	`)
+
+	toml.Unmarshal(b, &its)
+	require.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
+}
+
 func TestUnmarshalDecodeErrors(t *testing.T) {
 	examples := []struct {
 		desc string
