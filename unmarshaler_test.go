@@ -2848,6 +2848,27 @@ func TestIssue931(t *testing.T) {
 
 func TestIssue931Interface(t *testing.T) {
 	type items struct {
+		Slice interface{}
+	}
+
+	type item = map[string]interface{}
+
+	its := items{[]interface{}{item{"Name": "a"}, item{"Name": "b"}}}
+
+	b := []byte(`
+	[[Slice]]
+  Name = 'c'
+
+[[Slice]]
+  Name = 'd'
+	`)
+
+	toml.Unmarshal(b, &its)
+	require.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
+}
+
+func TestIssue931SliceInterface(t *testing.T) {
+	type items struct {
 		Slice []interface{}
 	}
 
