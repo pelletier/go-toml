@@ -477,11 +477,56 @@ func (enc *Encoder) encodeString(b []byte, v string, options valueOptions) []byt
 }
 
 func needsQuoting(v string) bool {
-	// TODO: vectorize
-	for _, b := range []byte(v) {
-		if b == '\'' || b == '\r' || b == '\n' || characters.InvalidAscii(b) {
+	for _, r := range v {
+		if shouldQuoteRune(r) {
 			return true
 		}
+	}
+
+	return false
+}
+
+// shouldQuoteRune returns true if the rune should be quoted.
+// excludes all runes in the Basic Multilingual Plane and all Emoticons.
+func shouldQuoteRune(r rune) bool {
+	if r == '\'' || r == '\r' || r == '\n' || characters.InvalidAscii(byte(r)) {
+		return true
+	}
+
+	// Basic Multilingual Plane, Letters and Emoji
+	if r < 0x1000 || unicode.IsLetter(r) || isEmoticon(r) {
+		return false
+	}
+
+	return true
+}
+
+// Uses the following list to identify the emoticon range:
+// https://unicode.org/emoji/charts/full-emoji-list.html
+func isEmoticon(r rune) bool { //nolint:cyclop
+	if r > 0x1F600 && r < 0x1F64F { // Emoticons
+		return true
+	}
+	if r > 0x1F300 && r < 0x1F5FF { // Misc Symbols and Pictographs
+		return true
+	}
+	if r > 0x1F680 && r < 0x1F6FF { // Transport and Map
+		return true
+	}
+	if r > 0x2600 && r < 0x26FF { // Misc symbols
+		return true
+	}
+	if r > 0x2700 && r < 0x27BF { // Dingbats
+		return true
+	}
+	if r > 0xFE00 && r < 0xFE0F { // Variation Selectors
+		return true
+	}
+	if r > 0x1F900 && r < 0x1F9FF { // Supplemental Symbols and Pictographs
+		return true
+	}
+	if r > 0x1F1E6 && r < 0x1F1FF { // Flags
+		return true
 	}
 	return false
 }

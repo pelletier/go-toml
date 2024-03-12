@@ -116,20 +116,19 @@ func TestBasicMarshalQuotedKey(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := `'Z.string-àéù' = 'Hello'
-'Yfloat-𝟘' = 3.5
+"Yfloat-𝟘" = 3.5
 
 ['Xsubdoc-àéù']
 String2 = 'One'
 
-[['W.sublist-𝟘']]
+[["W.sublist-𝟘"]]
 String2 = 'Two'
 
-[['W.sublist-𝟘']]
+[["W.sublist-𝟘"]]
 String2 = 'Three'
 `
 
-	require.Equal(t, string(expected), string(result))
-
+	require.Equal(t, expected, string(result))
 }
 
 func TestEmptyMarshal(t *testing.T) {
