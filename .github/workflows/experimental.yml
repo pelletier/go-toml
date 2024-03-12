@@ -1,0 +1,36 @@
+# Those tests are allowed to fail. They don't represent an officially supported\
+# situation, but rather ones that are nice to have.
+name: experimental
+on:
+# Not ready for merged commits yet.
+#  push:
+#    branches:
+#      - v2
+  pull_request:
+    branches:
+      - v2
+
+jobs:
+  linux32:
+    name: linux 386
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup go
+        uses: actions/setup-go@master
+        with:
+          go-version: 1.19
+      - name: Run unit tests
+        run: GOARCH=386 go test ./...
+  tinygo:
+    name: tinygo 0.25.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: tinygo test ./...
+        run: |
+          docker run --rm -v $(pwd):/src -w /src tinygo/tinygo:0.25.0 tinygo test ./...
