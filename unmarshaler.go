@@ -17,12 +17,6 @@ import (
 	"github.com/pelletier/go-toml/v2/unstable"
 )
 
-// The Unmarshaler interface may be implemented by types to customize their
-// behavior when being unmarshaled from a TOML document.
-type Unmarshaler interface {
-	UnmarshalTOML(value *unstable.Node) error
-}
-
 // Unmarshal deserializes a TOML document into a Go value.
 //
 // It is a shortcut for Decoder.Decode() with the default options.
@@ -673,7 +667,7 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 
 	if d.unmarshalerInterface {
 		if v.CanAddr() && v.Addr().CanInterface() {
-			if outi, ok := v.Addr().Interface().(Unmarshaler); ok {
+			if outi, ok := v.Addr().Interface().(unstable.Unmarshaler); ok {
 				return outi.UnmarshalTOML(value)
 			}
 		}
