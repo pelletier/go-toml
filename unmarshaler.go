@@ -41,6 +41,9 @@ type Decoder struct {
 
 	// global settings
 	strict bool
+
+	// toggles unmarshaler interface
+	unmarshalerInterface bool
 }
 
 // NewDecoder creates a new Decoder that will read from r.
@@ -57,6 +60,16 @@ func NewDecoder(r io.Reader) *Decoder {
 // description of the missing fields.
 func (d *Decoder) DisallowUnknownFields() *Decoder {
 	d.strict = true
+	return d
+}
+
+// EnableUnmarshalerInterface allows to enable unmarshaler interface.
+//
+// *Unstable:* This method does not follow the compatibility guarantees of
+// semver. It can be changed or removed without a new major version being
+// issued.
+func (d *Decoder) EnableUnmarshalerInterface() *Decoder {
+	d.unmarshalerInterface = true
 	return d
 }
 
@@ -114,6 +127,7 @@ func (d *Decoder) Decode(v interface{}) error {
 		strict: strict{
 			Enabled: d.strict,
 		},
+		unmarshalerInterface: d.unmarshalerInterface,
 	}
 
 	return dec.FromParser(v)
@@ -148,6 +162,9 @@ type decoder struct {
 
 	// Strict mode
 	strict strict
+
+	// Flag that enables/disables unmarshaler interface.
+	unmarshalerInterface bool
 
 	// Current context for the error.
 	errorContext *errorContext
@@ -654,9 +671,11 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 		v = initAndDereferencePointer(v)
 	}
 
-	if v.CanAddr() && v.Addr().CanInterface() {
-		if outi, ok := v.Addr().Interface().(Unmarshaler); ok {
-			return outi.UnmarshalTOML(value)
+	if d.unmarshalerInterface {
+		if v.CanAddr() && v.Addr().CanInterface() {
+			if outi, ok := v.Addr().Interface().(Unmarshaler); ok {
+				return outi.UnmarshalTOML(value)
+			}
 		}
 	}
 

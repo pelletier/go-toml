@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pelletier/go-toml/v2/unstable"
 	"math"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/pelletier/go-toml/v2/unstable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -3795,10 +3795,11 @@ func TestUnmarshal_CustomUnmarshaler(t *testing.T) {
 	}
 
 	examples := []struct {
-		desc     string
-		input    string
-		expected MyConfig
-		err      bool
+		desc                        string
+		disableUnmarshalerInterface bool
+		input                       string
+		expected                    MyConfig
+		err                         bool
 	}{
 		{
 			desc:     "empty",
@@ -3832,13 +3833,25 @@ foo = "bar"`,
 				}("bar"),
 			},
 		},
+		{
+			desc:                        "simple example, but unmarshaler interface disabled",
+			disableUnmarshalerInterface: true,
+			input:                       `unmarshalers = [1,2,3]`,
+			err:                         true,
+		},
 	}
 
 	for _, ex := range examples {
 		e := ex
 		t.Run(e.desc, func(t *testing.T) {
 			foo := MyConfig{}
-			err := toml.Unmarshal([]byte(e.input), &foo)
+
+			decoder := toml.NewDecoder(bytes.NewReader([]byte(e.input)))
+			if !ex.disableUnmarshalerInterface {
+				decoder.EnableUnmarshalerInterface()
+			}
+			err := decoder.Decode(&foo)
+
 			if e.err {
 				require.Error(t, err)
 			} else {
