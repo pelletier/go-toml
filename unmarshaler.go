@@ -59,6 +59,14 @@ func (d *Decoder) DisallowUnknownFields() *Decoder {
 
 // EnableUnmarshalerInterface allows to enable unmarshaler interface.
 //
+// With this feature enabled, types implementing the unstable/Unmarshaler
+// interface can be decoded from any structure of the document. It allows types
+// that don't have a straightfoward TOML representation to provide their own
+// decoding logic.
+//
+// Currently, types can only decode from a single value. Tables and array tables
+// are not supported.
+//
 // *Unstable:* This method does not follow the compatibility guarantees of
 // semver. It can be changed or removed without a new major version being
 // issued.
