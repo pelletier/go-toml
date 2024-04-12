@@ -1499,6 +1499,43 @@ func TestMarshalCommented(t *testing.T) {
 	require.Equal(t, expected, string(out))
 }
 
+func TestMarshalIndentedCustomTypeArray(t *testing.T) {
+	c := struct {
+		Nested struct {
+			NestedArray []struct {
+				Value int
+			}
+		}
+	}{
+		Nested: struct {
+			NestedArray []struct {
+				Value int
+			}
+		}{
+			NestedArray: []struct {
+				Value int
+			}{
+				{Value: 1},
+				{Value: 2},
+			},
+		},
+	}
+
+	expected := `[Nested]
+  [[Nested.NestedArray]]
+    Value = 1
+
+  [[Nested.NestedArray]]
+    Value = 2
+`
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetIndentTables(true)
+	require.NoError(t, enc.Encode(c))
+	require.Equal(t, expected, buf.String())
+}
+
 func ExampleMarshal() {
 	type MyConfig struct {
 		Version int
