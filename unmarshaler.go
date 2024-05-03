@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"reflect"
 	"strings"
@@ -117,7 +116,7 @@ func (d *Decoder) EnableUnmarshalerInterface() *Decoder {
 //	Inline Table     -> same as Table
 //	Array of Tables  -> same as Array and Table
 func (d *Decoder) Decode(v interface{}) error {
-	b, err := ioutil.ReadAll(d.r)
+	b, err := io.ReadAll(d.r)
 	if err != nil {
 		return fmt.Errorf("toml: %w", err)
 	}
@@ -1078,7 +1077,7 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 		}
 		return mk, nil
 
-	case reflect.PtrTo(keyType).Implements(textUnmarshalerType):
+	case reflect.PointerTo(keyType).Implements(textUnmarshalerType):
 		mk := reflect.New(keyType)
 		if err := mk.Interface().(encoding.TextUnmarshaler).UnmarshalText(data); err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error unmarshalling key type %s from text: %w", stringType, err)

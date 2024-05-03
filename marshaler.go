@@ -280,7 +280,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	}
 
 	hasTextMarshaler := v.Type().Implements(textMarshalerType)
-	if hasTextMarshaler || (v.CanAddr() && reflect.PtrTo(v.Type()).Implements(textMarshalerType)) {
+	if hasTextMarshaler || (v.CanAddr() && reflect.PointerTo(v.Type()).Implements(textMarshalerType)) {
 		if !hasTextMarshaler {
 			v = v.Addr()
 		}
@@ -951,7 +951,7 @@ func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
 	if !v.IsValid() {
 		return false
 	}
-	if v.Type() == timeType || v.Type().Implements(textMarshalerType) || (v.Kind() != reflect.Ptr && v.CanAddr() && reflect.PtrTo(v.Type()).Implements(textMarshalerType)) {
+	if v.Type() == timeType || v.Type().Implements(textMarshalerType) || (v.Kind() != reflect.Ptr && v.CanAddr() && reflect.PointerTo(v.Type()).Implements(textMarshalerType)) {
 		return false
 	}
 
