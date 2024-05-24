@@ -8,7 +8,7 @@ import (
 	"io"
 	"math"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -668,8 +668,8 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 }
 
 func sortEntriesByKey(e []entry) {
-	sort.Slice(e, func(i, j int) bool {
-		return e[i].Key < e[j].Key
+	slices.SortFunc(e, func(a, b entry) int {
+		return strings.Compare(a.Key, b.Key)
 	})
 }
 
