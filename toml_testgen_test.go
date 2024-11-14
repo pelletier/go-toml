@@ -1804,7 +1804,7 @@ func TestTOMLTest_Valid_Array_Empty(t *testing.T) {
 	testgenValid(t, input, jsonRef)
 }
 
-func TestTOMLTest_Valid_Array_Hetergeneous(t *testing.T) {
+func TestTOMLTest_Valid_Array_Heterogeneous(t *testing.T) {
 	input := "mixed = [[1, 2], [\"a\", \"b\"], [1.1, 2.1]]\n"
 	jsonRef := "{\n  \"mixed\": [\n    [\n      {\n        \"type\": \"integer\",\n        \"value\": \"1\"\n      },\n      {\n        \"type\": \"integer\",\n        \"value\": \"2\"\n      }\n    ],\n    [\n      {\n        \"type\": \"string\",\n        \"value\": \"a\"\n      },\n      {\n        \"type\": \"string\",\n        \"value\": \"b\"\n      }\n    ],\n    [\n      {\n        \"type\": \"float\",\n        \"value\": \"1.1\"\n      },\n      {\n        \"type\": \"float\",\n        \"value\": \"2.1\"\n      }\n    ]\n  ]\n}\n"
 	testgenValid(t, input, jsonRef)

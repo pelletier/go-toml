@@ -42,7 +42,7 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 		}
 		return m, nil
 
-	// Array: remove tags from all itenm.
+	// Array: remove tags from all items.
 	case []interface{}:
 		a := make([]interface{}, len(v))
 		for i := range v {

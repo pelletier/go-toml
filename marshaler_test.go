@@ -1280,7 +1280,7 @@ randomize = true
 	require.Equal(t, expected, buf.String())
 }
 
-func TestMarhsalIssue888(t *testing.T) {
+func TestMarshalIssue888(t *testing.T) {
 	type Thing struct {
 		FieldA string `comment:"my field A"`
 		FieldB string `comment:"my field B"`
@@ -1629,15 +1629,15 @@ func ExampleMarshal_commented() {
 	}
 
 	type Costs struct {
-		Cost       *int           `toml:"cost"        comment:"default cost (for wildcarded equalence or matched with regex, or if no value cost set)"`
-		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equalence without wildcards) (additional tuning, usually not needed)"`
+		Cost       *int           `toml:"cost"        comment:"default cost (for wildcarded equivalence or matched with regex, or if no value cost set)"`
+		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equivalence without wildcards) (additional tuning, usually not needed)"`
 	}
 
 	type ClickHouse struct {
 		URL string `toml:"url" comment:"default url, see https://clickhouse.tech/docs/en/interfaces/http. Can be overwritten with query-params"`
 
-		RenderMaxQueries        int               `toml:"render-max-queries" comment:"Max queries to render queiries"`
-		RenderConcurrentQueries int               `toml:"render-concurrent-queries" comment:"Concurrent queries to render queiries"`
+		RenderMaxQueries        int               `toml:"render-max-queries" comment:"Max queries to render queries"`
+		RenderConcurrentQueries int               `toml:"render-concurrent-queries" comment:"Concurrent queries to render queries"`
 		TaggedCosts             map[string]*Costs `toml:"tagged-costs,commented"`
 		TreeTable               string            `toml:"tree-table,commented"`
 		ReverseTreeTable        string            `toml:"reverse-tree-table,commented"`
@@ -1711,9 +1711,9 @@ func ExampleMarshal_commented() {
 	// [clickhouse]
 	// # default url, see https://clickhouse.tech/docs/en/interfaces/http. Can be overwritten with query-params
 	// url = 'http://localhost:8123?cancel_http_readonly_queries_on_client_close=1'
-	// # Max queries to render queiries
+	// # Max queries to render queries
 	// render-max-queries = 0
-	// # Concurrent queries to render queiries
+	// # Concurrent queries to render queries
 	// render-concurrent-queries = 0
 	// # tree-table = ''
 	// # reverse-tree-table = ''
