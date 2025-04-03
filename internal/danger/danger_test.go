@@ -4,9 +4,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
+	"github.com/pelletier/go-toml/v2/internal/assert"
 	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
@@ -72,7 +70,7 @@ func TestSubsliceOffsetInvalid(t *testing.T) {
 	for _, e := range examples {
 		t.Run(e.desc, func(t *testing.T) {
 			d, s := e.test()
-			require.Panics(t, func() {
+			assert.Panics(t, func() {
 				danger.SubsliceOffset(d, s)
 			})
 		})
@@ -83,9 +81,9 @@ func TestStride(t *testing.T) {
 	a := []byte{1, 2, 3, 4}
 	x := &a[1]
 	n := (*byte)(danger.Stride(unsafe.Pointer(x), unsafe.Sizeof(byte(0)), 1))
-	require.Equal(t, &a[2], n)
+	assert.Equal(t, &a[2], n)
 	n = (*byte)(danger.Stride(unsafe.Pointer(x), unsafe.Sizeof(byte(0)), -1))
-	require.Equal(t, &a[0], n)
+	assert.Equal(t, &a[0], n)
 }
 
 func TestBytesRange(t *testing.T) {
@@ -166,12 +164,12 @@ func TestBytesRange(t *testing.T) {
 		t.Run(e.desc, func(t *testing.T) {
 			start, end := e.test()
 			if e.expected == nil {
-				require.Panics(t, func() {
+				assert.Panics(t, func() {
 					danger.BytesRange(start, end)
 				})
 			} else {
 				res := danger.BytesRange(start, end)
-				require.Equal(t, e.expected, res)
+				assert.Equal(t, e.expected, res)
 			}
 		})
 	}

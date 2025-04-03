@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func TestUnmarshalSimple(t *testing.T) {
@@ -345,10 +345,10 @@ type benchmarkDoc struct {
 
 func TestUnmarshalReferenceFile(t *testing.T) {
 	bytes, err := ioutil.ReadFile("benchmark.toml")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	d := benchmarkDoc{}
 	err = toml.Unmarshal(bytes, &d)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := benchmarkDoc{
 		Table: struct {
@@ -627,7 +627,7 @@ trimmed in raw strings.
 		},
 	}
 
-	require.Equal(t, expected, d)
+	assert.Equal(t, expected, d)
 }
 
 var hugoFrontMatterbytes = []byte(`

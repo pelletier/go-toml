@@ -5,8 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func TestConvert(t *testing.T) {
@@ -36,7 +35,7 @@ a = 42.0
 		b := new(bytes.Buffer)
 		err := convert(strings.NewReader(e.input), b)
 		if e.errors {
-			require.Error(t, err)
+			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
 			assert.Equal(t, e.expected, b.String())

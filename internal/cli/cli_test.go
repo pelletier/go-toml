@@ -11,8 +11,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func processMain(args []string, input io.Reader, stdout, stderr io.Writer, f ConvertFn) int {
@@ -30,8 +29,8 @@ func TestProcessMainStdin(t *testing.T) {
 	})
 
 	assert.Equal(t, 0, exit)
-	assert.Empty(t, stdout.String())
-	assert.Empty(t, stderr.String())
+	assert.Zero(t, stdout.String())
+	assert.Zero(t, stderr.String())
 }
 
 func TestProcessMainStdinErr(t *testing.T) {
@@ -44,8 +43,8 @@ func TestProcessMainStdinErr(t *testing.T) {
 	})
 
 	assert.Equal(t, -1, exit)
-	assert.Empty(t, stdout.String())
-	assert.NotEmpty(t, stderr.String())
+	assert.Zero(t, stdout.String())
+	assert.NotZero(t, stderr.String())
 }
 
 func TestProcessMainStdinDecodeErr(t *testing.T) {
@@ -59,16 +58,16 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 	})
 
 	assert.Equal(t, -1, exit)
-	assert.Empty(t, stdout.String())
-	assert.Contains(t, stderr.String(), "error occurred at")
+	assert.Zero(t, stdout.String())
+	assert.True(t, strings.Contains(stderr.String(), "error occurred at"))
 }
 
 func TestProcessMainFileExists(t *testing.T) {
 	tmpfile, err := ioutil.TempFile("", "example")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer os.Remove(tmpfile.Name())
 	_, err = tmpfile.Write([]byte(`some data`))
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -78,8 +77,8 @@ func TestProcessMainFileExists(t *testing.T) {
 	})
 
 	assert.Equal(t, 0, exit)
-	assert.Empty(t, stdout.String())
-	assert.Empty(t, stderr.String())
+	assert.Zero(t, stdout.String())
+	assert.Zero(t, stderr.String())
 }
 
 func TestProcessMainFileDoesNotExist(t *testing.T) {
@@ -91,22 +90,22 @@ func TestProcessMainFileDoesNotExist(t *testing.T) {
 	})
 
 	assert.Equal(t, -1, exit)
-	assert.Empty(t, stdout.String())
-	assert.NotEmpty(t, stderr.String())
+	assert.Zero(t, stdout.String())
+	assert.NotZero(t, stderr.String())
 }
 
 func TestProcessMainFilesInPlace(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	path1 := path.Join(dir, "file1")
 	path2 := path.Join(dir, "file2")
 
 	err = ioutil.WriteFile(path1, []byte("content 1"), 0600)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	err = ioutil.WriteFile(path2, []byte("content 2"), 0600)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	p := Program{
 		Fn:      dummyFileFn,
@@ -115,15 +114,15 @@ func TestProcessMainFilesInPlace(t *testing.T) {
 
 	exit := p.main([]string{path1, path2}, os.Stdin, os.Stdout, os.Stderr)
 
-	require.Equal(t, 0, exit)
+	assert.Equal(t, 0, exit)
 
 	v1, err := ioutil.ReadFile(path1)
-	require.NoError(t, err)
-	require.Equal(t, "1", string(v1))
+	assert.NoError(t, err)
+	assert.Equal(t, "1", string(v1))
 
 	v2, err := ioutil.ReadFile(path2)
-	require.NoError(t, err)
-	require.Equal(t, "2", string(v2))
+	assert.NoError(t, err)
+	assert.Equal(t, "2", string(v2))
 }
 
 func TestProcessMainFilesInPlaceErrRead(t *testing.T) {
@@ -134,18 +133,18 @@ func TestProcessMainFilesInPlaceErrRead(t *testing.T) {
 
 	exit := p.main([]string{"/this/path/is/invalid"}, os.Stdin, os.Stdout, os.Stderr)
 
-	require.Equal(t, -1, exit)
+	assert.Equal(t, -1, exit)
 }
 
 func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	path1 := path.Join(dir, "file1")
 
 	err = ioutil.WriteFile(path1, []byte("content 1"), 0600)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	p := Program{
 		Fn:      func(io.Reader, io.Writer) error { return fmt.Errorf("oh no") },
@@ -154,11 +153,11 @@ func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 
 	exit := p.main([]string{path1}, os.Stdin, os.Stdout, os.Stderr)
 
-	require.Equal(t, -1, exit)
+	assert.Equal(t, -1, exit)
 
 	v1, err := ioutil.ReadFile(path1)
-	require.NoError(t, err)
-	require.Equal(t, "content 1", string(v1))
+	assert.NoError(t, err)
+	assert.Equal(t, "content 1", string(v1))
 }
 
 func dummyFileFn(r io.Reader, w io.Writer) error {

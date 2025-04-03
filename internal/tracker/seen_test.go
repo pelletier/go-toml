@@ -4,7 +4,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func TestEntrySize(t *testing.T) {
@@ -12,5 +12,9 @@ func TestEntrySize(t *testing.T) {
 	// performance of unmarshaling documents. Should only be increased with care
 	// and a very good reason.
 	maxExpectedEntrySize := 48
-	require.LessOrEqual(t, int(unsafe.Sizeof(entry{})), maxExpectedEntrySize)
+	assert.True(t,
+		int(unsafe.Sizeof(entry{})) <= maxExpectedEntrySize,
+		"Expected entry to be less than or equal to %d, got: %d",
+		maxExpectedEntrySize, int(unsafe.Sizeof(entry{})),
+	)
 }

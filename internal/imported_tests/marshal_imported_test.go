@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func TestDocMarshal(t *testing.T) {
@@ -107,13 +107,13 @@ name = 'List.Second'
 `
 
 	result, err := toml.Marshal(docData)
-	require.NoError(t, err)
-	require.Equal(t, marshalTestToml, string(result))
+	assert.NoError(t, err)
+	assert.Equal(t, marshalTestToml, string(result))
 }
 
 func TestBasicMarshalQuotedKey(t *testing.T) {
 	result, err := toml.Marshal(quotedKeyMarshalTestData)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `'Z.string-àéù' = 'Hello'
 'Yfloat-𝟘' = 3.5
@@ -128,7 +128,7 @@ String2 = 'Two'
 String2 = 'Three'
 `
 
-	require.Equal(t, string(expected), string(result))
+	assert.Equal(t, string(expected), string(result))
 
 }
 
@@ -153,7 +153,7 @@ func TestEmptyMarshal(t *testing.T) {
 		Map:        map[string]string{},
 	}
 	result, err := toml.Marshal(doc)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `title = 'Placeholder'
 bool = false
@@ -164,7 +164,7 @@ stringlist = []
 [map]
 `
 
-	require.Equal(t, string(expected), string(result))
+	assert.Equal(t, string(expected), string(result))
 }
 
 type textMarshaler struct {
@@ -187,13 +187,13 @@ func TestTextMarshaler(t *testing.T) {
 	t.Run("at root", func(t *testing.T) {
 		_, err := toml.Marshal(m)
 		// in v2 we do not allow TextMarshaler at root
-		require.Error(t, err)
+		assert.Error(t, err)
 	})
 
 	t.Run("leaf", func(t *testing.T) {
 		res, err := toml.Marshal(wrap{m})
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
-		require.Equal(t, "TM = 'Sally Fields'\n", string(res))
+		assert.Equal(t, "TM = 'Sally Fields'\n", string(res))
 	})
 }

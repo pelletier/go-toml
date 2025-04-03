@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 var bench_inputs = []struct {
@@ -35,11 +35,11 @@ func TestUnmarshalDatasetCode(t *testing.T) {
 			buf := fixture(t, tc.name)
 
 			var v interface{}
-			require.NoError(t, toml.Unmarshal(buf, &v))
+			assert.NoError(t, toml.Unmarshal(buf, &v))
 
 			b, err := json.Marshal(v)
-			require.NoError(t, err)
-			require.Equal(t, len(b), tc.jsonLen)
+			assert.NoError(t, err)
+			assert.Equal(t, len(b), tc.jsonLen)
 		})
 	}
 }
@@ -53,7 +53,7 @@ func BenchmarkUnmarshalDataset(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				var v interface{}
-				require.NoError(b, toml.Unmarshal(buf, &v))
+				assert.NoError(b, toml.Unmarshal(buf, &v))
 			}
 		})
 	}
@@ -68,13 +68,13 @@ func fixture(tb testing.TB, path string) []byte {
 	if os.IsNotExist(err) {
 		tb.Skip("benchmark fixture not found:", file)
 	}
-	require.NoError(tb, err)
+	assert.NoError(tb, err)
 	defer f.Close()
 
 	gz, err := gzip.NewReader(f)
-	require.NoError(tb, err)
+	assert.NoError(tb, err)
 
 	buf, err := ioutil.ReadAll(gz)
-	require.NoError(tb, err)
+	assert.NoError(tb, err)
 	return buf
 }
