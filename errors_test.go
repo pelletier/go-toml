@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2/internal/assert"
 	"github.com/pelletier/go-toml/v2/unstable"
-	"github.com/stretchr/testify/assert"
 )
 
 //nolint:funlen

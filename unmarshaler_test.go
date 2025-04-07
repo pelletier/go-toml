@@ -12,9 +12,8 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 	"github.com/pelletier/go-toml/v2/unstable"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type unmarshalTextKey struct {
@@ -109,7 +108,7 @@ func TestDecodeReaderError(t *testing.T) {
 	dec := toml.NewDecoder(r)
 	m := map[string]interface{}{}
 	err := dec.Decode(&m)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 // nolint:funlen
@@ -187,9 +186,9 @@ func TestUnmarshal_Integers(t *testing.T) {
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, e.expected, doc.A)
 			}
 		})
@@ -321,9 +320,9 @@ func TestUnmarshal_Floats(t *testing.T) {
 			doc := doc{}
 			err := toml.Unmarshal([]byte(`A = `+e.input), &doc)
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				if e.testFn != nil {
 					e.testFn(t, doc.A)
 				} else {
@@ -2094,9 +2093,9 @@ B = "data"`,
 				if err == nil {
 					t.Log("=>", test.target)
 				}
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				if test.assert != nil {
 					test.assert(t, test)
 				} else {
@@ -2158,14 +2157,14 @@ func TestUnmarshalOverflows(t *testing.T) {
 				doc := "A = " + v
 				err := toml.Unmarshal([]byte(doc), e.t)
 				t.Log("input:", doc)
-				require.Error(t, err)
+				assert.Error(t, err)
 			})
 		}
 		t.Run(fmt.Sprintf("%T ok", e.t), func(t *testing.T) {
 			doc := "A = 1"
 			err := toml.Unmarshal([]byte(doc), e.t)
 			t.Log("input:", doc)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -2179,9 +2178,9 @@ func TestUnmarshalErrors(t *testing.T) {
 
 	s := mystruct{}
 	err := toml.Unmarshal([]byte(data), &s)
-	require.Error(t, err)
+	assert.Error(t, err)
 
-	require.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.mystruct.Bar of type string", err.Error())
+	assert.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.mystruct.Bar of type string", err.Error())
 }
 
 func TestUnmarshalStringInvalidStructField(t *testing.T) {
@@ -2203,16 +2202,16 @@ port = "bad"
 
 	file := strings.NewReader(data)
 	err := toml.NewDecoder(file).Decode(&cfg)
-	require.Error(t, err)
+	assert.Error(t, err)
 
 	x := err.(*toml.DecodeError)
-	require.Equal(t, "toml: cannot decode TOML string into struct field toml_test.Server.Port of type int", x.Error())
+	assert.Equal(t, "toml: cannot decode TOML string into struct field toml_test.Server.Port of type int", x.Error())
 	expected := `1| [server]
 2| path = "/my/path"
 3| port = "bad"
  |        ~~~~~ cannot decode TOML string into struct field toml_test.Server.Port of type int`
 
-	require.Equal(t, expected, x.String())
+	assert.Equal(t, expected, x.String())
 }
 
 func TestUnmarshalIntegerInvalidStructField(t *testing.T) {
@@ -2234,38 +2233,38 @@ port = 50
 
 	file := strings.NewReader(data)
 	err := toml.NewDecoder(file).Decode(&cfg)
-	require.Error(t, err)
+	assert.Error(t, err)
 
 	x := err.(*toml.DecodeError)
-	require.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.Server.Path of type string", x.Error())
+	assert.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.Server.Path of type string", x.Error())
 	expected := `1| [server]
 2| path = 100
  |        ~~~ cannot decode TOML integer into struct field toml_test.Server.Path of type string
 3| port = 50`
 
-	require.Equal(t, expected, x.String())
+	assert.Equal(t, expected, x.String())
 }
 
 func TestUnmarshalInvalidTarget(t *testing.T) {
 	x := "foo"
 	err := toml.Unmarshal([]byte{}, x)
-	require.Error(t, err)
+	assert.Error(t, err)
 
 	var m *map[string]interface{}
 	err = toml.Unmarshal([]byte{}, m)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestUnmarshalFloat32(t *testing.T) {
 	t.Run("fits", func(t *testing.T) {
 		doc := "A = 1.2"
 		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	})
 	t.Run("overflows", func(t *testing.T) {
 		doc := "A = 4.40282346638528859811704183484516925440e+38"
 		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
-		require.Error(t, err)
+		assert.Error(t, err)
 	})
 }
 
@@ -2357,7 +2356,7 @@ bar = 42`,
 					x = &struct{}{}
 				}
 				err := d.Decode(x)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			})
 		})
 	}
@@ -2379,15 +2378,15 @@ val1 = "test1"
 	}
 
 	err := toml.Unmarshal(configFile, cfg)
-	require.NoError(t, err)
-	require.Equal(t, "test2", cfg.Val2)
+	assert.NoError(t, err)
+	assert.Equal(t, "test2", cfg.Val2)
 }
 
 func TestIssue287(t *testing.T) {
 	b := `y=[[{}]]`
 	v := map[string]interface{}{}
 	err := toml.Unmarshal([]byte(b), &v)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := map[string]interface{}{
 		"y": []interface{}{
@@ -2396,7 +2395,7 @@ func TestIssue287(t *testing.T) {
 			},
 		},
 	}
-	require.Equal(t, expected, v)
+	assert.Equal(t, expected, v)
 }
 
 type (
@@ -2415,7 +2414,7 @@ name = "decode"
 version = "0.1.0"`)
 	m := Map458{}
 	err := toml.Unmarshal(s, &m)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	a := m.A("package")
 	expected := Slice458{
 		map[string]interface{}{
@@ -2454,7 +2453,7 @@ func TestIssue484(t *testing.T) {
 
 	var cfg Config484
 	err := toml.Unmarshal(raw, &cfg)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, Config484{
 		Integers: []Integer484{{1}, {2}, {3}, {100}},
 	}, cfg)
@@ -2472,7 +2471,7 @@ bar = 2021-04-08
 	}
 	ss := new(s)
 	err := toml.Unmarshal([]byte(data), ss)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestIssue508(t *testing.T) {
@@ -2488,15 +2487,15 @@ func TestIssue508(t *testing.T) {
 
 	t1 := text{}
 	err := toml.Unmarshal(b, &t1)
-	require.NoError(t, err)
-	require.Equal(t, "This is a title", t1.head.Title)
+	assert.NoError(t, err)
+	assert.Equal(t, "This is a title", t1.head.Title)
 }
 
 func TestIssue507(t *testing.T) {
 	data := []byte{'0', '=', '\n', '0', 'a', 'm', 'e'}
 	m := map[string]interface{}{}
 	err := toml.Unmarshal(data, &m)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 type uuid [16]byte
@@ -2519,8 +2518,8 @@ func TestIssue564(t *testing.T) {
 	var config Config
 
 	err := toml.Unmarshal([]byte(`id = "0818a52b97b94768941ba1172c76cf6c"`), &config)
-	require.NoError(t, err)
-	require.Equal(t, uuid{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}, config.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, uuid{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}, config.ID)
 }
 
 func TestIssue575(t *testing.T) {
@@ -2557,7 +2556,7 @@ xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
 
 	var dist doc
 	err := toml.Unmarshal(b, &dist)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := doc{
 		Pkg: map[string]pkg{
@@ -2574,60 +2573,60 @@ xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
 		},
 	}
 
-	require.Equal(t, expected, dist)
+	assert.Equal(t, expected, dist)
 }
 
 func TestIssue579(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`[foo`), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue581(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`P=[#`), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue585(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a=1979-05127T 0`), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue586(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a={ `), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue588(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a=[1#`), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 // Support lowercase 'T' and 'Z'
 func TestIssue600(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a=1979-05-27t00:32:00z`), &v)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestIssue596(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(`a=1979-05-27T90:+2:99`), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue602(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte(""), &v)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	var expected interface{} = map[string]interface{}{}
 
-	require.Equal(t, expected, v)
+	assert.Equal(t, expected, v)
 }
 
 func TestIssue623(t *testing.T) {
@@ -2639,31 +2638,31 @@ func TestIssue623(t *testing.T) {
 foo = "bar"`
 
 	err := toml.Unmarshal([]byte(values), &definition)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue631(t *testing.T) {
 	v := map[string]interface{}{}
 	err := toml.Unmarshal([]byte("\"\\b\u007f\"= 2"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue658(t *testing.T) {
 	var v map[string]interface{}
 	err := toml.Unmarshal([]byte("e={b=1,b=4}"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue662(t *testing.T) {
 	var v map[string]interface{}
 	err := toml.Unmarshal([]byte("a=[{b=1,b=2}]"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue666(t *testing.T) {
 	var v map[string]interface{}
 	err := toml.Unmarshal([]byte("a={}\na={}"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue677(t *testing.T) {
@@ -2687,7 +2686,7 @@ Program = "hugo"
 	p := tomlParser{}
 
 	err := toml.Unmarshal([]byte(doc), &p)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := tomlParser{
 		Build: &_tomlJob{
@@ -2699,7 +2698,7 @@ Program = "hugo"
 			},
 		},
 	}
-	require.Equal(t, expected, p)
+	assert.Equal(t, expected, p)
 }
 
 func TestIssue701(t *testing.T) {
@@ -2733,50 +2732,50 @@ z=0
 func TestIssue703(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte("[a]\nx.y=0\n[a.x]"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue708(t *testing.T) {
 	v := map[string]string{}
 	err := toml.Unmarshal([]byte("0=\"\"\"\\\r\n\"\"\""), &v)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"0": ""}, v)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"0": ""}, v)
 }
 
 func TestIssue710(t *testing.T) {
 	v := map[string]toml.LocalTime{}
 	err := toml.Unmarshal([]byte(`0=00:00:00.0000000000`), &v)
-	require.NoError(t, err)
-	require.Equal(t, map[string]toml.LocalTime{"0": {Precision: 9}}, v)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]toml.LocalTime{"0": {Precision: 9}}, v)
 	v1 := map[string]toml.LocalTime{}
 	err = toml.Unmarshal([]byte(`0=00:00:00.0000000001`), &v1)
-	require.NoError(t, err)
-	require.Equal(t, map[string]toml.LocalTime{"0": {Precision: 9}}, v1)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]toml.LocalTime{"0": {Precision: 9}}, v1)
 	v2 := map[string]toml.LocalTime{}
 	err = toml.Unmarshal([]byte(`0=00:00:00.1111111119`), &v2)
-	require.NoError(t, err)
-	require.Equal(t, map[string]toml.LocalTime{"0": {Nanosecond: 111111111, Precision: 9}}, v2)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]toml.LocalTime{"0": {Nanosecond: 111111111, Precision: 9}}, v2)
 }
 
 func TestIssue715(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte("0=+"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 
 	err = toml.Unmarshal([]byte("0=-"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 
 	err = toml.Unmarshal([]byte("0=+A"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue714(t *testing.T) {
 	var v interface{}
 	err := toml.Unmarshal([]byte("0."), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 
 	err = toml.Unmarshal([]byte("0={0=0,"), &v)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue772(t *testing.T) {
@@ -2794,8 +2793,8 @@ func TestIssue772(t *testing.T) {
 
 	config := Config{}
 	err := toml.Unmarshal(defaultConfigFile, &config)
-	require.NoError(t, err)
-	require.Equal(t, "reach-masterdev-", config.FileHandling.FilePattern)
+	assert.NoError(t, err)
+	assert.Equal(t, "reach-masterdev-", config.FileHandling.FilePattern)
 }
 
 func TestIssue774(t *testing.T) {
@@ -2811,14 +2810,14 @@ func TestIssue774(t *testing.T) {
 	c.SCP = []ScpData{{Host: "main.domain.com"}}
 
 	b, err := toml.Marshal(c)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `# Array of Secure Copy Configurations
 [[scp]]
 Host = 'main.domain.com'
 `
 
-	require.Equal(t, expected, string(b))
+	assert.Equal(t, expected, string(b))
 }
 
 func TestIssue799(t *testing.T) {
@@ -2834,7 +2833,7 @@ answer = 42
 	}
 
 	err := toml.Unmarshal([]byte(testTOML), &s)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue807(t *testing.T) {
@@ -2848,14 +2847,14 @@ func TestIssue807(t *testing.T) {
 
 	var m M
 	err := toml.Unmarshal([]byte(`name = 'foo'`), &m)
-	require.NoError(t, err)
-	require.Equal(t, "foo", m.Name)
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", m.Name)
 }
 
 func TestIssue850(t *testing.T) {
 	data := make(map[string]string)
 	err := toml.Unmarshal([]byte("foo = {}"), &data)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIssue851(t *testing.T) {
@@ -2866,11 +2865,11 @@ func TestIssue851(t *testing.T) {
 	content := "params = {a=\"1\",b=\"2\"}"
 	var target Target
 	err := toml.Unmarshal([]byte(content), &target)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
 	err = toml.Unmarshal([]byte(content), &target)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, target.Params)
 }
 
 func TestIssue866(t *testing.T) {
@@ -2952,11 +2951,11 @@ fizz = "abc"
 blah.a = "def"`)
 	var cfg config
 	err := toml.Unmarshal(b, &cfg)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	require.Equal(t, "abc", cfg.Fizz)
-	require.Equal(t, "def", cfg.blah.A)
-	require.Equal(t, "def", cfg.A)
+	assert.Equal(t, "abc", cfg.Fizz)
+	assert.Equal(t, "def", cfg.blah.A)
+	assert.Equal(t, "def", cfg.A)
 }
 
 func TestIssue931(t *testing.T) {
@@ -2979,7 +2978,7 @@ func TestIssue931(t *testing.T) {
 	`)
 
 	toml.Unmarshal(b, &its)
-	require.Equal(t, items{[]item{{"c"}, {"d"}}}, its)
+	assert.Equal(t, items{[]item{{"c"}, {"d"}}}, its)
 }
 
 func TestIssue931Interface(t *testing.T) {
@@ -3000,7 +2999,7 @@ func TestIssue931Interface(t *testing.T) {
 	`)
 
 	toml.Unmarshal(b, &its)
-	require.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
+	assert.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
 }
 
 func TestIssue931SliceInterface(t *testing.T) {
@@ -3026,7 +3025,7 @@ func TestIssue931SliceInterface(t *testing.T) {
 	`)
 
 	toml.Unmarshal(b, &its)
-	require.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
+	assert.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
 }
 
 func TestUnmarshalDecodeErrors(t *testing.T) {
@@ -3465,7 +3464,7 @@ world'`,
 		t.Run(e.desc, func(t *testing.T) {
 			m := map[string]interface{}{}
 			err := toml.Unmarshal([]byte(e.data), &m)
-			require.Error(t, err)
+			assert.Error(t, err)
 
 			var de *toml.DecodeError
 			if !errors.As(err, &de) {
@@ -3474,7 +3473,7 @@ world'`,
 
 			if e.msg != "" {
 				t.Log("\n" + de.String())
-				require.Equal(t, "toml: "+e.msg, de.Error())
+				assert.Equal(t, "toml: "+e.msg, de.Error())
 			}
 		})
 	}
@@ -3505,9 +3504,9 @@ func TestOmitEmpty(t *testing.T) {
 	}}}
 
 	b, err := toml.Marshal(d)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	require.Equal(t, "X = [{Foo = 'test', Inner = {V = 'alue'}}]\n", string(b))
+	assert.Equal(t, "X = [{Foo = 'test', Inner = {V = 'alue'}}]\n", string(b))
 }
 
 func TestUnmarshalTags(t *testing.T) {
@@ -3534,8 +3533,8 @@ comma = 'ok'
 	}
 
 	err := toml.Unmarshal([]byte(data), &d)
-	require.NoError(t, err)
-	require.Equal(t, expected, d)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, d)
 }
 
 func TestASCIIControlCharacters(t *testing.T) {
@@ -3566,7 +3565,7 @@ func TestASCIIControlCharacters(t *testing.T) {
 		t.Helper()
 		m := map[string]interface{}{}
 		err := toml.Unmarshal(input, &m)
-		require.Error(t, err)
+		assert.Error(t, err)
 
 		var de *toml.DecodeError
 		if !errors.As(err, &de) {
@@ -3668,15 +3667,15 @@ func TestLocalDateTime(t *testing.T) {
 			doc := `a = ` + e.input
 			m := map[string]toml.LocalDateTime{}
 			err := toml.Unmarshal([]byte(doc), &m)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			actual := m["a"]
 			golang, err := time.Parse("2006-01-02T15:04:05.999999999", e.input)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			expected := toml.LocalDateTime{
 				toml.LocalDate{golang.Year(), int(golang.Month()), golang.Day()},
 				toml.LocalTime{golang.Hour(), golang.Minute(), golang.Second(), golang.Nanosecond(), e.prec},
 			}
-			require.Equal(t, expected, actual)
+			assert.Equal(t, expected, actual)
 		})
 	}
 }
@@ -3750,11 +3749,11 @@ func TestUnmarshal_RecursiveTable(t *testing.T) {
 			foo := Foo{}
 			err := toml.Unmarshal([]byte(e.input), &foo)
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				j, err := json.Marshal(foo)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, e.expected, string(j))
 			}
 		})
@@ -3841,11 +3840,11 @@ func TestUnmarshal_RecursiveTableArray(t *testing.T) {
 			foo := Foo{}
 			err := toml.Unmarshal([]byte(e.input), &foo)
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				j, err := json.Marshal(foo)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, e.expected, string(j))
 			}
 		})
@@ -3861,8 +3860,8 @@ func TestUnmarshalEmbedNonString(t *testing.T) {
 	d := doc{}
 
 	err := toml.Unmarshal([]byte(`foo = 'bar'`), &d)
-	require.NoError(t, err)
-	require.Nil(t, d.Foo)
+	assert.NoError(t, err)
+	assert.Equal(t, d.Foo, nil)
 }
 
 func TestUnmarshal_Nil(t *testing.T) {
@@ -3898,11 +3897,11 @@ func TestUnmarshal_Nil(t *testing.T) {
 			foo := Foo{}
 			err := toml.Unmarshal([]byte(e.input), &foo)
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				j, err := toml.Marshal(foo)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, e.expected, string(j))
 			}
 		})
@@ -3987,14 +3986,14 @@ foo = "bar"`,
 			err := decoder.Decode(&foo)
 
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
-				require.Equal(t, len(foo.Unmarshalers), len(e.expected.Unmarshalers))
+				assert.NoError(t, err)
+				assert.Equal(t, len(foo.Unmarshalers), len(e.expected.Unmarshalers))
 				for i := 0; i < len(foo.Unmarshalers); i++ {
-					require.Equal(t, foo.Unmarshalers[i], e.expected.Unmarshalers[i])
+					assert.Equal(t, foo.Unmarshalers[i], e.expected.Unmarshalers[i])
 				}
-				require.Equal(t, foo.Foo, e.expected.Foo)
+				assert.Equal(t, foo.Foo, e.expected.Foo)
 			}
 		})
 	}

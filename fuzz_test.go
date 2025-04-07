@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func FuzzUnmarshal(f *testing.F) {
@@ -48,6 +48,6 @@ func FuzzUnmarshal(f *testing.F) {
 		if err != nil {
 			t.Fatalf("failed round trip: %s", err)
 		}
-		require.Equal(t, v, v2)
+		assert.Equal(t, v, v2)
 	})
 }

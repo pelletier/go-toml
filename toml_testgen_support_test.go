@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 	"github.com/pelletier/go-toml/v2/internal/testsuite"
-	"github.com/stretchr/testify/require"
 )
 
 func testgenInvalid(t *testing.T, input string) {
@@ -45,15 +45,15 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 		t.Fatalf("failed parsing toml: %s", err)
 	}
 	j, err := testsuite.ValueToTaggedJSON(doc)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	var ref interface{}
 	err = json.Unmarshal([]byte(jsonRef), &ref)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	var actual interface{}
 	err = json.Unmarshal([]byte(j), &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	testsuite.CmpJSON(t, "", ref, actual)
 }

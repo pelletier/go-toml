@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 func TestParser_AST_Numbers(t *testing.T) {
@@ -141,9 +141,9 @@ func TestParser_AST_Numbers(t *testing.T) {
 			p.NextExpression()
 			err := p.Error()
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				expected := astNode{
 					Kind: KeyValue,
@@ -168,8 +168,8 @@ type (
 
 func compareNode(t *testing.T, e astNode, n *Node) {
 	t.Helper()
-	require.Equal(t, e.Kind, n.Kind)
-	require.Equal(t, e.Data, n.Data)
+	assert.Equal(t, e.Kind, n.Kind)
+	assert.Equal(t, e.Data, n.Data)
 
 	compareIterator(t, e.Children, n.Children())
 }
@@ -341,9 +341,9 @@ func TestParser_AST(t *testing.T) {
 			p.NextExpression()
 			err := p.Error()
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				compareNode(t, e.ast, p.Expression())
 			}
 		})
@@ -431,9 +431,9 @@ func TestParser_AST_DateTimes(t *testing.T) {
 			p.NextExpression()
 			err := p.Error()
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				expected := astNode{
 					Kind: KeyValue,

@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 type marshalTextKey struct {
@@ -28,6 +28,27 @@ type marshalBadTextKey struct{}
 
 func (k marshalBadTextKey) MarshalText() ([]byte, error) {
 	return nil, fmt.Errorf("error")
+}
+
+func toFloat(x interface{}) float64 {
+	// Shortened version of testify/toFloat
+	var xf float64
+	switch xn := x.(type) {
+	case float32:
+		xf = float64(xn)
+	case float64:
+		xf = xn
+	}
+	return xf
+}
+
+func inDelta(t *testing.T, expected, actual interface{}, delta float64) {
+	dt := toFloat(expected) - toFloat(actual)
+	assert.True(t,
+		dt < -delta && dt < delta,
+		"Difference between %v and %v is %v, but difference was %v",
+		expected, actual, delta, dt,
+	)
 }
 
 func TestMarshal(t *testing.T) {
@@ -764,18 +785,18 @@ Three = [1, 2, 3]
 		t.Run(e.desc, func(t *testing.T) {
 			b, err := toml.Marshal(e.v)
 			if e.err {
-				require.Error(t, err)
+				assert.Error(t, err)
 
 				return
 			}
 
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, e.expected, string(b))
 
 			// make sure the output is always valid TOML
 			defaultMap := map[string]interface{}{}
 			err = toml.Unmarshal(b, &defaultMap)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 
 			testWithAllFlags(t, func(t *testing.T, flags int) {
 				t.Helper()
@@ -785,13 +806,13 @@ Three = [1, 2, 3]
 				setFlags(enc, flags)
 
 				err := enc.Encode(e.v)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				inlineMap := map[string]interface{}{}
 				err = toml.Unmarshal(buf.Bytes(), &inlineMap)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
-				require.Equal(t, defaultMap, inlineMap)
+				assert.Equal(t, defaultMap, inlineMap)
 			})
 		})
 	}
@@ -858,8 +879,8 @@ nan = nan
 `
 
 	actual, err := toml.Marshal(v)
-	require.NoError(t, err)
-	require.Equal(t, expected, string(actual))
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(actual))
 
 	v64 := map[string]float64{
 		"nan":  math.NaN(),
@@ -868,8 +889,8 @@ nan = nan
 	}
 
 	actual, err = toml.Marshal(v64)
-	require.NoError(t, err)
-	require.Equal(t, expected, string(actual))
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(actual))
 }
 
 //nolint:funlen
@@ -929,7 +950,7 @@ func TestMarshalIndentTables(t *testing.T) {
 			enc := toml.NewEncoder(&buf)
 			enc.SetIndentTables(true)
 			err := enc.Encode(e.v)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, e.expected, buf.String())
 		})
 	}
@@ -949,13 +970,13 @@ func (c *customTextMarshaler) MarshalText() ([]byte, error) {
 func TestMarshalTextMarshaler_NoRoot(t *testing.T) {
 	c := customTextMarshaler{}
 	_, err := toml.Marshal(&c)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestMarshalTextMarshaler_Error(t *testing.T) {
 	m := map[string]interface{}{"a": &customTextMarshaler{value: 1}}
 	_, err := toml.Marshal(m)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestMarshalTextMarshaler_ErrorInline(t *testing.T) {
@@ -968,13 +989,13 @@ func TestMarshalTextMarshaler_ErrorInline(t *testing.T) {
 	}
 
 	_, err := toml.Marshal(d)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestMarshalTextMarshaler(t *testing.T) {
 	m := map[string]interface{}{"a": &customTextMarshaler{value: 2}}
 	r, err := toml.Marshal(m)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "a = '::2'\n", string(r))
 }
 
@@ -988,7 +1009,7 @@ func TestEncodeToBrokenWriter(t *testing.T) {
 	w := brokenWriter{}
 	enc := toml.NewEncoder(&w)
 	err := enc.Encode(map[string]string{"hello": "world"})
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestEncoderSetIndentSymbol(t *testing.T) {
@@ -997,7 +1018,7 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 	enc.SetIndentTables(true)
 	enc.SetIndentSymbol(">>>")
 	err := enc.Encode(map[string]map[string]string{"parent": {"hello": "world"}})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expected := `[parent]
 >>>hello = 'world'
 `
@@ -1016,7 +1037,7 @@ func TestEncoderSetMarshalJsonNumbers(t *testing.T) {
 		"E": json.Number("0.0"),
 		"F": json.Number(""),
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expected := `A = 1.1
 B = 0.042
 C = 42
@@ -1053,7 +1074,7 @@ func TestEncoderOmitempty(t *testing.T) {
 	d := doc{}
 
 	b, err := toml.Marshal(d)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := ``
 
@@ -1070,7 +1091,7 @@ func TestEncoderTagFieldName(t *testing.T) {
 	d := doc{String: "world"}
 
 	b, err := toml.Marshal(d)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `hello = 'world'
 '#' = ''
@@ -1085,11 +1106,11 @@ func TestIssue436(t *testing.T) {
 
 	var v interface{}
 	err := json.Unmarshal(data, &v)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	var buf bytes.Buffer
 	err = toml.NewEncoder(&buf).Encode(v)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `[[a]]
 [a.b]
@@ -1111,27 +1132,30 @@ func TestIssue424(t *testing.T) {
 	msg2 := Message2{"Hello\\World"}
 
 	toml1, err := toml.Marshal(msg1)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	toml2, err := toml.Marshal(msg2)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	msg1parsed := Message1{}
 	err = toml.Unmarshal(toml1, &msg1parsed)
-	require.NoError(t, err)
-	require.Equal(t, msg1, msg1parsed)
+	assert.NoError(t, err)
+	assert.Equal(t, msg1, msg1parsed)
 
 	msg2parsed := Message2{}
 	err = toml.Unmarshal(toml2, &msg2parsed)
-	require.NoError(t, err)
-	require.Equal(t, msg2, msg2parsed)
+	assert.NoError(t, err)
+	assert.Equal(t, msg2, msg2parsed)
 }
 
 func TestIssue567(t *testing.T) {
 	var m map[string]interface{}
 	err := toml.Unmarshal([]byte("A = 12:08:05"), &m)
-	require.NoError(t, err)
-	require.IsType(t, m["A"], toml.LocalTime{})
+	assert.NoError(t, err)
+	assert.Equal(t,
+		reflect.TypeOf(m["A"]), reflect.TypeOf(toml.LocalTime{}),
+		"Expected type '%v', got: %v", reflect.TypeOf(m["A"]), reflect.TypeOf(toml.LocalTime{}),
+	)
 }
 
 func TestIssue590(t *testing.T) {
@@ -1140,7 +1164,7 @@ func TestIssue590(t *testing.T) {
 		Option CustomType `toml:"option"`
 	}
 	err := toml.Unmarshal([]byte("option = 42"), &cfg)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestIssue571(t *testing.T) {
@@ -1156,14 +1180,14 @@ func TestIssue571(t *testing.T) {
 		Float64: 43,
 	}
 	b, err := toml.Marshal(foo)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	var foo2 Foo
 	err = toml.Unmarshal(b, &foo2)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	assert.InDelta(t, 42, foo2.Float32, closeEnough)
-	assert.InDelta(t, 43, foo2.Float64, closeEnough)
+	inDelta(t, 42, foo2.Float32, closeEnough)
+	inDelta(t, 43, foo2.Float64, closeEnough)
 }
 
 func TestIssue678(t *testing.T) {
@@ -1176,13 +1200,13 @@ func TestIssue678(t *testing.T) {
 	}
 
 	out, err := toml.Marshal(cfg)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "BigInt = '123'\n", string(out))
 
 	cfg2 := &Config{}
 	err = toml.Unmarshal(out, cfg2)
-	require.NoError(t, err)
-	require.Equal(t, cfg, cfg2)
+	assert.NoError(t, err)
+	assert.Equal(t, cfg, cfg2)
 }
 
 func TestIssue752(t *testing.T) {
@@ -1197,8 +1221,8 @@ func TestIssue752(t *testing.T) {
 	c := Container{}
 
 	out, err := toml.Marshal(c)
-	require.NoError(t, err)
-	require.Equal(t, "", string(out))
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(out))
 }
 
 func TestIssue768(t *testing.T) {
@@ -1207,14 +1231,14 @@ func TestIssue768(t *testing.T) {
 	}
 
 	out, err := toml.Marshal(&cfg{})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `# This is a multiline comment.
 # This is line 2.
 Name = ''
 `
 
-	require.Equal(t, expected, string(out))
+	assert.Equal(t, expected, string(out))
 }
 
 func TestIssue786(t *testing.T) {
@@ -1230,9 +1254,9 @@ func TestIssue786(t *testing.T) {
 
 	x := Test{}
 	b, err := toml.Marshal(x)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	require.Equal(t, "", string(b))
+	assert.Equal(t, "", string(b))
 
 	type General struct {
 		From      string `toml:"from,omitempty" json:"from,omitempty" comment:"from in graphite-web format, the local TZ is used"`
@@ -1277,7 +1301,7 @@ from = '-2d'
 randomize = true
 `
 
-	require.Equal(t, expected, buf.String())
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestMarshalIssue888(t *testing.T) {
@@ -1316,7 +1340,7 @@ func TestMarshalIssue888(t *testing.T) {
   FieldB = 'field b 2'
 `
 
-	require.Equal(t, expected, buf.String())
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestMarshalNestedAnonymousStructs(t *testing.T) {
@@ -1352,8 +1376,8 @@ value = ''
 `
 
 	result, err := toml.Marshal(doc)
-	require.NoError(t, err)
-	require.Equal(t, expected, string(result))
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(result))
 }
 
 func TestMarshalNestedAnonymousStructs_DuplicateField(t *testing.T) {
@@ -1378,9 +1402,9 @@ value = ''
 `
 
 	result, err := toml.Marshal(doc)
-	require.NoError(t, err)
-	require.NoError(t, err)
-	require.Equal(t, expected, string(result))
+	assert.NoError(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(result))
 }
 
 func TestMarshalNestedAnonymousStructs_PointerEmbedded(t *testing.T) {
@@ -1411,8 +1435,8 @@ func TestMarshalNestedAnonymousStructs_PointerEmbedded(t *testing.T) {
 `
 
 	result, err := toml.Marshal(doc)
-	require.NoError(t, err)
-	require.Equal(t, expected, string(result))
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(result))
 }
 
 func TestLocalTime(t *testing.T) {
@@ -1429,12 +1453,12 @@ func TestLocalTime(t *testing.T) {
 `
 
 	out, err := toml.Marshal(v)
-	require.NoError(t, err)
-	require.Equal(t, expected, string(out))
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(out))
 }
 
 func TestMarshalUint64Overflow(t *testing.T) {
-	// The TOML spec only requires implementation to provide support for the
+	// The TOML spec only asserts implementation to provide support for the
 	// int64 range. To avoid generating TOML documents that would not be
 	// supported by standard-compliant parsers, uint64 > max int64 cannot be
 	// marshaled.
@@ -1443,7 +1467,7 @@ func TestMarshalUint64Overflow(t *testing.T) {
 	}
 
 	_, err := toml.Marshal(x)
-	require.Error(t, err)
+	assert.Error(t, err)
 }
 
 func TestIndentWithInlineTable(t *testing.T) {
@@ -1463,7 +1487,7 @@ func TestIndentWithInlineTable(t *testing.T) {
 	enc.SetIndentTables(true)
 	enc.SetTablesInline(true)
 	enc.SetArraysMultiline(true)
-	require.NoError(t, enc.Encode(x))
+	assert.NoError(t, enc.Encode(x))
 	assert.Equal(t, expected, buf.String())
 }
 
@@ -1520,7 +1544,7 @@ func TestMarshalCommented(t *testing.T) {
 	}
 
 	out, err := toml.Marshal(c)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `# Int = 42
 # String = 'root'
@@ -1552,7 +1576,7 @@ func TestMarshalCommented(t *testing.T) {
 # Values = [4, 5, 6]
 `
 
-	require.Equal(t, expected, string(out))
+	assert.Equal(t, expected, string(out))
 }
 
 func TestMarshalIndentedCustomTypeArray(t *testing.T) {
@@ -1588,8 +1612,8 @@ func TestMarshalIndentedCustomTypeArray(t *testing.T) {
 	var buf bytes.Buffer
 	enc := toml.NewEncoder(&buf)
 	enc.SetIndentTables(true)
-	require.NoError(t, enc.Encode(c))
-	require.Equal(t, expected, buf.String())
+	assert.NoError(t, enc.Encode(c))
+	assert.Equal(t, expected, buf.String())
 }
 
 func ExampleMarshal() {
@@ -1759,7 +1783,7 @@ func TestReadmeComments(t *testing.T) {
 		},
 	}
 	out, err := toml.Marshal(example)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := `# Host IP to connect to.
 host = '127.0.0.1'
@@ -1771,5 +1795,5 @@ port = 4242
 # cipher = 'AEAD-AES128-GCM-SHA256'
 # version = 'TLS 1.3'
 `
-	require.Equal(t, expected, string(out))
+	assert.Equal(t, expected, string(out))
 }

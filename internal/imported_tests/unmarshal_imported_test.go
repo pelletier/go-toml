@@ -16,8 +16,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
 type basicMarshalTestStruct struct {
@@ -123,7 +122,7 @@ func TestInterface(t *testing.T) {
 	var config Conf
 	config.Inter = &NestedStruct{}
 	err := toml.Unmarshal(doc, &config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expected := Conf{
 		Name: "rui",
 		Age:  18,
@@ -139,8 +138,8 @@ func TestInterface(t *testing.T) {
 func TestBasicUnmarshal(t *testing.T) {
 	result := basicMarshalTestStruct{}
 	err := toml.Unmarshal(basicTestToml, &result)
-	require.NoError(t, err)
-	require.Equal(t, basicTestData, result)
+	assert.NoError(t, err)
+	assert.Equal(t, basicTestData, result)
 }
 
 type quotedKeyMarshalTestStruct struct {
@@ -300,7 +299,7 @@ func TestDocUnmarshal(t *testing.T) {
 	result := testDoc{}
 	err := toml.Unmarshal(marshalTestToml, &result)
 	expected := docData
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -340,7 +339,7 @@ shouldntBeHere = 2
 func TestUnexportedUnmarshal(t *testing.T) {
 	result := unexportedMarshalTestStruct{}
 	err := toml.Unmarshal(unexportedTestToml, &result)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, unexportedTestData, result)
 }
 
@@ -456,7 +455,7 @@ func TestEmptytomlUnmarshal(t *testing.T) {
 
 	result := emptyMarshalTestStruct{}
 	err := toml.Unmarshal(emptyTestToml, &result)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, emptyTestData, result)
 }
 
@@ -504,7 +503,7 @@ Str = "Hello"
 func TestPointerUnmarshal(t *testing.T) {
 	result := pointerMarshalTestStruct{}
 	err := toml.Unmarshal(pointerTestToml, &result)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, pointerTestData, result)
 }
 
@@ -540,7 +539,7 @@ StringPtr = [["Three", "Four"]]
 func TestNestedUnmarshal(t *testing.T) {
 	result := nestedMarshalTestStruct{}
 	err := toml.Unmarshal(nestedTestToml, &result)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, nestedTestData, result)
 }
 
@@ -834,7 +833,7 @@ func TestUnmarshalTabInStringAndQuotedKey(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			result := Test{}
 			err := toml.Unmarshal(test.input, &result)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, test.expected, result)
 		})
 	}
@@ -963,7 +962,7 @@ func TestUnmarshalTypeTableHeader(t *testing.T) {
 	}
 
 	expected := map[header]map[string]int{
-		"test": map[string]int{"a": 1},
+		"test": {"a": 1},
 	}
 
 	if !reflect.DeepEqual(result, expected) {
@@ -1090,7 +1089,7 @@ func TestUnmarshalCheckConversionFloatInt(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			err := toml.Unmarshal([]byte(test.input), &conversionCheck{})
-			require.Error(t, err)
+			assert.Error(t, err)
 		})
 	}
 }
@@ -1125,7 +1124,7 @@ func TestUnmarshalOverflow(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			err := toml.Unmarshal([]byte(test.input), &overflow{})
-			require.Error(t, err)
+			assert.Error(t, err)
 		})
 	}
 }
@@ -1745,7 +1744,7 @@ Age = 23
 	}
 	actual := OuterStruct{}
 	err := toml.Unmarshal(doc, &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
 }
 
@@ -1830,7 +1829,7 @@ InnerField = "After4"
 	}
 
 	err := toml.Unmarshal(doc, &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
 }
 
@@ -1879,7 +1878,7 @@ type arrayTooSmallStruct struct {
 func TestUnmarshalSlice(t *testing.T) {
 	var actual sliceStruct
 	err := toml.Unmarshal(sliceTomlDemo, &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expected := sliceStruct{
 		Slice:          []string{"Howdy", "Hey There"},
 		SlicePtr:       &[]string{"Howdy", "Hey There"},
@@ -1930,7 +1929,7 @@ func TestUnmarshalMixedTypeSlice(t *testing.T) {
 		},
 	}
 	err := toml.Unmarshal(doc, &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expected, actual)
 }
 
@@ -1939,7 +1938,7 @@ func TestUnmarshalArray(t *testing.T) {
 
 	var actual arrayStruct
 	err = toml.Unmarshal(sliceTomlDemo, &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	expected := arrayStruct{
 		Slice:          [4]string{"Howdy", "Hey There"},
@@ -1998,8 +1997,13 @@ func TestDecoderStrict(t *testing.T) {
 	}
 
 	err := strictDecoder(input).Decode(&doc)
-	require.Error(t, err)
-	require.IsType(t, &toml.StrictMissingError{}, err)
+	assert.Error(t, err)
+
+	assert.Equal(t,
+		reflect.TypeOf(err), reflect.TypeOf(&toml.StrictMissingError{}),
+		"Expected a *toml.StrictMissingError, got: %v", reflect.TypeOf(err),
+	)
+
 	se := err.(*toml.StrictMissingError)
 
 	keys := []toml.Key{}
@@ -2015,10 +2019,10 @@ func TestDecoderStrict(t *testing.T) {
 		{"undecoded", "array"},
 	}
 
-	require.Equal(t, expectedKeys, keys)
+	assert.Equal(t, expectedKeys, keys)
 
 	err = decoder(input).Decode(&doc)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	var m map[string]interface{}
 	err = decoder(input).Decode(&m)
@@ -2036,7 +2040,7 @@ func TestDecoderStrictValid(t *testing.T) {
 	}
 
 	err := strictDecoder(input).Decode(&doc)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 type docUnmarshalTOML struct {
@@ -2087,7 +2091,7 @@ func TestCustomUnmarshal(t *testing.T) {
 
 	var d parent
 	err := toml.Unmarshal([]byte(input), &d)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "ok1", d.Doc.Decoded.Key)
 	assert.Equal(t, "ok2", d.DocPointer.Decoded.Key)
 }
@@ -2153,7 +2157,7 @@ Int = 21
 Float = 2.0
 `
 	err := toml.Unmarshal([]byte(input), &doc)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 12, doc.UnixTime.Value)
 	assert.Equal(t, 42, doc.Version.Value)
 	assert.Equal(t, 1, doc.Bool.Value)
@@ -2223,7 +2227,10 @@ func TestUnmarshalEmptyInterface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.IsType(t, map[string]interface{}{}, v)
+	assert.Equal(t,
+		reflect.TypeOf(map[string]interface{}{}), reflect.TypeOf(v),
+		"Expected map[string]interface{}{} type, got: %v", reflect.TypeOf(v),
+	)
 
 	x := v.(map[string]interface{})
 	assert.Equal(t, "pelletier", x["User"])
