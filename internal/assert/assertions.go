@@ -79,7 +79,7 @@ func Zero[T any](t testing.TB, value T, msgAndArgs ...any) {
 	}
 	t.Helper()
 	msg := formatMsgAndArgs("Expected zero value but got:", msgAndArgs...)
-	t.Fatalf("%s\n%s", msg, fmt.Sprintf("%v", value))
+	t.Fatalf("%s\n%v", msg, value)
 }
 
 func NotZero[T any](t testing.TB, value T, msgAndArgs ...any) {
@@ -92,7 +92,7 @@ func NotZero[T any](t testing.TB, value T, msgAndArgs ...any) {
 	}
 	t.Helper()
 	msg := formatMsgAndArgs("Unexpected zero value:", msgAndArgs...)
-	t.Fatalf("%s\n%s", msg, fmt.Sprintf("%v", value))
+	t.Fatalf("%s\n%v", msg, value)
 }
 
 func formatMsgAndArgs(msg string, args ...any) string {
