@@ -1773,3 +1773,38 @@ port = 4242
 `
 	require.Equal(t, expected, string(out))
 }
+
+func TestMarshalMultilineStringArray(t *testing.T) {
+	type StringArrayExample struct {
+		TextMultilineStrings []string `toml:",multiline,text_multiline"`
+		MultilineStrings     []string `toml:",multiline"`
+		SimpleStrings        []string
+	}
+
+	example := StringArrayExample{
+		TextMultilineStrings: []string{"first\nline", "second\nline", "third", "fourth"},
+		MultilineStrings:     []string{"first\nline", "second\nline", "third", "fourth"},
+		SimpleStrings:        []string{"one", "two", "three", "four"},
+	}
+
+	out, err := toml.Marshal(example)
+	require.NoError(t, err)
+
+	expected := `TextMultilineStrings = [
+  """first
+line""",
+  """second
+line""",
+  'third',
+  'fourth'
+]
+MultilineStrings = [
+  "first\nline",
+  "second\nline",
+  'third',
+  'fourth'
+]
+SimpleStrings = ['one', 'two', 'three', 'four']
+`
+	assert.Equal(t, expected, string(out))
+}
