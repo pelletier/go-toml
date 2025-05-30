@@ -381,7 +381,7 @@ func isNil(v reflect.Value) bool {
 }
 
 func shouldOmitEmpty(options valueOptions, v reflect.Value) bool {
-	return options.omitempty && isEmptyValue(v)
+	return options.omitempty && v.IsZero()
 }
 
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v reflect.Value) ([]byte, error) {
@@ -416,54 +416,6 @@ func (enc *Encoder) commented(commented bool, b []byte) []byte {
 		return append(b, "# "...)
 	}
 	return b
-}
-
-func isEmptyValue(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.Struct:
-		return isEmptyStruct(v)
-	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
-		return v.Len() == 0
-	case reflect.Bool:
-		return !v.Bool()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return v.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return v.Float() == 0
-	case reflect.Interface, reflect.Ptr:
-		return v.IsNil()
-	}
-	return false
-}
-
-func isEmptyStruct(v reflect.Value) bool {
-	// TODO: merge with walkStruct and cache.
-	typ := v.Type()
-	for i := 0; i < typ.NumField(); i++ {
-		fieldType := typ.Field(i)
-
-		// only consider exported fields
-		if fieldType.PkgPath != "" {
-			continue
-		}
-
-		tag := fieldType.Tag.Get("toml")
-
-		// special field name to skip field
-		if tag == "-" {
-			continue
-		}
-
-		f := v.Field(i)
-
-		if !isEmptyValue(f) {
-			return false
-		}
-	}
-
-	return true
 }
 
 const literalQuote = '\''

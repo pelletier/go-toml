@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"net/netip"
 	"reflect"
 	"strings"
 	"testing"
@@ -1069,6 +1070,8 @@ func TestEncoderOmitempty(t *testing.T) {
 		Ptr     *string           `toml:",omitempty,multiline"`
 		Iface   interface{}       `toml:",omitempty,multiline"`
 		Struct  struct{}          `toml:",omitempty,multiline"`
+		Time    time.Time         `toml:",omitempty,multiline"`
+		IP      netip.Addr        `toml:",omitempty,multiline"`
 	}
 
 	d := doc{}
@@ -1077,6 +1080,25 @@ func TestEncoderOmitempty(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := ``
+
+	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitemptyComparableStruct(t *testing.T) {
+	type doc struct {
+		Time time.Time  `toml:",omitempty"`
+		IP   netip.Addr `toml:",omitempty"`
+	}
+
+	d := doc{
+		Time: time.Date(2001, 2, 3, 4, 5, 6, 7, time.UTC),
+		IP:   netip.MustParseAddr("192.168.178.35"),
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	expected := "Time = 2001-02-03T04:05:06.000000007Z\nIP = '192.168.178.35'\n"
 
 	assert.Equal(t, expected, string(b))
 }
