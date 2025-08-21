@@ -412,7 +412,7 @@ foo = "bar"`,
 					assert: func(t *testing.T, test test) {
 						// Despite the documentation:
 						//     Pointer variable equality is determined based on the equality of the
-						// 		 referenced values (as opposed to the memory addresses).
+						//		 referenced values (as opposed to the memory addresses).
 						// assert.Equal does not work properly with maps with pointer keys
 						// https://github.com/stretchr/testify/issues/1143
 						expected := make(map[unmarshalTextKey]string)
@@ -3884,9 +3884,9 @@ func TestUnmarshal_Nil(t *testing.T) {
 		{
 			desc: "simplest",
 			input: `
-            [foo]
-            [foo.foo]
-            `,
+	    [foo]
+	    [foo.foo]
+	    `,
 			expected: "[foo]\n[foo.foo]\n",
 		},
 	}
@@ -4042,11 +4042,6 @@ func TestIssue994_OK(t *testing.T) {
 }
 
 func TestIssue995(t *testing.T) {
-	// Reproduces https://github.com/pelletier/go-toml/issues/995
-	// The decoder used to panic with "reflect: slice index out of range"
-	// when encountering a nested array table like [[rules.allowlists]] while
-	// the parent slice (Rules) was still empty.
-
 	type AllowList struct {
 		Description string
 		Condition   string
