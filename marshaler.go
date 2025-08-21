@@ -517,12 +517,26 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 		del = 0x7f
 	)
 
-	for _, r := range []byte(v) {
+	bv := []byte(v)
+	for i := 0; i < len(bv); i++ {
+		r := bv[i]
 		switch r {
 		case '\\':
 			b = append(b, `\\`...)
 		case '"':
-			b = append(b, `\"`...)
+			if multiline {
+				// Quotation marks do not need to be quoted in multiline strings unless
+				// it contains 3 consecutive. If 3+ quotes appear, quote all of them
+				// because it's visually better
+				if i+2 > len(bv) || bv[i+1] != '"' || bv[i+2] != '"' {
+					b = append(b, r)
+				} else {
+					b = append(b, `\"\"\"`...)
+					i += 2
+				}
+			} else {
+				b = append(b, `\"`...)
+			}
 		case '\b':
 			b = append(b, `\b`...)
 		case '\f':

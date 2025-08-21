@@ -390,6 +390,54 @@ world"""
 `,
 		},
 		{
+			desc: "multi-line quotation",
+			v: struct {
+				A string `toml:",multiline"`
+			}{
+				A: "hello\n\"world\"",
+			},
+			expected: `A = """
+hello
+"world""""
+`,
+		},
+		{
+			desc: "multi-line triple quotation",
+			v: struct {
+				A string `toml:",multiline"`
+			}{
+				A: "hello\n\"\"\"world\"",
+			},
+			expected: `A = """
+hello
+\"\"\"world""""
+`,
+		},
+		{
+			desc: "multi-line triple quotation",
+			v: struct {
+				A string `toml:",multiline"`
+			}{
+				A: "hello\n\"world\"\"\"",
+			},
+			expected: `A = """
+hello
+"world\"\"\""""
+`,
+		},
+		{
+			desc: "multi-line sextuple quotation",
+			v: struct {
+				A string `toml:",multiline"`
+			}{
+				A: "hello\n\"\"\"\"\"\"world\"",
+			},
+			expected: `A = """
+hello
+\"\"\"\"\"\"world""""
+`,
+		},
+		{
 			desc: "inline field",
 			v: struct {
 				A map[string]string `toml:",inline"`
