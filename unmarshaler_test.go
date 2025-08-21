@@ -412,7 +412,7 @@ foo = "bar"`,
 					assert: func(t *testing.T, test test) {
 						// Despite the documentation:
 						//     Pointer variable equality is determined based on the equality of the
-						// 		 referenced values (as opposed to the memory addresses).
+						//		 referenced values (as opposed to the memory addresses).
 						// assert.Equal does not work properly with maps with pointer keys
 						// https://github.com/stretchr/testify/issues/1143
 						expected := make(map[unmarshalTextKey]string)
@@ -3884,9 +3884,9 @@ func TestUnmarshal_Nil(t *testing.T) {
 		{
 			desc: "simplest",
 			input: `
-            [foo]
-            [foo.foo]
-            `,
+	    [foo]
+	    [foo.foo]
+	    `,
 			expected: "[foo]\n[foo.foo]\n",
 		},
 	}
@@ -4039,4 +4039,203 @@ func TestIssue994_OK(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "bar from unmarshaler", d.S)
+}
+
+func TestIssue995(t *testing.T) {
+	type AllowList struct {
+		Description string
+		Condition   string
+		Commits     []string
+		Paths       []string
+		RegexTarget string
+		Regexes     []string
+		StopWords   []string
+	}
+
+	type Rule struct {
+		ID          string
+		Description string
+		Regex       string
+		SecretGroup int
+		Entropy     interface{}
+		Keywords    []string
+		Path        string
+		Tags        []string
+		AllowList   *AllowList
+		Allowlists  []AllowList
+	}
+
+	type GitleaksConfig struct {
+		Description string
+		Rules       []Rule
+		Allowlist   struct {
+			Commits     []string
+			Paths       []string
+			RegexTarget string
+			Regexes     []string
+			StopWords   []string
+		}
+	}
+
+	doc := `
+[[allowlists]]
+  description = "Exception for File "
+  files = [ '''app/src''']
+
+[[rules.allowlists]]
+  description = "policies"
+  regexes = [
+    '''abc'''
+  ]
+`
+
+	var cfg GitleaksConfig
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+
+	// Ensure no panic and that nested array table was created.
+	if len(cfg.Rules) == 0 {
+		t.Fatalf("expected Rules to contain at least one element after unmarshaling nested array table")
+	}
+	if len(cfg.Rules[0].Allowlists) != 1 {
+		t.Fatalf("expected first Rule to have exactly one allowlists entry, got %d", len(cfg.Rules[0].Allowlists))
+	}
+	assert.Equal(t, "policies", cfg.Rules[0].Allowlists[0].Description)
+	assert.Equal(t, []string{"abc"}, cfg.Rules[0].Allowlists[0].Regexes)
+}
+
+func TestIssue995_InterfaceSlice_MultiNested(t *testing.T) {
+	type Root struct {
+		Rules []interface{}
+	}
+
+	doc := `
+[[rules.allowlists]]
+  description = "a"
+
+[[rules.allowlists]]
+  description = "b"
+`
+
+	var r Root
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
+
+	if len(r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
+	}
+
+	m, ok := r.Rules[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected Rules[0] to be a map[string]any, got %T", r.Rules[0])
+	}
+
+	als, ok := m["allowlists"].([]interface{})
+	if !ok {
+		t.Fatalf("expected allowlists to be []any, got %T", m["allowlists"])
+	}
+	if len(als) != 2 {
+		t.Fatalf("expected 2 allowlists entries, got %d", len(als))
+	}
+
+	a0, ok := als[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected allowlists[0] to be map[string]any, got %T", als[0])
+	}
+	a1, ok := als[1].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected allowlists[1] to be map[string]any, got %T", als[1])
+	}
+	assert.Equal(t, "a", a0["description"])
+	assert.Equal(t, "b", a1["description"])
+}
+
+func TestIssue995_MultiNestedConcrete(t *testing.T) {
+	type AllowList struct {
+		Description string
+	}
+	type Rule struct {
+		Allowlists []AllowList
+	}
+	type Root struct {
+		Rules []Rule
+	}
+
+	doc := `
+[[rules.allowlists]]
+  description = "a"
+
+[[rules.allowlists]]
+  description = "b"
+`
+
+	var r Root
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
+
+	if len(r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
+	}
+	assert.Equal(t, 2, len(r.Rules[0].Allowlists))
+	assert.Equal(t, "a", r.Rules[0].Allowlists[0].Description)
+	assert.Equal(t, "b", r.Rules[0].Allowlists[1].Description)
+}
+
+func TestIssue995_PointerToSlice_Rules(t *testing.T) {
+	type AllowList struct{ Description string }
+	type Rule struct{ Allowlists []AllowList }
+	type Root struct{ Rules *[]Rule }
+
+	doc := `
+[[rules.allowlists]]
+  description = "a"
+
+[[rules.allowlists]]
+  description = "b"
+`
+
+	var r Root
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
+	if r.Rules == nil {
+		t.Fatalf("expected Rules pointer to be initialized")
+	}
+	if len(*r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(*r.Rules))
+	}
+	rule := (*r.Rules)[0]
+	assert.Equal(t, 2, len(rule.Allowlists))
+	assert.Equal(t, "a", rule.Allowlists[0].Description)
+	assert.Equal(t, "b", rule.Allowlists[1].Description)
+}
+
+func TestIssue995_SliceNonEmpty_UsesLastElement(t *testing.T) {
+	type AllowList struct{ Description string }
+	type Rule struct{ Allowlists []AllowList }
+	type Root struct{ Rules []Rule }
+
+	// Pre-initialize with one Rule; nested array table should populate
+	// the last element, not create a new one at this level.
+	var r Root
+	r.Rules = []Rule{{}}
+
+	doc := `
+[[rules.allowlists]]
+  description = "a"
+
+[[rules.allowlists]]
+  description = "b"
+`
+
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
+	if len(r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
+	}
+	assert.Equal(t, 2, len(r.Rules[0].Allowlists))
+	// Values presence check
+	got := []string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
+	if !(got[0] == "a" && got[1] == "b") && !(got[0] == "b" && got[1] == "a") {
+		t.Fatalf("unexpected values in allowlists: %v", got)
+	}
 }

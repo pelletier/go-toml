@@ -416,15 +416,39 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 
 		return v, nil
 	case reflect.Slice:
-		elem := v.Index(v.Len() - 1)
+		// Create a new element when the slice is empty; otherwise operate on
+		// the last element.
+		var (
+			elem    reflect.Value
+			created bool
+		)
+		if v.Len() == 0 {
+			created = true
+			elemType := v.Type().Elem()
+			if elemType.Kind() == reflect.Interface {
+				elem = makeMapStringInterface()
+			} else {
+				elem = reflect.New(elemType).Elem()
+			}
+		} else {
+			elem = v.Index(v.Len() - 1)
+		}
+
 		x, err := d.handleArrayTable(key, elem)
 		if err != nil || d.skipUntilTable {
 			return reflect.Value{}, err
 		}
 		if x.IsValid() {
-			elem.Set(x)
+			if created {
+				elem = x
+			} else {
+				elem.Set(x)
+			}
 		}
 
+		if created {
+			return reflect.Append(v, elem), nil
+		}
 		return v, err
 	case reflect.Array:
 		idx := d.arrayIndex(false, v)
