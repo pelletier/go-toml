@@ -1154,6 +1154,17 @@ func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node
 	case reflect.Struct:
 		path, found := structFieldPath(v, string(key.Node().Data))
 		if !found {
+			// If no matching struct field is found but the target implements the
+			// unstable.Unmarshaler interface (and it is enabled), delegate the
+			// decoding of this value to the custom unmarshaler.
+			if d.unmarshalerInterface {
+				if v.CanAddr() && v.Addr().CanInterface() {
+					if outi, ok := v.Addr().Interface().(unstable.Unmarshaler); ok {
+						return reflect.Value{}, outi.UnmarshalTOML(value)
+					}
+				}
+			}
+			// Otherwise, keep previous behavior and skip until the next table.
 			d.skipUntilTable = true
 			break
 		}
