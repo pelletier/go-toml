@@ -3998,3 +3998,24 @@ foo = "bar"`,
 		})
 	}
 }
+
+type doc994 struct{}
+
+func (d *doc994) UnmarshalTOML(value *unstable.Node) error {
+	return errors.New("expected-error")
+}
+
+func TestIssue994(t *testing.T) {
+	var _ unstable.Unmarshaler = (*doc994)(nil)
+	tomlBytes := []byte(`foo = "bar"`)
+	var d doc994
+	err := toml.NewDecoder(bytes.NewReader(tomlBytes)).
+		EnableUnmarshalerInterface().
+		Decode(&d)
+
+	assert.Error(t, err)
+
+	if err.Error() != "expected-error" {
+		t.Fatalf("expected error 'expected-error', got '%s'", err.Error())
+	}
+}
