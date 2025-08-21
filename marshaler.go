@@ -194,10 +194,11 @@ func (enc *Encoder) Encode(v interface{}) error {
 }
 
 type valueOptions struct {
-	multiline bool
-	omitempty bool
-	commented bool
-	comment   string
+	multiline     bool
+	omitempty     bool
+	commented     bool
+	comment       string
+	textMultiline bool
 }
 
 type encoderCtx struct {
@@ -772,10 +773,11 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 		}
 
 		options := valueOptions{
-			multiline: opts.multiline,
-			omitempty: opts.omitempty,
-			commented: opts.commented,
-			comment:   fieldType.Tag.Get("comment"),
+			multiline:     opts.multiline,
+			omitempty:     opts.omitempty,
+			commented:     opts.commented,
+			comment:       fieldType.Tag.Get("comment"),
+			textMultiline: opts.textMultiline,
 		}
 
 		if opts.inline || !willConvertToTableOrArrayTable(ctx, f) {
@@ -831,10 +833,11 @@ func isValidName(s string) bool {
 }
 
 type tagOptions struct {
-	multiline bool
-	inline    bool
-	omitempty bool
-	commented bool
+	multiline     bool
+	inline        bool
+	omitempty     bool
+	commented     bool
+	textMultiline bool
 }
 
 func parseTag(tag string) (string, tagOptions) {
@@ -864,6 +867,8 @@ func parseTag(tag string) (string, tagOptions) {
 			opts.omitempty = true
 		case "commented":
 			opts.commented = true
+		case "text_multiline":
+			opts.textMultiline = true
 		}
 	}
 
@@ -1122,7 +1127,16 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 			b = enc.indent(subCtx.indent, b)
 		}
 
-		b, err = enc.encode(b, subCtx, v.Index(i))
+		elemValue := v.Index(i)
+		if elemValue.Kind() == reflect.String {
+			str := elemValue.String()
+			if strings.Contains(str, "\n") && ctx.options.textMultiline {
+				b = enc.encodeTextMultilineString(b, str, true)
+				continue
+			}
+		}
+
+		b, err = enc.encode(b, subCtx, elemValue)
 		if err != nil {
 			return nil, err
 		}
@@ -1141,6 +1155,24 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 func (enc *Encoder) indent(level int, b []byte) []byte {
 	for i := 0; i < level; i++ {
 		b = append(b, enc.indentSymbol...)
+	}
+
+	return b
+}
+
+func (enc *Encoder) encodeTextMultilineString(b []byte, v string, quoted bool) []byte {
+	if quoted {
+		b = append(b, `"""`...)
+	} else {
+		b = append(b, []byte{'"'}...)
+	}
+
+	b = append(b, v...)
+
+	if quoted {
+		b = append(b, `"""`...)
+	} else {
+		b = append(b, []byte{'"'}...)
 	}
 
 	return b
