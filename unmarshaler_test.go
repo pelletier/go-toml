@@ -4105,11 +4105,11 @@ func TestIssue995(t *testing.T) {
 }
 
 func TestIssue995_InterfaceSlice_MultiNested(t *testing.T) {
-    type Root struct {
-        Rules []interface{}
-    }
+	type Root struct {
+		Rules []interface{}
+	}
 
-    doc := `
+	doc := `
 [[rules.allowlists]]
   description = "a"
 
@@ -4117,51 +4117,51 @@ func TestIssue995_InterfaceSlice_MultiNested(t *testing.T) {
   description = "b"
 `
 
-    var r Root
-    err := toml.Unmarshal([]byte(doc), &r)
-    assert.NoError(t, err)
+	var r Root
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
 
-    if len(r.Rules) != 1 {
-        t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
-    }
+	if len(r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
+	}
 
-    m, ok := r.Rules[0].(map[string]interface{})
-    if !ok {
-        t.Fatalf("expected Rules[0] to be a map[string]any, got %T", r.Rules[0])
-    }
+	m, ok := r.Rules[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected Rules[0] to be a map[string]any, got %T", r.Rules[0])
+	}
 
-    als, ok := m["allowlists"].([]interface{})
-    if !ok {
-        t.Fatalf("expected allowlists to be []any, got %T", m["allowlists"])
-    }
-    if len(als) != 2 {
-        t.Fatalf("expected 2 allowlists entries, got %d", len(als))
-    }
+	als, ok := m["allowlists"].([]interface{})
+	if !ok {
+		t.Fatalf("expected allowlists to be []any, got %T", m["allowlists"])
+	}
+	if len(als) != 2 {
+		t.Fatalf("expected 2 allowlists entries, got %d", len(als))
+	}
 
-    a0, ok := als[0].(map[string]interface{})
-    if !ok {
-        t.Fatalf("expected allowlists[0] to be map[string]any, got %T", als[0])
-    }
-    a1, ok := als[1].(map[string]interface{})
-    if !ok {
-        t.Fatalf("expected allowlists[1] to be map[string]any, got %T", als[1])
-    }
-    assert.Equal(t, "a", a0["description"])
-    assert.Equal(t, "b", a1["description"])
+	a0, ok := als[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected allowlists[0] to be map[string]any, got %T", als[0])
+	}
+	a1, ok := als[1].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected allowlists[1] to be map[string]any, got %T", als[1])
+	}
+	assert.Equal(t, "a", a0["description"])
+	assert.Equal(t, "b", a1["description"])
 }
 
 func TestIssue995_MultiNestedConcrete(t *testing.T) {
-    type AllowList struct {
-        Description string
-    }
-    type Rule struct {
-        Allowlists []AllowList
-    }
-    type Root struct {
-        Rules []Rule
-    }
+	type AllowList struct {
+		Description string
+	}
+	type Rule struct {
+		Allowlists []AllowList
+	}
+	type Root struct {
+		Rules []Rule
+	}
 
-    doc := `
+	doc := `
 [[rules.allowlists]]
   description = "a"
 
@@ -4169,24 +4169,24 @@ func TestIssue995_MultiNestedConcrete(t *testing.T) {
   description = "b"
 `
 
-    var r Root
-    err := toml.Unmarshal([]byte(doc), &r)
-    assert.NoError(t, err)
+	var r Root
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
 
-    if len(r.Rules) != 1 {
-        t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
-    }
-    assert.Equal(t, 2, len(r.Rules[0].Allowlists))
-    assert.Equal(t, "a", r.Rules[0].Allowlists[0].Description)
-    assert.Equal(t, "b", r.Rules[0].Allowlists[1].Description)
+	if len(r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
+	}
+	assert.Equal(t, 2, len(r.Rules[0].Allowlists))
+	assert.Equal(t, "a", r.Rules[0].Allowlists[0].Description)
+	assert.Equal(t, "b", r.Rules[0].Allowlists[1].Description)
 }
 
 func TestIssue995_PointerToSlice_Rules(t *testing.T) {
-    type AllowList struct{ Description string }
-    type Rule struct{ Allowlists []AllowList }
-    type Root struct{ Rules *[]Rule }
+	type AllowList struct{ Description string }
+	type Rule struct{ Allowlists []AllowList }
+	type Root struct{ Rules *[]Rule }
 
-    doc := `
+	doc := `
 [[rules.allowlists]]
   description = "a"
 
@@ -4194,32 +4194,32 @@ func TestIssue995_PointerToSlice_Rules(t *testing.T) {
   description = "b"
 `
 
-    var r Root
-    err := toml.Unmarshal([]byte(doc), &r)
-    assert.NoError(t, err)
-    if r.Rules == nil {
-        t.Fatalf("expected Rules pointer to be initialized")
-    }
-    if len(*r.Rules) != 1 {
-        t.Fatalf("expected one element in Rules, got %d", len(*r.Rules))
-    }
-    rule := (*r.Rules)[0]
-    assert.Equal(t, 2, len(rule.Allowlists))
-    assert.Equal(t, "a", rule.Allowlists[0].Description)
-    assert.Equal(t, "b", rule.Allowlists[1].Description)
+	var r Root
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
+	if r.Rules == nil {
+		t.Fatalf("expected Rules pointer to be initialized")
+	}
+	if len(*r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(*r.Rules))
+	}
+	rule := (*r.Rules)[0]
+	assert.Equal(t, 2, len(rule.Allowlists))
+	assert.Equal(t, "a", rule.Allowlists[0].Description)
+	assert.Equal(t, "b", rule.Allowlists[1].Description)
 }
 
 func TestIssue995_SliceNonEmpty_UsesLastElement(t *testing.T) {
-    type AllowList struct{ Description string }
-    type Rule struct{ Allowlists []AllowList }
-    type Root struct{ Rules []Rule }
+	type AllowList struct{ Description string }
+	type Rule struct{ Allowlists []AllowList }
+	type Root struct{ Rules []Rule }
 
-    // Pre-initialize with one Rule; nested array table should populate
-    // the last element, not create a new one at this level.
-    var r Root
-    r.Rules = []Rule{{}}
+	// Pre-initialize with one Rule; nested array table should populate
+	// the last element, not create a new one at this level.
+	var r Root
+	r.Rules = []Rule{{}}
 
-    doc := `
+	doc := `
 [[rules.allowlists]]
   description = "a"
 
@@ -4227,15 +4227,15 @@ func TestIssue995_SliceNonEmpty_UsesLastElement(t *testing.T) {
   description = "b"
 `
 
-    err := toml.Unmarshal([]byte(doc), &r)
-    assert.NoError(t, err)
-    if len(r.Rules) != 1 {
-        t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
-    }
-    assert.Equal(t, 2, len(r.Rules[0].Allowlists))
-    // Values presence check
-    got := []string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
-    if !(got[0] == "a" && got[1] == "b") && !(got[0] == "b" && got[1] == "a") {
-        t.Fatalf("unexpected values in allowlists: %v", got)
-    }
+	err := toml.Unmarshal([]byte(doc), &r)
+	assert.NoError(t, err)
+	if len(r.Rules) != 1 {
+		t.Fatalf("expected one element in Rules, got %d", len(r.Rules))
+	}
+	assert.Equal(t, 2, len(r.Rules[0].Allowlists))
+	// Values presence check
+	got := []string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
+	if !(got[0] == "a" && got[1] == "b") && !(got[0] == "b" && got[1] == "a") {
+		t.Fatalf("unexpected values in allowlists: %v", got)
+	}
 }
