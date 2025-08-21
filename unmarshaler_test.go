@@ -4019,3 +4019,24 @@ func TestIssue994(t *testing.T) {
 		t.Fatalf("expected error 'expected-error', got '%s'", err.Error())
 	}
 }
+
+type doc994ok struct {
+	S string
+}
+
+func (d *doc994ok) UnmarshalTOML(value *unstable.Node) error {
+	d.S = string(value.Data) + " from unmarshaler"
+	return nil
+}
+
+func TestIssue994_OK(t *testing.T) {
+	var _ unstable.Unmarshaler = (*doc994ok)(nil)
+	tomlBytes := []byte(`foo = "bar"`)
+	var d doc994ok
+	err := toml.NewDecoder(bytes.NewReader(tomlBytes)).
+		EnableUnmarshalerInterface().
+		Decode(&d)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "bar from unmarshaler", d.S)
+}
