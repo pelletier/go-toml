@@ -520,7 +520,6 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 	bv := []byte(v)
 	for i := 0; i < len(bv); i++ {
 		r := bv[i]
-		// for _, r := range []byte(v) {
 		switch r {
 		case '\\':
 			b = append(b, `\\`...)
@@ -532,13 +531,8 @@ func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byt
 				if i+2 > len(bv) || bv[i+1] != '"' || bv[i+2] != '"' {
 					b = append(b, r)
 				} else {
-					for {
-						b = append(b, `\"`...)
-						if i+1 == len(bv) || bv[i+1] != '"' {
-							break
-						}
-						i++
-					}
+					b = append(b, `\"\"\"`...)
+					i += 2
 				}
 			} else {
 				b = append(b, `\"`...)
