@@ -4042,47 +4042,47 @@ func TestIssue994_OK(t *testing.T) {
 }
 
 func TestIssue995(t *testing.T) {
-    // Reproduces https://github.com/pelletier/go-toml/issues/995
-    // The decoder used to panic with "reflect: slice index out of range"
-    // when encountering a nested array table like [[rules.allowlists]] while
-    // the parent slice (Rules) was still empty.
+	// Reproduces https://github.com/pelletier/go-toml/issues/995
+	// The decoder used to panic with "reflect: slice index out of range"
+	// when encountering a nested array table like [[rules.allowlists]] while
+	// the parent slice (Rules) was still empty.
 
-    type AllowList struct {
-        Description string
-        Condition   string
-        Commits     []string
-        Paths       []string
-        RegexTarget string
-        Regexes     []string
-        StopWords   []string
-    }
+	type AllowList struct {
+		Description string
+		Condition   string
+		Commits     []string
+		Paths       []string
+		RegexTarget string
+		Regexes     []string
+		StopWords   []string
+	}
 
-    type Rule struct {
-        ID          string
-        Description string
-        Regex       string
-        SecretGroup int
-        Entropy     interface{}
-        Keywords    []string
-        Path        string
-        Tags        []string
-        AllowList   *AllowList
-        Allowlists  []AllowList
-    }
+	type Rule struct {
+		ID          string
+		Description string
+		Regex       string
+		SecretGroup int
+		Entropy     interface{}
+		Keywords    []string
+		Path        string
+		Tags        []string
+		AllowList   *AllowList
+		Allowlists  []AllowList
+	}
 
-    type GitleaksConfig struct {
-        Description string
-        Rules       []Rule
-        Allowlist   struct {
-            Commits     []string
-            Paths       []string
-            RegexTarget string
-            Regexes     []string
-            StopWords   []string
-        }
-    }
+	type GitleaksConfig struct {
+		Description string
+		Rules       []Rule
+		Allowlist   struct {
+			Commits     []string
+			Paths       []string
+			RegexTarget string
+			Regexes     []string
+			StopWords   []string
+		}
+	}
 
-    doc := `
+	doc := `
 [[allowlists]]
   description = "Exception for File "
   files = [ '''app/src''']
@@ -4094,17 +4094,17 @@ func TestIssue995(t *testing.T) {
   ]
 `
 
-    var cfg GitleaksConfig
-    err := toml.Unmarshal([]byte(doc), &cfg)
-    assert.NoError(t, err)
+	var cfg GitleaksConfig
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
 
-    // Ensure no panic and that nested array table was created.
-    if len(cfg.Rules) == 0 {
-        t.Fatalf("expected Rules to contain at least one element after unmarshaling nested array table")
-    }
-    if len(cfg.Rules[0].Allowlists) != 1 {
-        t.Fatalf("expected first Rule to have exactly one allowlists entry, got %d", len(cfg.Rules[0].Allowlists))
-    }
-    assert.Equal(t, "policies", cfg.Rules[0].Allowlists[0].Description)
-    assert.Equal(t, []string{"abc"}, cfg.Rules[0].Allowlists[0].Regexes)
+	// Ensure no panic and that nested array table was created.
+	if len(cfg.Rules) == 0 {
+		t.Fatalf("expected Rules to contain at least one element after unmarshaling nested array table")
+	}
+	if len(cfg.Rules[0].Allowlists) != 1 {
+		t.Fatalf("expected first Rule to have exactly one allowlists entry, got %d", len(cfg.Rules[0].Allowlists))
+	}
+	assert.Equal(t, "policies", cfg.Rules[0].Allowlists[0].Description)
+	assert.Equal(t, []string{"abc"}, cfg.Rules[0].Allowlists[0].Regexes)
 }
