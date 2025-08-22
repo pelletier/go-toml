@@ -52,7 +52,7 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 	assert.NoError(t, err)
 
 	var actual interface{}
-	err = json.Unmarshal([]byte(j), &actual)
+	err = json.Unmarshal(j, &actual)
 	assert.NoError(t, err)
 
 	testsuite.CmpJSON(t, "", ref, actual)

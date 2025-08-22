@@ -832,7 +832,7 @@ func parseTag(tag string) (string, tagOptions) {
 	}
 
 	raw := tag[idx+1:]
-	tag = string(tag[:idx])
+	tag = tag[:idx]
 	for raw != "" {
 		var o string
 		i := strings.Index(raw, ",")
