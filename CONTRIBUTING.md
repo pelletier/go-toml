@@ -168,12 +168,12 @@ Checklist:
 1. Decide on the next version number. Use semver. Review commits since last
    version to assess.
 2. Tag release. For example:
-```
-git checkout v2
-git pull
-git tag v2.2.0
-git push --tags
-```
+   ```
+   git checkout v2
+   git pull
+   git tag v2.2.0
+   git push --tags
+   ```
 3. CI automatically builds a draft GitHub release. Review it and edit as
    necessary. Look for "Other changes". That would indicate a pull request not
    labeled properly. Tweak labels and pull request titles until changelog looks
