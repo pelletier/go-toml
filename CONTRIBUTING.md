@@ -33,7 +33,7 @@ The documentation is present in the [README][readme] and thorough the source
 code. On release, it gets updated on [pkg.go.dev][pkg.go.dev]. To make a change
 to the documentation, create a pull request with your proposed changes. For
 simple changes like that, the easiest way to go is probably the "Fork this
-project and edit the file" button on Github, displayed at the top right of the
+project and edit the file" button on GitHub, displayed at the top right of the
 file. Unless it's a trivial change (for example a typo), provide a little bit of
 context in your pull request description or commit message.
 
@@ -111,7 +111,7 @@ code lowers the coverage.
 
 Go-toml aims to stay efficient. We rely on a set of scenarios executed with Go's
 builtin benchmark systems. Because of their noisy nature, containers provided by
-Github Actions cannot be reliably used for benchmarking. As a result, you are
+GitHub Actions cannot be reliably used for benchmarking. As a result, you are
 responsible for checking that your changes do not incur a performance penalty.
 You can run their following to execute benchmarks:
 
@@ -174,7 +174,7 @@ git pull
 git tag v2.2.0
 git push --tags
 ```
-3. CI automatically builds a draft Github release. Review it and edit as
+3. CI automatically builds a draft GitHub release. Review it and edit as
    necessary. Look for "Other changes". That would indicate a pull request not
    labeled properly. Tweak labels and pull request titles until changelog looks
    good for users.

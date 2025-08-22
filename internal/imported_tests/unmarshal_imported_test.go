@@ -2283,7 +2283,7 @@ func (c *Custom) UnmarshalTOML(v interface{}) error {
 	return nil
 }
 
-func TestGithubIssue431(t *testing.T) {
+func TestGitHubIssue431(t *testing.T) {
 	doc := `key = "value"`
 	var c Config
 	if err := toml.Unmarshal([]byte(doc), &c); err != nil {
@@ -2321,7 +2321,7 @@ type config437 struct {
 	} `toml:"HTTP"`
 }
 
-func TestGithubIssue437(t *testing.T) {
+func TestGitHubIssue437(t *testing.T) {
 	t.Skipf("unmarshalTOML not implemented")
 	src := `
 [HTTP]
