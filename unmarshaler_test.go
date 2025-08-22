@@ -2977,7 +2977,8 @@ func TestIssue931(t *testing.T) {
   Name = 'd'
 	`)
 
-	toml.Unmarshal(b, &its)
+	err := toml.Unmarshal(b, &its)
+	assert.NoError(t, err)
 	assert.Equal(t, items{[]item{{"c"}, {"d"}}}, its)
 }
 
@@ -2998,7 +2999,8 @@ func TestIssue931Interface(t *testing.T) {
   Name = 'd'
 	`)
 
-	toml.Unmarshal(b, &its)
+	err := toml.Unmarshal(b, &its)
+	assert.NoError(t, err)
 	assert.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
 }
 
@@ -3024,7 +3026,8 @@ func TestIssue931SliceInterface(t *testing.T) {
   Name = 'd'
 	`)
 
-	toml.Unmarshal(b, &its)
+	err := toml.Unmarshal(b, &its)
+	assert.NoError(t, err)
 	assert.Equal(t, items{[]interface{}{item{"Name": "c"}, item{"Name": "d"}}}, its)
 }
 
