@@ -161,6 +161,8 @@ func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder {
 //
 // The "omitempty" option prevents empty values or groups from being emitted.
 //
+// The "omitzero" option prevents zero values or groups from being emitted.
+//
 // The "commented" option prefixes the value and all its children with a comment
 // symbol.
 //
@@ -196,6 +198,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 type valueOptions struct {
 	multiline bool
 	omitempty bool
+	omitzero  bool
 	commented bool
 	comment   string
 }
@@ -382,6 +385,10 @@ func isNil(v reflect.Value) bool {
 
 func shouldOmitEmpty(options valueOptions, v reflect.Value) bool {
 	return options.omitempty && isEmptyValue(v)
+}
+
+func shouldOmitZero(options valueOptions, v reflect.Value) bool {
+	return options.omitzero && v.IsZero()
 }
 
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v reflect.Value) ([]byte, error) {
@@ -774,6 +781,7 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 		options := valueOptions{
 			multiline: opts.multiline,
 			omitempty: opts.omitempty,
+			omitzero:  opts.omitzero,
 			commented: opts.commented,
 			comment:   fieldType.Tag.Get("comment"),
 		}
@@ -834,6 +842,7 @@ type tagOptions struct {
 	multiline bool
 	inline    bool
 	omitempty bool
+	omitzero  bool
 	commented bool
 }
 
@@ -862,6 +871,8 @@ func parseTag(tag string) (string, tagOptions) {
 			opts.inline = true
 		case "omitempty":
 			opts.omitempty = true
+		case "omitzero":
+			opts.omitzero = true
 		case "commented":
 			opts.commented = true
 		}
@@ -896,6 +907,9 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		if shouldOmitEmpty(kv.Options, kv.Value) {
 			continue
 		}
+		if shouldOmitZero(kv.Options, kv.Value) {
+			continue
+		}
 		hasNonEmptyKV = true
 
 		ctx.setKey(kv.Key)
@@ -913,6 +927,9 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	first := true
 	for _, table := range t.tables {
 		if shouldOmitEmpty(table.Options, table.Value) {
+			continue
+		}
+		if shouldOmitZero(table.Options, table.Value) {
 			continue
 		}
 		if first {
@@ -947,6 +964,9 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	first := true
 	for _, kv := range t.kvs {
 		if shouldOmitEmpty(kv.Options, kv.Value) {
+			continue
+		}
+		if shouldOmitZero(kv.Options, kv.Value) {
 			continue
 		}
 
