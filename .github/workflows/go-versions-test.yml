@@ -1,0 +1,36 @@
+name: Go Versions Compatibility Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      go_versions:
+        description: 'Go versions to test (space-separated, e.g., "1.21 1.22 1.23")'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run Go versions compatibility test
+        run: |
+          VERSIONS="${{ github.event.inputs.go_versions }}"
+          ./test-go-versions.sh --output ./test-results $VERSIONS
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-versions-test-results
+          path: |
+            test-results/
+          retention-days: 30

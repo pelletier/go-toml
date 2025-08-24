@@ -92,6 +92,48 @@ However, given GitHub's new policy to _not_ run Actions on pull requests until a
 maintainer clicks on button, it is highly recommended that you run them locally
 as you make changes.
 
+### Test across Go versions
+
+The repository includes tooling to test go-toml across multiple Go versions
+(1.11 through 1.25) both locally and in GitHub Actions.
+
+#### Local testing with Docker
+
+Prerequisites: Docker installed and running, Bash shell, `rsync` command.
+
+```bash
+# Test all Go versions in parallel (default)
+./test-go-versions.sh
+
+# Test specific versions
+./test-go-versions.sh 1.21 1.22 1.23
+
+# Test sequentially (slower but uses less resources)
+./test-go-versions.sh --sequential
+
+# Verbose output with custom results directory
+./test-go-versions.sh --verbose --output ./my-results 1.24 1.25
+
+# Show all options
+./test-go-versions.sh --help
+```
+
+The script creates Docker containers for each Go version and runs the full test
+suite. Results are saved to a `test-results/` directory with individual logs and
+a comprehensive summary report.
+
+The script only exits with a non-zero status code if either of the two most
+recent Go versions fail.
+
+#### GitHub Actions testing (maintainers)
+
+1. Go to the **Actions** tab in the GitHub repository
+2. Select **"Go Versions Compatibility Test"** from the workflow list
+3. Click **"Run workflow"**
+4. Optionally customize:
+   - **Go versions**: Space-separated list (e.g., `1.21 1.22 1.23`)
+   - **Execution mode**: Parallel (faster) or sequential (more stable)
+
 ### Check coverage
 
 We use `go tool cover` to compute test coverage. Most code editors have a way to
