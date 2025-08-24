@@ -89,7 +89,7 @@ func (n *Node) Next() *Node {
 }
 
 // Child returns a pointer to the first child node of this node. Other children
-// can be accessed calling Next on the first child.  Returns an nil if this Node
+// can be accessed calling Next on the first child.  Returns nil if this Node
 // has no child.
 func (n *Node) Child() *Node {
 	if n.child == 0 {

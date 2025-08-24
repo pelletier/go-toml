@@ -3,7 +3,7 @@ package benchmark_test
 import (
 	"compress/gzip"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -74,7 +74,7 @@ func fixture(tb testing.TB, path string) []byte {
 	gz, err := gzip.NewReader(f)
 	assert.NoError(tb, err)
 
-	buf, err := ioutil.ReadAll(gz)
+	buf, err := io.ReadAll(gz)
 	assert.NoError(tb, err)
 	return buf
 }

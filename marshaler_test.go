@@ -1326,7 +1326,8 @@ func TestIssue786(t *testing.T) {
 	config.Custom = []Custom{{Name: "omit", General: General{Randomize: false}}}
 	config.Custom = append(config.Custom, Custom{Name: "present", General: General{From: "-2d", Randomize: true}})
 	encoder := toml.NewEncoder(buf)
-	encoder.Encode(config)
+	err = encoder.Encode(config)
+	assert.NoError(t, err)
 
 	expected := `# from in graphite-web format, the local TZ is used
 from = '-2d'
@@ -1372,7 +1373,8 @@ func TestMarshalIssue888(t *testing.T) {
 	}
 
 	encoder := toml.NewEncoder(buf).SetIndentTables(true)
-	encoder.Encode(config)
+	err := encoder.Encode(config)
+	assert.NoError(t, err)
 
 	expected := `# custom config
 [[Custom]]

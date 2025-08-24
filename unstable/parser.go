@@ -1076,7 +1076,7 @@ byteLoop:
 			}
 		case c == 'T' || c == 't' || c == ':' || c == '.':
 			hasTime = true
-		case c == '+' || c == '-' || c == 'Z' || c == 'z':
+		case c == '+' || c == 'Z' || c == 'z':
 			hasTz = true
 		case c == ' ':
 			if !seenSpace && i+1 < len(b) && isDigit(b[i+1]) {

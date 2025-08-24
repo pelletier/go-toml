@@ -10,7 +10,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// Marshal is a helpfer function for calling toml.Marshal
+// Marshal is a helper function for calling toml.Marshal
 //
 // Only needed to avoid package import loops.
 func Marshal(v interface{}) ([]byte, error) {
