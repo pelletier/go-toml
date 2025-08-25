@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"net/netip"
 	"reflect"
 	"strings"
 	"testing"
@@ -1117,6 +1118,9 @@ func TestEncoderOmitempty(t *testing.T) {
 		Ptr     *string           `toml:",omitempty,multiline"`
 		Iface   interface{}       `toml:",omitempty,multiline"`
 		Struct  struct{}          `toml:",omitempty,multiline"`
+		Inline  struct {
+			String string `toml:",omitempty,multiline"`
+		} `toml:",inline"`
 	}
 
 	d := doc{}
@@ -1124,7 +1128,68 @@ func TestEncoderOmitempty(t *testing.T) {
 	b, err := toml.Marshal(d)
 	assert.NoError(t, err)
 
-	expected := ``
+	expected := `Inline = {}
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitzero(t *testing.T) {
+	type doc struct {
+		String  string            `toml:",omitzero,multiline"`
+		Bool    bool              `toml:",omitzero,multiline"`
+		Int     int               `toml:",omitzero,multiline"`
+		Int8    int8              `toml:",omitzero,multiline"`
+		Int16   int16             `toml:",omitzero,multiline"`
+		Int32   int32             `toml:",omitzero,multiline"`
+		Int64   int64             `toml:",omitzero,multiline"`
+		Uint    uint              `toml:",omitzero,multiline"`
+		Uint8   uint8             `toml:",omitzero,multiline"`
+		Uint16  uint16            `toml:",omitzero,multiline"`
+		Uint32  uint32            `toml:",omitzero,multiline"`
+		Uint64  uint64            `toml:",omitzero,multiline"`
+		Float32 float32           `toml:",omitzero,multiline"`
+		Float64 float64           `toml:",omitzero,multiline"`
+		MapNil  map[string]string `toml:",omitzero,multiline"`
+		Slice   []string          `toml:",omitzero,multiline"`
+		Ptr     *string           `toml:",omitzero,multiline"`
+		Iface   interface{}       `toml:",omitzero,multiline"`
+		Struct  struct{}          `toml:",omitzero,multiline"`
+		Time    time.Time         `toml:",omitzero,multiline"`
+		IP      netip.Addr        `toml:",omitzero,multiline"`
+		Inline  struct {
+			String string `toml:",omitzero,multiline"`
+		} `toml:",inline"`
+	}
+
+	d := doc{}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	expected := `Inline = {}
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitzeroOpaqueStruct(t *testing.T) {
+	type doc struct {
+		Time time.Time  `toml:",omitzero"`
+		IP   netip.Addr `toml:",omitzero"`
+	}
+
+	d := doc{
+		Time: time.Date(2001, 2, 3, 4, 5, 6, 7, time.UTC),
+		IP:   netip.MustParseAddr("192.168.178.35"),
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	expected := `Time = 2001-02-03T04:05:06.000000007Z
+IP = '192.168.178.35'
+`
 
 	assert.Equal(t, expected, string(b))
 }
