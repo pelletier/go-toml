@@ -1991,7 +1991,8 @@ func TestDecoderStrict(t *testing.T) {
 		"Expected a *toml.StrictMissingError, got: %v", reflect.TypeOf(err),
 	)
 
-	se := err.(*toml.StrictMissingError)
+	var se *toml.StrictMissingError
+	assert.True(t, errors.As(err, &se))
 
 	keys := []toml.Key{}
 

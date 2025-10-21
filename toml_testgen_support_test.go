@@ -6,6 +6,7 @@ package toml_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -39,7 +40,8 @@ func testgenValid(t *testing.T, input string, jsonRef string) {
 
 	err := testsuite.Unmarshal([]byte(input), &doc)
 	if err != nil {
-		if de, ok := err.(*toml.DecodeError); ok {
+		de := &toml.DecodeError{}
+		if errors.As(err, &de) {
 			t.Logf("%s\n%s", err, de)
 		}
 		t.Fatalf("failed parsing toml: %s", err)

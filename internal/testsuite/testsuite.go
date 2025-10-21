@@ -37,13 +37,13 @@ func DecodeStdin() error {
 	var decoded map[string]interface{}
 
 	if err := toml.NewDecoder(os.Stdin).Decode(&decoded); err != nil {
-		return fmt.Errorf("Error decoding TOML: %s", err)
+		return fmt.Errorf("Error decoding TOML: %w", err)
 	}
 
 	j := json.NewEncoder(os.Stdout)
 	j.SetIndent("", "  ")
 	if err := j.Encode(addTag(decoded)); err != nil {
-		return fmt.Errorf("Error encoding JSON: %s", err)
+		return fmt.Errorf("Error encoding JSON: %w", err)
 	}
 
 	return nil

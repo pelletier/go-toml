@@ -378,7 +378,7 @@ func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflec
 	case reflect.Array:
 		idx := d.arrayIndex(true, v)
 		if idx >= v.Len() {
-			return v, fmt.Errorf("%s at position %d", d.typeMismatchError("array table", v.Type()), idx)
+			return v, fmt.Errorf("%w at position %d", d.typeMismatchError("array table", v.Type()), idx)
 		}
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
@@ -453,7 +453,7 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 	case reflect.Array:
 		idx := d.arrayIndex(false, v)
 		if idx >= v.Len() {
-			return v, fmt.Errorf("%s at position %d", d.typeMismatchError("array table", v.Type()), idx)
+			return v, fmt.Errorf("%w at position %d", d.typeMismatchError("array table", v.Type()), idx)
 		}
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)

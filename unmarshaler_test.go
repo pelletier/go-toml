@@ -2204,7 +2204,8 @@ port = "bad"
 	err := toml.NewDecoder(file).Decode(&cfg)
 	assert.Error(t, err)
 
-	x := err.(*toml.DecodeError)
+	var x *toml.DecodeError
+	assert.True(t, errors.As(err, &x))
 	assert.Equal(t, "toml: cannot decode TOML string into struct field toml_test.Server.Port of type int", x.Error())
 	expected := `1| [server]
 2| path = "/my/path"
@@ -2235,7 +2236,8 @@ port = 50
 	err := toml.NewDecoder(file).Decode(&cfg)
 	assert.Error(t, err)
 
-	x := err.(*toml.DecodeError)
+	var x *toml.DecodeError
+	assert.True(t, errors.As(err, &x))
 	assert.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.Server.Path of type string", x.Error())
 	expected := `1| [server]
 2| path = 100
@@ -3918,7 +3920,7 @@ type CustomUnmarshalerKey struct {
 func (k *CustomUnmarshalerKey) UnmarshalTOML(value *unstable.Node) error {
 	item, err := strconv.ParseInt(string(value.Data), 10, 64)
 	if err != nil {
-		return fmt.Errorf("error converting to int64, %v", err)
+		return fmt.Errorf("error converting to int64, %w", err)
 	}
 	k.A = item
 	return nil
