@@ -1197,7 +1197,7 @@ func TestEncoderTagFieldName(t *testing.T) {
 	type doc struct {
 		String string `toml:"hello"`
 		OkSym  string `toml:"#"`
-		Bad    string `toml:"\"`
+		Bad    string `toml:"\"` //nolint:govet
 	}
 
 	d := doc{String: "world"}
