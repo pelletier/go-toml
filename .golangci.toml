@@ -57,6 +57,10 @@ default-signifies-exhaustive = true
 path = ".test.go"
 linters = ["goconst"]
 
+[[linters.exclusions.rules]]
+path = "main.go"
+linters = ["forbidigo"]
+
 [formatters]
 enable = [
     "gci",
