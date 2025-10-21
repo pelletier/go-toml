@@ -673,7 +673,7 @@ func (p *Parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, 
 	return token, token[i : len(token)-3], rest, err
 }
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,cyclop
 func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
@@ -1118,7 +1118,7 @@ byteLoop:
 	}), b[i:], nil
 }
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,cyclop
 func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 	i := 0
 

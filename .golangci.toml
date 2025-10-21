@@ -16,7 +16,6 @@ enable = [
     "forbidigo",
     "funlen",
     "gochecknoinits",
-    "gocognit",
     "goconst",
     "gocritic",
     "godox",
