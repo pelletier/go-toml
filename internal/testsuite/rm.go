@@ -18,7 +18,6 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 
 	// Switch on the data type.
 	switch v := typedJson.(type) {
-
 	// Object: this can either be a TOML table or a primitive with tags.
 	case map[string]interface{}:
 		// This value represents a primitive: remove the tags and return just

@@ -30,7 +30,6 @@ func (p *Program) Execute() {
 func (p *Program) main(files []string, input io.Reader, output, error io.Writer) int {
 	err := p.run(files, input, output)
 	if err != nil {
-
 		var derr *toml.DecodeError
 		if errors.As(err, &derr) {
 			fmt.Fprintln(error, derr.String())
