@@ -1,19 +1,11 @@
-[service]
-golangci-lint-version =  "1.39.0"
-
-[linters-settings.wsl]
-allow-assign-and-anything = true
-
-[linters-settings.exhaustive]
-default-signifies-exhaustive = true
+version = "2"
 
 [linters]
-disable-all = true
+default = "none"
 enable = [
     "asciicheck",
     "bodyclose",
     "cyclop",
-    "deadcode",
     "depguard",
     "dogsled",
     "dupl",
@@ -21,13 +13,8 @@ enable = [
     "errcheck",
     "errorlint",
     "exhaustive",
-    # "exhaustivestruct",
-    "exportloopref",
     "forbidigo",
-    # "forcetypeassert",
     "funlen",
-    "gci",
-    # "gochecknoglobals",
     "gochecknoinits",
     "gocognit",
     "goconst",
@@ -35,20 +22,11 @@ enable = [
     "gocyclo",
     "godot",
     "godox",
-    # "goerr113",
-    "gofmt",
-    "gofumpt",
     "goheader",
-    "goimports",
-    "golint",
-    "gomnd",
-    # "gomoddirectives",
     "gomodguard",
     "goprintffuncname",
     "gosec",
-    "gosimple",
     "govet",
-    # "ifshort",
     "importas",
     "ineffassign",
     "lll",
@@ -57,28 +35,30 @@ enable = [
     "nakedret",
     "nestif",
     "nilerr",
-    # "nlreturn",
     "noctx",
     "nolintlint",
-    #"paralleltest",
     "prealloc",
     "predeclared",
     "revive",
     "rowserrcheck",
     "sqlclosecheck",
     "staticcheck",
-    "structcheck",
-    "stylecheck",
-    # "testpackage",
     "thelper",
     "tparallel",
-    "typecheck",
     "unconvert",
     "unparam",
     "unused",
-    "varcheck",
     "wastedassign",
     "whitespace",
-    # "wrapcheck",
-    # "wsl"
+]
+
+[linters.settings.exhaustive]
+default-signifies-exhaustive = true
+
+[formatters]
+enable = [
+    "gci",
+    "gofmt",
+    "gofumpt",
+    "goimports",
 ]
