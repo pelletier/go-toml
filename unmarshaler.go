@@ -458,9 +458,9 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
 		return v, err
+	default:
+		return d.handleArrayTable(key, v)
 	}
-
-	return d.handleArrayTable(key, v)
 }
 
 func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {

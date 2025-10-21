@@ -309,16 +309,16 @@ func (s *SeenTracker) checkKeyValue(node *unstable.Node) (bool, error) {
 		return s.checkInlineTable(value)
 	case unstable.Array:
 		return s.checkArray(value)
+	default:
+		return false, nil
 	}
-
-	return false, nil
 }
 
 func (s *SeenTracker) checkArray(node *unstable.Node) (first bool, err error) {
 	it := node.Children()
 	for it.Next() {
 		n := it.Node()
-		switch n.Kind {
+		switch n.Kind { //nolint:exhaustive
 		case unstable.InlineTable:
 			first, err = s.checkInlineTable(n)
 			if err != nil {
