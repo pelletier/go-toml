@@ -19,7 +19,6 @@ enable = [
     "gocognit",
     "goconst",
     "gocritic",
-    "gocyclo",
     "godot",
     "godox",
     "goheader",
