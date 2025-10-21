@@ -53,6 +53,10 @@ enable = [
 [linters.settings.exhaustive]
 default-signifies-exhaustive = true
 
+[[linters.exclusions.rules]]
+path = ".test.go"
+linters = ["goconst"]
+
 [formatters]
 enable = [
     "gci",
