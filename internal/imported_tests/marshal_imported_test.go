@@ -128,7 +128,7 @@ String2 = 'Two'
 String2 = 'Three'
 `
 
-	assert.Equal(t, string(expected), string(result))
+	assert.Equal(t, expected, string(result))
 }
 
 func TestEmptyMarshal(t *testing.T) {
@@ -163,7 +163,7 @@ stringlist = []
 [map]
 `
 
-	assert.Equal(t, string(expected), string(result))
+	assert.Equal(t, expected, string(result))
 }
 
 type textMarshaler struct {
