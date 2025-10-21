@@ -718,7 +718,6 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	for i < len(token)-3 {
 		c := token[i]
 
-		//nolint:nestif
 		if c == '\\' {
 			// When the last non-whitespace character on a line is an unescaped \,
 			// it will be trimmed along with all whitespace (including newlines) up

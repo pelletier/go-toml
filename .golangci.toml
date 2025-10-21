@@ -31,7 +31,6 @@ enable = [
     "makezero",
     "misspell",
     "nakedret",
-    "nestif",
     "nilerr",
     "noctx",
     "nolintlint",
