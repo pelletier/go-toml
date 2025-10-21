@@ -953,7 +953,7 @@ const (
 // compile time, so it is computed during initialization.
 var maxUint int64 = math.MaxInt64
 
-func init() {
+func init() { //nolint:gochecknoinits
 	m := uint64(^uint(0))
 	if m < uint64(maxUint) {
 		maxUint = int64(m)
