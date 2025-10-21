@@ -587,7 +587,7 @@ func (x *IntOrString) MarshalTOML() ([]byte, error) {
 	s := *(*string)(x)
 	_, err := strconv.Atoi(s)
 	if err != nil {
-		return []byte(fmt.Sprintf(`"%s"`, s)), nil
+		return []byte(fmt.Sprintf(`"%s"`, s)), nil //nolint:nilerr
 	}
 	return []byte(s), nil
 }
