@@ -13,7 +13,7 @@ func addTag(key string, tomlData interface{}) interface{} {
 	// Switch on the data type.
 	switch orig := tomlData.(type) {
 	default:
-		//return map[string]interface{}{}
+		// return map[string]interface{}{}
 		panic(fmt.Sprintf("Unknown type: %T", tomlData))
 
 	// A table: we don't need to add any tags, just recurse for every table

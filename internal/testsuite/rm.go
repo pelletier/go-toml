@@ -79,7 +79,7 @@ func untag(typed map[string]interface{}) (interface{}, error) {
 		}
 		return f, nil
 
-		//toml.LocalDate{Year:2020, Month:12, Day:12}
+		// toml.LocalDate{Year:2020, Month:12, Day:12}
 	case "datetime":
 		return time.Parse("2006-01-02T15:04:05.999999999Z07:00", v)
 	case "datetime-local":

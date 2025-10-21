@@ -83,5 +83,5 @@ func (p *Program) runFileInPlace(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, out.Bytes(), 0600)
+	return os.WriteFile(path, out.Bytes(), 0o600)
 }

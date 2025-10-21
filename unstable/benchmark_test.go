@@ -5,12 +5,14 @@ import (
 	"testing"
 )
 
-var valid10Ascii = []byte("1234567890")
-var valid10Utf8 = []byte("日本語a")
-var valid1kUtf8 = bytes.Repeat([]byte("0123456789日本語日本語日本語日abcdefghijklmnopqrstuvwx"), 16)
-var valid1MUtf8 = bytes.Repeat(valid1kUtf8, 1024)
-var valid1kAscii = bytes.Repeat([]byte("012345678998jhjklasDJKLAAdjdfjsdklfjdslkabcdefghijklmnopqrstuvwx"), 16)
-var valid1MAscii = bytes.Repeat(valid1kAscii, 1024)
+var (
+	valid10Ascii = []byte("1234567890")
+	valid10Utf8  = []byte("日本語a")
+	valid1kUtf8  = bytes.Repeat([]byte("0123456789日本語日本語日本語日abcdefghijklmnopqrstuvwx"), 16)
+	valid1MUtf8  = bytes.Repeat(valid1kUtf8, 1024)
+	valid1kAscii = bytes.Repeat([]byte("012345678998jhjklasDJKLAAdjdfjsdklfjdslkabcdefghijklmnopqrstuvwx"), 16)
+	valid1MAscii = bytes.Repeat(valid1kAscii, 1024)
+)
 
 func BenchmarkScanComments(b *testing.B) {
 	wrap := func(x []byte) []byte {

@@ -26,7 +26,7 @@ func TestDocMarshal(t *testing.T) {
 		Unexported2 int               `toml:"-"`
 	}
 
-	var docData = testDoc{
+	docData := testDoc{
 		Title:       "TOML Marshal Testing",
 		unexported:  0,
 		Unexported2: 0,
@@ -129,7 +129,6 @@ String2 = 'Three'
 `
 
 	assert.Equal(t, string(expected), string(result))
-
 }
 
 func TestEmptyMarshal(t *testing.T) {

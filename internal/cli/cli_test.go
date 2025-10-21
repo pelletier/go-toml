@@ -101,9 +101,9 @@ func TestProcessMainFilesInPlace(t *testing.T) {
 	path1 := path.Join(dir, "file1")
 	path2 := path.Join(dir, "file2")
 
-	err = os.WriteFile(path1, []byte("content 1"), 0600)
+	err = os.WriteFile(path1, []byte("content 1"), 0o600)
 	assert.NoError(t, err)
-	err = os.WriteFile(path2, []byte("content 2"), 0600)
+	err = os.WriteFile(path2, []byte("content 2"), 0o600)
 	assert.NoError(t, err)
 
 	p := Program{
@@ -142,7 +142,7 @@ func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 
 	path1 := path.Join(dir, "file1")
 
-	err = os.WriteFile(path1, []byte("content 1"), 0600)
+	err = os.WriteFile(path1, []byte("content 1"), 0o600)
 	assert.NoError(t, err)
 
 	p := Program{
