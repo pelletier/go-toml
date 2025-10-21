@@ -9,7 +9,7 @@ import (
 )
 
 // addTag adds JSON tags to a data structure as expected by toml-test.
-func addTag(key string, tomlData interface{}) interface{} {
+func addTag(tomlData interface{}) interface{} {
 	// Switch on the data type.
 	switch orig := tomlData.(type) {
 	default:
@@ -21,7 +21,7 @@ func addTag(key string, tomlData interface{}) interface{} {
 	case map[string]interface{}:
 		typed := make(map[string]interface{}, len(orig))
 		for k, v := range orig {
-			typed[k] = addTag(k, v)
+			typed[k] = addTag(v)
 		}
 		return typed
 
@@ -30,13 +30,13 @@ func addTag(key string, tomlData interface{}) interface{} {
 	case []map[string]interface{}:
 		typed := make([]map[string]interface{}, len(orig))
 		for i, v := range orig {
-			typed[i] = addTag("", v).(map[string]interface{})
+			typed[i] = addTag(v).(map[string]interface{})
 		}
 		return typed
 	case []interface{}:
 		typed := make([]interface{}, len(orig))
 		for i, v := range orig {
-			typed[i] = addTag("", v)
+			typed[i] = addTag(v)
 		}
 		return typed
 

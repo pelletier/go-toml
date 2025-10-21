@@ -240,5 +240,5 @@ func valMismatch(t *testing.T, key string, wantType, haveType string, want, have
 	t.Fatalf("Key '%s' is not an %s but %s:\n"+
 		"  Expected:     %#[3]v\n"+
 		"  Your encoder: %#[4]v",
-		key, wantType, want, have)
+		key, wantType, haveType, want, have)
 }

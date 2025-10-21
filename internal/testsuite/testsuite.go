@@ -27,7 +27,7 @@ func Unmarshal(data []byte, v interface{}) error {
 // ValueToTaggedJSON takes a data structure and returns the tagged JSON
 // representation.
 func ValueToTaggedJSON(doc interface{}) ([]byte, error) {
-	return json.MarshalIndent(addTag("", doc), "", "  ")
+	return json.MarshalIndent(addTag(doc), "", "  ")
 }
 
 // DecodeStdin is a helper function for the toml-test binary interface.  TOML input
@@ -42,7 +42,7 @@ func DecodeStdin() error {
 
 	j := json.NewEncoder(os.Stdout)
 	j.SetIndent("", "  ")
-	if err := j.Encode(addTag("", decoded)); err != nil {
+	if err := j.Encode(addTag(decoded)); err != nil {
 		return fmt.Errorf("Error encoding JSON: %s", err)
 	}
 

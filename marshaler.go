@@ -580,9 +580,9 @@ func (enc *Encoder) encodeUnquotedKey(b []byte, v string) []byte {
 	return append(b, v...)
 }
 
-func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) {
+func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) []byte {
 	if len(ctx.parentKey) == 0 {
-		return b, nil
+		return b
 	}
 
 	b = enc.encodeComment(ctx.indent, ctx.options.comment, b)
@@ -602,7 +602,7 @@ func (enc *Encoder) encodeTableHeader(ctx encoderCtx, b []byte) ([]byte, error) 
 
 	b = append(b, "]\n"...)
 
-	return b, nil
+	return b
 }
 
 //nolint:cyclop
@@ -891,10 +891,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	}
 
 	if !ctx.skipTableHeader {
-		b, err = enc.encodeTableHeader(ctx, b)
-		if err != nil {
-			return nil, err
-		}
+		b = enc.encodeTableHeader(ctx, b)
 
 		if enc.indentTables && len(ctx.parentKey) > 0 {
 			ctx.indent++

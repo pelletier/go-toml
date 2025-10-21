@@ -28,7 +28,7 @@ func (p parser) Decode(input string) (output string, outputIsError bool, retErr 
 		return err.Error(), true, nil
 	}
 
-	j, err := json.MarshalIndent(addTag("", v), "", "  ")
+	j, err := json.MarshalIndent(addTag(v), "", "  ")
 	if err != nil {
 		return "", false, retErr
 	}
