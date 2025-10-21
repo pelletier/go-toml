@@ -942,7 +942,6 @@ nan = nan
 	assert.Equal(t, expected, string(actual))
 }
 
-//nolint:funlen
 func TestMarshalIndentTables(t *testing.T) {
 	examples := []struct {
 		desc     string

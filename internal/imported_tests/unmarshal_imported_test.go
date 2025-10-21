@@ -149,9 +149,6 @@ type quotedKeyMarshalTestStruct struct {
 	SubList []basicMarshalTestSubStruct `toml:"W.sublist-𝟘"`
 }
 
-// TODO: Remove nolint once var is used by a test
-//
-//nolint:unused
 var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	String:  "Hello",
 	Float:   3.5,
@@ -183,7 +180,7 @@ type testDoc struct {
 	Subdocs     testDocSubs       `toml:"subdoc"`
 	Basics      testDocBasics     `toml:"basic"`
 	SubDocList  []testSubDoc      `toml:"subdoclist"`
-	err         int               `toml:"shouldntBeHere"` // nolint:unused
+	err         int               `toml:"shouldntBeHere"` //nolint:unused
 	unexported  int               `toml:"shouldntBeHere"`
 	Unexported2 int               `toml:"-"`
 }
@@ -1028,9 +1025,8 @@ type testBadDuration struct {
 }
 
 // TODO: add back camelCase test
-var testCamelCaseKeyToml = []byte(`fooBar = 10`) //nolint:unused
+var testCamelCaseKeyToml = []byte(`fooBar = 10`)
 
-//nolint:unused
 func TestUnmarshalCamelCaseKey(t *testing.T) {
 	t.Skipf("don't know if it is a good idea to automatically convert like that yet")
 	var x struct {
@@ -1049,7 +1045,7 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 
 func TestUnmarshalNegativeUint(t *testing.T) {
 	t.Skipf("not sure if we this should always error")
-	type check struct{ U uint } // nolint:unused
+	type check struct{ U uint }
 	err := toml.Unmarshal([]byte("U = -1"), &check{})
 	assert.Error(t, err)
 }

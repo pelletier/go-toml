@@ -111,7 +111,7 @@ func TestDecodeReaderError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// nolint:funlen
+//nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	examples := []struct {
 		desc     string
