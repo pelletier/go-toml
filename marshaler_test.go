@@ -44,6 +44,7 @@ func toFloat(x interface{}) float64 {
 }
 
 func inDelta(t *testing.T, expected, actual interface{}, delta float64) {
+	t.Helper()
 	dt := toFloat(expected) - toFloat(actual)
 	assert.True(t,
 		dt < -delta && dt < delta,

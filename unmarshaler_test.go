@@ -410,6 +410,7 @@ foo = "bar"`,
 					target:   &doc{},
 					expected: &doc{{A: "a", B: "1"}: "foo"},
 					assert: func(t *testing.T, test test) {
+						t.Helper()
 						// Despite the documentation:
 						//     Pointer variable equality is determined based on the equality of the
 						//		 referenced values (as opposed to the memory addresses).
@@ -1939,9 +1940,6 @@ B = "data"`,
 				return test{
 					target:   &map[int]string{},
 					expected: &map[int]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1952,9 +1950,6 @@ B = "data"`,
 				return test{
 					target:   &map[int8]string{},
 					expected: &map[int8]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1965,9 +1960,6 @@ B = "data"`,
 				return test{
 					target:   &map[int64]string{},
 					expected: &map[int64]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1978,9 +1970,6 @@ B = "data"`,
 				return test{
 					target:   &map[uint]string{},
 					expected: &map[uint]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1991,9 +1980,6 @@ B = "data"`,
 				return test{
 					target:   &map[uint8]string{},
 					expected: &map[uint8]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2004,9 +1990,6 @@ B = "data"`,
 				return test{
 					target:   &map[uint64]string{},
 					expected: &map[uint64]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2027,9 +2010,6 @@ B = "data"`,
 				return test{
 					target:   &map[float64]string{},
 					expected: &map[float64]string{1.01: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2050,9 +2030,6 @@ B = "data"`,
 				return test{
 					target:   &map[float32]string{},
 					expected: &map[float32]string{1.01: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},

@@ -12,135 +12,167 @@ type Data struct {
 
 func TestBadMessage(t *testing.T) {
 	invalidMessage := func() { True(t, false, 1234) }
-	assertOk(t, "Non-fmt message value", func(t testing.TB) {
-		Panics(t, invalidMessage)
+	assertOk(t, "Non-fmt message value", func(tb testing.TB) {
+		tb.Helper()
+		Panics(tb, invalidMessage)
 	})
-	assertFail(t, "Non-fmt message value", func(t testing.TB) {
-		True(t, false, "example %s", "message")
+	assertFail(t, "Non-fmt message value", func(tb testing.TB) {
+		tb.Helper()
+		True(tb, false, "example %s", "message")
 	})
 }
 
 func TestTrue(t *testing.T) {
-	assertOk(t, "Succeed", func(t testing.TB) {
-		True(t, 1 > 0)
+	assertOk(t, "Succeed", func(tb testing.TB) {
+		tb.Helper()
+		True(tb, 1 > 0)
 	})
-	assertFail(t, "Fail", func(t testing.TB) {
-		True(t, 1 < 0)
+	assertFail(t, "Fail", func(tb testing.TB) {
+		tb.Helper()
+		True(tb, 1 < 0)
 	})
 }
 
 func TestFalse(t *testing.T) {
-	assertOk(t, "Succeed", func(t testing.TB) {
-		False(t, 1 < 0)
+	assertOk(t, "Succeed", func(tb testing.TB) {
+		tb.Helper()
+		False(tb, 1 < 0)
 	})
-	assertFail(t, "Fail", func(t testing.TB) {
-		False(t, 1 > 0)
+	assertFail(t, "Fail", func(tb testing.TB) {
+		tb.Helper()
+		False(tb, 1 > 0)
 	})
 }
 
 func TestEqual(t *testing.T) {
-	assertOk(t, "Nil", func(t testing.TB) {
-		Equal(t, interface{}(nil), interface{}(nil))
+	assertOk(t, "Nil", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, interface{}(nil), interface{}(nil))
 	})
-	assertOk(t, "Identical structs", func(t testing.TB) {
-		Equal(t, Data{"expected", 1234}, Data{"expected", 1234})
+	assertOk(t, "Identical structs", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, Data{"expected", 1234}, Data{"expected", 1234})
 	})
-	assertFail(t, "Different structs", func(t testing.TB) {
-		Equal(t, Data{"expected", 1234}, Data{"actual", 1234})
+	assertFail(t, "Different structs", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, Data{"expected", 1234}, Data{"actual", 1234})
 	})
-	assertOk(t, "Identical numbers", func(t testing.TB) {
-		Equal(t, 1234, 1234)
+	assertOk(t, "Identical numbers", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, 1234, 1234)
 	})
-	assertFail(t, "Identical numbers", func(t testing.TB) {
-		Equal(t, 1234, 1324)
+	assertFail(t, "Identical numbers", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, 1234, 1324)
 	})
-	assertOk(t, "Zero-length byte arrays", func(t testing.TB) {
-		Equal(t, []byte(nil), []byte(""))
+	assertOk(t, "Zero-length byte arrays", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, []byte(nil), []byte(""))
 	})
-	assertOk(t, "Identical byte arrays", func(t testing.TB) {
-		Equal(t, []byte{1, 2, 3, 4}, []byte{1, 2, 3, 4})
+	assertOk(t, "Identical byte arrays", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, []byte{1, 2, 3, 4}, []byte{1, 2, 3, 4})
 	})
-	assertFail(t, "Different byte arrays", func(t testing.TB) {
-		Equal(t, []byte{1, 2, 3, 4}, []byte{1, 3, 2, 4})
+	assertFail(t, "Different byte arrays", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, []byte{1, 2, 3, 4}, []byte{1, 3, 2, 4})
 	})
-	assertOk(t, "Identical strings", func(t testing.TB) {
-		Equal(t, "example", "example")
+	assertOk(t, "Identical strings", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, "example", "example")
 	})
-	assertFail(t, "Identical strings", func(t testing.TB) {
-		Equal(t, "example", "elpmaxe")
+	assertFail(t, "Identical strings", func(tb testing.TB) {
+		tb.Helper()
+		Equal(tb, "example", "elpmaxe")
 	})
 }
 
 func TestError(t *testing.T) {
-	assertOk(t, "Error", func(t testing.TB) {
-		Error(t, fmt.Errorf("example"))
+	assertOk(t, "Error", func(tb testing.TB) {
+		tb.Helper()
+		Error(tb, fmt.Errorf("example"))
 	})
-	assertFail(t, "Nil", func(t testing.TB) {
-		Error(t, nil)
+	assertFail(t, "Nil", func(tb testing.TB) {
+		tb.Helper()
+		Error(tb, nil)
 	})
 }
 
 func TestNoError(t *testing.T) {
-	assertFail(t, "Error", func(t testing.TB) {
-		NoError(t, fmt.Errorf("example"))
+	assertFail(t, "Error", func(tb testing.TB) {
+		tb.Helper()
+		NoError(tb, fmt.Errorf("example"))
 	})
-	assertOk(t, "Nil", func(t testing.TB) {
-		NoError(t, nil)
+	assertOk(t, "Nil", func(tb testing.TB) {
+		tb.Helper()
+		NoError(tb, nil)
 	})
 }
 
 func TestPanics(t *testing.T) {
 	willPanic := func() { panic("example") }
 	wontPanic := func() {}
-	assertOk(t, "Will panic", func(t testing.TB) {
-		Panics(t, willPanic)
+	assertOk(t, "Will panic", func(tb testing.TB) {
+		tb.Helper()
+		Panics(tb, willPanic)
 	})
-	assertFail(t, "Won't panic", func(t testing.TB) {
-		Panics(t, wontPanic)
+	assertFail(t, "Won't panic", func(tb testing.TB) {
+		tb.Helper()
+		Panics(tb, wontPanic)
 	})
 }
 
 func TestZero(t *testing.T) {
-	assertOk(t, "Empty struct", func(t testing.TB) {
-		Zero(t, Data{})
+	assertOk(t, "Empty struct", func(tb testing.TB) {
+		tb.Helper()
+		Zero(tb, Data{})
 	})
-	assertFail(t, "Non-empty struct", func(t testing.TB) {
-		Zero(t, Data{Label: "example"})
+	assertFail(t, "Non-empty struct", func(tb testing.TB) {
+		tb.Helper()
+		Zero(tb, Data{Label: "example"})
 	})
-	assertOk(t, "Nil slice", func(t testing.TB) {
+	assertOk(t, "Nil slice", func(tb testing.TB) {
+		tb.Helper()
 		var slice []int
-		Zero(t, slice)
+		Zero(tb, slice)
 	})
-	assertFail(t, "Non-empty slice", func(t testing.TB) {
+	assertFail(t, "Non-empty slice", func(tb testing.TB) {
+		tb.Helper()
 		slice := []int{1, 2, 3, 4}
-		Zero(t, slice)
+		Zero(tb, slice)
 	})
-	assertOk(t, "Zero-length slice", func(t testing.TB) {
+	assertOk(t, "Zero-length slice", func(tb testing.TB) {
+		tb.Helper()
 		slice := []int{}
-		Zero(t, slice)
+		Zero(tb, slice)
 	})
 }
 
 func TestNotZero(t *testing.T) {
-	assertFail(t, "Empty struct", func(t testing.TB) {
+	assertFail(t, "Empty struct", func(tb testing.TB) {
+		tb.Helper()
 		zero := Data{}
-		NotZero(t, zero)
+		NotZero(tb, zero)
 	})
-	assertOk(t, "Non-empty struct", func(t testing.TB) {
+	assertOk(t, "Non-empty struct", func(tb testing.TB) {
+		tb.Helper()
 		notZero := Data{Label: "example"}
-		NotZero(t, notZero)
+		NotZero(tb, notZero)
 	})
-	assertFail(t, "Nil slice", func(t testing.TB) {
+	assertFail(t, "Nil slice", func(tb testing.TB) {
+		tb.Helper()
 		var slice []int
-		NotZero(t, slice)
+		NotZero(tb, slice)
 	})
-	assertFail(t, "Zero-length slice", func(t testing.TB) {
+	assertFail(t, "Zero-length slice", func(tb testing.TB) {
+		tb.Helper()
 		slice := []int{}
-		NotZero(t, slice)
+		NotZero(tb, slice)
 	})
-	assertOk(t, "Non-empty slice", func(t testing.TB) {
+	assertOk(t, "Non-empty slice", func(tb testing.TB) {
+		tb.Helper()
 		slice := []int{1, 2, 3, 4}
-		NotZero(t, slice)
+		NotZero(tb, slice)
 	})
 }
 
@@ -157,7 +189,7 @@ func (t *testCase) Fatalf(message string, args ...interface{}) {
 	t.failed = fmt.Sprintf(message, args...)
 }
 
-func assertFail(t *testing.T, name string, fn func(t testing.TB)) {
+func assertFail(t *testing.T, name string, fn func(testing.TB)) {
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
 		t.Helper()
@@ -171,7 +203,7 @@ func assertFail(t *testing.T, name string, fn func(t testing.TB)) {
 	})
 }
 
-func assertOk(t *testing.T, name string, fn func(t testing.TB)) {
+func assertOk(t *testing.T, name string, fn func(testing.TB)) {
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
 		t.Helper()
