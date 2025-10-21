@@ -542,7 +542,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 
 	var err error
 	for len(b) > 0 {
-		cref := invalidReference
+		var cref reference
 		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
@@ -972,7 +972,7 @@ func hexToRune(b []byte, length int) (rune, error) {
 
 	var r uint32
 	for i, c := range b {
-		d := uint32(0)
+		var d uint32
 		switch {
 		case '0' <= c && c <= '9':
 			d = uint32(c - '0')

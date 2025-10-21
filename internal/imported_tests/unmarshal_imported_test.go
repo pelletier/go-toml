@@ -2013,6 +2013,7 @@ func TestDecoderStrict(t *testing.T) {
 
 	var m map[string]interface{}
 	err = decoder(input).Decode(&m)
+	assert.NoError(t, err)
 }
 
 func TestDecoderStrictValid(t *testing.T) {
