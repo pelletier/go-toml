@@ -273,7 +273,7 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) err
 	var err error
 	var first bool // used for to clear array tables on first use
 
-	if !(d.skipUntilTable && expr.Kind == unstable.KeyValue) {
+	if !d.skipUntilTable || expr.Kind != unstable.KeyValue {
 		first, err = d.seen.CheckExpression(expr)
 		if err != nil {
 			return err

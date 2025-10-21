@@ -981,7 +981,7 @@ type testDuration struct {
 	Microsec1 time.Duration  `toml:"microsec1"`
 	Microsec2 *time.Duration `toml:"microsec2"`
 	Millisec  time.Duration  `toml:"millisec"`
-	Sec       time.Duration  `toml:"sec"`
+	Sec       time.Duration  `toml:"sec"` //nolint:staticcheck
 	Min       time.Duration  `toml:"min"`
 	Hour      time.Duration  `toml:"hour"`
 	Mixed     time.Duration  `toml:"mixed"`

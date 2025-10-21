@@ -2467,7 +2467,7 @@ func TestIssue508(t *testing.T) {
 	t1 := text{}
 	err := toml.Unmarshal(b, &t1)
 	assert.NoError(t, err)
-	assert.Equal(t, "This is a title", t1.head.Title)
+	assert.Equal(t, "This is a title", t1.Title)
 }
 
 func TestIssue507(t *testing.T) {
@@ -2773,7 +2773,7 @@ func TestIssue772(t *testing.T) {
 	config := Config{}
 	err := toml.Unmarshal(defaultConfigFile, &config)
 	assert.NoError(t, err)
-	assert.Equal(t, "reach-masterdev-", config.FileHandling.FilePattern)
+	assert.Equal(t, "reach-masterdev-", config.FilePattern)
 }
 
 func TestIssue774(t *testing.T) {
@@ -2933,7 +2933,7 @@ blah.a = "def"`)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "abc", cfg.Fizz)
-	assert.Equal(t, "def", cfg.blah.A)
+	assert.Equal(t, "def", cfg.A)
 	assert.Equal(t, "def", cfg.A)
 }
 
@@ -4216,8 +4216,8 @@ func TestIssue995_SliceNonEmpty_UsesLastElement(t *testing.T) {
 	}
 	assert.Equal(t, 2, len(r.Rules[0].Allowlists))
 	// Values presence check
-	got := []string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
-	if !(got[0] == "a" && got[1] == "b") && !(got[0] == "b" && got[1] == "a") {
+	got := [...]string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
+	if got != [2]string{"a", "b"} && got != [2]string{"b", "a"} {
 		t.Fatalf("unexpected values in allowlists: %v", got)
 	}
 }

@@ -119,7 +119,7 @@ func (n *Node) Key() Iterator {
 	case Table, ArrayTable:
 		return Iterator{node: n.Child()}
 	default:
-		panic(fmt.Errorf("Key() is not supported on a %s", n.Kind))
+		panic(fmt.Errorf("key is not supported on a %s", n.Kind))
 	}
 }
 

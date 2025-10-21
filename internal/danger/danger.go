@@ -2,20 +2,19 @@ package danger
 
 import (
 	"fmt"
-	"reflect"
 	"unsafe"
 )
 
 const maxInt = uintptr(int(^uint(0) >> 1))
 
 func SubsliceOffset(data []byte, subslice []byte) int {
-	datap := (*reflect.SliceHeader)(unsafe.Pointer(&data))
-	hlp := (*reflect.SliceHeader)(unsafe.Pointer(&subslice))
+	datap := uintptr(unsafe.Pointer(unsafe.SliceData(data)))
+	hlp := uintptr(unsafe.Pointer(unsafe.SliceData(subslice)))
 
-	if hlp.Data < datap.Data {
-		panic(fmt.Errorf("subslice address (%d) is before data address (%d)", hlp.Data, datap.Data))
+	if hlp < datap {
+		panic(fmt.Errorf("subslice address (%d) is before data address (%d)", hlp, datap))
 	}
-	offset := hlp.Data - datap.Data
+	offset := hlp - datap
 
 	if offset > maxInt {
 		panic(fmt.Errorf("slice offset larger than int (%d)", offset))
@@ -23,12 +22,12 @@ func SubsliceOffset(data []byte, subslice []byte) int {
 
 	intoffset := int(offset)
 
-	if intoffset > datap.Len {
-		panic(fmt.Errorf("slice offset (%d) is farther than data length (%d)", intoffset, datap.Len))
+	if intoffset > len(data) {
+		panic(fmt.Errorf("slice offset (%d) is farther than data length (%d)", intoffset, len(data)))
 	}
 
-	if intoffset+hlp.Len > datap.Len {
-		panic(fmt.Errorf("slice ends (%d+%d) is farther than data length (%d)", intoffset, hlp.Len, datap.Len))
+	if intoffset+len(subslice) > len(data) {
+		panic(fmt.Errorf("slice ends (%d+%d) is farther than data length (%d)", intoffset, len(subslice), len(data)))
 	}
 
 	return intoffset
@@ -38,20 +37,21 @@ func BytesRange(start []byte, end []byte) []byte {
 	if start == nil || end == nil {
 		panic("cannot call BytesRange with nil")
 	}
-	startp := (*reflect.SliceHeader)(unsafe.Pointer(&start))
-	endp := (*reflect.SliceHeader)(unsafe.Pointer(&end))
 
-	if startp.Data > endp.Data {
-		panic(fmt.Errorf("start pointer address (%d) is after end pointer address (%d)", startp.Data, endp.Data))
+	startp := uintptr(unsafe.Pointer(unsafe.SliceData(start)))
+	endp := uintptr(unsafe.Pointer(unsafe.SliceData(end)))
+
+	if startp > endp {
+		panic(fmt.Errorf("start pointer address (%d) is after end pointer address (%d)", startp, endp))
 	}
 
-	l := startp.Len
-	endLen := int(endp.Data-startp.Data) + endp.Len
+	l := len(start)
+	endLen := int(endp-startp) + len(end)
 	if endLen > l {
 		l = endLen
 	}
 
-	if l > startp.Cap {
+	if l > cap(start) {
 		panic(fmt.Errorf("range length is larger than capacity"))
 	}
 
@@ -59,7 +59,5 @@ func BytesRange(start []byte, end []byte) []byte {
 }
 
 func Stride(ptr unsafe.Pointer, size uintptr, offset int) unsafe.Pointer {
-	// TODO: replace with unsafe.Add when Go 1.17 is released
-	//   https://github.com/golang/go/issues/40481
-	return unsafe.Pointer(uintptr(ptr) + uintptr(int(size)*offset))
+	return unsafe.Add(ptr, size*uintptr(offset))
 }

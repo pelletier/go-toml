@@ -87,7 +87,12 @@ func NotZero[T any](tb testing.TB, value T, msgAndArgs ...any) {
 	var zero T
 	if !objectsAreEqual(value, zero) {
 		val := reflect.ValueOf(value)
-		if !((val.Kind() == reflect.Slice || val.Kind() == reflect.Map || val.Kind() == reflect.Array) && val.Len() == 0) {
+		switch val.Kind() {
+		case reflect.Slice, reflect.Map, reflect.Array:
+			if val.Len() > 0 {
+				return
+			}
+		default:
 			return
 		}
 	}
