@@ -329,28 +329,30 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case reflect.Float32:
 		f := v.Float()
 
-		if math.IsNaN(f) {
+		switch {
+		case math.IsNaN(f):
 			b = append(b, "nan"...)
-		} else if f > math.MaxFloat32 {
+		case f > math.MaxFloat32:
 			b = append(b, "inf"...)
-		} else if f < -math.MaxFloat32 {
+		case f < -math.MaxFloat32:
 			b = append(b, "-inf"...)
-		} else if math.Trunc(f) == f {
+		case math.Trunc(f) == f:
 			b = strconv.AppendFloat(b, f, 'f', 1, 32)
-		} else {
+		default:
 			b = strconv.AppendFloat(b, f, 'f', -1, 32)
 		}
 	case reflect.Float64:
 		f := v.Float()
-		if math.IsNaN(f) {
+		switch {
+		case math.IsNaN(f):
 			b = append(b, "nan"...)
-		} else if f > math.MaxFloat64 {
+		case f > math.MaxFloat64:
 			b = append(b, "inf"...)
-		} else if f < -math.MaxFloat64 {
+		case f < -math.MaxFloat64:
 			b = append(b, "-inf"...)
-		} else if math.Trunc(f) == f {
+		case math.Trunc(f) == f:
 			b = strconv.AppendFloat(b, f, 'f', 1, 64)
-		} else {
+		default:
 			b = strconv.AppendFloat(b, f, 'f', -1, 64)
 		}
 	case reflect.Bool:

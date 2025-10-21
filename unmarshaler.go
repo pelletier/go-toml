@@ -494,7 +494,8 @@ func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn h
 
 		mv := v.MapIndex(mk)
 		set := false
-		if !mv.IsValid() {
+		switch {
+		case !mv.IsValid():
 			// If there is no value in the map, create a new one according to
 			// the map type. If the element type is interface, create either a
 			// map[string]interface{} or a []interface{} depending on whether
@@ -507,13 +508,13 @@ func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn h
 				mv = reflect.New(t).Elem()
 			}
 			set = true
-		} else if mv.Kind() == reflect.Interface {
+		case mv.Kind() == reflect.Interface:
 			mv = mv.Elem()
 			if !mv.IsValid() {
 				mv = makeFn()
 			}
 			set = true
-		} else if !mv.CanAddr() {
+		case !mv.CanAddr():
 			vt := v.Type()
 			t := vt.Elem()
 			oldmv := mv
@@ -1336,7 +1337,9 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 			continue
 		}
 
-		fieldPath := append(path, i)
+		fieldPath := make([]int, 0, len(path)+1)
+		fieldPath = append(fieldPath, path...)
+		fieldPath = append(fieldPath, i)
 		fieldPath = fieldPath[:len(fieldPath):len(fieldPath)]
 
 		name := f.Tag.Get("toml")

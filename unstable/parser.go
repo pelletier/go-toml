@@ -611,12 +611,13 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []b
 	latestCommentRef := invalidReference
 
 	addComment := func(ref reference) {
-		if rootCommentRef == invalidReference {
+		switch {
+		case rootCommentRef == invalidReference:
 			rootCommentRef = ref
-		} else if latestCommentRef == invalidReference {
+		case latestCommentRef == invalidReference:
 			p.builder.AttachChild(rootCommentRef, ref)
 			latestCommentRef = ref
-		} else {
+		default:
 			p.builder.Chain(latestCommentRef, ref)
 			latestCommentRef = ref
 		}

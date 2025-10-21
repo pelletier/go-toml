@@ -1893,19 +1893,12 @@ func TestUnmarshalMixedTypeSlice(t *testing.T) {
 		ArrayField []interface{}
 	}
 
-	//doc := []byte(`ArrayField = [3.14,100,true,"hello world",{Field = "inner1"},[{Field = "inner2"},{Field = "inner3"}]]
-	//`)
-
 	doc := []byte(`ArrayField = [{Field = "inner1"},[{Field = "inner2"},{Field = "inner3"}]]
 `)
 
 	actual := TestStruct{}
 	expected := TestStruct{
 		ArrayField: []interface{}{
-			//3.14,
-			//int64(100),
-			//true,
-			//"hello world",
 			map[string]interface{}{
 				"Field": "inner1",
 			},
@@ -2049,19 +2042,6 @@ func (d *docUnmarshalTOML) UnmarshalTOML(i interface{}) error {
 		d.Decoded.Key = keyString
 	}
 	return nil
-}
-
-func TestDecoderStrictCustomUnmarshal(t *testing.T) {
-	t.Skip()
-	//input := `key = "ok"`
-	//var doc docUnmarshalTOML
-	//err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
-	//if err != nil {
-	//	t.Fatal("unexpected error:", err)
-	//}
-	//if doc.Decoded.Key != "ok" {
-	//	t.Errorf("Bad unmarshal: expected ok, got %v", doc.Decoded.Key)
-	//}
 }
 
 type parent struct {

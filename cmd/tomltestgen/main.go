@@ -67,13 +67,16 @@ func kebabToCamel(kebab string) string {
 		if nextUpper {
 			camel += strings.ToUpper(string(c))
 			nextUpper = false
-		} else if c == '-' {
-			nextUpper = true
-		} else if c == '/' {
-			nextUpper = true
-			camel += "_"
 		} else {
-			camel += string(c)
+			switch c {
+			case '-':
+				nextUpper = true
+			case '/':
+				nextUpper = true
+				camel += "_"
+			default:
+				camel += string(c)
+			}
 		}
 	}
 	return camel
