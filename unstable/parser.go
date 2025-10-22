@@ -96,6 +96,8 @@ func (p *Parser) Reset(b []byte) {
 // document or an error occurred, it returns false.
 //
 // Retrieve the parsed expression with Expression().
+//
+//nolint:cyclop
 func (p *Parser) NextExpression() bool {
 	if len(p.left) == 0 || p.err != nil {
 		return false
@@ -606,6 +608,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
+//nolint:cyclop
 func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []byte, error) {
 	rootCommentRef := invalidReference
 	latestCommentRef := invalidReference
@@ -964,6 +967,7 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	return token, builder.Bytes(), rest, nil
 }
 
+//nolint:cyclop
 func hexToRune(b []byte, length int) (rune, error) {
 	if len(b) < length {
 		return -1, NewParserError(b, "unicode point needs %d character, not %d", length, len(b))
@@ -1053,6 +1057,7 @@ func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) 
 	return p.scanIntOrFloat(b)
 }
 
+//nolint:cyclop
 func (p *Parser) scanDateTime(b []byte) (reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.

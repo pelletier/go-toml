@@ -9,6 +9,8 @@ import (
 )
 
 // Remove JSON tags to a data structure as returned by toml-test.
+//
+//nolint:cyclop
 func rmTag(typedJson interface{}) (interface{}, error) {
 	// Check if key is in the table m.
 	in := func(key string, m map[string]interface{}) bool {
@@ -60,7 +62,7 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 
 // Return a primitive: read the "type" and convert the "value" to that.
 //
-//nolint:funlen
+//nolint:funlen,cyclop
 func untag(typed map[string]interface{}) (interface{}, error) {
 	t := typed["type"].(string)
 	v := typed["value"].(string)

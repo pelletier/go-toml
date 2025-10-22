@@ -33,7 +33,7 @@ func (u utf8Err) Zero() bool {
 // 0xA - 0x1F => invalid
 // 0x7F => invalid
 //
-//nolint:funlen
+//nolint:funlen,cyclop
 func Utf8TomlValidAlreadyEscaped(p []byte) (err utf8Err) {
 	// Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
 	offset := 0
@@ -108,6 +108,8 @@ func Utf8TomlValidAlreadyEscaped(p []byte) (err utf8Err) {
 }
 
 // Return the size of the next rune if valid, 0 otherwise.
+//
+//nolint:cyclop
 func Utf8ValidNext(p []byte) int {
 	c := p[0]
 

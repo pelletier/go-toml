@@ -253,7 +253,7 @@ func (ctx *encoderCtx) isRoot() bool {
 	return len(ctx.parentKey) == 0 && !ctx.hasKey
 }
 
-//nolint:funlen
+//nolint:funlen,cyclop
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	i := v.Interface()
 
@@ -506,7 +506,7 @@ func (enc *Encoder) encodeLiteralString(b []byte, v string) []byte {
 	return b
 }
 
-//nolint:funlen
+//nolint:funlen,cyclop
 func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byte {
 	stringQuote := `"`
 
@@ -645,6 +645,7 @@ func (enc *Encoder) encodeKey(b []byte, k string) []byte {
 	}
 }
 
+//nolint:cyclop
 func (enc *Encoder) keyToString(k reflect.Value) (string, error) {
 	keyType := k.Type()
 	switch {
@@ -741,6 +742,7 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 	t.tables = append(t.tables, entry{Key: k, Value: v, Options: options})
 }
 
+//nolint:cyclop
 func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 	// TODO: cache this
 	typ := v.Type()
@@ -886,7 +888,7 @@ func parseTag(tag string) (string, tagOptions) {
 	return tag, opts
 }
 
-//nolint:funlen
+//nolint:funlen,cyclop
 func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
@@ -996,6 +998,7 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 	return b, nil
 }
 
+//nolint:cyclop
 func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
 	if !v.IsValid() {
 		return false

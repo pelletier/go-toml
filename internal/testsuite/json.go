@@ -22,6 +22,7 @@ func CmpJSON(t *testing.T, key string, want, have interface{}) {
 	}
 }
 
+//nolint:cyclop
 func cmpJSONMaps(t *testing.T, key string, want map[string]interface{}, have interface{}) {
 	t.Helper()
 	haveMap, ok := have.(map[string]interface{})
