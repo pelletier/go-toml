@@ -114,15 +114,3 @@ func untag(typed map[string]interface{}) (interface{}, error) {
 
 	return nil, fmt.Errorf("untag: unrecognized tag type %q", t)
 }
-
-func parseTime(v, format string, local bool) (t time.Time, err error) {
-	if local {
-		t, err = time.ParseInLocation(format, v, time.Local)
-	} else {
-		t, err = time.Parse(format, v)
-	}
-	if err != nil {
-		return time.Time{}, fmt.Errorf("could not parse %q as a datetime: %w", v, err)
-	}
-	return t, nil
-}

@@ -185,6 +185,7 @@ type testDoc struct {
 	Unexported2 int               `toml:"-"`
 }
 
+//nolint:unused
 type testMapDoc struct {
 	Title    string            `toml:"title"`
 	BasicMap map[string]string `toml:"basic_map"`
@@ -540,21 +541,25 @@ func TestNestedUnmarshal(t *testing.T) {
 	assert.Equal(t, nestedTestData, result)
 }
 
+//nolint:unused
 type customMarshalerParent struct {
 	Self    customMarshaler   `toml:"me"`
 	Friends []customMarshaler `toml:"friends"`
 }
 
+//nolint:unused
 type customMarshaler struct {
 	FirstName string
 	LastName  string
 }
 
+//nolint:unused
 func (c customMarshaler) MarshalTOML() ([]byte, error) {
 	fullName := fmt.Sprintf("%s %s", c.FirstName, c.LastName)
 	return []byte(fullName), nil
 }
 
+//nolint:unused
 var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
 
 // TODO: Remove nolint once var is used by a test
@@ -684,6 +689,7 @@ var commentTestToml = []byte(`
     My = "Baar"
 `)
 
+//nolint:unused
 type mapsTestStruct struct {
 	Simple map[string]string
 	Paths  map[string]string
@@ -859,10 +865,12 @@ var testDocBasicToml = []byte(`
   uint_val = 5001
 `)
 
+//nolint:unused
 type testDocCustomTag struct {
 	Doc testDocBasicsCustomTag `file:"document"`
 }
 
+//nolint:unused
 type testDocBasicsCustomTag struct {
 	Bool       bool      `file:"bool_val"`
 	Date       time.Time `file:"date_val"`
@@ -873,6 +881,7 @@ type testDocBasicsCustomTag struct {
 	unexported int       `file:"shouldntBeHere"`
 }
 
+//nolint:unused
 var testDocCustomTagData = testDocCustomTag{
 	Doc: testDocBasicsCustomTag{
 		Bool:       true,

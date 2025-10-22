@@ -21,7 +21,7 @@ func TestDocMarshal(t *testing.T) {
 		Subdocs     testDocSubs       `toml:"subdoc"`
 		Basics      testDocBasics     `toml:"basic"`
 		SubDocList  []testSubDoc      `toml:"subdoclist"`
-		err         int               `toml:"shouldntBeHere"`
+		err         int               `toml:"shouldntBeHere"` //nolint:unused
 		unexported  int               `toml:"shouldntBeHere"`
 		Unexported2 int               `toml:"-"`
 	}

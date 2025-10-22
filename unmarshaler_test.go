@@ -1347,7 +1347,7 @@ B = "data"`,
 			input: `foo = "bar"`,
 			gen: func() test {
 				type doc struct {
-					foo string
+					foo string //nolint:unused
 				}
 				return test{
 					target:   &doc{},
@@ -3463,7 +3463,7 @@ world'`,
 
 func TestOmitEmpty(t *testing.T) {
 	type inner struct {
-		private string
+		private string //nolint:unused
 		Skip    string `toml:"-"`
 		V       string
 	}
