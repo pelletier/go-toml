@@ -106,6 +106,7 @@ func main() {
 	for _, f := range dirContent {
 		filename := strings.TrimPrefix(f, "tests/valid/")
 		name := kebabToCamel(strings.TrimSuffix(filename, ".toml"))
+		name = strings.ReplaceAll(name, ".", "_")
 
 		log.Printf("> [%s] %s\n", "invalid", name)
 
@@ -126,6 +127,7 @@ func main() {
 	for _, f := range dirContent {
 		filename := strings.TrimPrefix(f, "tests/valid/")
 		name := kebabToCamel(strings.TrimSuffix(filename, ".toml"))
+		name = strings.ReplaceAll(name, ".", "_")
 
 		log.Printf("> [%s] %s\n", "valid", name)
 
