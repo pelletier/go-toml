@@ -11,7 +11,6 @@ import (
 	"github.com/pelletier/go-toml/v2/unstable"
 )
 
-//nolint:funlen
 func TestDecodeError(t *testing.T) {
 	examples := []struct {
 		desc     string

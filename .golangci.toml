@@ -53,7 +53,7 @@ default-signifies-exhaustive = true
 
 [[linters.exclusions.rules]]
 path = ".test.go"
-linters = ["goconst", "gosec"]
+linters = ["funlen", "goconst", "gosec"]
 
 [[linters.exclusions.rules]]
 path = "main.go"

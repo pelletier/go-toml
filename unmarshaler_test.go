@@ -111,7 +111,6 @@ func TestDecodeReaderError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-//nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	examples := []struct {
 		desc     string
@@ -195,7 +194,6 @@ func TestUnmarshal_Integers(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestUnmarshal_Floats(t *testing.T) {
 	examples := []struct {
 		desc     string
@@ -333,7 +331,6 @@ func TestUnmarshal_Floats(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestUnmarshal(t *testing.T) {
 	type test struct {
 		target   interface{}
@@ -3579,7 +3576,6 @@ func TestASCIIControlCharacters(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestLocalDateTime(t *testing.T) {
 	examples := []struct {
 		desc  string

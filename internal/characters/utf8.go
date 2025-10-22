@@ -32,6 +32,8 @@ func (u utf8Err) Zero() bool {
 // 0x9 => tab, ok
 // 0xA - 0x1F => invalid
 // 0x7F => invalid
+//
+//nolint:funlen
 func Utf8TomlValidAlreadyEscaped(p []byte) (err utf8Err) {
 	// Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
 	offset := 0

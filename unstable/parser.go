@@ -351,7 +351,7 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	return ref, b, err
 }
 
-//nolint:cyclop,funlen
+//nolint:funlen,cyclop
 func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 	ref := invalidReference

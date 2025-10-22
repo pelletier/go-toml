@@ -96,6 +96,7 @@ func usage() {
 	flag.PrintDefaults()
 }
 
+//nolint:funlen
 func main() {
 	flag.Usage = usage
 	flag.Parse()

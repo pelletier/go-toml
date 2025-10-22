@@ -196,7 +196,6 @@ func compareIterator(t *testing.T, expected []astNode, actual Iterator) {
 	}
 }
 
-//nolint:funlen
 func TestParser_AST(t *testing.T) {
 	examples := []struct {
 		desc  string
