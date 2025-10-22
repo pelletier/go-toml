@@ -1074,10 +1074,10 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 	assert.Equal(t, expected, w.String())
 }
 
-func TestEncoderSetMarshalJsonNumbers(t *testing.T) {
+func TestEncoderSetMarshalJSONNumbers(t *testing.T) {
 	var w strings.Builder
 	enc := toml.NewEncoder(&w)
-	enc.SetMarshalJsonNumbers(true)
+	enc.SetMarshalJSONNumbers(true)
 	err := enc.Encode(map[string]interface{}{
 		"A": json.Number("1.1"),
 		"B": json.Number("42e-3"),
@@ -1887,12 +1887,12 @@ func TestReadmeComments(t *testing.T) {
 	type Config struct {
 		Host string `toml:"host" comment:"Host IP to connect to."`
 		Port int    `toml:"port" comment:"Port of the remote server."`
-		Tls  TLS    `toml:"TLS,commented" comment:"Encryption parameters (optional)"`
+		TLS  TLS    `toml:"TLS,commented" comment:"Encryption parameters (optional)"`
 	}
 	example := Config{
 		Host: "127.0.0.1",
 		Port: 4242,
-		Tls: TLS{
+		TLS: TLS{
 			Cipher:  "AEAD-AES128-GCM-SHA256",
 			Version: "TLS 1.3",
 		},

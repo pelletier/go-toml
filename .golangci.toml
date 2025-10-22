@@ -61,6 +61,11 @@ linters = ["cyclop", "funlen", "goconst", "gosec"]
 path = "main.go"
 linters = ["forbidigo"]
 
+[[linters.exclusions.rules]]
+path = "internal"
+linters = ["revive"]
+text = "(exported|indent-error-flow): "
+
 [formatters]
 enable = [
     "gci",

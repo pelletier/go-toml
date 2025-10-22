@@ -12,7 +12,7 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
-var bench_inputs = []struct {
+var benchInputs = []struct {
 	name    string
 	jsonLen int
 }{
@@ -30,7 +30,7 @@ var bench_inputs = []struct {
 }
 
 func TestUnmarshalDatasetCode(t *testing.T) {
-	for _, tc := range bench_inputs {
+	for _, tc := range benchInputs {
 		t.Run(tc.name, func(t *testing.T) {
 			buf := fixture(t, tc.name)
 
@@ -45,7 +45,7 @@ func TestUnmarshalDatasetCode(t *testing.T) {
 }
 
 func BenchmarkUnmarshalDataset(b *testing.B) {
-	for _, tc := range bench_inputs {
+	for _, tc := range benchInputs {
 		b.Run(tc.name, func(b *testing.B) {
 			buf := fixture(b, tc.name)
 			b.SetBytes(int64(len(buf)))

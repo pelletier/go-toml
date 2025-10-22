@@ -1,3 +1,4 @@
+// Package assert provides assertion functions for unit testing.
 package assert
 
 import (

@@ -708,11 +708,11 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 
 	if !escaped {
 		str := token[startIdx:endIdx]
-		verr := characters.Utf8TomlValidAlreadyEscaped(str)
-		if verr.Zero() {
+		highlight := characters.Utf8TomlValidAlreadyEscaped(str)
+		if len(highlight) == 0 {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, NewParserError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, nil, NewParserError(highlight, "invalid UTF-8")
 	}
 
 	var builder bytes.Buffer
@@ -900,11 +900,11 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// validate the string and return a direct reference to the buffer.
 	if !escaped {
 		str := token[startIdx:endIdx]
-		verr := characters.Utf8TomlValidAlreadyEscaped(str)
-		if verr.Zero() {
+		highlight := characters.Utf8TomlValidAlreadyEscaped(str)
+		if len(highlight) == 0 {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, NewParserError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, nil, NewParserError(highlight, "invalid UTF-8")
 	}
 
 	i := startIdx

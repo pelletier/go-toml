@@ -11,7 +11,7 @@ import (
 // Remove JSON tags to a data structure as returned by toml-test.
 //
 //nolint:cyclop
-func rmTag(typedJson interface{}) (interface{}, error) {
+func rmTag(typedJSON interface{}) (interface{}, error) {
 	// Check if key is in the table m.
 	in := func(key string, m map[string]interface{}) bool {
 		_, ok := m[key]
@@ -19,7 +19,7 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 	}
 
 	// Switch on the data type.
-	switch v := typedJson.(type) {
+	switch v := typedJSON.(type) {
 	// Object: this can either be a TOML table or a primitive with tags.
 	case map[string]interface{}:
 		// This value represents a primitive: remove the tags and return just
@@ -57,7 +57,7 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 	}
 
 	// The top level must be an object or array.
-	return nil, fmt.Errorf("unrecognized JSON format '%T'", typedJson)
+	return nil, fmt.Errorf("unrecognized JSON format '%T'", typedJSON)
 }
 
 // Return a primitive: read the "type" and convert the "value" to that.

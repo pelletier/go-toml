@@ -42,7 +42,7 @@ type Encoder struct {
 	arraysMultiline    bool
 	indentSymbol       string
 	indentTables       bool
-	marshalJsonNumbers bool
+	marshalJSONNumbers bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -91,12 +91,19 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 
 // SetMarshalJsonNumbers forces the encoder to serialize `json.Number` as a
 // float or integer instead of relying on TextMarshaler to emit a string.
+// Deprecated: use SetMarshalJSONNumbers instead.
+func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder { //revive:disable:var-naming
+	return enc.SetMarshalJSONNumbers(indent)
+}
+
+// SetMarshalJSONNumbers forces the encoder to serialize `json.Number` as a
+// float or integer instead of relying on TextMarshaler to emit a string.
 //
 // *Unstable:* This method does not follow the compatibility guarantees of
 // semver. It can be changed or removed without a new major version being
 // issued.
-func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder {
-	enc.marshalJsonNumbers = indent
+func (enc *Encoder) SetMarshalJSONNumbers(indent bool) *Encoder {
+	enc.marshalJSONNumbers = indent
 	return enc
 }
 
@@ -270,16 +277,15 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 	case LocalDateTime:
 		return append(b, x.String()...), nil
 	case json.Number:
-		if enc.marshalJsonNumbers {
+		if enc.marshalJSONNumbers {
 			if x == "" { /// Useful zero value.
 				return append(b, "0"...), nil
 			} else if v, err := x.Int64(); err == nil {
 				return enc.encode(b, ctx, reflect.ValueOf(v))
 			} else if f, err := x.Float64(); err == nil {
 				return enc.encode(b, ctx, reflect.ValueOf(f))
-			} else {
-				return nil, fmt.Errorf("toml: unable to convert %q to int64 or float64", x)
 			}
+			return nil, fmt.Errorf("toml: unable to convert %q to int64 or float64", x)
 		}
 	}
 
@@ -490,7 +496,7 @@ func (enc *Encoder) encodeString(b []byte, v string, options valueOptions) []byt
 func needsQuoting(v string) bool {
 	// TODO: vectorize
 	for _, b := range []byte(v) {
-		if b == '\'' || b == '\r' || b == '\n' || characters.InvalidAscii(b) {
+		if b == '\'' || b == '\r' || b == '\n' || characters.InvalidASCII(b) {
 			return true
 		}
 	}
@@ -778,9 +784,8 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 					walkStruct(ctx, t, f.Elem())
 				}
 				continue
-			} else {
-				k = fieldType.Name
 			}
+			k = fieldType.Name
 		}
 
 		if isNil(f) {

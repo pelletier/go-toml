@@ -54,6 +54,7 @@ func (s *StrictMissingError) String() string {
 	return buf.String()
 }
 
+// Key is a slice of strings that represents a path to a value in a TOML document.
 type Key []string
 
 // Error returns the error message contained in the DecodeError.

@@ -1,3 +1,4 @@
+// Package cli provides common functions for command-line programs.
 package cli
 
 import (
@@ -27,16 +28,16 @@ func (p *Program) Execute() {
 	os.Exit(p.main(flag.Args(), os.Stdin, os.Stdout, os.Stderr))
 }
 
-func (p *Program) main(files []string, input io.Reader, output, error io.Writer) int {
+func (p *Program) main(files []string, input io.Reader, output, stderr io.Writer) int {
 	err := p.run(files, input, output)
 	if err != nil {
 		var derr *toml.DecodeError
 		if errors.As(err, &derr) {
-			_, _ = fmt.Fprintln(error, derr.String())
+			_, _ = fmt.Fprintln(stderr, derr.String())
 			row, col := derr.Position()
-			_, _ = fmt.Fprintln(error, "error occurred at row", row, "column", col)
+			_, _ = fmt.Fprintln(stderr, "error occurred at row", row, "column", col)
 		} else {
-			_, _ = fmt.Fprintln(error, err.Error())
+			_, _ = fmt.Fprintln(stderr, err.Error())
 		}
 
 		return -1

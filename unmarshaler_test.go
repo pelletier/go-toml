@@ -33,7 +33,7 @@ func (k *unmarshalTextKey) UnmarshalText(text []byte) error {
 
 type unmarshalBadTextKey struct{}
 
-func (k *unmarshalBadTextKey) UnmarshalText(text []byte) error {
+func (k *unmarshalBadTextKey) UnmarshalText([]byte) error {
 	return fmt.Errorf("error")
 }
 
@@ -2476,7 +2476,7 @@ func TestIssue507(t *testing.T) {
 
 type uuid [16]byte
 
-func (u *uuid) UnmarshalText(text []byte) (err error) {
+func (u *uuid) UnmarshalText([]byte) (err error) {
 	// Note: the original reported issue had a more complex implementation
 	// of this function. But the important part is to verify that a
 	// non-struct type implementing UnmarshalText works with the unmarshal
@@ -2519,7 +2519,7 @@ xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
 `)
 
 	type target struct {
-		XZ_URL string
+		XZ_URL string //revive:disable:var-naming
 	}
 
 	type pkg struct {
@@ -3979,7 +3979,7 @@ foo = "bar"`,
 
 type doc994 struct{}
 
-func (d *doc994) UnmarshalTOML(value *unstable.Node) error {
+func (d *doc994) UnmarshalTOML(*unstable.Node) error {
 	return errors.New("expected-error")
 }
 

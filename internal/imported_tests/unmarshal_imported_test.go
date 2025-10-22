@@ -1,4 +1,4 @@
-package imported_tests
+package imported_tests //revive:disable:var-naming
 
 // Those tests were imported directly from go-toml v1
 // https://raw.githubusercontent.com/pelletier/go-toml/a2e52561804c6cd9392ebf0048ca64fe4af67a43/marshal_test.go
@@ -2256,7 +2256,7 @@ type Custom struct {
 	v string
 }
 
-func (c *Custom) UnmarshalTOML(v interface{}) error {
+func (c *Custom) UnmarshalTOML(interface{}) error {
 	c.v = "called"
 	return nil
 }
@@ -2281,14 +2281,14 @@ type durationString struct {
 	time.Duration
 }
 
-func (d *durationString) UnmarshalTOML(v interface{}) error {
+func (d *durationString) UnmarshalTOML(interface{}) error {
 	d.Duration = 10 * time.Second
 	return nil
 }
 
 type config437Error struct{}
 
-func (e *config437Error) UnmarshalTOML(v interface{}) error {
+func (e *config437Error) UnmarshalTOML(interface{}) error {
 	return errors.New("expected")
 }
 

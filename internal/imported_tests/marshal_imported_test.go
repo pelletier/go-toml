@@ -1,4 +1,4 @@
-package imported_tests
+package imported_tests //revive:disable:var-naming
 
 // Those tests have been imported from v1, but adjust to match the new
 // defaults of v2.

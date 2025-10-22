@@ -6,12 +6,12 @@ import (
 )
 
 var (
-	valid10Ascii = []byte("1234567890")
+	valid10ASCII = []byte("1234567890")
 	valid10Utf8  = []byte("日本語a")
 	valid1kUtf8  = bytes.Repeat([]byte("0123456789日本語日本語日本語日abcdefghijklmnopqrstuvwx"), 16)
 	valid1MUtf8  = bytes.Repeat(valid1kUtf8, 1024)
-	valid1kAscii = bytes.Repeat([]byte("012345678998jhjklasDJKLAAdjdfjsdklfjdslkabcdefghijklmnopqrstuvwx"), 16)
-	valid1MAscii = bytes.Repeat(valid1kAscii, 1024)
+	valid1kASCII = bytes.Repeat([]byte("012345678998jhjklasDJKLAAdjdfjsdklfjdslkabcdefghijklmnopqrstuvwx"), 16)
+	valid1MASCII = bytes.Repeat(valid1kASCII, 1024)
 )
 
 func BenchmarkScanComments(b *testing.B) {
@@ -20,9 +20,9 @@ func BenchmarkScanComments(b *testing.B) {
 	}
 
 	inputs := map[string][]byte{
-		"10Valid":     wrap(valid10Ascii),
-		"1kValid":     wrap(valid1kAscii),
-		"1MValid":     wrap(valid1MAscii),
+		"10Valid":     wrap(valid10ASCII),
+		"1kValid":     wrap(valid1kASCII),
+		"1MValid":     wrap(valid1MASCII),
 		"10ValidUtf8": wrap(valid10Utf8),
 		"1kValidUtf8": wrap(valid1kUtf8),
 		"1MValidUtf8": wrap(valid1MUtf8),
@@ -47,9 +47,9 @@ func BenchmarkParseLiteralStringValid(b *testing.B) {
 	}
 
 	inputs := map[string][]byte{
-		"10Valid":     wrap(valid10Ascii),
-		"1kValid":     wrap(valid1kAscii),
-		"1MValid":     wrap(valid1MAscii),
+		"10Valid":     wrap(valid10ASCII),
+		"1kValid":     wrap(valid1kASCII),
+		"1MValid":     wrap(valid1MASCII),
 		"10ValidUtf8": wrap(valid10Utf8),
 		"1kValidUtf8": wrap(valid1kUtf8),
 		"1MValidUtf8": wrap(valid1MUtf8),
@@ -65,7 +65,7 @@ func BenchmarkParseLiteralStringValid(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, _, _, err := p.parseLiteralString(input)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 		})

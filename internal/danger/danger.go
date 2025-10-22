@@ -1,3 +1,4 @@
+// Package danger provides optimized unsafe functions.
 package danger
 
 import (
