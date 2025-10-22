@@ -64,7 +64,7 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 func TestProcessMainFileExists(t *testing.T) {
 	tmpfile, err := os.CreateTemp(t.TempDir(), "example")
 	assert.NoError(t, err)
-	_, err = tmpfile.Write([]byte(`some data`))
+	_, err = tmpfile.WriteString(`some data`)
 	assert.NoError(t, err)
 	assert.NoError(t, tmpfile.Close())
 

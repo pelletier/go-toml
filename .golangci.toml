@@ -26,6 +26,7 @@ enable = [
     "ineffassign",
     "lll",
     "makezero",
+    "mirror",
     "misspell",
     "nakedret",
     "nilerr",
