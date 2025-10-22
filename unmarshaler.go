@@ -226,7 +226,7 @@ func (d *decoder) FromParser(v interface{}) error {
 	}
 
 	if r.IsNil() {
-		return fmt.Errorf("toml: decoding pointer target cannot be nil")
+		return errors.New("toml: decoding pointer target cannot be nil")
 	}
 
 	r = r.Elem()

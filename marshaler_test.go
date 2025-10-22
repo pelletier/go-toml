@@ -3,6 +3,7 @@ package toml_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -28,7 +29,7 @@ func (k marshalTextKey) MarshalText() ([]byte, error) {
 type marshalBadTextKey struct{}
 
 func (k marshalBadTextKey) MarshalText() ([]byte, error) {
-	return nil, fmt.Errorf("error")
+	return nil, errors.New("error")
 }
 
 func toFloat(x interface{}) float64 {
@@ -1011,7 +1012,7 @@ type customTextMarshaler struct {
 
 func (c *customTextMarshaler) MarshalText() ([]byte, error) {
 	if c.value == 1 {
-		return nil, fmt.Errorf("cannot represent 1 because this is a silly test")
+		return nil, errors.New("cannot represent 1 because this is a silly test")
 	}
 	return []byte(fmt.Sprintf("::%d", c.value)), nil
 }
@@ -1051,7 +1052,7 @@ func TestMarshalTextMarshaler(t *testing.T) {
 type brokenWriter struct{}
 
 func (b *brokenWriter) Write([]byte) (int, error) {
-	return 0, fmt.Errorf("dead")
+	return 0, errors.New("dead")
 }
 
 func TestEncodeToBrokenWriter(t *testing.T) {

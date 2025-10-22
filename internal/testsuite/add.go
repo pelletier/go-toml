@@ -3,6 +3,7 @@ package testsuite
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
@@ -54,11 +55,11 @@ func addTag(tomlData interface{}) interface{} {
 
 	// Tag primitive values: bool, string, int, and float64.
 	case bool:
-		return tag("bool", fmt.Sprintf("%v", orig))
+		return tag("bool", strconv.FormatBool(orig))
 	case string:
 		return tag("string", orig)
 	case int64:
-		return tag("integer", fmt.Sprintf("%d", orig))
+		return tag("integer", strconv.FormatInt(orig, 10))
 	case float64:
 		// Special case for nan since NaN == NaN is false.
 		if math.IsNaN(orig) {

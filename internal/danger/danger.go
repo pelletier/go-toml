@@ -53,7 +53,7 @@ func BytesRange(start []byte, end []byte) []byte {
 	}
 
 	if l > cap(start) {
-		panic(fmt.Errorf("range length is larger than capacity"))
+		panic("range length is larger than capacity")
 	}
 
 	return start[:l]

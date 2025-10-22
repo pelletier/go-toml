@@ -1,6 +1,7 @@
 package assert
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -90,7 +91,7 @@ func TestEqual(t *testing.T) {
 func TestError(t *testing.T) {
 	assertOk(t, "Error", func(tb testing.TB) {
 		tb.Helper()
-		Error(tb, fmt.Errorf("example"))
+		Error(tb, errors.New("example"))
 	})
 	assertFail(t, "Nil", func(tb testing.TB) {
 		tb.Helper()
@@ -101,7 +102,7 @@ func TestError(t *testing.T) {
 func TestNoError(t *testing.T) {
 	assertFail(t, "Error", func(tb testing.TB) {
 		tb.Helper()
-		NoError(tb, fmt.Errorf("example"))
+		NoError(tb, errors.New("example"))
 	})
 	assertOk(t, "Nil", func(tb testing.TB) {
 		tb.Helper()

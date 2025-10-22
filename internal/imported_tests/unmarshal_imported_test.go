@@ -1531,7 +1531,7 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 	}
 
 	for i, example := range examples {
-		doc := fmt.Sprintf(`date = %s`, example.in)
+		doc := "date = " + example.in
 
 		t.Run(fmt.Sprintf("ToLocalDateTime_%d_%s", i, example.name), func(t *testing.T) {
 			type dateStruct struct {
@@ -1617,7 +1617,7 @@ func TestUnmarshalLocalTime(t *testing.T) {
 	}
 
 	for i, example := range examples {
-		doc := fmt.Sprintf(`Time = %s`, example.in)
+		doc := "Time = " + example.in
 
 		t.Run(fmt.Sprintf("ToLocalTime_%d_%s", i, example.name), func(t *testing.T) {
 			type dateStruct struct {

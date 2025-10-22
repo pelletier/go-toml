@@ -2,7 +2,7 @@ package cli
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -38,7 +38,7 @@ func TestProcessMainStdinErr(t *testing.T) {
 	input := strings.NewReader("this is the input")
 
 	exit := processMain([]string{}, input, stdout, stderr, func(io.Reader, io.Writer) error {
-		return fmt.Errorf("something bad")
+		return errors.New("something bad")
 	})
 
 	assert.Equal(t, -1, exit)
@@ -142,7 +142,7 @@ func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
 	assert.NoError(t, err)
 
 	p := Program{
-		Fn:      func(io.Reader, io.Writer) error { return fmt.Errorf("oh no") },
+		Fn:      func(io.Reader, io.Writer) error { return errors.New("oh no") },
 		Inplace: true,
 	}
 

@@ -34,7 +34,7 @@ func (k *unmarshalTextKey) UnmarshalText(text []byte) error {
 type unmarshalBadTextKey struct{}
 
 func (k *unmarshalBadTextKey) UnmarshalText([]byte) error {
-	return fmt.Errorf("error")
+	return errors.New("error")
 }
 
 func ExampleDecoder_DisallowUnknownFields() {
@@ -99,7 +99,7 @@ func ExampleUnmarshal() {
 type badReader struct{}
 
 func (r *badReader) Read([]byte) (int, error) {
-	return 0, fmt.Errorf("testing error")
+	return 0, errors.New("testing error")
 }
 
 func TestDecodeReaderError(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -186,7 +187,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 	ctx.inline = enc.tablesInline
 
 	if v == nil {
-		return fmt.Errorf("toml: cannot encode a nil interface")
+		return errors.New("toml: cannot encode a nil interface")
 	}
 
 	b, err := enc.encode(b, ctx, reflect.ValueOf(v))
@@ -319,7 +320,7 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 		return enc.encodeSlice(b, ctx, v)
 	case reflect.Interface:
 		if v.IsNil() {
-			return nil, fmt.Errorf("toml: encoding a nil interface is not supported")
+			return nil, errors.New("toml: encoding a nil interface is not supported")
 		}
 
 		return enc.encode(b, ctx, v.Elem())

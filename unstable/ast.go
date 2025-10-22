@@ -113,7 +113,7 @@ func (n *Node) Key() Iterator {
 	case KeyValue:
 		value := n.Child()
 		if !value.Valid() {
-			panic(fmt.Errorf("KeyValue should have at least two children"))
+			panic("KeyValue should have at least two children")
 		}
 		return Iterator{node: value.Next()}
 	case Table, ArrayTable:
