@@ -69,7 +69,7 @@ func fixture(tb testing.TB, path string) []byte {
 		tb.Skip("benchmark fixture not found:", file)
 	}
 	assert.NoError(tb, err)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	gz, err := gzip.NewReader(f)
 	assert.NoError(tb, err)

@@ -32,11 +32,11 @@ func (p *Program) main(files []string, input io.Reader, output, error io.Writer)
 	if err != nil {
 		var derr *toml.DecodeError
 		if errors.As(err, &derr) {
-			fmt.Fprintln(error, derr.String())
+			_, _ = fmt.Fprintln(error, derr.String())
 			row, col := derr.Position()
-			fmt.Fprintln(error, "error occurred at row", row, "column", col)
+			_, _ = fmt.Fprintln(error, "error occurred at row", row, "column", col)
 		} else {
-			fmt.Fprintln(error, err.Error())
+			_, _ = fmt.Fprintln(error, err.Error())
 		}
 
 		return -1
@@ -53,7 +53,7 @@ func (p *Program) run(files []string, input io.Reader, output io.Writer) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		input = f
 	}
 	return p.Fn(input, output)
