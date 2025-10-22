@@ -44,6 +44,7 @@ enable = [
     "unconvert",
     "unparam",
     "unused",
+    "usetesting",
     "wastedassign",
     "whitespace",
 ]

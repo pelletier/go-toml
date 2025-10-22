@@ -62,11 +62,11 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 }
 
 func TestProcessMainFileExists(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "example")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "example")
 	assert.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
 	_, err = tmpfile.Write([]byte(`some data`))
 	assert.NoError(t, err)
+	assert.NoError(t, tmpfile.Close())
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -94,14 +94,12 @@ func TestProcessMainFileDoesNotExist(t *testing.T) {
 }
 
 func TestProcessMainFilesInPlace(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	path1 := path.Join(dir, "file1")
 	path2 := path.Join(dir, "file2")
 
-	err = os.WriteFile(path1, []byte("content 1"), 0o600)
+	err := os.WriteFile(path1, []byte("content 1"), 0o600)
 	assert.NoError(t, err)
 	err = os.WriteFile(path2, []byte("content 2"), 0o600)
 	assert.NoError(t, err)
@@ -136,13 +134,11 @@ func TestProcessMainFilesInPlaceErrRead(t *testing.T) {
 }
 
 func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	path1 := path.Join(dir, "file1")
 
-	err = os.WriteFile(path1, []byte("content 1"), 0o600)
+	err := os.WriteFile(path1, []byte("content 1"), 0o600)
 	assert.NoError(t, err)
 
 	p := Program{
