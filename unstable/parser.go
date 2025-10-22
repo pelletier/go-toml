@@ -70,8 +70,8 @@ func (p *Parser) Data() []byte {
 // panics.
 func (p *Parser) Range(b []byte) Range {
 	return Range{
-		Offset: uint32(danger.SubsliceOffset(p.data, b)),
-		Length: uint32(len(b)),
+		Offset: uint32(danger.SubsliceOffset(p.data, b)), // #nosec G115
+		Length: uint32(len(b)),                           // #nosec G115
 	}
 }
 

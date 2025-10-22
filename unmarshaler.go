@@ -956,6 +956,7 @@ var maxUint int64 = math.MaxInt64
 
 func init() { //nolint:gochecknoinits
 	m := uint64(^uint(0))
+	// #nosec G115
 	if m < uint64(maxUint) {
 		maxUint = int64(m)
 	}

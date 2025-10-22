@@ -83,7 +83,7 @@ func (n *Node) Next() *Node {
 	if n.next == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(n)
+	ptr := unsafe.Pointer(n) // #nosec G103
 	size := unsafe.Sizeof(Node{})
 	return (*Node)(danger.Stride(ptr, size, n.next))
 }
@@ -95,7 +95,7 @@ func (n *Node) Child() *Node {
 	if n.child == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(n)
+	ptr := unsafe.Pointer(n) // #nosec G103
 	size := unsafe.Sizeof(Node{})
 	return (*Node)(danger.Stride(ptr, size, n.child))
 }

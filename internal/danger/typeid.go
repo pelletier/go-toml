@@ -19,5 +19,5 @@ func MakeTypeID(t reflect.Type) TypeID {
 	// reflect.Type has the fields:
 	// typ unsafe.Pointer
 	// ptr unsafe.Pointer
-	return TypeID((*[2]unsafe.Pointer)(unsafe.Pointer(&t))[1])
+	return TypeID((*[2]unsafe.Pointer)(unsafe.Pointer(&t))[1]) // #nosec G103
 }

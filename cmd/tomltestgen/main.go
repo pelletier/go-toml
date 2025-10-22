@@ -112,7 +112,7 @@ func main() {
 
 		log.Printf("> [%s] %s\n", "invalid", name)
 
-		tomlContent, err := os.ReadFile(f)
+		tomlContent, err := os.ReadFile(f) // #nosec G304
 		if err != nil {
 			fmt.Printf("failed to read test file: %s\n", err)
 			os.Exit(1)
@@ -132,14 +132,14 @@ func main() {
 
 		log.Printf("> [%s] %s\n", "valid", name)
 
-		tomlContent, err := os.ReadFile(f)
+		tomlContent, err := os.ReadFile(f) // #nosec G304
 		if err != nil {
 			fmt.Printf("failed reading test file: %s\n", err)
 			os.Exit(1)
 		}
 
 		filename = strings.TrimSuffix(f, ".toml")
-		jsonContent, err := os.ReadFile(filename + ".json")
+		jsonContent, err := os.ReadFile(filename + ".json") // #nosec G304
 		if err != nil {
 			fmt.Printf("failed reading validation json: %s\n", err)
 			os.Exit(1)
@@ -174,7 +174,7 @@ func main() {
 		return
 	}
 
-	err = os.WriteFile(*out, outputBytes, 0o644)
+	err = os.WriteFile(*out, outputBytes, 0o600)
 	if err != nil {
 		panic(err)
 	}

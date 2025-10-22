@@ -8,8 +8,8 @@ import (
 const maxInt = uintptr(int(^uint(0) >> 1))
 
 func SubsliceOffset(data []byte, subslice []byte) int {
-	datap := uintptr(unsafe.Pointer(unsafe.SliceData(data)))
-	hlp := uintptr(unsafe.Pointer(unsafe.SliceData(subslice)))
+	datap := uintptr(unsafe.Pointer(unsafe.SliceData(data)))   // #nosec G103
+	hlp := uintptr(unsafe.Pointer(unsafe.SliceData(subslice))) // #nosec G103
 
 	if hlp < datap {
 		panic(fmt.Errorf("subslice address (%d) is before data address (%d)", hlp, datap))
@@ -38,8 +38,8 @@ func BytesRange(start []byte, end []byte) []byte {
 		panic("cannot call BytesRange with nil")
 	}
 
-	startp := uintptr(unsafe.Pointer(unsafe.SliceData(start)))
-	endp := uintptr(unsafe.Pointer(unsafe.SliceData(end)))
+	startp := uintptr(unsafe.Pointer(unsafe.SliceData(start))) // #nosec G103
+	endp := uintptr(unsafe.Pointer(unsafe.SliceData(end)))     // #nosec G103
 
 	if startp > endp {
 		panic(fmt.Errorf("start pointer address (%d) is after end pointer address (%d)", startp, endp))

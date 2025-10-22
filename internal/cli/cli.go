@@ -70,7 +70,7 @@ func (p *Program) runAllFilesInPlace(files []string) error {
 }
 
 func (p *Program) runFileInPlace(path string) error {
-	in, err := os.ReadFile(path)
+	in, err := os.ReadFile(path) // #nosec G304
 	if err != nil {
 		return err
 	}
