@@ -5,8 +5,8 @@ import (
 	"unicode/utf8"
 )
 
-// Verified that a given string is only made of valid UTF-8 characters allowed
-// by the TOML spec:
+// Utf8TomlValidAlreadyEscaped verifies that a given string is only made of
+// valid UTF-8 characters allowed by the TOML spec:
 //
 // Any Unicode character may be used except those that must be escaped:
 // quotation mark, backslash, and the control characters other than tab (U+0000
@@ -83,7 +83,7 @@ func Utf8TomlValidAlreadyEscaped(p []byte) []byte {
 	return nil
 }
 
-// Return the size of the next rune if valid, 0 otherwise.
+// Utf8ValidNext returns the size of the next rune if valid, 0 otherwise.
 //
 //nolint:cyclop
 func Utf8ValidNext(p []byte) int {
