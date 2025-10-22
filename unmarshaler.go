@@ -1115,35 +1115,39 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 			return reflect.Value{}, fmt.Errorf("toml: error unmarshalling key type %s from text: %w", stringType, err)
 		}
 		return mk.Elem(), nil
+	}
 
-	case keyType.Kind() == reflect.Int || keyType.Kind() == reflect.Int8 || keyType.Kind() == reflect.Int16 || keyType.Kind() == reflect.Int32 || keyType.Kind() == reflect.Int64:
+	switch keyType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		key, err := strconv.ParseInt(string(data), 10, 64)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from integer: %w", stringType, err)
 		}
 		return reflect.ValueOf(key).Convert(keyType), nil
-	case keyType.Kind() == reflect.Uint || keyType.Kind() == reflect.Uint8 || keyType.Kind() == reflect.Uint16 || keyType.Kind() == reflect.Uint32 || keyType.Kind() == reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		key, err := strconv.ParseUint(string(data), 10, 64)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from unsigned integer: %w", stringType, err)
 		}
 		return reflect.ValueOf(key).Convert(keyType), nil
 
-	case keyType.Kind() == reflect.Float32:
+	case reflect.Float32:
 		key, err := strconv.ParseFloat(string(data), 32)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from float: %w", stringType, err)
 		}
 		return reflect.ValueOf(float32(key)), nil
 
-	case keyType.Kind() == reflect.Float64:
+	case reflect.Float64:
 		key, err := strconv.ParseFloat(string(data), 64)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from float: %w", stringType, err)
 		}
 		return reflect.ValueOf(float64(key)), nil
+
+	default:
+		return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", stringType, keyType)
 	}
-	return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", stringType, keyType)
 }
 
 //nolint:funlen,cyclop

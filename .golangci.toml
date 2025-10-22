@@ -50,6 +50,9 @@ enable = [
 [linters.settings.exhaustive]
 default-signifies-exhaustive = true
 
+[linters.settings.lll]
+line-length = 150
+
 [[linters.exclusions.rules]]
 path = ".test.go"
 linters = ["cyclop", "funlen", "goconst", "gosec"]

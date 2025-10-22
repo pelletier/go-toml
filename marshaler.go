@@ -645,33 +645,35 @@ func (enc *Encoder) encodeKey(b []byte, k string) []byte {
 	}
 }
 
-//nolint:cyclop
 func (enc *Encoder) keyToString(k reflect.Value) (string, error) {
 	keyType := k.Type()
-	switch {
-	case keyType.Kind() == reflect.String:
-		return k.String(), nil
-
-	case keyType.Implements(textMarshalerType):
+	if keyType.Implements(textMarshalerType) {
 		keyB, err := k.Interface().(encoding.TextMarshaler).MarshalText()
 		if err != nil {
 			return "", fmt.Errorf("toml: error marshalling key %v from text: %w", k, err)
 		}
 		return string(keyB), nil
+	}
 
-	case keyType.Kind() == reflect.Int || keyType.Kind() == reflect.Int8 || keyType.Kind() == reflect.Int16 || keyType.Kind() == reflect.Int32 || keyType.Kind() == reflect.Int64:
+	switch keyType.Kind() {
+	case reflect.String:
+		return k.String(), nil
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return strconv.FormatInt(k.Int(), 10), nil
 
-	case keyType.Kind() == reflect.Uint || keyType.Kind() == reflect.Uint8 || keyType.Kind() == reflect.Uint16 || keyType.Kind() == reflect.Uint32 || keyType.Kind() == reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return strconv.FormatUint(k.Uint(), 10), nil
 
-	case keyType.Kind() == reflect.Float32:
+	case reflect.Float32:
 		return strconv.FormatFloat(k.Float(), 'f', -1, 32), nil
 
-	case keyType.Kind() == reflect.Float64:
+	case reflect.Float64:
 		return strconv.FormatFloat(k.Float(), 'f', -1, 64), nil
+
+	default:
+		return "", fmt.Errorf("toml: type %s is not supported as a map key", keyType.Kind())
 	}
-	return "", fmt.Errorf("toml: type %s is not supported as a map key", keyType.Kind())
 }
 
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
@@ -1003,11 +1005,14 @@ func willConvertToTable(ctx encoderCtx, v reflect.Value) bool {
 	if !v.IsValid() {
 		return false
 	}
-	if v.Type() == timeType || v.Type().Implements(textMarshalerType) || (v.Kind() != reflect.Ptr && v.CanAddr() && reflect.PointerTo(v.Type()).Implements(textMarshalerType)) {
+	t := v.Type()
+	if t == timeType || t.Implements(textMarshalerType) {
+		return false
+	}
+	if v.Kind() != reflect.Ptr && v.CanAddr() && reflect.PointerTo(t).Implements(textMarshalerType) {
 		return false
 	}
 
-	t := v.Type()
 	switch t.Kind() {
 	case reflect.Map, reflect.Struct:
 		return !ctx.inline

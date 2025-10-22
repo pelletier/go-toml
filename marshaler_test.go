@@ -1762,14 +1762,14 @@ func ExampleMarshal() {
 func ExampleMarshal_commented() {
 	type Common struct {
 		Listen               string        `toml:"listen"                     comment:"general listener"`
-		PprofListen          string        `toml:"pprof-listen"               comment:"listener to serve /debug/pprof requests. '-pprof' argument overrides it"`
-		MaxMetricsPerTarget  int           `toml:"max-metrics-per-target"     comment:"limit numbers of queried metrics per target in /render requests, 0 or negative = unlimited"`
+		PprofListen          string        `toml:"pprof-listen"               comment:"listener to serve /debug/pprof requests. '-pprof' argument overrides it"`                    //nolint:lll
+		MaxMetricsPerTarget  int           `toml:"max-metrics-per-target"     comment:"limit numbers of queried metrics per target in /render requests, 0 or negative = unlimited"` //nolint:lll
 		MemoryReturnInterval time.Duration `toml:"memory-return-interval"     comment:"daemon will return the freed memory to the OS when it>0"`
 	}
 
 	type Costs struct {
 		Cost       *int           `toml:"cost"        comment:"default cost (for wildcarded equivalence or matched with regex, or if no value cost set)"`
-		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equivalence without wildcards) (additional tuning, usually not needed)"`
+		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equivalence without wildcards) (additional tuning, usually not needed)"` //nolint:lll
 	}
 
 	type ClickHouse struct {
@@ -1784,7 +1784,7 @@ func ExampleMarshal_commented() {
 		DateTreeTableVersion    int               `toml:"date-tree-table-version,commented"`
 		TreeTimeout             time.Duration     `toml:"tree-timeout,commented"`
 		TagTable                string            `toml:"tag-table,commented"`
-		ExtraPrefix             string            `toml:"extra-prefix"             comment:"add extra prefix (directory in graphite) for all metrics, w/o trailing dot"`
+		ExtraPrefix             string            `toml:"extra-prefix"             comment:"add extra prefix (directory in graphite) for all metrics, w/o trailing dot"` //nolint:lll
 		ConnectTimeout          time.Duration     `toml:"connect-timeout"          comment:"TCP connection timeout"`
 		DataTableLegacy         string            `toml:"data-table,commented"`
 		RollupConfLegacy        string            `toml:"rollup-conf,commented"`
