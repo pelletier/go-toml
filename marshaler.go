@@ -100,6 +100,13 @@ func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder {
 	return enc
 }
 
+// Interface that a node can implement to use said functionality
+type TomlEncoderComment interface {
+	// comment returns a comment string for any particular node, this is mostly for implementing
+	// dynamic comments
+	TomlComment() string
+}
+
 // Encode writes a TOML representation of v to the stream.
 //
 // If v cannot be represented to TOML it returns an error.
@@ -739,8 +746,13 @@ func (t *table) pushTable(k string, v reflect.Value, options valueOptions) {
 func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 	// TODO: cache this
 	typ := v.Type()
+	value := v
+	if v.Kind() == reflect.Ptr {
+		value = v.Elem()
+	}
 	for i := 0; i < typ.NumField(); i++ {
 		fieldType := typ.Field(i)
+		fieldValue := value.Field(i)
 
 		// only consider exported fields
 		if fieldType.PkgPath != "" {
@@ -778,12 +790,17 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 			continue
 		}
 
+		comment := fieldType.Tag.Get("comment")
+		if encoder, ok := fieldValue.Interface().(TomlEncoderComment); ok {
+			comment = encoder.TomlComment()
+		}
+
 		options := valueOptions{
 			multiline: opts.multiline,
 			omitempty: opts.omitempty,
 			omitzero:  opts.omitzero,
 			commented: opts.commented,
-			comment:   fieldType.Tag.Get("comment"),
+			comment:   comment,
 		}
 
 		if opts.inline || !willConvertToTableOrArrayTable(ctx, f) {
@@ -1098,6 +1115,12 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 		if i != 0 {
 			b = append(b, "\n"...)
 		}
+
+		comment := ""
+		if encoder, ok := v.Index(i).Interface().(TomlEncoderComment); ok {
+			comment = encoder.TomlComment()
+		}
+		b = enc.encodeComment(ctx.indent, comment, b)
 
 		b = append(b, scratch...)
 
