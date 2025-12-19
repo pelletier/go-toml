@@ -54,6 +54,17 @@ func (s *StrictMissingError) String() string {
 	return buf.String()
 }
 
+// Unwrap returns wrapped decode errors
+//
+// Implements errors.Join() interface.
+func (s *StrictMissingError) Unwrap() []error {
+	var errs []error
+	for i := range s.Errors {
+		errs = append(errs, &s.Errors[i])
+	}
+	return errs
+}
+
 type Key []string
 
 // Error returns the error message contained in the DecodeError.

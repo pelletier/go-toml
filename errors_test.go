@@ -205,6 +205,21 @@ func TestDecodeError_Accessors(t *testing.T) {
 	assert.Equal(t, "bar", e.String())
 }
 
+func TestStrictErrorUnwrap(t *testing.T) {
+	fo := bytes.NewBufferString(`
+Missing = 1
+OtherMissing = 1
+`)
+	var out struct{}
+	err := NewDecoder(fo).DisallowUnknownFields().Decode(&out)
+	assert.Error(t, err)
+
+	strictErr := &StrictMissingError{}
+	assert.True(t, errors.As(err, &strictErr))
+
+	assert.Equal(t, 2, len(strictErr.Unwrap()))
+}
+
 func ExampleDecodeError() {
 	doc := `name = 123__456`
 
