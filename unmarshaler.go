@@ -1034,7 +1034,7 @@ func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error 
 	case reflect.Interface:
 		r = reflect.ValueOf(i)
 	default:
-		return unstable.NewParserError(d.p.Raw(value.Raw), d.typeMismatchString("integer", v.Type()))
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("integer", v.Type()))
 	}
 
 	if !r.Type().AssignableTo(v.Type()) {
@@ -1053,7 +1053,7 @@ func (d *decoder) unmarshalString(value *unstable.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
-		return unstable.NewParserError(d.p.Raw(value.Raw), d.typeMismatchString("string", v.Type()))
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("string", v.Type()))
 	}
 
 	return nil
