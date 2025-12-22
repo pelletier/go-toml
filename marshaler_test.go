@@ -1928,7 +1928,7 @@ port = 4242
 	assert.Equal(t, expected, string(out))
 }
 
-// tests for dynamic comment implementation
+// test dynamic comments
 // dynamicCommenter implements TomlComment() to provide dynamic comments
 type dynamicCommenter struct {
 	Value   string
@@ -2240,6 +2240,112 @@ port = '443'
 			out, err := toml.Marshal(e.v)
 			assert.NoError(t, err)
 			assert.Equal(t, e.expected, string(out))
+		})
+	}
+}
+
+// customTomlMarshaler implements MarshalToml for testing
+type customTomlMarshaler struct {
+	Name  string
+	Value int
+}
+
+func (c customTomlMarshaler) MarshalToml() ([]byte, error) {
+	return []byte("testmarshal"), nil
+}
+
+// errorTomlMarshaler always returns an error
+type errorTomlMarshaler struct{}
+
+func (e errorTomlMarshaler) MarshalToml() ([]byte, error) {
+	return nil, fmt.Errorf("intentional marshal error")
+}
+
+// pointerTomlMarshaler implements MarshalToml with pointer receiver
+type pointerTomlMarshaler struct {
+	Data string `toml:"data"`
+}
+
+func (p *pointerTomlMarshaler) MarshalToml() ([]byte, error) {
+	return []byte(fmt.Sprintf("data = '%s'\n", p.Data)), nil
+}
+
+// TestMarshalTomlInterface tests the MarshalToml interface implementation
+func TestMarshalTomlInterface(t *testing.T) {
+	examples := []struct {
+		desc     string
+		v        interface{}
+		expected string
+		err      bool
+	}{
+		{
+			desc:     "basic MarshalToml implementation",
+			v:        customTomlMarshaler{Name: "test", Value: 42},
+			expected: `testmarshal`,
+		},
+		{
+			desc: "MarshalToml in map",
+			v: map[string]customTomlMarshaler{
+				"custom": {Name: "nested", Value: 100},
+			},
+			expected: `[custom]
+testmarshal`,
+		},
+		{
+			desc: "MarshalToml with error",
+			v:    errorTomlMarshaler{},
+			err:  true,
+		},
+		{
+			desc: "MarshalToml with error in map",
+			v: map[string]interface{}{
+				"field": errorTomlMarshaler{},
+			},
+			err: true,
+		},
+		{
+			desc: "pointer receiver MarshalToml",
+			v:    &pointerTomlMarshaler{Data: "pointer data"},
+			expected: `data = 'pointer data'
+`,
+		},
+		{
+			desc: "pointer receiver MarshalToml in struct",
+			v: struct {
+				Field *pointerTomlMarshaler
+			}{
+				Field: &pointerTomlMarshaler{Data: "nested pointer"},
+			},
+			expected: `[Field]
+data = 'nested pointer'
+`,
+		},
+		{
+			desc: "MarshalToml in slice",
+			v: map[string][]interface{}{
+				"items": {
+					customTomlMarshaler{Name: "item1", Value: 1},
+					customTomlMarshaler{Name: "item2", Value: 2},
+				},
+			},
+			expected: `[[items]]
+testmarshal
+[[items]]
+testmarshal`,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			b, err := toml.Marshal(e.v)
+			if e.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, e.expected, string(b))
 		})
 	}
 }

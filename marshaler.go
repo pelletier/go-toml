@@ -107,6 +107,10 @@ type TomlEncoderComment interface {
 	TomlComment() string
 }
 
+type MarshalToml interface {
+	MarshalToml() ([]byte, error)
+}
+
 // Encode writes a TOML representation of v to the stream.
 //
 // If v cannot be represented to TOML it returns an error.
@@ -262,6 +266,10 @@ func (ctx *encoderCtx) isRoot() bool {
 
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	i := v.Interface()
+
+	// if marshaler, ok := i.(MarshalToml); ok {
+	// 	return marshaler.MarshalToml()
+	// }
 
 	switch x := i.(type) {
 	case time.Time:
@@ -676,10 +684,11 @@ func (enc *Encoder) keyToString(k reflect.Value) (string, error) {
 }
 
 func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	var (
-		t                 table
-		emptyValueOptions valueOptions
-	)
+	var emptyValueOptions valueOptions
+
+	t := table{
+		value: v,
+	}
 
 	iter := v.MapRange()
 	for iter.Next() {
@@ -722,6 +731,11 @@ type entry struct {
 type table struct {
 	kvs    []entry
 	tables []entry
+	value  reflect.Value
+}
+
+func (t *table) setValue(v reflect.Value) {
+	t.value = v
 }
 
 func (t *table) pushKV(k string, v reflect.Value, options valueOptions) {
@@ -791,8 +805,8 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 		}
 
 		comment := fieldType.Tag.Get("comment")
-		if encoder, ok := fieldValue.Interface().(TomlEncoderComment); ok {
-			comment = encoder.TomlComment()
+		if commenter, ok := fieldValue.Interface().(TomlEncoderComment); ok {
+			comment = commenter.TomlComment()
 		}
 
 		options := valueOptions{
@@ -812,7 +826,9 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 }
 
 func (enc *Encoder) encodeStruct(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
-	var t table
+	t := table{
+		value: v,
+	}
 
 	walkStruct(ctx, &t, v)
 
@@ -920,6 +936,12 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	ctx.skipTableHeader = false
 
 	hasNonEmptyKV := false
+
+	// marshal table if value implements marshaltoml interface
+	if marshaler, ok := t.value.Interface().(MarshalToml); ok {
+		return enc.MarshalToml(ctx, b, marshaler)
+	}
+
 	for _, kv := range t.kvs {
 		if shouldOmitEmpty(kv.Options, kv.Value) {
 			continue
@@ -1117,8 +1139,8 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 		}
 
 		comment := ""
-		if encoder, ok := v.Index(i).Interface().(TomlEncoderComment); ok {
-			comment = encoder.TomlComment()
+		if commenter, ok := v.Index(i).Interface().(TomlEncoderComment); ok {
+			comment = commenter.TomlComment()
 		}
 		b = enc.encodeComment(ctx.indent, comment, b)
 
@@ -1178,6 +1200,16 @@ func (enc *Encoder) encodeSliceAsArray(b []byte, ctx encoderCtx, v reflect.Value
 
 	b = append(b, ']')
 
+	return b, nil
+}
+
+func (enc *Encoder) MarshalToml(ctx encoderCtx, b []byte, m MarshalToml) ([]byte, error) {
+	v, err := m.MarshalToml()
+	if err != nil {
+		return b, err
+	}
+
+	b = append(b, v...)
 	return b, nil
 }
 
