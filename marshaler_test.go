@@ -2333,6 +2333,43 @@ testmarshal
 [[items]]
 testmarshal`,
 		},
+		{
+			desc: "MarshalToml in nested structs",
+			v: struct {
+				Outer struct {
+					Inner customTomlMarshaler
+				}
+			}{
+				Outer: struct {
+					Inner customTomlMarshaler
+				}{
+					Inner: customTomlMarshaler{Name: "nested", Value: 99},
+				},
+			},
+			expected: `[Outer]
+[Outer.Inner]
+testmarshal`,
+		},
+		{
+			desc: "MarshalToml with array elements",
+			v: struct {
+				Simple customTomlMarshaler
+				Number int
+				Text   string
+				Array  []string
+			}{
+				Simple: customTomlMarshaler{Name: "simple", Value: 42},
+				Number: 100,
+				Text:   "hello",
+				Array:  []string{"one", "two", "three"},
+			},
+			expected: `Number = 100
+Text = 'hello'
+Array = ['one', 'two', 'three']
+
+[Simple]
+testmarshal`,
+		},
 	}
 
 	for _, e := range examples {
