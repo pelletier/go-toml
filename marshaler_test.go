@@ -2267,7 +2267,7 @@ type pointerTomlMarshaler struct {
 }
 
 func (p *pointerTomlMarshaler) MarshalToml() ([]byte, error) {
-	return []byte(fmt.Sprintf("data = '%s'\n", p.Data)), nil
+	return []byte("testmarshal"), nil
 }
 
 // TestMarshalTomlInterface tests the MarshalToml interface implementation

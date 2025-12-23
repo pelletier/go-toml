@@ -107,6 +107,8 @@ type TomlEncoderComment interface {
 	TomlComment() string
 }
 
+// MarshalToml interface can be implemented by types to write custom marshal functions
+// currently only supported by maps, tables, slice of tables etc
 type MarshalToml interface {
 	MarshalToml() ([]byte, error)
 }
