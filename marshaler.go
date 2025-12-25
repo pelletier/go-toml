@@ -269,10 +269,6 @@ func (ctx *encoderCtx) isRoot() bool {
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	i := v.Interface()
 
-	// if marshaler, ok := i.(MarshalToml); ok {
-	// 	return marshaler.MarshalToml()
-	// }
-
 	switch x := i.(type) {
 	case time.Time:
 		if x.Nanosecond() > 0 {
@@ -342,8 +338,14 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 
 	// values
 	case reflect.String:
+		if marshaler, ok := i.(MarshalToml); ok {
+			return enc.MarshalToml(ctx, b, marshaler)
+		}
 		b = enc.encodeString(b, v.String(), ctx.options)
 	case reflect.Float32:
+		if marshaler, ok := i.(MarshalToml); ok {
+			return enc.MarshalToml(ctx, b, marshaler)
+		}
 		f := v.Float()
 
 		if math.IsNaN(f) {
@@ -358,6 +360,9 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 			b = strconv.AppendFloat(b, f, 'f', -1, 32)
 		}
 	case reflect.Float64:
+		if marshaler, ok := i.(MarshalToml); ok {
+			return enc.MarshalToml(ctx, b, marshaler)
+		}
 		f := v.Float()
 		if math.IsNaN(f) {
 			b = append(b, "nan"...)
@@ -371,18 +376,27 @@ func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, e
 			b = strconv.AppendFloat(b, f, 'f', -1, 64)
 		}
 	case reflect.Bool:
+		if marshaler, ok := i.(MarshalToml); ok {
+			return enc.MarshalToml(ctx, b, marshaler)
+		}
 		if v.Bool() {
 			b = append(b, "true"...)
 		} else {
 			b = append(b, "false"...)
 		}
 	case reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8, reflect.Uint:
+		if marshaler, ok := i.(MarshalToml); ok {
+			return enc.MarshalToml(ctx, b, marshaler)
+		}
 		x := v.Uint()
 		if x > uint64(math.MaxInt64) {
 			return nil, fmt.Errorf("toml: not encoding uint (%d) greater than max int64 (%d)", x, int64(math.MaxInt64))
 		}
 		b = strconv.AppendUint(b, x, 10)
 	case reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Int:
+		if marshaler, ok := i.(MarshalToml); ok {
+			return enc.MarshalToml(ctx, b, marshaler)
+		}
 		b = strconv.AppendInt(b, v.Int(), 10)
 	default:
 		return nil, fmt.Errorf("toml: cannot encode value of type %s", v.Kind())
