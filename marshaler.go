@@ -821,8 +821,10 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 		}
 
 		comment := fieldType.Tag.Get("comment")
-		if commenter, ok := fieldValue.Interface().(TOMLEncoderComment); ok {
-			comment = commenter.TOMLComment()
+		if fieldValue.CanInterface() {
+			if commenter, ok := fieldValue.Interface().(TOMLEncoderComment); ok {
+				comment = commenter.TOMLComment()
+			}
 		}
 
 		options := valueOptions{
@@ -954,8 +956,10 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 	hasNonEmptyKV := false
 
 	// marshal table if value implements marshaltoml interface
-	if marshaler, ok := t.value.Interface().(MarshalTOML); ok {
-		return enc.MarshalTOML(ctx, b, marshaler)
+	if t.value.CanInterface() {
+		if marshaler, ok := t.value.Interface().(MarshalTOML); ok {
+			return enc.MarshalTOML(ctx, b, marshaler)
+		}
 	}
 
 	for _, kv := range t.kvs {
