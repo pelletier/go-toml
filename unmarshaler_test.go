@@ -3184,7 +3184,17 @@ world'`,
 		{
 			desc: "invalid seconds value",
 			data: `a=1979-05-27T12:45:99`,
-			msg:  `seconds cannot be greater 60`,
+			msg:  `seconds cannot be greater than 59`,
+		},
+		{
+			desc: "leap second not supported",
+			data: `a=1979-05-27T12:45:60`,
+			msg:  `seconds cannot be greater than 59`,
+		},
+		{
+			desc: "leap second with max date causes overflow",
+			data: `s=9999-12-31 23:59:60z`,
+			msg:  `seconds cannot be greater than 59`,
 		},
 		{
 			desc: `binary with invalid digit`,
