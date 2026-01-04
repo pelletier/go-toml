@@ -390,7 +390,28 @@ func shouldOmitEmpty(options valueOptions, v reflect.Value) bool {
 }
 
 func shouldOmitZero(options valueOptions, v reflect.Value) bool {
-	return options.omitzero && v.IsZero()
+	if !options.omitzero {
+		return false
+	}
+
+	// Check if the type implements isZeroer interface (has a custom IsZero method).
+	if v.Type().Implements(isZeroerType) {
+		return v.Interface().(isZeroer).IsZero()
+	}
+
+	// Check if pointer type implements isZeroer.
+	if reflect.PointerTo(v.Type()).Implements(isZeroerType) {
+		if v.CanAddr() {
+			return v.Addr().Interface().(isZeroer).IsZero()
+		}
+		// Create a temporary addressable copy to call the pointer receiver method.
+		pv := reflect.New(v.Type())
+		pv.Elem().Set(v)
+		return pv.Interface().(isZeroer).IsZero()
+	}
+
+	// Fall back to reflect's IsZero for types without custom IsZero method.
+	return v.IsZero()
 }
 
 func (enc *Encoder) encodeKv(b []byte, ctx encoderCtx, options valueOptions, v reflect.Value) ([]byte, error) {

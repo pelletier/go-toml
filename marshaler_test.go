@@ -1195,6 +1195,286 @@ IP = '192.168.178.35'
 	assert.Equal(t, expected, string(b))
 }
 
+// customZeroType has a custom IsZero method that returns true
+// when Value is less than 10.
+type customZeroType struct {
+	Value int
+}
+
+func (c customZeroType) IsZero() bool {
+	return c.Value < 10
+}
+
+// customZeroPointerType has a custom IsZero method on the pointer receiver.
+type customZeroPointerType struct {
+	Value int
+}
+
+func (c *customZeroPointerType) IsZero() bool {
+	return c.Value < 10
+}
+
+func TestEncoderOmitzeroCustomIsZero(t *testing.T) {
+	type doc struct {
+		Custom customZeroType `toml:",omitzero"`
+		Normal int            `toml:",omitzero"`
+	}
+
+	// Custom.Value = 5, which is < 10, so custom IsZero returns true
+	d := doc{
+		Custom: customZeroType{Value: 5},
+		Normal: 0,
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Both fields should be omitted: Custom because custom IsZero returns true,
+	// Normal because its reflect zero value is true.
+	expected := ``
+
+	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitzeroCustomIsZeroNotZero(t *testing.T) {
+	type doc struct {
+		Custom customZeroType `toml:",omitzero"`
+		Normal int            `toml:",omitzero"`
+	}
+
+	// Custom.Value = 15, which is >= 10, so custom IsZero returns false
+	d := doc{
+		Custom: customZeroType{Value: 15},
+		Normal: 42,
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Both fields should be present
+	expected := `Normal = 42
+
+[Custom]
+Value = 15
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitzeroCustomIsZeroPointerReceiver(t *testing.T) {
+	type doc struct {
+		Custom customZeroPointerType `toml:",omitzero"`
+	}
+
+	// Custom.Value = 5, which is < 10, so custom IsZero returns true
+	d := doc{
+		Custom: customZeroPointerType{Value: 5},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Field should be omitted because custom IsZero returns true
+	expected := ``
+
+	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitzeroCustomIsZeroPointerReceiverNotZero(t *testing.T) {
+	type doc struct {
+		Custom customZeroPointerType `toml:",omitzero"`
+	}
+
+	// Custom.Value = 15, which is >= 10, so custom IsZero returns false
+	d := doc{
+		Custom: customZeroPointerType{Value: 15},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Field should be present
+	expected := `[Custom]
+Value = 15
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+// TestEncoderOmitzeroCustomIsZeroPointerReceiverAddressable tests the v.CanAddr() path
+// by marshaling a pointer to a struct, which makes fields addressable.
+func TestEncoderOmitzeroCustomIsZeroPointerReceiverAddressable(t *testing.T) {
+	type doc struct {
+		Custom customZeroPointerType `toml:",omitzero"`
+	}
+
+	// Custom.Value = 5, which is < 10, so custom IsZero returns true
+	d := &doc{
+		Custom: customZeroPointerType{Value: 5},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Field should be omitted because custom IsZero returns true
+	expected := ``
+
+	assert.Equal(t, expected, string(b))
+}
+
+// TestEncoderOmitzeroCustomIsZeroPointerReceiverAddressableNotZero tests the v.CanAddr() path
+// when custom IsZero returns false.
+func TestEncoderOmitzeroCustomIsZeroPointerReceiverAddressableNotZero(t *testing.T) {
+	type doc struct {
+		Custom customZeroPointerType `toml:",omitzero"`
+	}
+
+	// Custom.Value = 15, which is >= 10, so custom IsZero returns false
+	d := &doc{
+		Custom: customZeroPointerType{Value: 15},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Field should be present
+	expected := `[Custom]
+Value = 15
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+// TestEncoderOmitzeroCustomIsZeroInlineTable tests omitzero with inline tables.
+func TestEncoderOmitzeroCustomIsZeroInlineTable(t *testing.T) {
+	type doc struct {
+		Custom customZeroType `toml:",omitzero,inline"`
+	}
+
+	// Custom.Value = 5, which is < 10, so custom IsZero returns true
+	d := doc{
+		Custom: customZeroType{Value: 5},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Field should be omitted
+	expected := ``
+
+	assert.Equal(t, expected, string(b))
+}
+
+// TestEncoderOmitzeroCustomIsZeroInlineTableNotZero tests omitzero with inline tables when not zero.
+func TestEncoderOmitzeroCustomIsZeroInlineTableNotZero(t *testing.T) {
+	type doc struct {
+		Custom customZeroType `toml:",omitzero,inline"`
+	}
+
+	// Custom.Value = 15, which is >= 10, so custom IsZero returns false
+	d := doc{
+		Custom: customZeroType{Value: 15},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Field should be present as inline table
+	expected := `Custom = {Value = 15}
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+// TestEncoderOmitzeroCustomIsZeroMixedTypes tests omitzero with a mix of custom and regular types.
+func TestEncoderOmitzeroCustomIsZeroMixedTypes(t *testing.T) {
+	type doc struct {
+		Custom  customZeroType `toml:",omitzero"`
+		Regular int            `toml:",omitzero"`
+		NoOmit  customZeroType `toml:""`
+		Pointer *int           `toml:",omitzero"`
+	}
+
+	d := doc{
+		Custom:  customZeroType{Value: 5}, // IsZero returns true
+		Regular: 0,                        // zero value
+		NoOmit:  customZeroType{Value: 5}, // not omitted (no omitzero tag)
+		Pointer: nil,                      // nil pointer
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Custom is omitted (custom IsZero true), Regular is omitted (zero value),
+	// NoOmit is present (no omitzero tag), Pointer is omitted (nil)
+	expected := `[NoOmit]
+Value = 5
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
+// TestEncoderOmitzeroCustomIsZeroSlice tests omitzero with slices containing custom types.
+func TestEncoderOmitzeroCustomIsZeroSlice(t *testing.T) {
+	type doc struct {
+		Items []customZeroType `toml:",omitzero"`
+	}
+
+	// Nil slice should be omitted (IsZero returns true for nil slices)
+	d := doc{
+		Items: nil,
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	expected := ``
+
+	assert.Equal(t, expected, string(b))
+
+	// Empty but non-nil slice is NOT zero, so it's included
+	d2 := doc{
+		Items: []customZeroType{},
+	}
+
+	b2, err := toml.Marshal(d2)
+	assert.NoError(t, err)
+
+	expected2 := `Items = []
+`
+
+	assert.Equal(t, expected2, string(b2))
+}
+
+// TestEncoderOmitzeroCustomIsZeroNestedStruct tests omitzero with nested structs.
+func TestEncoderOmitzeroCustomIsZeroNestedStruct(t *testing.T) {
+	type inner struct {
+		Custom customZeroType `toml:",omitzero"`
+		Value  int            `toml:",omitzero"`
+	}
+	type doc struct {
+		Inner inner `toml:",omitzero"`
+	}
+
+	// Inner struct has all zero fields, but the struct itself is not zero
+	// (reflect.Value.IsZero checks if all fields are zero)
+	d := doc{
+		Inner: inner{
+			Custom: customZeroType{Value: 5}, // custom IsZero returns true
+			Value:  0,                        // zero value
+		},
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+
+	// Inner is present but its fields are omitted
+	expected := `[Inner]
+`
+
+	assert.Equal(t, expected, string(b))
+}
+
 func TestEncoderTagFieldName(t *testing.T) {
 	type doc struct {
 		String string `toml:"hello"`
