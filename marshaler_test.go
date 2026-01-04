@@ -1214,6 +1214,30 @@ Bad = ''
 	assert.Equal(t, expected, string(b))
 }
 
+func TestEncoderSetFieldTag(t *testing.T) {
+	type fieldTagTestType struct {
+		Hellllooo     string `json:"hello"`
+		Nnnummbbeerrr int    `json:"number"`
+	}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc = enc.SetFieldTag("json")
+
+	input := fieldTagTestType{
+		Hellllooo:     "hi",
+		Nnnummbbeerrr: 1,
+	}
+	err := enc.Encode(input)
+	require.NoError(t, err)
+
+	expValue := `hello = 'hi'
+number = 1
+`
+
+	require.Equal(t, expValue, buf.String())
+}
+
 func TestIssue436(t *testing.T) {
 	data := []byte(`{"a": [ { "b": { "c": "d" } } ]}`)
 

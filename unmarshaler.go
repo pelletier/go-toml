@@ -21,7 +21,7 @@ import (
 //
 // It is a shortcut for Decoder.Decode() with the default options.
 func Unmarshal(data []byte, v interface{}) error {
-	d := decoder{}
+	d := decoder{fieldTag: tomlFieldTag}
 	d.p.Reset(data)
 	return d.FromParser(v)
 }
@@ -36,11 +36,14 @@ type Decoder struct {
 
 	// toggles unmarshaler interface
 	unmarshalerInterface bool
+
+	// fieldTag is the tag name used to decode struct fields.
+	fieldTag string
 }
 
 // NewDecoder creates a new Decoder that will read from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r: r}
+	return &Decoder{r: r, fieldTag: tomlFieldTag}
 }
 
 // DisallowUnknownFields causes the Decoder to return an error when the
@@ -70,6 +73,11 @@ func (d *Decoder) DisallowUnknownFields() *Decoder {
 // issued.
 func (d *Decoder) EnableUnmarshalerInterface() *Decoder {
 	d.unmarshalerInterface = true
+	return d
+}
+
+func (d *Decoder) SetFieldTag(fieldTag string) *Decoder {
+	d.fieldTag = fieldTag
 	return d
 }
 
@@ -125,6 +133,7 @@ func (d *Decoder) Decode(v interface{}) error {
 			Enabled: d.strict,
 		},
 		unmarshalerInterface: d.unmarshalerInterface,
+		fieldTag:             d.fieldTag,
 	}
 	dec.p.Reset(b)
 
@@ -166,6 +175,9 @@ type decoder struct {
 
 	// Current context for the error.
 	errorContext *errorContext
+
+	// fieldTag is the tag name used to decode struct fields.
+	fieldTag string
 }
 
 type errorContext struct {
@@ -536,7 +548,7 @@ func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn h
 			v.SetMapIndex(mk, mv)
 		}
 	case reflect.Struct:
-		path, found := structFieldPath(v, string(key.Node().Data))
+		path, found := d.structFieldPath(v, string(key.Node().Data))
 		if !found {
 			d.skipUntilTable = true
 			return reflect.Value{}, nil
@@ -1176,7 +1188,7 @@ func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node
 			v.SetMapIndex(mk, mv)
 		}
 	case reflect.Struct:
-		path, found := structFieldPath(v, string(key.Node().Data))
+		path, found := d.structFieldPath(v, string(key.Node().Data))
 		if !found {
 			// If no matching struct field is found but the target implements the
 			// unstable.Unmarshaler interface (and it is enabled), delegate the
@@ -1296,7 +1308,7 @@ type fieldPathsMap = map[string][]int
 
 var globalFieldPathsCache atomic.Value // map[danger.TypeID]fieldPathsMap
 
-func structFieldPath(v reflect.Value, name string) ([]int, bool) {
+func (d *decoder) structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	t := v.Type()
 
 	cache, _ := globalFieldPathsCache.Load().(map[danger.TypeID]fieldPathsMap)
@@ -1305,7 +1317,7 @@ func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	if !ok {
 		fieldPaths = map[string][]int{}
 
-		forEachField(t, nil, func(name string, path []int) {
+		d.forEachField(t, nil, func(name string, path []int) {
 			fieldPaths[name] = path
 			// extra copy for the case-insensitive match
 			fieldPaths[strings.ToLower(name)] = path
@@ -1326,7 +1338,7 @@ func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	return path, ok
 }
 
-func forEachField(t reflect.Type, path []int, do func(name string, path []int)) {
+func (d *decoder) forEachField(t reflect.Type, path []int, do func(name string, path []int)) {
 	n := t.NumField()
 	for i := 0; i < n; i++ {
 		f := t.Field(i)
@@ -1339,7 +1351,7 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 		fieldPath := append(path, i)
 		fieldPath = fieldPath[:len(fieldPath):len(fieldPath)]
 
-		name := f.Tag.Get("toml")
+		name := f.Tag.Get(d.fieldTag)
 		if name == "-" {
 			continue
 		}
@@ -1355,7 +1367,7 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 			}
 
 			if t2.Kind() == reflect.Struct {
-				forEachField(t2, fieldPath, do)
+				d.forEachField(t2, fieldPath, do)
 			}
 			continue
 		}

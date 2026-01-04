@@ -111,6 +111,21 @@ func TestDecodeReaderError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestDecoderSetFieldTag(t *testing.T) {
+	type fieldTagTestType struct {
+		A string `json:"aaa"`
+		B string `json:"bbb"`
+	}
+
+	d := toml.NewDecoder(strings.NewReader("aaa = \"foo\"\nbbb = \"bar\""))
+	d.SetFieldTag("json")
+	var output fieldTagTestType
+	err := d.Decode(&output)
+	require.NoError(t, err)
+	assert.Equal(t, "foo", output.A)
+	assert.Equal(t, "bar", output.B)
+}
+
 // nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	examples := []struct {
