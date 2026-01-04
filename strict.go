@@ -1,7 +1,6 @@
 package toml
 
 import (
-	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 	"github.com/pelletier/go-toml/v2/unstable"
 )
@@ -103,5 +102,5 @@ func keyLocation(node *unstable.Node) []byte {
 		end = k.Node().Data
 	}
 
-	return danger.BytesRange(start, end)
+	return start[:cap(start)-cap(end)+len(end)]
 }

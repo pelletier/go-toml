@@ -2,9 +2,6 @@ package unstable
 
 import (
 	"fmt"
-	"unsafe"
-
-	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 // Iterator over a sequence of nodes.
@@ -37,7 +34,7 @@ func (c *Iterator) Next() bool {
 // IsLast returns true if the current node of the iterator is the last
 // one.  Subsequent calls to Next() will return false.
 func (c *Iterator) IsLast() bool {
-	return c.node.next == 0
+	return c.node.next == nil
 }
 
 // Node returns a pointer to the node pointed at by the iterator.
@@ -65,11 +62,9 @@ type Node struct {
 	Raw  Range  // Raw bytes from the input.
 	Data []byte // Node value (either allocated or referencing the input).
 
-	// References to other nodes, as offsets in the backing array
-	// from this node. References can go backward, so those can be
-	// negative.
-	next  int // 0 if last element
-	child int // 0 if no child
+	// References to other nodes.
+	next  *Node // nil if last element
+	child *Node // nil if no child
 }
 
 // Range of bytes in the document.
@@ -80,24 +75,14 @@ type Range struct {
 
 // Next returns a pointer to the next node, or nil if there is no next node.
 func (n *Node) Next() *Node {
-	if n.next == 0 {
-		return nil
-	}
-	ptr := unsafe.Pointer(n)
-	size := unsafe.Sizeof(Node{})
-	return (*Node)(danger.Stride(ptr, size, n.next))
+	return n.next
 }
 
 // Child returns a pointer to the first child node of this node. Other children
 // can be accessed calling Next on the first child.  Returns nil if this Node
 // has no child.
 func (n *Node) Child() *Node {
-	if n.child == 0 {
-		return nil
-	}
-	ptr := unsafe.Pointer(n)
-	size := unsafe.Sizeof(Node{})
-	return (*Node)(danger.Stride(ptr, size, n.child))
+	return n.child
 }
 
 // Valid returns true if the node's kind is set (not to Invalid).

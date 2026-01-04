@@ -1,8 +1,8 @@
 package tracker
 
 import (
+	"reflect"
 	"testing"
-	"unsafe"
 
 	"github.com/pelletier/go-toml/v2/internal/assert"
 )
@@ -13,8 +13,8 @@ func TestEntrySize(t *testing.T) {
 	// and a very good reason.
 	maxExpectedEntrySize := 48
 	assert.True(t,
-		int(unsafe.Sizeof(entry{})) <= maxExpectedEntrySize,
+		int(reflect.TypeOf(entry{}).Size()) <= maxExpectedEntrySize,
 		"Expected entry to be less than or equal to %d, got: %d",
-		maxExpectedEntrySize, int(unsafe.Sizeof(entry{})),
+		maxExpectedEntrySize, int(reflect.TypeOf(entry{}).Size()),
 	)
 }

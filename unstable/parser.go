@@ -6,7 +6,6 @@ import (
 	"unicode"
 
 	"github.com/pelletier/go-toml/v2/internal/characters"
-	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 // ParserError describes an error relative to the content of the document.
@@ -70,7 +69,7 @@ func (p *Parser) Data() []byte {
 // panics.
 func (p *Parser) Range(b []byte) Range {
 	return Range{
-		Offset: uint32(danger.SubsliceOffset(p.data, b)),
+		Offset: uint32(cap(p.data) - cap(b)),
 		Length: uint32(len(b)),
 	}
 }
@@ -126,6 +125,7 @@ func (p *Parser) NextExpression() bool {
 		p.first = false
 
 		if p.ref.Valid() {
+			p.builder.Link()
 			return true
 		}
 	}
@@ -159,7 +159,7 @@ type Shape struct {
 }
 
 func (p *Parser) position(b []byte) Position {
-	offset := danger.SubsliceOffset(p.data, b)
+	offset := cap(p.data) - cap(b)
 
 	lead := p.data[:offset]
 
