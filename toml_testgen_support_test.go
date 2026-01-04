@@ -1,5 +1,5 @@
-//go:generate go run github.com/toml-lang/toml-test/cmd/toml-test@master -copy ./tests
-//go:generate go run ./cmd/tomltestgen/main.go -o toml_testgen_test.go
+//go:generate go run github.com/toml-lang/toml-test/cmd/toml-test@v1.6.0 -copy ./tests
+//go:generate go run ./cmd/tomltestgen/main.go -r v1.6.0 -o toml_testgen_test.go
 
 // This is a support file for toml_testgen_test.go
 package toml_test
