@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 	"github.com/pelletier/go-toml/v2/unstable"
 )
@@ -123,6 +122,7 @@ func (d *Decoder) Decode(v interface{}) error {
 	dec := decoder{
 		strict: strict{
 			Enabled: d.strict,
+			doc:     b,
 		},
 		unmarshalerInterface: d.unmarshalerInterface,
 	}
@@ -1300,13 +1300,13 @@ func fieldByIndex(v reflect.Value, path []int) reflect.Value {
 
 type fieldPathsMap = map[string][]int
 
-var globalFieldPathsCache atomic.Value // map[danger.TypeID]fieldPathsMap
+var globalFieldPathsCache atomic.Value // map[reflect.Type]fieldPathsMap
 
 func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	t := v.Type()
 
-	cache, _ := globalFieldPathsCache.Load().(map[danger.TypeID]fieldPathsMap)
-	fieldPaths, ok := cache[danger.MakeTypeID(t)]
+	cache, _ := globalFieldPathsCache.Load().(map[reflect.Type]fieldPathsMap)
+	fieldPaths, ok := cache[t]
 
 	if !ok {
 		fieldPaths = map[string][]int{}
@@ -1317,8 +1317,8 @@ func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 			fieldPaths[strings.ToLower(name)] = path
 		})
 
-		newCache := make(map[danger.TypeID]fieldPathsMap, len(cache)+1)
-		newCache[danger.MakeTypeID(t)] = fieldPaths
+		newCache := make(map[reflect.Type]fieldPathsMap, len(cache)+1)
+		newCache[t] = fieldPaths
 		for k, v := range cache {
 			newCache[k] = v
 		}
