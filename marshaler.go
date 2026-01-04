@@ -90,13 +90,6 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 	return enc
 }
 
-// SetMarshalJsonNumbers forces the encoder to serialize `json.Number` as a
-// float or integer instead of relying on TextMarshaler to emit a string.
-// Deprecated: use SetMarshalJSONNumbers instead.
-func (enc *Encoder) SetMarshalJsonNumbers(indent bool) *Encoder { //revive:disable:var-naming
-	return enc.SetMarshalJSONNumbers(indent)
-}
-
 // SetMarshalJSONNumbers forces the encoder to serialize `json.Number` as a
 // float or integer instead of relying on TextMarshaler to emit a string.
 //
