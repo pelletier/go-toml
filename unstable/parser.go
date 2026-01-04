@@ -125,7 +125,6 @@ func (p *Parser) NextExpression() bool {
 		p.first = false
 
 		if p.ref.Valid() {
-			p.builder.Link()
 			return true
 		}
 	}

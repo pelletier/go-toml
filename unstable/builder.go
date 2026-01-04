@@ -4,88 +4,118 @@ package unstable
 //
 // It is immutable once constructed with Builder.
 type root struct {
-	nodes []Node
+	first *Node
 }
 
 // Iterator over the top level nodes.
 func (r *root) Iterator() Iterator {
-	it := Iterator{}
-	if len(r.nodes) > 0 {
-		it.node = &r.nodes[0]
-	}
-	return it
+	return Iterator{node: r.first}
 }
 
-func (r *root) at(idx reference) *Node {
-	return &r.nodes[idx]
+type reference struct {
+	*Node
 }
 
-type reference int
-
-const invalidReference reference = -1
+var invalidReference = reference{}
 
 func (r reference) Valid() bool {
-	return r != invalidReference
+	return r.Node != nil
 }
 
 type builder struct {
-	tree         root
-	lastIdx      int
-	nextOffsets  []int
-	childOffsets []int
+	// chunks of nodes. Pointers to nodes are stable because we only append
+	// to the last chunk, and chunks are allocated with fixed capacity.
+	chunks [][]Node
+	// current chunk index
+	chunkIdx int
+
+	// root node of the tree
+	root root
+
+	// last pushed node (for chaining)
+	last *Node
 }
 
+const initialChunkSize = 16
+const maxChunkSize = 2048
+
 func (b *builder) Tree() *root {
-	return &b.tree
+	return &b.root
 }
 
 func (b *builder) NodeAt(ref reference) *Node {
-	return b.tree.at(ref)
+	return ref.Node
 }
 
 func (b *builder) Reset() {
-	b.tree.nodes = b.tree.nodes[:0]
-	b.nextOffsets = b.nextOffsets[:0]
-	b.childOffsets = b.childOffsets[:0]
-	b.lastIdx = 0
+	b.chunkIdx = 0
+	for i := range b.chunks {
+		b.chunks[i] = b.chunks[i][:0]
+	}
+	b.root.first = nil
+	b.last = nil
+}
+
+func (b *builder) ensureCapacity() {
+	if b.chunkIdx >= len(b.chunks) {
+		size := initialChunkSize
+		if len(b.chunks) > 0 {
+			lastCap := cap(b.chunks[len(b.chunks)-1])
+			size = lastCap * 2
+			if size > maxChunkSize {
+				size = maxChunkSize
+			}
+		}
+		b.chunks = append(b.chunks, make([]Node, 0, size))
+	}
+	if len(b.chunks[b.chunkIdx]) == cap(b.chunks[b.chunkIdx]) {
+		b.chunkIdx++
+		if b.chunkIdx >= len(b.chunks) {
+			size := initialChunkSize
+			if len(b.chunks) > 0 {
+				lastCap := cap(b.chunks[len(b.chunks)-1])
+				size = lastCap * 2
+				if size > maxChunkSize {
+					size = maxChunkSize
+				}
+			}
+			b.chunks = append(b.chunks, make([]Node, 0, size))
+		}
+	}
+}
+
+func (b *builder) push(n Node) *Node {
+	b.ensureCapacity()
+	chunk := &b.chunks[b.chunkIdx]
+	*chunk = append(*chunk, n)
+	return &(*chunk)[len(*chunk)-1]
 }
 
 func (b *builder) Push(n Node) reference {
-	b.lastIdx = len(b.tree.nodes)
-	b.tree.nodes = append(b.tree.nodes, n)
-	b.nextOffsets = append(b.nextOffsets, 0)
-	b.childOffsets = append(b.childOffsets, 0)
-	return reference(b.lastIdx)
+	ptr := b.push(n)
+	if b.root.first == nil {
+		b.root.first = ptr
+	}
+	b.last = ptr
+	return reference{ptr}
 }
 
 func (b *builder) PushAndChain(n Node) reference {
-	newIdx := len(b.tree.nodes)
-	b.tree.nodes = append(b.tree.nodes, n)
-	b.nextOffsets = append(b.nextOffsets, 0)
-	b.childOffsets = append(b.childOffsets, 0)
-
-	if b.lastIdx >= 0 {
-		b.nextOffsets[b.lastIdx] = newIdx - b.lastIdx
+	ptr := b.push(n)
+	if b.root.first == nil {
+		b.root.first = ptr
 	}
-	b.lastIdx = newIdx
-	return reference(b.lastIdx)
+	if b.last != nil {
+		b.last.next = ptr
+	}
+	b.last = ptr
+	return reference{ptr}
 }
 
 func (b *builder) AttachChild(parent reference, child reference) {
-	b.childOffsets[parent] = int(child) - int(parent)
+	parent.child = child.Node
 }
 
 func (b *builder) Chain(from reference, to reference) {
-	b.nextOffsets[from] = int(to) - int(from)
-}
-
-func (b *builder) Link() {
-	for i := range b.tree.nodes {
-		if next := b.nextOffsets[i]; next != 0 {
-			b.tree.nodes[i].next = &b.tree.nodes[i+next]
-		}
-		if child := b.childOffsets[i]; child != 0 {
-			b.tree.nodes[i].child = &b.tree.nodes[i+child]
-		}
-	}
+	from.next = to.Node
 }

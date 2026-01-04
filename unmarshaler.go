@@ -1293,13 +1293,22 @@ func fieldByIndex(v reflect.Value, path []int) reflect.Value {
 
 type fieldPathsMap = map[string][]int
 
-var globalFieldPathsCache atomic.Value // map[reflect.Type]fieldPathsMap
+var globalFieldPathsCache atomic.Value // map[uintptr]fieldPathsMap
 
 func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	t := v.Type()
+	// reflect.Type is an interface. We want to use the address of the underlying
+	// rtype as the key.
+	// This avoids using the interface as map key, which is slower.
+	//
+	// In the future this should be replaced by t.Pointer() if it becomes available.
+	//
+	// v.Type() returns a reflect.Type interface.
+	// reflect.ValueOf(t).Pointer() returns the address of the rtype.
+	tid := reflect.ValueOf(t).Pointer()
 
-	cache, _ := globalFieldPathsCache.Load().(map[reflect.Type]fieldPathsMap)
-	fieldPaths, ok := cache[t]
+	cache, _ := globalFieldPathsCache.Load().(map[uintptr]fieldPathsMap)
+	fieldPaths, ok := cache[tid]
 
 	if !ok {
 		fieldPaths = map[string][]int{}
@@ -1310,8 +1319,8 @@ func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 			fieldPaths[strings.ToLower(name)] = path
 		})
 
-		newCache := make(map[reflect.Type]fieldPathsMap, len(cache)+1)
-		newCache[t] = fieldPaths
+		newCache := make(map[uintptr]fieldPathsMap, len(cache)+1)
+		newCache[tid] = fieldPaths
 		for k, v := range cache {
 			newCache[k] = v
 		}
