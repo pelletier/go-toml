@@ -11,9 +11,7 @@ import (
 	"github.com/pelletier/go-toml/v2/unstable"
 )
 
-//nolint:funlen
 func TestDecodeError(t *testing.T) {
-
 	examples := []struct {
 		desc     string
 		doc      [3]string
@@ -161,13 +159,12 @@ line 5`,
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-
 			b := bytes.Buffer{}
-			b.Write([]byte(e.doc[0]))
+			b.WriteString(e.doc[0])
 			start := b.Len()
-			b.Write([]byte(e.doc[1]))
+			b.WriteString(e.doc[1])
 			end := b.Len()
-			b.Write([]byte(e.doc[2]))
+			b.WriteString(e.doc[2])
 			doc := b.Bytes()
 			hl := doc[start:end]
 
@@ -189,7 +186,6 @@ line 5`,
 }
 
 func TestDecodeError_Accessors(t *testing.T) {
-
 	e := DecodeError{
 		message: "foo",
 		line:    1,

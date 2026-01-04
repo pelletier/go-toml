@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-// typeID is used as key in encoder and decoder caches to enable using
+// TypeID is used as key in encoder and decoder caches to enable using
 // the optimize runtime.mapaccess2_fast64 function instead of the more
 // expensive lookup if we were to use reflect.Type as map key.
 //
@@ -19,5 +19,5 @@ func MakeTypeID(t reflect.Type) TypeID {
 	// reflect.Type has the fields:
 	// typ unsafe.Pointer
 	// ptr unsafe.Pointer
-	return TypeID((*[2]unsafe.Pointer)(unsafe.Pointer(&t))[1])
+	return TypeID((*[2]unsafe.Pointer)(unsafe.Pointer(&t))[1]) // #nosec G103
 }

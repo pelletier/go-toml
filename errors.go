@@ -58,13 +58,14 @@ func (s *StrictMissingError) String() string {
 //
 // Implements errors.Join() interface.
 func (s *StrictMissingError) Unwrap() []error {
-	var errs []error
+	errs := make([]error, 0, len(s.Errors))
 	for i := range s.Errors {
 		errs = append(errs, &s.Errors[i])
 	}
 	return errs
 }
 
+// Key is a slice of strings that represents a path to a value in a TOML document.
 type Key []string
 
 // Error returns the error message contained in the DecodeError.
@@ -92,12 +93,10 @@ func (e *DecodeError) Key() Key {
 // wrapDecodeError creates a DecodeError referencing a highlighted
 // range of bytes from document.
 //
-// highlight needs to be a sub-slice of document, or this function panics.
+// Highlight needs to be a sub-slice of document, or this function panics.
 //
 // The function copies all bytes used in DecodeError, so that document and
 // highlight can be freely deallocated.
-//
-//nolint:funlen
 func wrapDecodeError(document []byte, de *unstable.ParserError) *DecodeError {
 	offset := danger.SubsliceOffset(document, de.Highlight)
 
@@ -259,5 +258,5 @@ func positionAtEnd(b []byte) (row int, column int) {
 		}
 	}
 
-	return
+	return row, column
 }

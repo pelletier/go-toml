@@ -70,8 +70,8 @@ func (p *Parser) Data() []byte {
 // panics.
 func (p *Parser) Range(b []byte) Range {
 	return Range{
-		Offset: uint32(danger.SubsliceOffset(p.data, b)),
-		Length: uint32(len(b)),
+		Offset: uint32(danger.SubsliceOffset(p.data, b)), // #nosec G115
+		Length: uint32(len(b)),                           // #nosec G115
 	}
 }
 
@@ -351,7 +351,6 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	return ref, b, err
 }
 
-//nolint:cyclop,funlen
 func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 	ref := invalidReference
@@ -509,7 +508,6 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-//nolint:funlen,cyclop
 func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
@@ -542,7 +540,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 
 	var err error
 	for len(b) > 0 {
-		cref := invalidReference
+		var cref reference
 		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
@@ -611,12 +609,13 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []b
 	latestCommentRef := invalidReference
 
 	addComment := func(ref reference) {
-		if rootCommentRef == invalidReference {
+		switch {
+		case rootCommentRef == invalidReference:
 			rootCommentRef = ref
-		} else if latestCommentRef == invalidReference {
+		case latestCommentRef == invalidReference:
 			p.builder.AttachChild(rootCommentRef, ref)
 			latestCommentRef = ref
-		} else {
+		default:
 			p.builder.Chain(latestCommentRef, ref)
 			latestCommentRef = ref
 		}
@@ -672,7 +671,6 @@ func (p *Parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, 
 	return token, token[i : len(token)-3], rest, err
 }
 
-//nolint:funlen,gocognit,cyclop
 func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
@@ -704,11 +702,11 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 
 	if !escaped {
 		str := token[startIdx:endIdx]
-		verr := characters.Utf8TomlValidAlreadyEscaped(str)
-		if verr.Zero() {
+		highlight := characters.Utf8TomlValidAlreadyEscaped(str)
+		if len(highlight) == 0 {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, NewParserError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, nil, NewParserError(highlight, "invalid UTF-8")
 	}
 
 	var builder bytes.Buffer
@@ -718,7 +716,6 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	for i < len(token)-3 {
 		c := token[i]
 
-		//nolint:nestif
 		if c == '\\' {
 			// When the last non-whitespace character on a line is an unescaped \,
 			// it will be trimmed along with all whitespace (including newlines) up
@@ -744,7 +741,7 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 				i += j
 				for ; i < len(token)-3; i++ {
 					c := token[i]
-					if !(c == '\n' || c == '\r' || c == ' ' || c == '\t') {
+					if c != '\n' && c != '\r' && c != ' ' && c != '\t' {
 						i--
 						break
 					}
@@ -868,7 +865,6 @@ func (p *Parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 	}
 }
 
-//nolint:funlen,cyclop
 func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
@@ -897,11 +893,11 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// validate the string and return a direct reference to the buffer.
 	if !escaped {
 		str := token[startIdx:endIdx]
-		verr := characters.Utf8TomlValidAlreadyEscaped(str)
-		if verr.Zero() {
+		highlight := characters.Utf8TomlValidAlreadyEscaped(str)
+		if len(highlight) == 0 {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, NewParserError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, nil, NewParserError(highlight, "invalid UTF-8")
 	}
 
 	i := startIdx
@@ -972,7 +968,7 @@ func hexToRune(b []byte, length int) (rune, error) {
 
 	var r uint32
 	for i, c := range b {
-		d := uint32(0)
+		var d uint32
 		switch {
 		case '0' <= c && c <= '9':
 			d = uint32(c - '0')
@@ -1002,7 +998,6 @@ func (p *Parser) parseWhitespace(b []byte) []byte {
 	return rest
 }
 
-//nolint:cyclop
 func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) {
 	switch b[0] {
 	case 'i':
@@ -1118,7 +1113,6 @@ byteLoop:
 	}), b[i:], nil
 }
 
-//nolint:funlen,gocognit,cyclop
 func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 	i := 0
 

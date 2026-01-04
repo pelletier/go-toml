@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -56,5 +56,5 @@ a = 42`),
 type badReader struct{}
 
 func (r *badReader) Read([]byte) (int, error) {
-	return 0, fmt.Errorf("reader failed on purpose")
+	return 0, errors.New("reader failed on purpose")
 }

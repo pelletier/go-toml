@@ -83,7 +83,7 @@ func (n *Node) Next() *Node {
 	if n.next == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(n)
+	ptr := unsafe.Pointer(n) // #nosec G103
 	size := unsafe.Sizeof(Node{})
 	return (*Node)(danger.Stride(ptr, size, n.next))
 }
@@ -95,7 +95,7 @@ func (n *Node) Child() *Node {
 	if n.child == 0 {
 		return nil
 	}
-	ptr := unsafe.Pointer(n)
+	ptr := unsafe.Pointer(n) // #nosec G103
 	size := unsafe.Sizeof(Node{})
 	return (*Node)(danger.Stride(ptr, size, n.child))
 }
@@ -113,13 +113,13 @@ func (n *Node) Key() Iterator {
 	case KeyValue:
 		value := n.Child()
 		if !value.Valid() {
-			panic(fmt.Errorf("KeyValue should have at least two children"))
+			panic("KeyValue should have at least two children")
 		}
 		return Iterator{node: value.Next()}
 	case Table, ArrayTable:
 		return Iterator{node: n.Child()}
 	default:
-		panic(fmt.Errorf("Key() is not supported on a %s", n.Kind))
+		panic(fmt.Errorf("key is not supported on a %s", n.Kind))
 	}
 }
 

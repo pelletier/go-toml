@@ -3,6 +3,7 @@ package toml_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -28,7 +29,7 @@ func (k marshalTextKey) MarshalText() ([]byte, error) {
 type marshalBadTextKey struct{}
 
 func (k marshalBadTextKey) MarshalText() ([]byte, error) {
-	return nil, fmt.Errorf("error")
+	return nil, errors.New("error")
 }
 
 func toFloat(x interface{}) float64 {
@@ -44,6 +45,7 @@ func toFloat(x interface{}) float64 {
 }
 
 func inDelta(t *testing.T, expected, actual interface{}, delta float64) {
+	t.Helper()
 	dt := toFloat(expected) - toFloat(actual)
 	assert.True(t,
 		dt < -delta && dt < delta,
@@ -942,7 +944,6 @@ nan = nan
 	assert.Equal(t, expected, string(actual))
 }
 
-//nolint:funlen
 func TestMarshalIndentTables(t *testing.T) {
 	examples := []struct {
 		desc     string
@@ -1011,7 +1012,7 @@ type customTextMarshaler struct {
 
 func (c *customTextMarshaler) MarshalText() ([]byte, error) {
 	if c.value == 1 {
-		return nil, fmt.Errorf("cannot represent 1 because this is a silly test")
+		return nil, errors.New("cannot represent 1 because this is a silly test")
 	}
 	return []byte(fmt.Sprintf("::%d", c.value)), nil
 }
@@ -1051,7 +1052,7 @@ func TestMarshalTextMarshaler(t *testing.T) {
 type brokenWriter struct{}
 
 func (b *brokenWriter) Write([]byte) (int, error) {
-	return 0, fmt.Errorf("dead")
+	return 0, errors.New("dead")
 }
 
 func TestEncodeToBrokenWriter(t *testing.T) {
@@ -1074,10 +1075,10 @@ func TestEncoderSetIndentSymbol(t *testing.T) {
 	assert.Equal(t, expected, w.String())
 }
 
-func TestEncoderSetMarshalJsonNumbers(t *testing.T) {
+func TestEncoderSetMarshalJSONNumbers(t *testing.T) {
 	var w strings.Builder
 	enc := toml.NewEncoder(&w)
-	enc.SetMarshalJsonNumbers(true)
+	enc.SetMarshalJSONNumbers(true)
 	err := enc.Encode(map[string]interface{}{
 		"A": json.Number("1.1"),
 		"B": json.Number("42e-3"),
@@ -1198,7 +1199,7 @@ func TestEncoderTagFieldName(t *testing.T) {
 	type doc struct {
 		String string `toml:"hello"`
 		OkSym  string `toml:"#"`
-		Bad    string `toml:"\"`
+		Bad    string `toml:"\"` //nolint:govet
 	}
 
 	d := doc{String: "world"}
@@ -1762,14 +1763,14 @@ func ExampleMarshal() {
 func ExampleMarshal_commented() {
 	type Common struct {
 		Listen               string        `toml:"listen"                     comment:"general listener"`
-		PprofListen          string        `toml:"pprof-listen"               comment:"listener to serve /debug/pprof requests. '-pprof' argument overrides it"`
-		MaxMetricsPerTarget  int           `toml:"max-metrics-per-target"     comment:"limit numbers of queried metrics per target in /render requests, 0 or negative = unlimited"`
+		PprofListen          string        `toml:"pprof-listen"               comment:"listener to serve /debug/pprof requests. '-pprof' argument overrides it"`                    //nolint:lll
+		MaxMetricsPerTarget  int           `toml:"max-metrics-per-target"     comment:"limit numbers of queried metrics per target in /render requests, 0 or negative = unlimited"` //nolint:lll
 		MemoryReturnInterval time.Duration `toml:"memory-return-interval"     comment:"daemon will return the freed memory to the OS when it>0"`
 	}
 
 	type Costs struct {
 		Cost       *int           `toml:"cost"        comment:"default cost (for wildcarded equivalence or matched with regex, or if no value cost set)"`
-		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equivalence without wildcards) (additional tuning, usually not needed)"`
+		ValuesCost map[string]int `toml:"values-cost" comment:"cost with some value (for equivalence without wildcards) (additional tuning, usually not needed)"` //nolint:lll
 	}
 
 	type ClickHouse struct {
@@ -1784,7 +1785,7 @@ func ExampleMarshal_commented() {
 		DateTreeTableVersion    int               `toml:"date-tree-table-version,commented"`
 		TreeTimeout             time.Duration     `toml:"tree-timeout,commented"`
 		TagTable                string            `toml:"tag-table,commented"`
-		ExtraPrefix             string            `toml:"extra-prefix"             comment:"add extra prefix (directory in graphite) for all metrics, w/o trailing dot"`
+		ExtraPrefix             string            `toml:"extra-prefix"             comment:"add extra prefix (directory in graphite) for all metrics, w/o trailing dot"` //nolint:lll
 		ConnectTimeout          time.Duration     `toml:"connect-timeout"          comment:"TCP connection timeout"`
 		DataTableLegacy         string            `toml:"data-table,commented"`
 		RollupConfLegacy        string            `toml:"rollup-conf,commented"`
@@ -1887,12 +1888,12 @@ func TestReadmeComments(t *testing.T) {
 	type Config struct {
 		Host string `toml:"host" comment:"Host IP to connect to."`
 		Port int    `toml:"port" comment:"Port of the remote server."`
-		Tls  TLS    `toml:"TLS,commented" comment:"Encryption parameters (optional)"`
+		TLS  TLS    `toml:"TLS,commented" comment:"Encryption parameters (optional)"`
 	}
 	example := Config{
 		Host: "127.0.0.1",
 		Port: 4242,
-		Tls: TLS{
+		TLS: TLS{
 			Cipher:  "AEAD-AES128-GCM-SHA256",
 			Version: "TLS 1.3",
 		},

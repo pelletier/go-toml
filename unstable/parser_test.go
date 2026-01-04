@@ -196,7 +196,6 @@ func compareIterator(t *testing.T, expected []astNode, actual Iterator) {
 	}
 }
 
-//nolint:funlen
 func TestParser_AST(t *testing.T) {
 	examples := []struct {
 		desc  string
@@ -358,7 +357,7 @@ func BenchmarkParseBasicStringWithUnicode(b *testing.B) {
 		b.SetBytes(int64(len(input)))
 
 		for i := 0; i < b.N; i++ {
-			p.parseBasicString(input)
+			_, _, _, _ = p.parseBasicString(input)
 		}
 	})
 	b.Run("8", func(b *testing.B) {
@@ -367,7 +366,7 @@ func BenchmarkParseBasicStringWithUnicode(b *testing.B) {
 		b.SetBytes(int64(len(input)))
 
 		for i := 0; i < b.N; i++ {
-			p.parseBasicString(input)
+			_, _, _, _ = p.parseBasicString(input)
 		}
 	})
 }
@@ -383,7 +382,7 @@ func BenchmarkParseBasicStringsEasy(b *testing.B) {
 			b.SetBytes(int64(len(input)))
 
 			for i := 0; i < b.N; i++ {
-				p.parseBasicString(input)
+				_, _, _, _ = p.parseBasicString(input)
 			}
 		})
 	}

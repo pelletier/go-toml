@@ -33,8 +33,8 @@ func (k *unmarshalTextKey) UnmarshalText(text []byte) error {
 
 type unmarshalBadTextKey struct{}
 
-func (k *unmarshalBadTextKey) UnmarshalText(text []byte) error {
-	return fmt.Errorf("error")
+func (k *unmarshalBadTextKey) UnmarshalText([]byte) error {
+	return errors.New("error")
 }
 
 func ExampleDecoder_DisallowUnknownFields() {
@@ -99,7 +99,7 @@ func ExampleUnmarshal() {
 type badReader struct{}
 
 func (r *badReader) Read([]byte) (int, error) {
-	return 0, fmt.Errorf("testing error")
+	return 0, errors.New("testing error")
 }
 
 func TestDecodeReaderError(t *testing.T) {
@@ -111,7 +111,6 @@ func TestDecodeReaderError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// nolint:funlen
 func TestUnmarshal_Integers(t *testing.T) {
 	examples := []struct {
 		desc     string
@@ -195,7 +194,6 @@ func TestUnmarshal_Integers(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestUnmarshal_Floats(t *testing.T) {
 	examples := []struct {
 		desc     string
@@ -333,7 +331,6 @@ func TestUnmarshal_Floats(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestUnmarshal(t *testing.T) {
 	type test struct {
 		target   interface{}
@@ -410,6 +407,7 @@ foo = "bar"`,
 					target:   &doc{},
 					expected: &doc{{A: "a", B: "1"}: "foo"},
 					assert: func(t *testing.T, test test) {
+						t.Helper()
 						// Despite the documentation:
 						//     Pointer variable equality is determined based on the equality of the
 						//		 referenced values (as opposed to the memory addresses).
@@ -1346,7 +1344,7 @@ B = "data"`,
 			input: `foo = "bar"`,
 			gen: func() test {
 				type doc struct {
-					foo string
+					foo string //nolint:unused
 				}
 				return test{
 					target:   &doc{},
@@ -1939,9 +1937,6 @@ B = "data"`,
 				return test{
 					target:   &map[int]string{},
 					expected: &map[int]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1952,9 +1947,6 @@ B = "data"`,
 				return test{
 					target:   &map[int8]string{},
 					expected: &map[int8]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1965,9 +1957,6 @@ B = "data"`,
 				return test{
 					target:   &map[int64]string{},
 					expected: &map[int64]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1978,9 +1967,6 @@ B = "data"`,
 				return test{
 					target:   &map[uint]string{},
 					expected: &map[uint]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -1991,9 +1977,6 @@ B = "data"`,
 				return test{
 					target:   &map[uint8]string{},
 					expected: &map[uint8]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2004,9 +1987,6 @@ B = "data"`,
 				return test{
 					target:   &map[uint64]string{},
 					expected: &map[uint64]string{1: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2027,9 +2007,6 @@ B = "data"`,
 				return test{
 					target:   &map[float64]string{},
 					expected: &map[float64]string{1.01: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2050,9 +2027,6 @@ B = "data"`,
 				return test{
 					target:   &map[float32]string{},
 					expected: &map[float32]string{1.01: "a"},
-					assert: func(t *testing.T, test test) {
-						assert.Equal(t, test.expected, test.target)
-					},
 				}
 			},
 		},
@@ -2204,7 +2178,8 @@ port = "bad"
 	err := toml.NewDecoder(file).Decode(&cfg)
 	assert.Error(t, err)
 
-	x := err.(*toml.DecodeError)
+	var x *toml.DecodeError
+	assert.True(t, errors.As(err, &x))
 	assert.Equal(t, "toml: cannot decode TOML string into struct field toml_test.Server.Port of type int", x.Error())
 	expected := `1| [server]
 2| path = "/my/path"
@@ -2235,7 +2210,8 @@ port = 50
 	err := toml.NewDecoder(file).Decode(&cfg)
 	assert.Error(t, err)
 
-	x := err.(*toml.DecodeError)
+	var x *toml.DecodeError
+	assert.True(t, errors.As(err, &x))
 	assert.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.Server.Path of type string", x.Error())
 	expected := `1| [server]
 2| path = 100
@@ -2488,7 +2464,7 @@ func TestIssue508(t *testing.T) {
 	t1 := text{}
 	err := toml.Unmarshal(b, &t1)
 	assert.NoError(t, err)
-	assert.Equal(t, "This is a title", t1.head.Title)
+	assert.Equal(t, "This is a title", t1.Title)
 }
 
 func TestIssue507(t *testing.T) {
@@ -2500,7 +2476,7 @@ func TestIssue507(t *testing.T) {
 
 type uuid [16]byte
 
-func (u *uuid) UnmarshalText(text []byte) (err error) {
+func (u *uuid) UnmarshalText([]byte) (err error) {
 	// Note: the original reported issue had a more complex implementation
 	// of this function. But the important part is to verify that a
 	// non-struct type implementing UnmarshalText works with the unmarshal
@@ -2543,7 +2519,7 @@ xz_hash = "1a48f723fea1f17d786ce6eadd9d00914d38062d28fd9c455ed3c3801905b388"
 `)
 
 	type target struct {
-		XZ_URL string
+		XZ_URL string //revive:disable:var-naming
 	}
 
 	type pkg struct {
@@ -2794,7 +2770,7 @@ func TestIssue772(t *testing.T) {
 	config := Config{}
 	err := toml.Unmarshal(defaultConfigFile, &config)
 	assert.NoError(t, err)
-	assert.Equal(t, "reach-masterdev-", config.FileHandling.FilePattern)
+	assert.Equal(t, "reach-masterdev-", config.FilePattern)
 }
 
 func TestIssue774(t *testing.T) {
@@ -2954,7 +2930,7 @@ blah.a = "def"`)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "abc", cfg.Fizz)
-	assert.Equal(t, "def", cfg.blah.A)
+	assert.Equal(t, "def", cfg.A)
 	assert.Equal(t, "def", cfg.A)
 }
 
@@ -3484,7 +3460,7 @@ world'`,
 
 func TestOmitEmpty(t *testing.T) {
 	type inner struct {
-		private string
+		private string //nolint:unused
 		Skip    string `toml:"-"`
 		V       string
 	}
@@ -3600,7 +3576,6 @@ func TestASCIIControlCharacters(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestLocalDateTime(t *testing.T) {
 	examples := []struct {
 		desc  string
@@ -3918,7 +3893,7 @@ type CustomUnmarshalerKey struct {
 func (k *CustomUnmarshalerKey) UnmarshalTOML(value *unstable.Node) error {
 	item, err := strconv.ParseInt(string(value.Data), 10, 64)
 	if err != nil {
-		return fmt.Errorf("error converting to int64, %v", err)
+		return fmt.Errorf("error converting to int64, %w", err)
 	}
 	k.A = item
 	return nil
@@ -4004,7 +3979,7 @@ foo = "bar"`,
 
 type doc994 struct{}
 
-func (d *doc994) UnmarshalTOML(value *unstable.Node) error {
+func (d *doc994) UnmarshalTOML(*unstable.Node) error {
 	return errors.New("expected-error")
 }
 
@@ -4237,8 +4212,8 @@ func TestIssue995_SliceNonEmpty_UsesLastElement(t *testing.T) {
 	}
 	assert.Equal(t, 2, len(r.Rules[0].Allowlists))
 	// Values presence check
-	got := []string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
-	if !(got[0] == "a" && got[1] == "b") && !(got[0] == "b" && got[1] == "a") {
+	got := [...]string{r.Rules[0].Allowlists[0].Description, r.Rules[0].Allowlists[1].Description}
+	if got != [2]string{"a", "b"} && got != [2]string{"b", "a"} {
 		t.Fatalf("unexpected values in allowlists: %v", got)
 	}
 }

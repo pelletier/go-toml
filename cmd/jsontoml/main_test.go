@@ -14,7 +14,7 @@ func TestConvert(t *testing.T) {
 		input         string
 		expected      string
 		errors        bool
-		useJsonNumber bool
+		useJSONNumber bool
 	}{
 		{
 			name: "valid json",
@@ -30,7 +30,7 @@ a = 42.0
 		},
 		{
 			name:          "use json number",
-			useJsonNumber: true,
+			useJSONNumber: true,
 			input: `
 {
   "mytoml": {
@@ -50,7 +50,7 @@ a = 42
 
 	for _, e := range examples {
 		b := new(bytes.Buffer)
-		useJsonNumber = e.useJsonNumber
+		useJSONNumber = e.useJSONNumber
 		err := convert(strings.NewReader(e.input), b)
 		if e.errors {
 			assert.Error(t, err)

@@ -9,7 +9,7 @@ import (
 )
 
 // Remove JSON tags to a data structure as returned by toml-test.
-func rmTag(typedJson interface{}) (interface{}, error) {
+func rmTag(typedJSON interface{}) (interface{}, error) {
 	// Check if key is in the table m.
 	in := func(key string, m map[string]interface{}) bool {
 		_, ok := m[key]
@@ -17,8 +17,7 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 	}
 
 	// Switch on the data type.
-	switch v := typedJson.(type) {
-
+	switch v := typedJSON.(type) {
 	// Object: this can either be a TOML table or a primitive with tags.
 	case map[string]interface{}:
 		// This value represents a primitive: remove the tags and return just
@@ -56,7 +55,7 @@ func rmTag(typedJson interface{}) (interface{}, error) {
 	}
 
 	// The top level must be an object or array.
-	return nil, fmt.Errorf("unrecognized JSON format '%T'", typedJson)
+	return nil, fmt.Errorf("unrecognized JSON format '%T'", typedJSON)
 }
 
 // Return a primitive: read the "type" and convert the "value" to that.
@@ -79,7 +78,7 @@ func untag(typed map[string]interface{}) (interface{}, error) {
 		}
 		return f, nil
 
-		//toml.LocalDate{Year:2020, Month:12, Day:12}
+		// toml.LocalDate{Year:2020, Month:12, Day:12}
 	case "datetime":
 		return time.Parse("2006-01-02T15:04:05.999999999Z07:00", v)
 	case "datetime-local":
@@ -114,16 +113,4 @@ func untag(typed map[string]interface{}) (interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("untag: unrecognized tag type %q", t)
-}
-
-func parseTime(v, format string, local bool) (t time.Time, err error) {
-	if local {
-		t, err = time.ParseInLocation(format, v, time.Local)
-	} else {
-		t, err = time.Parse(format, v)
-	}
-	if err != nil {
-		return time.Time{}, fmt.Errorf("Could not parse %q as a datetime: %w", v, err)
-	}
-	return t, nil
 }

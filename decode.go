@@ -279,7 +279,6 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	return t, b, nil
 }
 
-//nolint:cyclop
 func parseFloat(b []byte) (float64, error) {
 	if len(b) == 4 && (b[0] == '+' || b[0] == '-') && b[1] == 'n' && b[2] == 'a' && b[3] == 'n' {
 		return math.NaN(), nil
