@@ -196,6 +196,7 @@ func compareIterator(t *testing.T, expected []astNode, actual Iterator) {
 	}
 }
 
+//nolint:funlen
 func TestParser_AST(t *testing.T) {
 	examples := []struct {
 		desc  string
@@ -602,6 +603,74 @@ key5 = [ # Next to start of inline array.
 	// 35:14->35:36 (781->803)   | Comment [# Next to array table.]
 	// ---
 	// 36:1->36:21 (804->824)    | Comment [# After array table.]
+}
+
+func TestIterator_IsLast(t *testing.T) {
+	// Test IsLast on an iterator with multiple elements using public Parser API
+	doc := `array = [1, 2, 3]`
+	p := Parser{}
+	p.Reset([]byte(doc))
+	p.NextExpression()
+
+	e := p.Expression()
+	arr := e.Value() // The array node
+
+	it := arr.Children()
+	count := 0
+	lastCount := 0
+	for it.Next() {
+		count++
+		if it.IsLast() {
+			lastCount++
+		}
+	}
+
+	assert.Equal(t, 3, count)
+	assert.Equal(t, 1, lastCount)
+}
+
+func TestNodeChaining(t *testing.T) {
+	// Test that sibling nodes are correctly chained via Next()
+	// This exercises the internal PushAndChain functionality through public APIs
+	doc := `a.b.c = 1`
+	p := Parser{}
+	p.Reset([]byte(doc))
+	p.NextExpression()
+
+	e := p.Expression()
+	// KeyValue has children: value, then key parts (a, b, c)
+	keyIt := e.Key()
+
+	// Collect all key parts by following the iterator
+	var keys []string
+	for keyIt.Next() {
+		keys = append(keys, string(keyIt.Node().Data))
+	}
+
+	assert.Equal(t, []string{"a", "b", "c"}, keys)
+}
+
+func TestMultipleExpressions(t *testing.T) {
+	// Test parsing multiple top-level expressions
+	// This exercises root iteration through public APIs
+	doc := `
+key1 = "value1"
+key2 = "value2"
+key3 = "value3"
+`
+	p := Parser{}
+	p.Reset([]byte(doc))
+
+	var keys []string
+	for p.NextExpression() {
+		e := p.Expression()
+		keyIt := e.Key()
+		keyIt.Next()
+		keys = append(keys, string(keyIt.Node().Data))
+	}
+
+	assert.NoError(t, p.Error())
+	assert.Equal(t, []string{"key1", "key2", "key3"}, keys)
 }
 
 func ExampleParser() {
