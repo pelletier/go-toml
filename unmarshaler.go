@@ -318,7 +318,7 @@ func (d *decoder) handleArrayTable(key unstable.Iterator, v reflect.Value) (refl
 	return d.handleKeyValues(v)
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflect.Value) (reflect.Value, error) {
 	switch v.Kind() {
 	case reflect.Interface:
@@ -395,7 +395,7 @@ func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflec
 // point to the last element of the collection. Unless it is the last part of
 // the key, then it needs to create a new element at the end.
 //
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Value) (reflect.Value, error) {
 	if key.IsLast() {
 		return d.handleArrayTableCollectionLast(key, v)
@@ -467,7 +467,7 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 	}
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
 	var rv reflect.Value
 
@@ -739,7 +739,7 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 	}
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (d *decoder) unmarshalArray(array *unstable.Node, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Slice:
@@ -969,7 +969,7 @@ func init() { //nolint:gochecknoinits
 	}
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error {
 	kind := v.Kind()
 	if kind == reflect.Float32 || kind == reflect.Float64 {
@@ -1150,7 +1150,7 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 	}
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node, v reflect.Value) (reflect.Value, error) {
 	// contains the replacement for v
 	var rv reflect.Value

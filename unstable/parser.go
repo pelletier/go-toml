@@ -353,7 +353,7 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	return ref, b, err
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 	ref := invalidReference
@@ -511,7 +511,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
@@ -676,7 +676,7 @@ func (p *Parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, 
 	return token, token[i : len(token)-3], rest, err
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
@@ -871,7 +871,7 @@ func (p *Parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 	}
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
@@ -1123,7 +1123,7 @@ byteLoop:
 	}), b[i:], nil
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 	i := 0
 

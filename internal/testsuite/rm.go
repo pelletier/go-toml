@@ -62,7 +62,7 @@ func rmTag(typedJSON interface{}) (interface{}, error) {
 
 // Return a primitive: read the "type" and convert the "value" to that.
 //
-//nolint:funlen,cyclop
+//nolint:cyclop
 func untag(typed map[string]interface{}) (interface{}, error) {
 	t := typed["type"].(string)
 	v := typed["value"].(string)

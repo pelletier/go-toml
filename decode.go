@@ -75,7 +75,7 @@ func parseDecimalDigits(b []byte) (int, error) {
 	return v, nil
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func parseDateTime(b []byte) (time.Time, error) {
 	// offset-date-time = full-date time-delim full-time
 	// full-time      = partial-time time-offset
@@ -190,7 +190,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 // []byte that is didn't need. This is to allow parseDateTime to parse those
 // remaining bytes as a timezone.
 //
-//nolint:funlen,cyclop
+//nolint:cyclop
 func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	var (
 		nspow = [10]int{0, 1e8, 1e7, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1, 1e0}

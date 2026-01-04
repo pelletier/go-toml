@@ -254,7 +254,7 @@ func (ctx *encoderCtx) isRoot() bool {
 	return len(ctx.parentKey) == 0 && !ctx.hasKey
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (enc *Encoder) encode(b []byte, ctx encoderCtx, v reflect.Value) ([]byte, error) {
 	i := v.Interface()
 
@@ -506,7 +506,7 @@ func (enc *Encoder) encodeLiteralString(b []byte, v string) []byte {
 	return b
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (enc *Encoder) encodeQuotedString(multiline bool, b []byte, v string) []byte {
 	stringQuote := `"`
 
@@ -889,7 +889,7 @@ func parseTag(tag string) (string, tagOptions) {
 	return tag, opts
 }
 
-//nolint:funlen,cyclop
+//nolint:cyclop
 func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, error) {
 	var err error
 
