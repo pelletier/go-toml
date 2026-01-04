@@ -58,7 +58,7 @@ func (s *StrictMissingError) String() string {
 //
 // Implements errors.Join() interface.
 func (s *StrictMissingError) Unwrap() []error {
-	var errs []error
+	errs := make([]error, 0, len(s.Errors))
 	for i := range s.Errors {
 		errs = append(errs, &s.Errors[i])
 	}
