@@ -44,8 +44,6 @@ const (
 )
 
 // String implementation of fmt.Stringer.
-//
-//nolint:cyclop
 func (k Kind) String() string {
 	switch k {
 	case Invalid:

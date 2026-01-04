@@ -96,8 +96,6 @@ func (p *Parser) Reset(b []byte) {
 // document or an error occurred, it returns false.
 //
 // Retrieve the parsed expression with Expression().
-//
-//nolint:cyclop
 func (p *Parser) NextExpression() bool {
 	if len(p.left) == 0 || p.err != nil {
 		return false
@@ -353,7 +351,6 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	return ref, b, err
 }
 
-//nolint:cyclop
 func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
 	ref := invalidReference
@@ -511,7 +508,6 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-//nolint:cyclop
 func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
@@ -608,7 +604,6 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-//nolint:cyclop
 func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []byte, error) {
 	rootCommentRef := invalidReference
 	latestCommentRef := invalidReference
@@ -676,7 +671,6 @@ func (p *Parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, 
 	return token, token[i : len(token)-3], rest, err
 }
 
-//nolint:cyclop
 func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim
@@ -871,7 +865,6 @@ func (p *Parser) parseSimpleKey(b []byte) (raw, key, rest []byte, err error) {
 	}
 }
 
-//nolint:cyclop
 func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// basic-string = quotation-mark *basic-char quotation-mark
 	// quotation-mark = %x22            ; "
@@ -967,7 +960,6 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	return token, builder.Bytes(), rest, nil
 }
 
-//nolint:cyclop
 func hexToRune(b []byte, length int) (rune, error) {
 	if len(b) < length {
 		return -1, NewParserError(b, "unicode point needs %d character, not %d", length, len(b))
@@ -1006,7 +998,6 @@ func (p *Parser) parseWhitespace(b []byte) []byte {
 	return rest
 }
 
-//nolint:cyclop
 func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) {
 	switch b[0] {
 	case 'i':
@@ -1057,7 +1048,6 @@ func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) 
 	return p.scanIntOrFloat(b)
 }
 
-//nolint:cyclop
 func (p *Parser) scanDateTime(b []byte) (reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
@@ -1123,7 +1113,6 @@ byteLoop:
 	}), b[i:], nil
 }
 
-//nolint:cyclop
 func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 	i := 0
 

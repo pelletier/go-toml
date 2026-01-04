@@ -268,7 +268,6 @@ Rules for the unmarshal code:
 - An "object" is either a struct or a map.
 */
 
-//nolint:cyclop
 func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) error {
 	var x reflect.Value
 	var err error
@@ -318,7 +317,6 @@ func (d *decoder) handleArrayTable(key unstable.Iterator, v reflect.Value) (refl
 	return d.handleKeyValues(v)
 }
 
-//nolint:cyclop
 func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflect.Value) (reflect.Value, error) {
 	switch v.Kind() {
 	case reflect.Interface:
@@ -394,8 +392,6 @@ func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflec
 // evaluated like a normal key, but if it returns a collection, it also needs to
 // point to the last element of the collection. Unless it is the last part of
 // the key, then it needs to create a new element at the end.
-//
-//nolint:cyclop
 func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Value) (reflect.Value, error) {
 	if key.IsLast() {
 		return d.handleArrayTableCollectionLast(key, v)
@@ -467,7 +463,6 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 	}
 }
 
-//nolint:cyclop
 func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
 	var rv reflect.Value
 
@@ -694,7 +689,6 @@ func (d *decoder) tryTextUnmarshaler(node *unstable.Node, v reflect.Value) (bool
 	return false, nil
 }
 
-//nolint:cyclop
 func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 	for v.Kind() == reflect.Ptr {
 		v = initAndDereferencePointer(v)
@@ -739,7 +733,6 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 	}
 }
 
-//nolint:cyclop
 func (d *decoder) unmarshalArray(array *unstable.Node, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Slice:
@@ -969,7 +962,6 @@ func init() { //nolint:gochecknoinits
 	}
 }
 
-//nolint:cyclop
 func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error {
 	kind := v.Kind()
 	if kind == reflect.Float32 || kind == reflect.Float64 {
@@ -1093,7 +1085,6 @@ func (d *decoder) handleKeyValueInner(key unstable.Iterator, value *unstable.Nod
 	return reflect.Value{}, d.handleValue(value, v)
 }
 
-//nolint:cyclop
 func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value, error) {
 	switch {
 	case stringType.AssignableTo(keyType):
@@ -1150,7 +1141,6 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 	}
 }
 
-//nolint:cyclop
 func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node, v reflect.Value) (reflect.Value, error) {
 	// contains the replacement for v
 	var rv reflect.Value
@@ -1342,7 +1332,6 @@ func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	return path, ok
 }
 
-//nolint:cyclop
 func forEachField(t reflect.Type, path []int, do func(name string, path []int)) {
 	n := t.NumField()
 	for i := 0; i < n; i++ {

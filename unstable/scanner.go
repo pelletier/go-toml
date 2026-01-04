@@ -68,7 +68,6 @@ func scanLiteralString(b []byte) ([]byte, []byte, error) {
 	return nil, nil, NewParserError(b[len(b):], "unterminated literal string")
 }
 
-//nolint:cyclop
 func scanMultilineLiteralString(b []byte) ([]byte, []byte, error) {
 	// ml-literal-string = ml-literal-string-delim [ newline ] ml-literal-body
 	// ml-literal-string-delim
@@ -207,7 +206,6 @@ func scanBasicString(b []byte) ([]byte, bool, []byte, error) {
 	return nil, escaped, nil, NewParserError(b[len(b):], `basic string not terminated by "`)
 }
 
-//nolint:cyclop
 func scanMultilineBasicString(b []byte) ([]byte, bool, []byte, error) {
 	// ml-basic-string = ml-basic-string-delim [ newline ] ml-basic-body
 	// ml-basic-string-delim

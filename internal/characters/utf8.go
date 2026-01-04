@@ -24,8 +24,6 @@ import (
 // 0x9 => tab, ok
 // 0xA - 0x1F => invalid
 // 0x7F => invalid
-//
-//nolint:cyclop
 func Utf8TomlValidAlreadyEscaped(p []byte) []byte {
 	// Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
 	for len(p) >= 8 {
@@ -84,8 +82,6 @@ func Utf8TomlValidAlreadyEscaped(p []byte) []byte {
 }
 
 // Utf8ValidNext returns the size of the next rune if valid, 0 otherwise.
-//
-//nolint:cyclop
 func Utf8ValidNext(p []byte) int {
 	c := p[0]
 

@@ -10,8 +10,6 @@ import (
 )
 
 // addTag adds JSON tags to a data structure as expected by toml-test.
-//
-//nolint:cyclop
 func addTag(tomlData interface{}) interface{} {
 	// Switch on the data type.
 	switch orig := tomlData.(type) {

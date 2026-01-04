@@ -5,7 +5,6 @@ default = "none"
 enable = [
     "asciicheck",
     "bodyclose",
-    "cyclop",
     "dogsled",
     "dupl",
     "durationcheck",
@@ -57,7 +56,7 @@ line-length = 150
 
 [[linters.exclusions.rules]]
 path = ".test.go"
-linters = ["cyclop", "goconst", "gosec"]
+linters = ["goconst", "gosec"]
 
 [[linters.exclusions.rules]]
 path = "main.go"
