@@ -23,7 +23,7 @@ type Program struct {
 }
 
 func (p *Program) Execute() {
-	flag.Usage = func() { fmt.Fprintf(os.Stderr, p.Usage) }
+	flag.Usage = func() { fmt.Fprint(os.Stderr, p.Usage) }
 	flag.Parse()
 	os.Exit(p.main(flag.Args(), os.Stdin, os.Stdout, os.Stderr))
 }
