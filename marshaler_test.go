@@ -2250,14 +2250,14 @@ type customTomlMarshaler struct {
 	Value int
 }
 
-func (c customTomlMarshaler) MarshalToml() ([]byte, error) {
+func (c customTomlMarshaler) MarshalTOML() ([]byte, error) {
 	return []byte("testmarshal"), nil
 }
 
 // errorTomlMarshaler always returns an error
 type errorTomlMarshaler struct{}
 
-func (e errorTomlMarshaler) MarshalToml() ([]byte, error) {
+func (e errorTomlMarshaler) MarshalTOML() ([]byte, error) {
 	return nil, fmt.Errorf("intentional marshal error")
 }
 
@@ -2266,7 +2266,7 @@ type pointerTomlMarshaler struct {
 	Data string `toml:"data"`
 }
 
-func (p *pointerTomlMarshaler) MarshalToml() ([]byte, error) {
+func (p *pointerTomlMarshaler) MarshalTOML() ([]byte, error) {
 	return []byte("testmarshal"), nil
 }
 
