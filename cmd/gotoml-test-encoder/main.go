@@ -1,3 +1,4 @@
+// Package gotoml-test-encoder is a minimal encoder program used to compare this library with other TOML implementations.
 package main
 
 import (
@@ -24,7 +25,7 @@ func main() {
 }
 
 func usage() {
-	log.Printf("Usage: %s < toml-file\n", path.Base(os.Args[0]))
+	log.Printf("Usage: %s < json-file\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 	os.Exit(1)
 }

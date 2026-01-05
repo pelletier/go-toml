@@ -12,7 +12,7 @@ import (
 func FuzzUnmarshal(f *testing.F) {
 	file, err := os.ReadFile("benchmark/benchmark.toml")
 	if err != nil {
-		panic(err)
+		f.Error(err)
 	}
 	f.Add(file)
 

@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 	"github.com/pelletier/go-toml/v2/unstable"
 )
@@ -123,6 +122,7 @@ func (d *Decoder) Decode(v interface{}) error {
 	dec := decoder{
 		strict: strict{
 			Enabled: d.strict,
+			doc:     b,
 		},
 		unmarshalerInterface: d.unmarshalerInterface,
 	}
@@ -226,7 +226,7 @@ func (d *decoder) FromParser(v interface{}) error {
 	}
 
 	if r.IsNil() {
-		return fmt.Errorf("toml: decoding pointer target cannot be nil")
+		return errors.New("toml: decoding pointer target cannot be nil")
 	}
 
 	r = r.Elem()
@@ -273,7 +273,7 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) err
 	var err error
 	var first bool // used for to clear array tables on first use
 
-	if !(d.skipUntilTable && expr.Kind == unstable.KeyValue) {
+	if !d.skipUntilTable || expr.Kind != unstable.KeyValue {
 		first, err = d.seen.CheckExpression(expr)
 		if err != nil {
 			return err
@@ -378,7 +378,7 @@ func (d *decoder) handleArrayTableCollectionLast(key unstable.Iterator, v reflec
 	case reflect.Array:
 		idx := d.arrayIndex(true, v)
 		if idx >= v.Len() {
-			return v, fmt.Errorf("%s at position %d", d.typeMismatchError("array table", v.Type()), idx)
+			return v, fmt.Errorf("%w at position %d", d.typeMismatchError("array table", v.Type()), idx)
 		}
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
@@ -453,14 +453,14 @@ func (d *decoder) handleArrayTableCollection(key unstable.Iterator, v reflect.Va
 	case reflect.Array:
 		idx := d.arrayIndex(false, v)
 		if idx >= v.Len() {
-			return v, fmt.Errorf("%s at position %d", d.typeMismatchError("array table", v.Type()), idx)
+			return v, fmt.Errorf("%w at position %d", d.typeMismatchError("array table", v.Type()), idx)
 		}
 		elem := v.Index(idx)
 		_, err := d.handleArrayTable(key, elem)
 		return v, err
+	default:
+		return d.handleArrayTable(key, v)
 	}
-
-	return d.handleArrayTable(key, v)
 }
 
 func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn handlerFn, makeFn valueMakerFn) (reflect.Value, error) {
@@ -494,7 +494,8 @@ func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn h
 
 		mv := v.MapIndex(mk)
 		set := false
-		if !mv.IsValid() {
+		switch {
+		case !mv.IsValid():
 			// If there is no value in the map, create a new one according to
 			// the map type. If the element type is interface, create either a
 			// map[string]interface{} or a []interface{} depending on whether
@@ -507,13 +508,13 @@ func (d *decoder) handleKeyPart(key unstable.Iterator, v reflect.Value, nextFn h
 				mv = reflect.New(t).Elem()
 			}
 			set = true
-		} else if mv.Kind() == reflect.Interface {
+		case mv.Kind() == reflect.Interface:
 			mv = mv.Elem()
 			if !mv.IsValid() {
 				mv = makeFn()
 			}
 			set = true
-		} else if !mv.CanAddr() {
+		case !mv.CanAddr():
 			vt := v.Type()
 			t := vt.Elem()
 			oldmv := mv
@@ -967,8 +968,9 @@ const (
 // compile time, so it is computed during initialization.
 var maxUint int64 = math.MaxInt64
 
-func init() {
+func init() { //nolint:gochecknoinits
 	m := uint64(^uint(0))
+	// #nosec G115
 	if m < uint64(maxUint) {
 		maxUint = int64(m)
 	}
@@ -1048,7 +1050,7 @@ func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error 
 	case reflect.Interface:
 		r = reflect.ValueOf(i)
 	default:
-		return unstable.NewParserError(d.p.Raw(value.Raw), d.typeMismatchString("integer", v.Type()))
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("integer", v.Type()))
 	}
 
 	if !r.Type().AssignableTo(v.Type()) {
@@ -1067,7 +1069,7 @@ func (d *decoder) unmarshalString(value *unstable.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
-		return unstable.NewParserError(d.p.Raw(value.Raw), d.typeMismatchString("string", v.Type()))
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("string", v.Type()))
 	}
 
 	return nil
@@ -1118,35 +1120,39 @@ func (d *decoder) keyFromData(keyType reflect.Type, data []byte) (reflect.Value,
 			return reflect.Value{}, fmt.Errorf("toml: error unmarshalling key type %s from text: %w", stringType, err)
 		}
 		return mk.Elem(), nil
+	}
 
-	case keyType.Kind() == reflect.Int || keyType.Kind() == reflect.Int8 || keyType.Kind() == reflect.Int16 || keyType.Kind() == reflect.Int32 || keyType.Kind() == reflect.Int64:
+	switch keyType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		key, err := strconv.ParseInt(string(data), 10, 64)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from integer: %w", stringType, err)
 		}
 		return reflect.ValueOf(key).Convert(keyType), nil
-	case keyType.Kind() == reflect.Uint || keyType.Kind() == reflect.Uint8 || keyType.Kind() == reflect.Uint16 || keyType.Kind() == reflect.Uint32 || keyType.Kind() == reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		key, err := strconv.ParseUint(string(data), 10, 64)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from unsigned integer: %w", stringType, err)
 		}
 		return reflect.ValueOf(key).Convert(keyType), nil
 
-	case keyType.Kind() == reflect.Float32:
+	case reflect.Float32:
 		key, err := strconv.ParseFloat(string(data), 32)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from float: %w", stringType, err)
 		}
 		return reflect.ValueOf(float32(key)), nil
 
-	case keyType.Kind() == reflect.Float64:
+	case reflect.Float64:
 		key, err := strconv.ParseFloat(string(data), 64)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("toml: error parsing key of type %s from float: %w", stringType, err)
 		}
 		return reflect.ValueOf(float64(key)), nil
+
+	default:
+		return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", stringType, keyType)
 	}
-	return reflect.Value{}, fmt.Errorf("toml: cannot convert map key of type %s to expected type %s", stringType, keyType)
 }
 
 func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node, v reflect.Value) (reflect.Value, error) {
@@ -1308,13 +1314,13 @@ func fieldByIndex(v reflect.Value, path []int) reflect.Value {
 
 type fieldPathsMap = map[string][]int
 
-var globalFieldPathsCache atomic.Value // map[danger.TypeID]fieldPathsMap
+var globalFieldPathsCache atomic.Value // map[reflect.Type]fieldPathsMap
 
 func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 	t := v.Type()
 
-	cache, _ := globalFieldPathsCache.Load().(map[danger.TypeID]fieldPathsMap)
-	fieldPaths, ok := cache[danger.MakeTypeID(t)]
+	cache, _ := globalFieldPathsCache.Load().(map[reflect.Type]fieldPathsMap)
+	fieldPaths, ok := cache[t]
 
 	if !ok {
 		fieldPaths = map[string][]int{}
@@ -1325,8 +1331,8 @@ func structFieldPath(v reflect.Value, name string) ([]int, bool) {
 			fieldPaths[strings.ToLower(name)] = path
 		})
 
-		newCache := make(map[danger.TypeID]fieldPathsMap, len(cache)+1)
-		newCache[danger.MakeTypeID(t)] = fieldPaths
+		newCache := make(map[reflect.Type]fieldPathsMap, len(cache)+1)
+		newCache[t] = fieldPaths
 		for k, v := range cache {
 			newCache[k] = v
 		}
@@ -1350,7 +1356,9 @@ func forEachField(t reflect.Type, path []int, do func(name string, path []int)) 
 			continue
 		}
 
-		fieldPath := append(path, i)
+		fieldPath := make([]int, 0, len(path)+1)
+		fieldPath = append(fieldPath, path...)
+		fieldPath = append(fieldPath, i)
 		fieldPath = fieldPath[:len(fieldPath):len(fieldPath)]
 
 		name := f.Tag.Get("toml")

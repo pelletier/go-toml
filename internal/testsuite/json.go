@@ -9,6 +9,7 @@ import (
 )
 
 func CmpJSON(t *testing.T, key string, want, have interface{}) {
+	t.Helper()
 	switch w := want.(type) {
 	case map[string]interface{}:
 		cmpJSONMaps(t, key, w, have)
@@ -22,6 +23,7 @@ func CmpJSON(t *testing.T, key string, want, have interface{}) {
 }
 
 func cmpJSONMaps(t *testing.T, key string, want map[string]interface{}, have interface{}) {
+	t.Helper()
 	haveMap, ok := have.(map[string]interface{})
 	if !ok {
 		mismatch(t, key, "table", want, haveMap)
@@ -61,6 +63,7 @@ func cmpJSONMaps(t *testing.T, key string, want map[string]interface{}, have int
 }
 
 func cmpJSONArrays(t *testing.T, key string, want, have interface{}) {
+	t.Helper()
 	wantSlice, ok := want.([]interface{})
 	if !ok {
 		panic(fmt.Sprintf("'value' should be a JSON array when 'type=array', but it is a %T", want))
@@ -83,6 +86,7 @@ func cmpJSONArrays(t *testing.T, key string, want, have interface{}) {
 }
 
 func cmpJSONValues(t *testing.T, key string, want, have map[string]interface{}) {
+	t.Helper()
 	wantType, ok := want["type"].(string)
 	if !ok {
 		panic(fmt.Sprintf("'type' should be a string, but it is a %T", want["type"]))
@@ -126,6 +130,7 @@ func cmpJSONValues(t *testing.T, key string, want, have map[string]interface{}) 
 }
 
 func cmpAsStrings(t *testing.T, key string, want, have string) {
+	t.Helper()
 	if want != have {
 		t.Fatalf("Values for key '%s' don't match:\n"+
 			"  Expected:     %s\n"+
@@ -135,6 +140,7 @@ func cmpAsStrings(t *testing.T, key string, want, have string) {
 }
 
 func cmpFloats(t *testing.T, key string, want, have string) {
+	t.Helper()
 	// Special case for NaN, since NaN != NaN.
 	if strings.HasSuffix(want, "nan") || strings.HasSuffix(have, "nan") {
 		if want != have {
@@ -177,6 +183,7 @@ var layouts = map[string]string{
 }
 
 func cmpAsDatetimes(t *testing.T, key string, kind, want, have string) {
+	t.Helper()
 	layout, ok := layouts[kind]
 	if !ok {
 		panic("should never happen")
@@ -197,15 +204,6 @@ func cmpAsDatetimes(t *testing.T, key string, kind, want, have string) {
 			"  Expected:     %v\n"+
 			"  Your encoder: %v",
 			key, wantT, haveT)
-	}
-}
-
-func cmpAsDatetimesLocal(t *testing.T, key string, want, have string) {
-	if datetimeRepl.Replace(want) != datetimeRepl.Replace(have) {
-		t.Fatalf("Values for key '%s' don't match:\n"+
-			"  Expected:     %v\n"+
-			"  Your encoder: %v",
-			key, want, have)
 	}
 }
 
@@ -230,6 +228,7 @@ func isValue(m map[string]interface{}) bool {
 }
 
 func mismatch(t *testing.T, key string, wantType string, want, have interface{}) {
+	t.Helper()
 	t.Fatalf("Key '%s' is not an %s but %[4]T:\n"+
 		"  Expected:     %#[3]v\n"+
 		"  Your encoder: %#[4]v",
@@ -237,8 +236,9 @@ func mismatch(t *testing.T, key string, wantType string, want, have interface{})
 }
 
 func valMismatch(t *testing.T, key string, wantType, haveType string, want, have interface{}) {
+	t.Helper()
 	t.Fatalf("Key '%s' is not an %s but %s:\n"+
 		"  Expected:     %#[3]v\n"+
 		"  Your encoder: %#[4]v",
-		key, wantType, want, have)
+		key, wantType, haveType, want, have)
 }

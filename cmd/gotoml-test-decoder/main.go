@@ -1,3 +1,4 @@
+// Package gotoml-test-decoder is a minimal decoder program used to compare this library with other TOML implementations.
 package main
 
 import (

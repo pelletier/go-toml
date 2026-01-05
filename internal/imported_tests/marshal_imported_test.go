@@ -1,4 +1,4 @@
-package imported_tests
+package imported_tests //revive:disable:var-naming
 
 // Those tests have been imported from v1, but adjust to match the new
 // defaults of v2.
@@ -21,12 +21,12 @@ func TestDocMarshal(t *testing.T) {
 		Subdocs     testDocSubs       `toml:"subdoc"`
 		Basics      testDocBasics     `toml:"basic"`
 		SubDocList  []testSubDoc      `toml:"subdoclist"`
-		err         int               `toml:"shouldntBeHere"`
+		err         int               `toml:"shouldntBeHere"` //nolint:unused
 		unexported  int               `toml:"shouldntBeHere"`
 		Unexported2 int               `toml:"-"`
 	}
 
-	var docData = testDoc{
+	docData := testDoc{
 		Title:       "TOML Marshal Testing",
 		unexported:  0,
 		Unexported2: 0,
@@ -128,8 +128,7 @@ String2 = 'Two'
 String2 = 'Three'
 `
 
-	assert.Equal(t, string(expected), string(result))
-
+	assert.Equal(t, expected, string(result))
 }
 
 func TestEmptyMarshal(t *testing.T) {
@@ -164,7 +163,7 @@ stringlist = []
 [map]
 `
 
-	assert.Equal(t, string(expected), string(result))
+	assert.Equal(t, expected, string(result))
 }
 
 type textMarshaler struct {

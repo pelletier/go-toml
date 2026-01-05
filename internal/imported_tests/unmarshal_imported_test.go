@@ -1,4 +1,4 @@
-package imported_tests
+package imported_tests //revive:disable:var-naming
 
 // Those tests were imported directly from go-toml v1
 // https://raw.githubusercontent.com/pelletier/go-toml/a2e52561804c6cd9392ebf0048ca64fe4af67a43/marshal_test.go
@@ -149,9 +149,6 @@ type quotedKeyMarshalTestStruct struct {
 	SubList []basicMarshalTestSubStruct `toml:"W.sublist-𝟘"`
 }
 
-// TODO: Remove nolint once var is used by a test
-//
-//nolint:deadcode,unused,varcheck
 var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 	String:  "Hello",
 	Float:   3.5,
@@ -161,7 +158,7 @@ var quotedKeyMarshalTestData = quotedKeyMarshalTestStruct{
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var quotedKeyMarshalTestToml = []byte(`"Yfloat-𝟘" = 3.5
 "Z.string-àéù" = "Hello"
 
@@ -183,11 +180,12 @@ type testDoc struct {
 	Subdocs     testDocSubs       `toml:"subdoc"`
 	Basics      testDocBasics     `toml:"basic"`
 	SubDocList  []testSubDoc      `toml:"subdoclist"`
-	err         int               `toml:"shouldntBeHere"` // nolint:structcheck,unused
+	err         int               `toml:"shouldntBeHere"` //nolint:unused
 	unexported  int               `toml:"shouldntBeHere"`
 	Unexported2 int               `toml:"-"`
 }
 
+//nolint:unused
 type testMapDoc struct {
 	Title    string            `toml:"title"`
 	BasicMap map[string]string `toml:"basic_map"`
@@ -274,7 +272,7 @@ var docData = testDoc{
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var mapTestDoc = testMapDoc{
 	Title: "TOML Marshal Testing",
 	BasicMap: map[string]string{
@@ -543,31 +541,35 @@ func TestNestedUnmarshal(t *testing.T) {
 	assert.Equal(t, nestedTestData, result)
 }
 
+//nolint:unused
 type customMarshalerParent struct {
 	Self    customMarshaler   `toml:"me"`
 	Friends []customMarshaler `toml:"friends"`
 }
 
+//nolint:unused
 type customMarshaler struct {
 	FirstName string
 	LastName  string
 }
 
+//nolint:unused
 func (c customMarshaler) MarshalTOML() ([]byte, error) {
 	fullName := fmt.Sprintf("%s %s", c.FirstName, c.LastName)
 	return []byte(fullName), nil
 }
 
+//nolint:unused
 var customMarshalerData = customMarshaler{FirstName: "Sally", LastName: "Fields"}
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var customMarshalerToml = []byte(`Sally Fields`)
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var nestedCustomMarshalerData = customMarshalerParent{
 	Self:    customMarshaler{FirstName: "Maiku", LastName: "Suteda"},
 	Friends: []customMarshaler{customMarshalerData},
@@ -575,7 +577,7 @@ var nestedCustomMarshalerData = customMarshalerParent{
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var nestedCustomMarshalerToml = []byte(`friends = ["Sally Fields"]
 me = "Maiku Suteda"
 `)
@@ -590,7 +592,7 @@ func (x *IntOrString) MarshalTOML() ([]byte, error) {
 	s := *(*string)(x)
 	_, err := strconv.Atoi(s)
 	if err != nil {
-		return []byte(fmt.Sprintf(`"%s"`, s)), nil
+		return []byte(fmt.Sprintf(`"%s"`, s)), nil //nolint:nilerr
 	}
 	return []byte(s), nil
 }
@@ -662,7 +664,7 @@ func (m *textPointerMarshaler) MarshalText() ([]byte, error) {
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var commentTestToml = []byte(`
 # it's a comment on type
 [postgres]
@@ -687,6 +689,7 @@ var commentTestToml = []byte(`
     My = "Baar"
 `)
 
+//nolint:unused
 type mapsTestStruct struct {
 	Simple map[string]string
 	Paths  map[string]string
@@ -700,7 +703,7 @@ type mapsTestStruct struct {
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var mapsTestData = mapsTestStruct{
 	Simple: map[string]string{
 		"one plus one": "two",
@@ -724,7 +727,7 @@ var mapsTestData = mapsTestStruct{
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var mapsTestToml = []byte(`
 [Other]
   "testing" = 3.9999
@@ -747,7 +750,7 @@ var mapsTestToml = []byte(`
 
 // TODO: Remove nolint once type is used by a test
 //
-//nolint:deadcode,unused
+//nolint:unused
 type structArrayNoTag struct {
 	A struct {
 		B []int64
@@ -757,7 +760,7 @@ type structArrayNoTag struct {
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var customTagTestToml = []byte(`
 [postgres]
   password = "bvalue"
@@ -772,7 +775,7 @@ var customTagTestToml = []byte(`
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var customCommentTagTestToml = []byte(`
 # db connection
 [postgres]
@@ -786,7 +789,7 @@ var customCommentTagTestToml = []byte(`
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var customCommentedTagTestToml = []byte(`
 [postgres]
   # password = "bvalue"
@@ -841,7 +844,7 @@ func TestUnmarshalTabInStringAndQuotedKey(t *testing.T) {
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var customMultilineTagTestToml = []byte(`int_slice = [
   1,
   2,
@@ -851,7 +854,7 @@ var customMultilineTagTestToml = []byte(`int_slice = [
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var testDocBasicToml = []byte(`
 [document]
   bool_val = true
@@ -862,16 +865,12 @@ var testDocBasicToml = []byte(`
   uint_val = 5001
 `)
 
-// TODO: Remove nolint once type is used by a test
-//
-//nolint:deadcode
+//nolint:unused
 type testDocCustomTag struct {
 	Doc testDocBasicsCustomTag `file:"document"`
 }
 
-// TODO: Remove nolint once type is used by a test
-//
-//nolint:deadcode
+//nolint:unused
 type testDocBasicsCustomTag struct {
 	Bool       bool      `file:"bool_val"`
 	Date       time.Time `file:"date_val"`
@@ -882,9 +881,7 @@ type testDocBasicsCustomTag struct {
 	unexported int       `file:"shouldntBeHere"`
 }
 
-// TODO: Remove nolint once var is used by a test
-//
-//nolint:deadcode,varcheck
+//nolint:unused
 var testDocCustomTagData = testDocCustomTag{
 	Doc: testDocBasicsCustomTag{
 		Bool:       true,
@@ -987,13 +984,13 @@ func TestUnmarshalInvalidPointerKind(t *testing.T) {
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused
+//nolint:unused
 type testDuration struct {
 	Nanosec   time.Duration  `toml:"nanosec"`
 	Microsec1 time.Duration  `toml:"microsec1"`
 	Microsec2 *time.Duration `toml:"microsec2"`
 	Millisec  time.Duration  `toml:"millisec"`
-	Sec       time.Duration  `toml:"sec"`
+	Sec       time.Duration  `toml:"sec"` //nolint:staticcheck
 	Min       time.Duration  `toml:"min"`
 	Hour      time.Duration  `toml:"hour"`
 	Mixed     time.Duration  `toml:"mixed"`
@@ -1002,7 +999,7 @@ type testDuration struct {
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var testDurationToml = []byte(`
 nanosec = "1ns"
 microsec1 = "1us"
@@ -1017,7 +1014,7 @@ a_string = "15s"
 
 // TODO: Remove nolint once var is used by a test
 //
-//nolint:deadcode,unused,varcheck
+//nolint:unused
 var testDurationToml2 = []byte(`a_string = "15s"
 hour = "1h0m0s"
 microsec1 = "1µs"
@@ -1031,15 +1028,14 @@ sec = "1s"
 
 // TODO: Remove nolint once type is used by a test
 //
-//nolint:deadcode,unused
+//nolint:unused
 type testBadDuration struct {
 	Val time.Duration `toml:"val"`
 }
 
 // TODO: add back camelCase test
-var testCamelCaseKeyToml = []byte(`fooBar = 10`) //nolint:unused
+var testCamelCaseKeyToml = []byte(`fooBar = 10`)
 
-//nolint:unused
 func TestUnmarshalCamelCaseKey(t *testing.T) {
 	t.Skipf("don't know if it is a good idea to automatically convert like that yet")
 	var x struct {
@@ -1058,7 +1054,7 @@ func TestUnmarshalCamelCaseKey(t *testing.T) {
 
 func TestUnmarshalNegativeUint(t *testing.T) {
 	t.Skipf("not sure if we this should always error")
-	type check struct{ U uint } // nolint:unused
+	type check struct{ U uint }
 	err := toml.Unmarshal([]byte("U = -1"), &check{})
 	assert.Error(t, err)
 }
@@ -1535,7 +1531,7 @@ func TestUnmarshalLocalDateTime(t *testing.T) {
 	}
 
 	for i, example := range examples {
-		doc := fmt.Sprintf(`date = %s`, example.in)
+		doc := "date = " + example.in
 
 		t.Run(fmt.Sprintf("ToLocalDateTime_%d_%s", i, example.name), func(t *testing.T) {
 			type dateStruct struct {
@@ -1621,7 +1617,7 @@ func TestUnmarshalLocalTime(t *testing.T) {
 	}
 
 	for i, example := range examples {
-		doc := fmt.Sprintf(`Time = %s`, example.in)
+		doc := "Time = " + example.in
 
 		t.Run(fmt.Sprintf("ToLocalTime_%d_%s", i, example.name), func(t *testing.T) {
 			type dateStruct struct {
@@ -1906,19 +1902,12 @@ func TestUnmarshalMixedTypeSlice(t *testing.T) {
 		ArrayField []interface{}
 	}
 
-	//doc := []byte(`ArrayField = [3.14,100,true,"hello world",{Field = "inner1"},[{Field = "inner2"},{Field = "inner3"}]]
-	//`)
-
 	doc := []byte(`ArrayField = [{Field = "inner1"},[{Field = "inner2"},{Field = "inner3"}]]
 `)
 
 	actual := TestStruct{}
 	expected := TestStruct{
 		ArrayField: []interface{}{
-			//3.14,
-			//int64(100),
-			//true,
-			//"hello world",
 			map[string]interface{}{
 				"Field": "inner1",
 			},
@@ -2004,7 +1993,8 @@ func TestDecoderStrict(t *testing.T) {
 		"Expected a *toml.StrictMissingError, got: %v", reflect.TypeOf(err),
 	)
 
-	se := err.(*toml.StrictMissingError)
+	var se *toml.StrictMissingError
+	assert.True(t, errors.As(err, &se))
 
 	keys := []toml.Key{}
 
@@ -2026,6 +2016,7 @@ func TestDecoderStrict(t *testing.T) {
 
 	var m map[string]interface{}
 	err = decoder(input).Decode(&m)
+	assert.NoError(t, err)
 }
 
 func TestDecoderStrictValid(t *testing.T) {
@@ -2060,19 +2051,6 @@ func (d *docUnmarshalTOML) UnmarshalTOML(i interface{}) error {
 		d.Decoded.Key = keyString
 	}
 	return nil
-}
-
-func TestDecoderStrictCustomUnmarshal(t *testing.T) {
-	t.Skip()
-	//input := `key = "ok"`
-	//var doc docUnmarshalTOML
-	//err := NewDecoder(bytes.NewReader([]byte(input))).Strict(true).Decode(&doc)
-	//if err != nil {
-	//	t.Fatal("unexpected error:", err)
-	//}
-	//if doc.Decoded.Key != "ok" {
-	//	t.Errorf("Bad unmarshal: expected ok, got %v", doc.Decoded.Key)
-	//}
 }
 
 type parent struct {
@@ -2278,7 +2256,7 @@ type Custom struct {
 	v string
 }
 
-func (c *Custom) UnmarshalTOML(v interface{}) error {
+func (c *Custom) UnmarshalTOML(interface{}) error {
 	c.v = "called"
 	return nil
 }
@@ -2303,14 +2281,14 @@ type durationString struct {
 	time.Duration
 }
 
-func (d *durationString) UnmarshalTOML(v interface{}) error {
+func (d *durationString) UnmarshalTOML(interface{}) error {
 	d.Duration = 10 * time.Second
 	return nil
 }
 
 type config437Error struct{}
 
-func (e *config437Error) UnmarshalTOML(v interface{}) error {
+func (e *config437Error) UnmarshalTOML(interface{}) error {
 	return errors.New("expected")
 }
 

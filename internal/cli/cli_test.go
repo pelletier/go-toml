@@ -2,7 +2,7 @@ package cli
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -23,7 +23,7 @@ func TestProcessMainStdin(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	input := strings.NewReader("this is the input")
 
-	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{}, input, stdout, stderr, func(io.Reader, io.Writer) error {
 		return nil
 	})
 
@@ -37,8 +37,8 @@ func TestProcessMainStdinErr(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	input := strings.NewReader("this is the input")
 
-	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
-		return fmt.Errorf("something bad")
+	exit := processMain([]string{}, input, stdout, stderr, func(io.Reader, io.Writer) error {
+		return errors.New("something bad")
 	})
 
 	assert.Equal(t, -1, exit)
@@ -51,7 +51,7 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	input := strings.NewReader("this is the input")
 
-	exit := processMain([]string{}, input, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{}, input, stdout, stderr, func(io.Reader, io.Writer) error {
 		var v interface{}
 		return toml.Unmarshal([]byte(`qwe = 001`), &v)
 	})
@@ -62,16 +62,16 @@ func TestProcessMainStdinDecodeErr(t *testing.T) {
 }
 
 func TestProcessMainFileExists(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "example")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "example")
 	assert.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
-	_, err = tmpfile.Write([]byte(`some data`))
+	_, err = tmpfile.WriteString(`some data`)
 	assert.NoError(t, err)
+	assert.NoError(t, tmpfile.Close())
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	exit := processMain([]string{tmpfile.Name()}, nil, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{tmpfile.Name()}, nil, stdout, stderr, func(io.Reader, io.Writer) error {
 		return nil
 	})
 
@@ -84,7 +84,7 @@ func TestProcessMainFileDoesNotExist(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	exit := processMain([]string{"/lets/hope/this/does/not/exist"}, nil, stdout, stderr, func(r io.Reader, w io.Writer) error {
+	exit := processMain([]string{"/lets/hope/this/does/not/exist"}, nil, stdout, stderr, func(io.Reader, io.Writer) error {
 		return nil
 	})
 
@@ -94,16 +94,14 @@ func TestProcessMainFileDoesNotExist(t *testing.T) {
 }
 
 func TestProcessMainFilesInPlace(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	path1 := path.Join(dir, "file1")
 	path2 := path.Join(dir, "file2")
 
-	err = os.WriteFile(path1, []byte("content 1"), 0600)
+	err := os.WriteFile(path1, []byte("content 1"), 0o600)
 	assert.NoError(t, err)
-	err = os.WriteFile(path2, []byte("content 2"), 0600)
+	err = os.WriteFile(path2, []byte("content 2"), 0o600)
 	assert.NoError(t, err)
 
 	p := Program{
@@ -136,17 +134,15 @@ func TestProcessMainFilesInPlaceErrRead(t *testing.T) {
 }
 
 func TestProcessMainFilesInPlaceFailFn(t *testing.T) {
-	dir, err := os.MkdirTemp("", "")
-	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	path1 := path.Join(dir, "file1")
 
-	err = os.WriteFile(path1, []byte("content 1"), 0600)
+	err := os.WriteFile(path1, []byte("content 1"), 0o600)
 	assert.NoError(t, err)
 
 	p := Program{
-		Fn:      func(io.Reader, io.Writer) error { return fmt.Errorf("oh no") },
+		Fn:      func(io.Reader, io.Writer) error { return errors.New("oh no") },
 		Inplace: true,
 	}
 

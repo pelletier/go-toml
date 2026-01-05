@@ -18,7 +18,7 @@ func TestUnmarshalSimple(t *testing.T) {
 
 	err := toml.Unmarshal(doc, &d)
 	if err != nil {
-		panic(err)
+		t.Error(err)
 	}
 }
 
@@ -38,7 +38,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 
 				err := toml.Unmarshal(doc, &d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 		})
@@ -52,7 +52,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 				d := map[string]interface{}{}
 				err := toml.Unmarshal(doc, &d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 		})
@@ -72,7 +72,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 				d := benchmarkDoc{}
 				err := toml.Unmarshal(bytes, &d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 		})
@@ -85,7 +85,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 				d := map[string]interface{}{}
 				err := toml.Unmarshal(bytes, &d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 		})
@@ -99,7 +99,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 			d := map[string]interface{}{}
 			err := toml.Unmarshal(hugoFrontMatterbytes, &d)
 			if err != nil {
-				panic(err)
+				b.Error(err)
 			}
 		}
 	})
@@ -123,7 +123,7 @@ func BenchmarkMarshal(b *testing.B) {
 
 			err := toml.Unmarshal(doc, &d)
 			if err != nil {
-				panic(err)
+				b.Error(err)
 			}
 
 			b.ReportAllocs()
@@ -134,7 +134,7 @@ func BenchmarkMarshal(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				out, err = marshal(d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 
@@ -145,7 +145,7 @@ func BenchmarkMarshal(b *testing.B) {
 			d := map[string]interface{}{}
 			err := toml.Unmarshal(doc, &d)
 			if err != nil {
-				panic(err)
+				b.Error(err)
 			}
 
 			b.ReportAllocs()
@@ -156,7 +156,7 @@ func BenchmarkMarshal(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				out, err = marshal(d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 
@@ -174,7 +174,7 @@ func BenchmarkMarshal(b *testing.B) {
 			d := benchmarkDoc{}
 			err := toml.Unmarshal(bytes, &d)
 			if err != nil {
-				panic(err)
+				b.Error(err)
 			}
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -184,7 +184,7 @@ func BenchmarkMarshal(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				out, err = marshal(d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 
@@ -195,7 +195,7 @@ func BenchmarkMarshal(b *testing.B) {
 			d := map[string]interface{}{}
 			err := toml.Unmarshal(bytes, &d)
 			if err != nil {
-				panic(err)
+				b.Error(err)
 			}
 
 			b.ReportAllocs()
@@ -205,7 +205,7 @@ func BenchmarkMarshal(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				out, err = marshal(d)
 				if err != nil {
-					panic(err)
+					b.Error(err)
 				}
 			}
 
@@ -217,7 +217,7 @@ func BenchmarkMarshal(b *testing.B) {
 		d := map[string]interface{}{}
 		err := toml.Unmarshal(hugoFrontMatterbytes, &d)
 		if err != nil {
-			panic(err)
+			b.Error(err)
 		}
 
 		b.ReportAllocs()
@@ -228,7 +228,7 @@ func BenchmarkMarshal(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			out, err = marshal(d)
 			if err != nil {
-				panic(err)
+				b.Error(err)
 			}
 		}
 

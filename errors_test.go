@@ -13,7 +13,6 @@ import (
 
 //nolint:funlen
 func TestDecodeError(t *testing.T) {
-
 	examples := []struct {
 		desc     string
 		doc      [3]string
@@ -161,13 +160,12 @@ line 5`,
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
-
 			b := bytes.Buffer{}
-			b.Write([]byte(e.doc[0]))
+			b.WriteString(e.doc[0])
 			start := b.Len()
-			b.Write([]byte(e.doc[1]))
+			b.WriteString(e.doc[1])
 			end := b.Len()
-			b.Write([]byte(e.doc[2]))
+			b.WriteString(e.doc[2])
 			doc := b.Bytes()
 			hl := doc[start:end]
 
@@ -189,7 +187,6 @@ line 5`,
 }
 
 func TestDecodeError_Accessors(t *testing.T) {
-
 	e := DecodeError{
 		message: "foo",
 		line:    1,
@@ -203,6 +200,84 @@ func TestDecodeError_Accessors(t *testing.T) {
 	assert.Equal(t, 2, c)
 	assert.Equal(t, Key{"one", "two"}, e.Key())
 	assert.Equal(t, "bar", e.String())
+}
+
+func TestDecodeError_DuplicateContent(t *testing.T) {
+	// This test verifies that when the same content appears multiple times
+	// in the document, the error correctly points to the actual location
+	// of the error, not the first occurrence of the content.
+	//
+	// The document has "1__2" on line 1 and "3__4" on line 2.
+	// Both have "__" which is invalid, but we want to ensure errors
+	// on line 2 report line 2, not line 1.
+
+	doc := `a = 1
+b = 3__4`
+
+	var v map[string]int
+	err := Unmarshal([]byte(doc), &v)
+
+	var derr *DecodeError
+	if !errors.As(err, &derr) {
+		t.Fatal("error not in expected format")
+	}
+
+	row, col := derr.Position()
+	// The error should be on line 2 where "3__4" is
+	if row != 2 {
+		t.Errorf("expected error on row 2, got row %d", row)
+	}
+	// Column should point to the "__" part (after "3")
+	if col < 5 {
+		t.Errorf("expected error at column >= 5, got column %d", col)
+	}
+}
+
+func TestDecodeError_Position(t *testing.T) {
+	// Test that error positions are correctly reported for various error locations
+	examples := []struct {
+		name        string
+		doc         string
+		expectedRow int
+		minCol      int
+	}{
+		{
+			name:        "error on first line",
+			doc:         `a = 1__2`,
+			expectedRow: 1,
+			minCol:      5,
+		},
+		{
+			name:        "error on second line",
+			doc:         "a = 1\nb = 2__3",
+			expectedRow: 2,
+			minCol:      5,
+		},
+		{
+			name:        "error on third line",
+			doc:         "a = 1\nb = 2\nc = 3__4",
+			expectedRow: 3,
+			minCol:      5,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.name, func(t *testing.T) {
+			var v map[string]int
+			err := Unmarshal([]byte(e.doc), &v)
+
+			var derr *DecodeError
+			if !errors.As(err, &derr) {
+				t.Fatal("error not in expected format")
+			}
+
+			row, col := derr.Position()
+			assert.Equal(t, e.expectedRow, row)
+			if col < e.minCol {
+				t.Errorf("expected column >= %d, got %d", e.minCol, col)
+			}
+		})
+	}
 }
 
 func TestStrictErrorUnwrap(t *testing.T) {

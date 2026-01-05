@@ -6,7 +6,6 @@ import (
 	"unicode"
 
 	"github.com/pelletier/go-toml/v2/internal/characters"
-	"github.com/pelletier/go-toml/v2/internal/danger"
 )
 
 // ParserError describes an error relative to the content of the document.
@@ -70,9 +69,24 @@ func (p *Parser) Data() []byte {
 // panics.
 func (p *Parser) Range(b []byte) Range {
 	return Range{
-		Offset: uint32(danger.SubsliceOffset(p.data, b)),
-		Length: uint32(len(b)),
+		Offset: uint32(p.subsliceOffset(b)), //nolint:gosec // TOML documents are small
+		Length: uint32(len(b)),              //nolint:gosec // TOML documents are small
 	}
+}
+
+// rangeOfToken computes the Range of a token given the remaining bytes after the token.
+// This is used when the token was extracted from the beginning of some position,
+// and 'rest' is what remains after the token.
+func (p *Parser) rangeOfToken(token, rest []byte) Range {
+	offset := len(p.data) - len(token) - len(rest)
+	return Range{Offset: uint32(offset), Length: uint32(len(token))} //nolint:gosec // TOML documents are small
+}
+
+// subsliceOffset returns the byte offset of subslice b within p.data.
+// b must be a suffix (tail) of p.data.
+func (p *Parser) subsliceOffset(b []byte) int {
+	// b is a suffix of p.data, so its offset is len(p.data) - len(b)
+	return len(p.data) - len(b)
 }
 
 // Raw returns the slice corresponding to the bytes in the given range.
@@ -158,25 +172,23 @@ type Shape struct {
 	End   Position
 }
 
-func (p *Parser) position(b []byte) Position {
-	offset := danger.SubsliceOffset(p.data, b)
+// Shape returns the shape of the given range in the input.  Will
+// panic if the range is not a subslice of the input.
+func (p *Parser) Shape(r Range) Shape {
+	return Shape{
+		Start: p.positionAt(int(r.Offset)),
+		End:   p.positionAt(int(r.Offset + r.Length)),
+	}
+}
 
+// positionAt returns the position at the given byte offset in the document.
+func (p *Parser) positionAt(offset int) Position {
 	lead := p.data[:offset]
 
 	return Position{
 		Offset: offset,
 		Line:   bytes.Count(lead, []byte{'\n'}) + 1,
 		Column: len(lead) - bytes.LastIndex(lead, []byte{'\n'}),
-	}
-}
-
-// Shape returns the shape of the given range in the input.  Will
-// panic if the range is not a subslice of the input.
-func (p *Parser) Shape(r Range) Shape {
-	raw := p.Raw(r)
-	return Shape{
-		Start: p.position(raw),
-		End:   p.position(raw[r.Length:]),
 	}
 }
 
@@ -199,7 +211,7 @@ func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
 	if p.KeepComments && err == nil {
 		ref = p.builder.Push(Node{
 			Kind: Comment,
-			Raw:  p.Range(data),
+			Raw:  p.rangeOfToken(data, rest),
 			Data: data,
 		})
 	}
@@ -376,7 +388,7 @@ func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
 		if err == nil {
 			ref = p.builder.Push(Node{
 				Kind: String,
-				Raw:  p.Range(raw),
+				Raw:  p.rangeOfToken(raw, b),
 				Data: v,
 			})
 		}
@@ -394,7 +406,7 @@ func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
 		if err == nil {
 			ref = p.builder.Push(Node{
 				Kind: String,
-				Raw:  p.Range(raw),
+				Raw:  p.rangeOfToken(raw, b),
 				Data: v,
 			})
 		}
@@ -456,7 +468,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 	parent := p.builder.Push(Node{
 		Kind: InlineTable,
-		Raw:  p.Range(b[:1]),
+		Raw:  p.rangeOfToken(b[:1], b[1:]),
 	})
 
 	first := true
@@ -542,7 +554,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 
 	var err error
 	for len(b) > 0 {
-		cref := invalidReference
+		var cref reference
 		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
@@ -611,12 +623,13 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []b
 	latestCommentRef := invalidReference
 
 	addComment := func(ref reference) {
-		if rootCommentRef == invalidReference {
+		switch {
+		case rootCommentRef == invalidReference:
 			rootCommentRef = ref
-		} else if latestCommentRef == invalidReference {
+		case latestCommentRef == invalidReference:
 			p.builder.AttachChild(rootCommentRef, ref)
 			latestCommentRef = ref
-		} else {
+		default:
 			p.builder.Chain(latestCommentRef, ref)
 			latestCommentRef = ref
 		}
@@ -704,11 +717,11 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 
 	if !escaped {
 		str := token[startIdx:endIdx]
-		verr := characters.Utf8TomlValidAlreadyEscaped(str)
-		if verr.Zero() {
+		highlight := characters.Utf8TomlValidAlreadyEscaped(str)
+		if len(highlight) == 0 {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, NewParserError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, nil, NewParserError(highlight, "invalid UTF-8")
 	}
 
 	var builder bytes.Buffer
@@ -744,7 +757,7 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 				i += j
 				for ; i < len(token)-3; i++ {
 					c := token[i]
-					if !(c == '\n' || c == '\r' || c == ' ' || c == '\t') {
+					if c != '\n' && c != '\r' && c != ' ' && c != '\t' {
 						i--
 						break
 					}
@@ -820,7 +833,7 @@ func (p *Parser) parseKey(b []byte) (reference, []byte, error) {
 
 	ref := p.builder.Push(Node{
 		Kind: Key,
-		Raw:  p.Range(raw),
+		Raw:  p.rangeOfToken(raw, b),
 		Data: key,
 	})
 
@@ -836,7 +849,7 @@ func (p *Parser) parseKey(b []byte) (reference, []byte, error) {
 
 			p.builder.PushAndChain(Node{
 				Kind: Key,
-				Raw:  p.Range(raw),
+				Raw:  p.rangeOfToken(raw, b),
 				Data: key,
 			})
 		} else {
@@ -897,11 +910,11 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	// validate the string and return a direct reference to the buffer.
 	if !escaped {
 		str := token[startIdx:endIdx]
-		verr := characters.Utf8TomlValidAlreadyEscaped(str)
-		if verr.Zero() {
+		highlight := characters.Utf8TomlValidAlreadyEscaped(str)
+		if len(highlight) == 0 {
 			return token, str, rest, nil
 		}
-		return nil, nil, nil, NewParserError(str[verr.Index:verr.Index+verr.Size], "invalid UTF-8")
+		return nil, nil, nil, NewParserError(highlight, "invalid UTF-8")
 	}
 
 	i := startIdx
@@ -972,7 +985,7 @@ func hexToRune(b []byte, length int) (rune, error) {
 
 	var r uint32
 	for i, c := range b {
-		d := uint32(0)
+		var d uint32
 		switch {
 		case '0' <= c && c <= '9':
 			d = uint32(c - '0')
@@ -1013,7 +1026,7 @@ func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) 
 		return p.builder.Push(Node{
 			Kind: Float,
 			Data: b[:3],
-			Raw:  p.Range(b[:3]),
+			Raw:  p.rangeOfToken(b[:3], b[3:]),
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
@@ -1023,7 +1036,7 @@ func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) 
 		return p.builder.Push(Node{
 			Kind: Float,
 			Data: b[:3],
-			Raw:  p.Range(b[:3]),
+			Raw:  p.rangeOfToken(b[:3], b[3:]),
 		}), b[3:], nil
 	case '+', '-':
 		return p.scanIntOrFloat(b)
@@ -1148,7 +1161,7 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 		return p.builder.Push(Node{
 			Kind: Integer,
 			Data: b[:i],
-			Raw:  p.Range(b[:i]),
+			Raw:  p.rangeOfToken(b[:i], b[i:]),
 		}), b[i:], nil
 	}
 
@@ -1172,7 +1185,7 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 				return p.builder.Push(Node{
 					Kind: Float,
 					Data: b[:i+3],
-					Raw:  p.Range(b[:i+3]),
+					Raw:  p.rangeOfToken(b[:i+3], b[i+3:]),
 				}), b[i+3:], nil
 			}
 
@@ -1184,7 +1197,7 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 				return p.builder.Push(Node{
 					Kind: Float,
 					Data: b[:i+3],
-					Raw:  p.Range(b[:i+3]),
+					Raw:  p.rangeOfToken(b[:i+3], b[i+3:]),
 				}), b[i+3:], nil
 			}
 
@@ -1207,7 +1220,7 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 	return p.builder.Push(Node{
 		Kind: kind,
 		Data: b[:i],
-		Raw:  p.Range(b[:i]),
+		Raw:  p.rangeOfToken(b[:i], b[i:]),
 	}), b[i:], nil
 }
 

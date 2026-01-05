@@ -107,7 +107,11 @@ type MyConfig struct {
 ### Unmarshaling
 
 [`Unmarshal`][unmarshal] reads a TOML document and fills a Go structure with its
-content. For example:
+content. 
+
+Note that the struct variable names are _capitalized_, while the variables in the toml document are _lowercase_.
+
+For example:
 
 ```go
 doc := `
@@ -132,6 +136,62 @@ fmt.Println("tags:", cfg.Tags)
 ```
 
 [unmarshal]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#Unmarshal
+
+
+Here is an example using tables with some simple nesting:
+
+```go
+doc := `
+age = 45
+fruits = ["apple", "pear"]
+
+# these are very important!
+[my-variables]
+first = 1
+second = 0.2
+third = "abc"
+
+# this is not so important.
+[my-variables.b]
+bfirst = 123
+`
+
+var Document struct {
+	Age int
+	Fruits []string
+
+	Myvariables struct {
+		First  int
+		Second float64
+		Third  string
+
+		B struct {
+			Bfirst int
+		}
+	} `toml:"my-variables"`
+}
+
+err := toml.Unmarshal([]byte(doc), &Document)
+if err != nil {
+	panic(err)
+}
+
+fmt.Println("age:", Document.Age)
+fmt.Println("fruits:", Document.Fruits)
+fmt.Println("my-variables.first:", Document.Myvariables.First)
+fmt.Println("my-variables.second:", Document.Myvariables.Second)
+fmt.Println("my-variables.third:", Document.Myvariables.Third)
+fmt.Println("my-variables.B.Bfirst:", Document.Myvariables.B.Bfirst)
+
+// Output:
+// age: 45
+// fruits: [apple pear]
+// my-variables.first: 1
+// my-variables.second: 0.2
+// my-variables.third: abc
+// my-variables.B.Bfirst: 123
+```
+
 
 ### Marshaling
 

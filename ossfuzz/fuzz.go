@@ -1,3 +1,4 @@
+// Package ossfuzz provides a fuzzing target for OSS-Fuzz.
 package ossfuzz
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// FuzzToml is the fuzzing target.
 func FuzzToml(data []byte) int {
 	if len(data) >= 2048 {
 		return 0

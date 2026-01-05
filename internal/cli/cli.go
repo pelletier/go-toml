@@ -1,3 +1,4 @@
+// Package cli provides common functions for command-line programs.
 package cli
 
 import (
@@ -22,22 +23,21 @@ type Program struct {
 }
 
 func (p *Program) Execute() {
-	flag.Usage = func() { fmt.Fprintf(os.Stderr, p.Usage) }
+	flag.Usage = func() { fmt.Fprint(os.Stderr, p.Usage) }
 	flag.Parse()
 	os.Exit(p.main(flag.Args(), os.Stdin, os.Stdout, os.Stderr))
 }
 
-func (p *Program) main(files []string, input io.Reader, output, error io.Writer) int {
+func (p *Program) main(files []string, input io.Reader, output, stderr io.Writer) int {
 	err := p.run(files, input, output)
 	if err != nil {
-
 		var derr *toml.DecodeError
 		if errors.As(err, &derr) {
-			fmt.Fprintln(error, derr.String())
+			_, _ = fmt.Fprintln(stderr, derr.String())
 			row, col := derr.Position()
-			fmt.Fprintln(error, "error occurred at row", row, "column", col)
+			_, _ = fmt.Fprintln(stderr, "error occurred at row", row, "column", col)
 		} else {
-			fmt.Fprintln(error, err.Error())
+			_, _ = fmt.Fprintln(stderr, err.Error())
 		}
 
 		return -1
@@ -54,7 +54,7 @@ func (p *Program) run(files []string, input io.Reader, output io.Writer) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		input = f
 	}
 	return p.Fn(input, output)
@@ -71,7 +71,7 @@ func (p *Program) runAllFilesInPlace(files []string) error {
 }
 
 func (p *Program) runFileInPlace(path string) error {
-	in, err := os.ReadFile(path)
+	in, err := os.ReadFile(path) // #nosec G304
 	if err != nil {
 		return err
 	}
@@ -83,5 +83,5 @@ func (p *Program) runFileInPlace(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, out.Bytes(), 0600)
+	return os.WriteFile(path, out.Bytes(), 0o600)
 }

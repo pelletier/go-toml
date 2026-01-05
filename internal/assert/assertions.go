@@ -1,3 +1,4 @@
+// Package assert provides assertion functions for unit testing.
 package assert
 
 import (
@@ -9,66 +10,67 @@ import (
 )
 
 // True asserts that an expression is true.
-func True(t testing.TB, ok bool, msgAndArgs ...any) {
+func True(tb testing.TB, ok bool, msgAndArgs ...any) {
+	tb.Helper()
 	if ok {
 		return
 	}
-	t.Helper()
-	t.Fatal(formatMsgAndArgs("Expected expression to be true", msgAndArgs...))
+	tb.Fatal(formatMsgAndArgs("Expected expression to be true", msgAndArgs...))
 }
 
 // False asserts that an expression is false.
-func False(t testing.TB, ok bool, msgAndArgs ...any) {
+func False(tb testing.TB, ok bool, msgAndArgs ...any) {
+	tb.Helper()
 	if !ok {
 		return
 	}
-	t.Helper()
-	t.Fatal(formatMsgAndArgs("Expected expression to be false", msgAndArgs...))
+	tb.Fatal(formatMsgAndArgs("Expected expression to be false", msgAndArgs...))
 }
 
 // Equal asserts that "expected" and "actual" are equal.
-func Equal[T any](t testing.TB, expected, actual T, msgAndArgs ...any) {
+func Equal[T any](tb testing.TB, expected, actual T, msgAndArgs ...any) {
+	tb.Helper()
 	if objectsAreEqual(expected, actual) {
 		return
 	}
-	t.Helper()
 	msg := formatMsgAndArgs("Expected values to be equal:", msgAndArgs...)
-	t.Fatalf("%s\n%s", msg, diff(expected, actual))
+	tb.Fatalf("%s\n%s", msg, diff(expected, actual))
 }
 
 // Error asserts that an error is not nil.
-func Error(t testing.TB, err error, msgAndArgs ...any) {
+func Error(tb testing.TB, err error, msgAndArgs ...any) {
+	tb.Helper()
 	if err != nil {
 		return
 	}
-	t.Helper()
-	t.Fatal(formatMsgAndArgs("Expected an error", msgAndArgs...))
+	tb.Fatal(formatMsgAndArgs("Expected an error", msgAndArgs...))
 }
 
 // NoError asserts that an error is nil.
-func NoError(t testing.TB, err error, msgAndArgs ...any) {
+func NoError(tb testing.TB, err error, msgAndArgs ...any) {
+	tb.Helper()
 	if err == nil {
 		return
 	}
-	t.Helper()
 	msg := formatMsgAndArgs("Unexpected error:", msgAndArgs...)
-	t.Fatalf("%s\n%+v", msg, err)
+	tb.Fatalf("%s\n%+v", msg, err)
 }
 
 // Panics asserts that the given function panics.
-func Panics(t testing.TB, fn func(), msgAndArgs ...any) {
-	t.Helper()
+func Panics(tb testing.TB, fn func(), msgAndArgs ...any) {
+	tb.Helper()
 	defer func() {
 		if recover() == nil {
 			msg := formatMsgAndArgs("Expected function to panic", msgAndArgs...)
-			t.Fatal(msg)
+			tb.Fatal(msg)
 		}
 	}()
 	fn()
 }
 
 // Zero asserts that a value is its zero value.
-func Zero[T any](t testing.TB, value T, msgAndArgs ...any) {
+func Zero[T any](tb testing.TB, value T, msgAndArgs ...any) {
+	tb.Helper()
 	var zero T
 	if objectsAreEqual(value, zero) {
 		return
@@ -77,22 +79,26 @@ func Zero[T any](t testing.TB, value T, msgAndArgs ...any) {
 	if (val.Kind() == reflect.Slice || val.Kind() == reflect.Map || val.Kind() == reflect.Array) && val.Len() == 0 {
 		return
 	}
-	t.Helper()
 	msg := formatMsgAndArgs("Expected zero value but got:", msgAndArgs...)
-	t.Fatalf("%s\n%v", msg, value)
+	tb.Fatalf("%s\n%v", msg, value)
 }
 
-func NotZero[T any](t testing.TB, value T, msgAndArgs ...any) {
+func NotZero[T any](tb testing.TB, value T, msgAndArgs ...any) {
+	tb.Helper()
 	var zero T
 	if !objectsAreEqual(value, zero) {
 		val := reflect.ValueOf(value)
-		if !((val.Kind() == reflect.Slice || val.Kind() == reflect.Map || val.Kind() == reflect.Array) && val.Len() == 0) {
+		switch val.Kind() {
+		case reflect.Slice, reflect.Map, reflect.Array:
+			if val.Len() > 0 {
+				return
+			}
+		default:
 			return
 		}
 	}
-	t.Helper()
 	msg := formatMsgAndArgs("Unexpected zero value:", msgAndArgs...)
-	t.Fatalf("%s\n%v", msg, value)
+	tb.Fatalf("%s\n%v", msg, value)
 }
 
 func formatMsgAndArgs(msg string, args ...any) string {
