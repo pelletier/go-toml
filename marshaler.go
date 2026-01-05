@@ -113,6 +113,11 @@ type MarshalTOML interface {
 	MarshalTOML() ([]byte, error)
 }
 
+// UnmarshalTOML interface can be implemented by types to write custom unmarshal functions
+type UnmarshalTOML interface {
+	UnmarshalTOML([]byte) error
+}
+
 // Encode writes a TOML representation of v to the stream.
 //
 // If v cannot be represented to TOML it returns an error.
@@ -823,6 +828,7 @@ func walkStruct(ctx encoderCtx, t *table, v reflect.Value) {
 		comment := fieldType.Tag.Get("comment")
 		if fieldValue.CanInterface() {
 			if commenter, ok := fieldValue.Interface().(TOMLEncoderComment); ok {
+				fmt.Println("testing")
 				comment = commenter.TOMLComment()
 			}
 		}

@@ -11,6 +11,7 @@ var (
 	textMarshalerType      = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 	tomlCommentType        = reflect.TypeOf((*TOMLEncoderComment)(nil)).Elem()
 	marshalTOMLType        = reflect.TypeOf((*MarshalTOML)(nil)).Elem()
+	unmarshalTOMLType      = reflect.TypeOf((*UnmarshalTOML)(nil)).Elem()
 	textUnmarshalerType    = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}(nil))
 	sliceInterfaceType     = reflect.TypeOf([]interface{}(nil))

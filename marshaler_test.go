@@ -1891,7 +1891,7 @@ type TLS struct {
 	Version string `toml:"version"`
 }
 
-func (t *TLS) TomlComment() string {
+func (t *TLS) TOMLComment() string {
 	return t.Cipher + t.Version + "this is a comment"
 }
 
@@ -1935,7 +1935,7 @@ type dynamicCommenter struct {
 	Comment string
 }
 
-func (d dynamicCommenter) TomlComment() string {
+func (d dynamicCommenter) TOMLComment() string {
 	return d.Comment
 }
 
@@ -1955,14 +1955,14 @@ type pointerCommenter struct {
 	Comment string
 }
 
-func (p *pointerCommenter) TomlComment() string {
+func (p *pointerCommenter) TOMLComment() string {
 	return p.Comment
 }
 
 // serverConfig is a user-defined type based on map[string]string
 type serverConfig map[string]string
 
-func (s serverConfig) TomlComment() string {
+func (s serverConfig) TOMLComment() string {
 	if host, ok := s["host"]; ok {
 		return "Configuration for " + host
 	}

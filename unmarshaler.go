@@ -706,6 +706,12 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 		return err
 	}
 
+	// this tried unmarshaling similar to encoding/json unmarshal interface
+	ok, err = d.tryUnmarshalTOML(value, v)
+	if ok || err != nil {
+		return err
+	}
+
 	switch value.Kind {
 	case unstable.String:
 		return d.unmarshalString(value, v)
@@ -878,6 +884,14 @@ func (d *decoder) unmarshalLocalTime(value *unstable.Node, v reflect.Value) erro
 
 	v.Set(reflect.ValueOf(lt))
 	return nil
+}
+
+func (d *decoder) tryUnmarshalTOML(value *unstable.Node, v reflect.Value) (bool, error) {
+	if v.CanAddr() && v.Addr().Type().Implements(unmarshalTOMLType) {
+		err := v.Addr().Interface().(UnmarshalTOML).UnmarshalTOML(value.Data)
+		return true, err
+	}
+	return false, nil
 }
 
 func (d *decoder) unmarshalLocalDateTime(value *unstable.Node, v reflect.Value) error {
