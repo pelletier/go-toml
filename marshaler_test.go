@@ -17,9 +17,16 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
+type commenter string
+
+func (c *commenter) TomlComment() string {
+	return string(*c) + ": this is some comment"
+}
+
 type marshalTextKey struct {
 	A string
 	B string
+	C commenter
 }
 
 func (k marshalTextKey) MarshalText() ([]byte, error) {
@@ -139,9 +146,9 @@ a = 'test'
 		{
 			desc: `map with text key`,
 			v: map[marshalTextKey]string{
-				{A: "a", B: "1"}: "value 1",
-				{A: "a", B: "2"}: "value 2",
-				{A: "b", B: "1"}: "value 3",
+				{A: "a", B: "1", C: "value 1 2 3 4"}: "value 1",
+				{A: "a", B: "2"}:                     "value 2",
+				{A: "b", B: "1"}:                     "value 3",
 			},
 			expected: `a-1 = 'value 1'
 a-2 = 'value 2'
@@ -2160,11 +2167,16 @@ func ExampleMarshal_commented() {
 	// # output-file = ''
 }
 
+type TLS struct {
+	Cipher  string `toml:"cipher"`
+	Version string `toml:"version"`
+}
+
+func (t *TLS) TOMLComment() string {
+	return t.Cipher + t.Version + "this is a comment"
+}
+
 func TestReadmeComments(t *testing.T) {
-	type TLS struct {
-		Cipher  string `toml:"cipher"`
-		Version string `toml:"version"`
-	}
 	type Config struct {
 		Host string `toml:"host" comment:"Host IP to connect to."`
 		Port int    `toml:"port" comment:"Port of the remote server."`
@@ -2178,6 +2190,7 @@ func TestReadmeComments(t *testing.T) {
 			Version: "TLS 1.3",
 		},
 	}
+
 	out, err := toml.Marshal(example)
 	assert.NoError(t, err)
 
@@ -2191,5 +2204,466 @@ port = 4242
 # cipher = 'AEAD-AES128-GCM-SHA256'
 # version = 'TLS 1.3'
 `
+
+	fmt.Println(string(out))
 	assert.Equal(t, expected, string(out))
+}
+
+// test dynamic comments
+// dynamicCommenter implements TomlComment() to provide dynamic comments
+type dynamicCommenter struct {
+	Value   string
+	Comment string
+}
+
+func (d dynamicCommenter) TOMLComment() string {
+	return d.Comment
+}
+
+// staticComment has only struct tag comment
+type staticComment struct {
+	Value string
+}
+
+// noComment has no comment at all
+type noComment struct {
+	Value string
+}
+
+// pointerCommenter tests TomlComment() with pointer receivers
+type pointerCommenter struct {
+	Value   string
+	Comment string
+}
+
+func (p *pointerCommenter) TOMLComment() string {
+	return p.Comment
+}
+
+// serverConfig is a user-defined type based on map[string]string
+type serverConfig map[string]string
+
+func (s serverConfig) TOMLComment() string {
+	if host, ok := s["host"]; ok {
+		return "Configuration for " + host
+	}
+	return "Server configuration"
+}
+
+// TestTomlEncoderInterface tests that the TomlEncoder interface works correctly
+// for dynamic comments. It verifies three scenarios:
+// 1. If a property implements TomlEncoder (TomlComment()), that comment is used
+// 2. If not, but struct tag has comment, that comment is used
+// 3. If neither exists, no comment is added
+func TestTomlEncoderInterface(t *testing.T) {
+	examples := []struct {
+		desc     string
+		v        interface{}
+		expected string
+	}{
+		{
+			desc: "dynamic comment overrides struct tag",
+			v: struct {
+				Field dynamicCommenter `comment:"this should be ignored"`
+			}{
+				Field: dynamicCommenter{
+					Value:   "test value",
+					Comment: "dynamic comment from TomlComment()",
+				},
+			},
+			expected: `# dynamic comment from TomlComment()
+[Field]
+Value = 'test value'
+Comment = 'dynamic comment from TomlComment()'
+`,
+		},
+		{
+			desc: "struct tag comment when no TomlComment()",
+			v: struct {
+				Field staticComment `comment:"struct tag comment"`
+			}{
+				Field: staticComment{
+					Value: "test value",
+				},
+			},
+			expected: `# struct tag comment
+[Field]
+Value = 'test value'
+`,
+		},
+		{
+			desc: "no comment when neither TomlComment() nor struct tag",
+			v: struct {
+				Field noComment
+			}{
+				Field: noComment{
+					Value: "test value",
+				},
+			},
+			expected: `[Field]
+Value = 'test value'
+`,
+		},
+		{
+			desc: "multiple fields with different comment types",
+			v: struct {
+				Dynamic dynamicCommenter `comment:"ignored static comment"`
+				Static  staticComment    `comment:"struct tag comment"`
+				None    noComment
+			}{
+				Dynamic: dynamicCommenter{
+					Value:   "dynamic value",
+					Comment: "runtime dynamic comment",
+				},
+				Static: staticComment{
+					Value: "static value",
+				},
+				None: noComment{
+					Value: "no comment value",
+				},
+			},
+			expected: `# runtime dynamic comment
+[Dynamic]
+Value = 'dynamic value'
+Comment = 'runtime dynamic comment'
+
+# struct tag comment
+[Static]
+Value = 'static value'
+
+[None]
+Value = 'no comment value'
+`,
+		},
+		{
+			desc: "empty dynamic comment results in no comment",
+			v: struct {
+				Field dynamicCommenter `comment:"struct tag comment"`
+			}{
+				Field: dynamicCommenter{
+					Value:   "test value",
+					Comment: "", // empty comment
+				},
+			},
+			expected: `[Field]
+Value = 'test value'
+Comment = ''
+`,
+		},
+		{
+			desc: "multiline dynamic comment",
+			v: struct {
+				Field dynamicCommenter
+			}{
+				Field: dynamicCommenter{
+					Value:   "test value",
+					Comment: "First line of comment\nSecond line of comment\nThird line",
+				},
+			},
+			expected: `# First line of comment
+# Second line of comment
+# Third line
+[Field]
+Value = 'test value'
+Comment = "First line of comment\nSecond line of comment\nThird line"
+`,
+		},
+		{
+			desc: "pointer receiver TomlComment()",
+			v: struct {
+				Field *pointerCommenter `comment:"struct tag comment"`
+			}{
+				Field: &pointerCommenter{
+					Value:   "test value",
+					Comment: "pointer receiver comment",
+				},
+			},
+			expected: `# pointer receiver comment
+[Field]
+Value = 'test value'
+Comment = 'pointer receiver comment'
+`,
+		},
+		{
+			desc: "key-value with struct tag comments",
+			v: struct {
+				Name    string `comment:"static name comment"`
+				Version int    `comment:"static version comment"`
+			}{
+				Name:    "test",
+				Version: 42,
+			},
+			expected: `# static name comment
+Name = 'test'
+# static version comment
+Version = 42
+`,
+		},
+		{
+			desc: "array table with dynamic comments",
+			v: struct {
+				Items []dynamicCommenter `comment:"items comment"`
+			}{
+				Items: []dynamicCommenter{
+					{Value: "item1", Comment: "comment for item 1"},
+					{Value: "item2", Comment: "comment for item 2"},
+				},
+			},
+			expected: `# items comment
+# comment for item 1
+[[Items]]
+Value = 'item1'
+Comment = 'comment for item 1'
+
+# comment for item 2
+[[Items]]
+Value = 'item2'
+Comment = 'comment for item 2'
+`,
+		},
+		{
+			desc: "nested struct with dynamic comments",
+			v: struct {
+				Outer struct {
+					Field dynamicCommenter `comment:"ignored inner comment"`
+				} `comment:"outer comment"`
+			}{
+				Outer: struct {
+					Field dynamicCommenter `comment:"ignored inner comment"`
+				}{
+					Field: dynamicCommenter{
+						Value:   "nested value",
+						Comment: "dynamic nested comment",
+					},
+				},
+			},
+			expected: `# outer comment
+[Outer]
+# dynamic nested comment
+[Outer.Field]
+Value = 'nested value'
+Comment = 'dynamic nested comment'
+`,
+		},
+		{
+			desc: "TomlComment() takes precedence over struct tag",
+			v: struct {
+				Database dynamicCommenter `comment:"Database connection settings"`
+				Cache    dynamicCommenter `comment:"Cache configuration"`
+			}{
+				Database: dynamicCommenter{
+					Value:   "localhost:5432",
+					Comment: "Production database connection",
+				},
+				Cache: dynamicCommenter{
+					Value:   "redis://localhost:6379",
+					Comment: "Redis cache settings",
+				},
+			},
+			expected: `# Production database connection
+[Database]
+Value = 'localhost:5432'
+Comment = 'Production database connection'
+
+# Redis cache settings
+[Cache]
+Value = 'redis://localhost:6379'
+Comment = 'Redis cache settings'
+`,
+		},
+		{
+			desc: "list of map[string]string with struct tag comment",
+			v: struct {
+				Servers []map[string]string `comment:"Server configurations"`
+			}{
+				Servers: []map[string]string{
+					{"host": "localhost", "port": "8080"},
+					{"host": "example.com", "port": "443"},
+				},
+			},
+			expected: `# Server configurations
+[[Servers]]
+host = 'localhost'
+port = '8080'
+
+[[Servers]]
+host = 'example.com'
+port = '443'
+`,
+		},
+		{
+			desc: "user-defined map type with TomlComment()",
+			v: struct {
+				Servers []serverConfig `comment:"static comment ignored"`
+			}{
+				Servers: []serverConfig{
+					{"host": "localhost", "port": "8080"},
+					{"host": "example.com", "port": "443"},
+				},
+			},
+			expected: `# static comment ignored
+# Configuration for localhost
+[[Servers]]
+host = 'localhost'
+port = '8080'
+
+# Configuration for example.com
+[[Servers]]
+host = 'example.com'
+port = '443'
+`,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			out, err := toml.Marshal(e.v)
+			assert.NoError(t, err)
+			assert.Equal(t, e.expected, string(out))
+		})
+	}
+}
+
+// customTomlMarshaler implements MarshalToml for testing
+type customTomlMarshaler struct {
+	Name  string
+	Value int
+}
+
+func (c customTomlMarshaler) MarshalTOML() ([]byte, error) {
+	return []byte("testmarshal"), nil
+}
+
+// errorTomlMarshaler always returns an error
+type errorTomlMarshaler struct{}
+
+func (e errorTomlMarshaler) MarshalTOML() ([]byte, error) {
+	return nil, fmt.Errorf("intentional marshal error")
+}
+
+// pointerTomlMarshaler implements MarshalToml with pointer receiver
+type pointerTomlMarshaler struct {
+	Data string `toml:"data"`
+}
+
+func (p *pointerTomlMarshaler) MarshalTOML() ([]byte, error) {
+	return []byte("testmarshal"), nil
+}
+
+// TestMarshalTomlInterface tests the MarshalToml interface implementation
+func TestMarshalTomlInterface(t *testing.T) {
+	examples := []struct {
+		desc     string
+		v        interface{}
+		expected string
+		err      bool
+	}{
+		{
+			desc:     "basic MarshalToml implementation",
+			v:        customTomlMarshaler{Name: "test", Value: 42},
+			expected: `testmarshal`,
+		},
+		{
+			desc: "MarshalToml in map",
+			v: map[string]customTomlMarshaler{
+				"custom": {Name: "nested", Value: 100},
+			},
+			expected: `[custom]
+testmarshal`,
+		},
+		{
+			desc: "MarshalToml with error",
+			v:    errorTomlMarshaler{},
+			err:  true,
+		},
+		{
+			desc: "MarshalToml with error in map",
+			v: map[string]interface{}{
+				"field": errorTomlMarshaler{},
+			},
+			err: true,
+		},
+		{
+			desc: "pointer receiver MarshalToml",
+			v:    &pointerTomlMarshaler{Data: "pointer data"},
+			expected: `data = 'pointer data'
+`,
+		},
+		{
+			desc: "pointer receiver MarshalToml in struct",
+			v: struct {
+				Field *pointerTomlMarshaler
+			}{
+				Field: &pointerTomlMarshaler{Data: "nested pointer"},
+			},
+			expected: `[Field]
+data = 'nested pointer'
+`,
+		},
+		{
+			desc: "MarshalToml in slice",
+			v: map[string][]interface{}{
+				"items": {
+					customTomlMarshaler{Name: "item1", Value: 1},
+					customTomlMarshaler{Name: "item2", Value: 2},
+				},
+			},
+			expected: `[[items]]
+testmarshal
+[[items]]
+testmarshal`,
+		},
+		{
+			desc: "MarshalToml in nested structs",
+			v: struct {
+				Outer struct {
+					Inner customTomlMarshaler
+				}
+			}{
+				Outer: struct {
+					Inner customTomlMarshaler
+				}{
+					Inner: customTomlMarshaler{Name: "nested", Value: 99},
+				},
+			},
+			expected: `[Outer]
+[Outer.Inner]
+testmarshal`,
+		},
+		{
+			desc: "MarshalToml with array elements",
+			v: struct {
+				Simple customTomlMarshaler
+				Number int
+				Text   string
+				Array  []string
+			}{
+				Simple: customTomlMarshaler{Name: "simple", Value: 42},
+				Number: 100,
+				Text:   "hello",
+				Array:  []string{"one", "two", "three"},
+			},
+			expected: `Number = 100
+Text = 'hello'
+Array = ['one', 'two', 'three']
+
+[Simple]
+testmarshal`,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			b, err := toml.Marshal(e.v)
+			if e.err {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, e.expected, string(b))
+		})
+	}
 }
