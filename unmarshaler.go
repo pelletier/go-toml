@@ -621,9 +621,119 @@ func (d *decoder) handleTable(key unstable.Iterator, v reflect.Value) (reflect.V
 	return d.handleKeyValues(v)
 }
 
+func (d *decoder) tryUnmarshalTOMLWithKeyValues(v reflect.Value) (reflect.Value, error) {
+	origV := v
+	type exprInfo struct {
+		keyRaw          unstable.Range
+		keyData         []byte
+		valueRaw        unstable.Range
+		valueData       []byte
+		valueSerialized string // For arrays/complex types that need immediate serialization
+	}
+
+	var exprs []exprInfo
+	allHaveRaw := true
+
+	// iterate over all the key value pairs till we hit non key value node
+	for d.nextExpr() {
+		expr := d.expr()
+		if expr.Kind != unstable.KeyValue {
+			d.stashExpr()
+			break
+		}
+
+		// build expr array while scoping key values so we can use this later
+		keyIt := expr.Key()
+		keyNode := keyIt.Node()
+		valueNode := expr.Value()
+
+		info := exprInfo{
+			keyRaw:    keyNode.Raw,
+			keyData:   append([]byte(nil), keyNode.Data...),
+			valueRaw:  valueNode.Raw,
+			valueData: append([]byte(nil), valueNode.Data...),
+		}
+
+		// for arrays, serialize immediately since we can't copy the node structure
+		if valueNode.Kind == unstable.Array {
+			info.valueSerialized = string(d.serializeArrayChildNode(valueNode))
+			allHaveRaw = false // Arrays need slow path
+		}
+
+		exprs = append(exprs, info)
+
+		// track whether all values have Raw fields for fast path
+		if valueNode.Raw.Length == 0 {
+			allHaveRaw = false
+		}
+	}
+
+	// nothing todo if no key values inm expr
+	if len(exprs) == 0 {
+		return origV, nil
+	}
+
+	var rawData []byte
+
+	if allHaveRaw {
+		// FAST PATH: Extract raw byte range directly from document
+		firstKeyOffset := exprs[0].keyRaw.Offset
+		lastValue := exprs[len(exprs)-1].valueRaw
+		lastValueEnd := lastValue.Offset + lastValue.Length
+		rawData = d.p.Data()[firstKeyOffset:lastValueEnd]
+	} else {
+		// SLOW PATH: Reconstruct TOML from parsed nodes
+		// Necessary for bool, array, datetime types that lack Raw fields
+		var tomlData strings.Builder
+		for _, e := range exprs {
+			tomlData.WriteString(string(e.keyData))
+			tomlData.WriteString(" = ")
+			if e.valueSerialized != "" {
+				// for array use pre serialized values since they are built from child values
+				tomlData.WriteString(e.valueSerialized)
+			} else if e.valueRaw.Length > 0 {
+				valueRaw := d.p.Data()[e.valueRaw.Offset : e.valueRaw.Offset+e.valueRaw.Length]
+				tomlData.Write(valueRaw)
+			} else {
+				tomlData.Write(e.valueData)
+			}
+			tomlData.WriteString("\n")
+		}
+		rawData = []byte(tomlData.String())
+	}
+
+	// call the custom UnmarshalTOML implementation
+	err := v.Addr().Interface().(UnmarshalTOML).UnmarshalTOML(rawData)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	return origV, nil
+}
+
 // Handle root expressions until the end of the document or the next
 // non-key-value.
 func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
+	// Dereference pointers to get to the actual value
+	origV := v
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		v = v.Elem()
+	}
+
+	// Check if the type implements UnmarshalTOML interface
+	// this path either reconstructs parts of toml to pass entire table node into the unmarshalerInterface.
+	// other route is a fast route which uses raw data, trims part of the raw data and passes it into the unmarshalerInterface
+	// this route helps avoid reconstruction of the toml string
+	if v.CanAddr() && v.Addr().Type().Implements(unmarshalTOMLType) {
+		return d.tryUnmarshalTOMLWithKeyValues(v)
+	}
+
+	// Restore v for normal processing
+	v = origV
+
+	// Normal processing for types that don't implement UnmarshalTOML
 	var rv reflect.Value
 	for d.nextExpr() {
 		expr := d.expr()
@@ -887,9 +997,45 @@ func (d *decoder) unmarshalLocalTime(value *unstable.Node, v reflect.Value) erro
 	return nil
 }
 
+func (d *decoder) serializeArrayChildNode(value *unstable.Node) []byte {
+	if value.Kind != unstable.Array {
+		return []byte("")
+	}
+
+	var buf strings.Builder
+	buf.WriteString("[")
+	it := value.Children()
+	first := true
+	for it.Next() {
+		child := it.Node()
+		if !first {
+			buf.WriteString(", ")
+		}
+		first = false
+
+		// Serialize each array element
+		if child.Raw.Length > 0 {
+			buf.Write(d.p.Data()[child.Raw.Offset : child.Raw.Offset+child.Raw.Length])
+		} else if len(child.Data) > 0 {
+			buf.Write(child.Data)
+		}
+	}
+	buf.WriteString("]")
+	return []byte(buf.String())
+}
+
 func (d *decoder) tryUnmarshalTOML(value *unstable.Node, v reflect.Value) (bool, error) {
 	if v.CanAddr() && v.Addr().Type().Implements(unmarshalTOMLType) {
-		err := v.Addr().Interface().(UnmarshalTOML).UnmarshalTOML(value.Data)
+		var data []byte
+
+		// Arrays don't have Data populated, need to serialize them
+		if value.Kind == unstable.Array {
+			data = d.serializeArrayChildNode(value)
+		} else {
+			data = value.Data
+		}
+
+		err := v.Addr().Interface().(UnmarshalTOML).UnmarshalTOML(data)
 		return true, err
 	}
 	return false, nil

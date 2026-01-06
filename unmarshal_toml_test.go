@@ -185,3 +185,193 @@ count = 25
 	assert.Equal(t, CustomBool(false), cfg.Flag) // Inverted
 	assert.Equal(t, CustomUint(125), cfg.Count)
 }
+
+type TestStruct struct {
+	Values map[string]any
+}
+
+func (ts *TestStruct) UnmarshalTOML(data []byte) error {
+	ts.Values = make(map[string]any)
+	return toml.Unmarshal(data, &ts.Values)
+}
+
+func TestUnmarshalTOMLOnStruct(t *testing.T) {
+	type S struct {
+		V    TestStruct `toml:"values"`
+		Name string
+	}
+	var cfg S
+	doc := `name = "testing"
+	
+	[values]
+	name = "test"
+	value = 10
+	score = 2.5
+	flag = true
+	count = 25
+	`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, "test", cfg.V.Values["name"])
+	assert.Equal(t, int64(10), cfg.V.Values["value"].(int64))
+}
+
+// TestUnmarshalTOMLOnStructWithBool tests the slow path with boolean values (no Raw fields)
+func TestUnmarshalTOMLOnStructWithBool(t *testing.T) {
+	type S struct {
+		V TestStruct `toml:"settings"`
+	}
+	var cfg S
+	doc := `
+[settings]
+enabled = true
+disabled = false
+active = true
+`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, true, cfg.V.Values["enabled"])
+	assert.Equal(t, false, cfg.V.Values["disabled"])
+	assert.Equal(t, true, cfg.V.Values["active"])
+}
+
+// TestUnmarshalTOMLOnStructWithArrays tests the slow path with array values (no Raw fields)
+func TestUnmarshalTOMLOnStructWithArrays(t *testing.T) {
+	type S struct {
+		V TestStruct `toml:"config"`
+	}
+	var cfg S
+	doc := `
+[config]
+numbers = [1, 2, 3, 4, 5]
+strings = ["hello", "world"]
+mixed = [1, "two", 3.0]
+`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+
+	numbers := cfg.V.Values["numbers"].([]interface{})
+	assert.Equal(t, 5, len(numbers))
+	assert.Equal(t, int64(1), numbers[0].(int64))
+	assert.Equal(t, int64(5), numbers[4].(int64))
+
+	strings := cfg.V.Values["strings"].([]interface{})
+	assert.Equal(t, 2, len(strings))
+	assert.Equal(t, "hello", strings[0])
+	assert.Equal(t, "world", strings[1])
+}
+
+// TestUnmarshalTOMLOnStructWithDateTime tests the slow path with datetime values (no Raw fields)
+func TestUnmarshalTOMLOnStructWithDateTime(t *testing.T) {
+	type S struct {
+		V TestStruct `toml:"timestamps"`
+	}
+	var cfg S
+	doc := `
+[timestamps]
+created = 1979-05-27T07:32:00Z
+modified = 1979-05-27T00:32:00-07:00
+local_datetime = 1979-05-27T07:32:00
+local_date = 1979-05-27
+local_time = 07:32:00
+`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+
+	// Verify datetime fields exist and are parsed
+	assert.NotZero(t, cfg.V.Values["created"])
+	assert.NotZero(t, cfg.V.Values["modified"])
+	assert.NotZero(t, cfg.V.Values["local_datetime"])
+	assert.NotZero(t, cfg.V.Values["local_date"])
+	assert.NotZero(t, cfg.V.Values["local_time"])
+}
+
+// TestUnmarshalTOMLOnStructMixed tests mixed value types (triggers slow path)
+func TestUnmarshalTOMLOnStructMixed(t *testing.T) {
+	type S struct {
+		V TestStruct `toml:"data"`
+	}
+	var cfg S
+	doc := `
+[data]
+name = "test"
+count = 42
+score = 3.14
+enabled = true
+tags = ["go", "toml", "test"]
+created = 2024-01-15T10:30:00Z
+`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+
+	// Verify all types are correctly unmarshaled through slow path
+	assert.Equal(t, "test", cfg.V.Values["name"])
+	assert.Equal(t, int64(42), cfg.V.Values["count"].(int64))
+	assert.Equal(t, 3.14, cfg.V.Values["score"])
+	assert.Equal(t, true, cfg.V.Values["enabled"])
+
+	tags := cfg.V.Values["tags"].([]interface{})
+	assert.Equal(t, 3, len(tags))
+	assert.Equal(t, "go", tags[0])
+
+	assert.NotZero(t, cfg.V.Values["created"])
+}
+
+// TestUnmarshalTOMLOnStructFastPath tests that fast path is used for strings/numbers only
+func TestUnmarshalTOMLOnStructFastPath(t *testing.T) {
+	type S struct {
+		V TestStruct `toml:"metrics"`
+	}
+	var cfg S
+	doc := `
+[metrics]
+name = "performance"
+requests = 1000
+latency = 25.5
+throughput = 99.9
+status = "healthy"
+`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+
+	// Verify fast path works correctly (all values have Raw fields)
+	assert.Equal(t, "performance", cfg.V.Values["name"])
+	assert.Equal(t, int64(1000), cfg.V.Values["requests"].(int64))
+	assert.Equal(t, 25.5, cfg.V.Values["latency"])
+	assert.Equal(t, 99.9, cfg.V.Values["throughput"])
+	assert.Equal(t, "healthy", cfg.V.Values["status"])
+}
+
+// CustomArray is a custom array type with UnmarshalTOML
+type CustomArray []string
+
+func (ca *CustomArray) UnmarshalTOML(data []byte) error {
+	// Parse as TOML array - wrap in document since data is just the value
+	doc := []byte(fmt.Sprintf("value = %s", data))
+	var wrapper struct {
+		Value []string
+	}
+	if err := toml.Unmarshal(doc, &wrapper); err != nil {
+		return err
+	}
+	*ca = make(CustomArray, len(wrapper.Value))
+	for i, v := range wrapper.Value {
+		(*ca)[i] = "custom-" + v
+	}
+	return nil
+}
+
+// TestUnmarshalTOMLCustomArrayType tests custom array type with UnmarshalTOML
+func TestUnmarshalTOMLCustomArrayType(t *testing.T) {
+	type Config struct {
+		Tags CustomArray `toml:"tags"`
+	}
+	var cfg Config
+	doc := `tags = ["go", "toml", "test"]`
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(cfg.Tags))
+	assert.Equal(t, "custom-go", cfg.Tags[0])
+	assert.Equal(t, "custom-toml", cfg.Tags[1])
+	assert.Equal(t, "custom-test", cfg.Tags[2])
+}
