@@ -4227,3 +4227,120 @@ func TestIssue995_SliceNonEmpty_UsesLastElement(t *testing.T) {
 		t.Fatalf("unexpected values in allowlists: %v", got)
 	}
 }
+
+// fooConfig974 is a struct that implements UnmarshalText for simple string
+// parsing, but can also be populated field-by-field from a TOML table.
+type fooConfig974 struct {
+	Name  string `toml:"name"`
+	Value string `toml:"value"`
+}
+
+func (f *fooConfig974) UnmarshalText(text []byte) error {
+	s := string(text)
+	f.Name = s
+	f.Value = s
+	return nil
+}
+
+type config974 struct {
+	Foo []fooConfig974 `toml:"foo"`
+}
+
+func TestIssue974_UnmarshalTextFallbackToStructForInlineTable(t *testing.T) {
+	// When the TOML value is an inline table, the unmarshaler should skip
+	// UnmarshalText and populate the struct fields directly.
+	doc := `foo = [{name = "a", value = "a"}, {name = "b", value = "b"}]`
+
+	var cfg config974
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, config974{
+		Foo: []fooConfig974{
+			{Name: "a", Value: "a"},
+			{Name: "b", Value: "b"},
+		},
+	}, cfg)
+}
+
+func TestIssue974_UnmarshalTextStillWorksForStrings(t *testing.T) {
+	// When the TOML value is a string, UnmarshalText should still be used.
+	doc := `foo = ["a", "b"]`
+
+	var cfg config974
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, config974{
+		Foo: []fooConfig974{
+			{Name: "a", Value: "a"},
+			{Name: "b", Value: "b"},
+		},
+	}, cfg)
+}
+
+// singleFooConfig974 tests the inline table case for a single value (not array)
+type singleConfig974 struct {
+	Foo fooConfig974 `toml:"foo"`
+}
+
+func TestIssue974_SingleInlineTable(t *testing.T) {
+	// A single inline table should also skip UnmarshalText
+	doc := `foo = {name = "hello", value = "world"}`
+
+	var cfg singleConfig974
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, singleConfig974{
+		Foo: fooConfig974{Name: "hello", Value: "world"},
+	}, cfg)
+}
+
+func TestIssue974_SingleString(t *testing.T) {
+	// A single string should use UnmarshalText
+	doc := `foo = "hello"`
+
+	var cfg singleConfig974
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, singleConfig974{
+		Foo: fooConfig974{Name: "hello", Value: "hello"},
+	}, cfg)
+}
+
+func TestIssue974_TableSyntax(t *testing.T) {
+	// Regular table syntax should also work (uses struct unmarshaling)
+	doc := `
+[foo]
+name = "hello"
+value = "world"
+`
+
+	var cfg singleConfig974
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, singleConfig974{
+		Foo: fooConfig974{Name: "hello", Value: "world"},
+	}, cfg)
+}
+
+func TestIssue974_ArrayTableSyntax(t *testing.T) {
+	// Array of tables syntax should also work
+	doc := `
+[[foo]]
+name = "a"
+value = "a"
+
+[[foo]]
+name = "b"
+value = "b"
+`
+
+	var cfg config974
+	err := toml.Unmarshal([]byte(doc), &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, config974{
+		Foo: []fooConfig974{
+			{Name: "a", Value: "a"},
+			{Name: "b", Value: "b"},
+		},
+	}, cfg)
+}

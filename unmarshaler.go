@@ -702,9 +702,15 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 		}
 	}
 
-	ok, err := d.tryTextUnmarshaler(value, v)
-	if ok || err != nil {
-		return err
+	// Only try TextUnmarshaler for scalar types. For Array and InlineTable,
+	// fall through to struct/map unmarshaling to allow flexible unmarshaling
+	// where a type can implement UnmarshalText for string values but still
+	// be populated field-by-field from a table. See issue #974.
+	if value.Kind != unstable.Array && value.Kind != unstable.InlineTable {
+		ok, err := d.tryTextUnmarshaler(value, v)
+		if ok || err != nil {
+			return err
+		}
 	}
 
 	switch value.Kind {
