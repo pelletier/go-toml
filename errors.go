@@ -260,7 +260,7 @@ func positionAtEnd(b []byte) (row int, column int) {
 		}
 	}
 
-	return
+	return row, column
 }
 
 // subsliceOffset returns the byte offset of subslice within data.

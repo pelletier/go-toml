@@ -1996,7 +1996,7 @@ func TestDecoderStrict(t *testing.T) {
 	var se *toml.StrictMissingError
 	assert.True(t, errors.As(err, &se))
 
-	keys := []toml.Key{}
+	keys := make([]toml.Key, 0, len(se.Errors))
 
 	for _, e := range se.Errors {
 		keys = append(keys, e.Key())

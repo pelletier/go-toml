@@ -40,6 +40,13 @@ go-toml is a TOML library for Go. The goal is to provide an easy-to-use and effi
 
 - Follow existing code format and structure
 - Code must pass `go fmt`
+- Code must pass linting with the same golangci-lint version as CI (see version in `.github/workflows/lint.yml`):
+  ```bash
+  # Install specific version (check lint.yml for current version)
+  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin <version>
+  # Run linter
+  golangci-lint run ./...
+  ```
 
 ### Commit Messages
 
