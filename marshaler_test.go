@@ -619,11 +619,35 @@ hello = 'world'
 			expected: ``,
 		},
 		{
-			desc: "nil value in map is ignored",
+			desc: "nil interface value in map is ignored",
 			v: map[string]interface{}{
 				"A": nil,
 			},
 			expected: ``,
+		},
+		{
+			desc: "nil pointer to struct in map produces empty table",
+			v: map[string]*struct{}{
+				"A": nil,
+			},
+			expected: `[A]
+`,
+		},
+		{
+			desc: "nil pointer to int in map produces zero value",
+			v: map[string]*int{
+				"A": nil,
+			},
+			expected: `A = 0
+`,
+		},
+		{
+			desc: "nil pointer to string in map produces empty string",
+			v: map[string]*string{
+				"A": nil,
+			},
+			expected: `A = ''
+`,
 		},
 		{
 			desc: "new line in table key",
@@ -2192,4 +2216,26 @@ port = 4242
 # version = 'TLS 1.3'
 `
 	assert.Equal(t, expected, string(out))
+}
+
+// TestMarshalIssue975 tests that nil pointer values in maps are marshaled as
+// empty tables, allowing round-trip marshaling to work correctly.
+// See https://github.com/pelletier/go-toml/issues/975
+func TestMarshalIssue975(t *testing.T) {
+	// Test case from the issue: map[string]*struct{}
+	oldMap := map[string]*struct{}{
+		"foo": nil,
+	}
+
+	doc, err := toml.Marshal(&oldMap)
+	assert.NoError(t, err)
+	assert.Equal(t, "[foo]\n", string(doc))
+
+	var newMap map[string]*struct{}
+	err = toml.Unmarshal(doc, &newMap)
+	assert.NoError(t, err)
+
+	// Verify the key is preserved after round-trip
+	_, exists := newMap["foo"]
+	assert.True(t, exists, "key 'foo' should exist after round-trip")
 }

@@ -705,7 +705,14 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 		v := iter.Value()
 
 		if isNil(v) {
-			continue
+			// For nil pointers, convert to zero value of the element type.
+			// This allows round-trip marshaling of maps with nil pointer values.
+			// For nil interfaces and nil maps, skip since we can't derive a type.
+			if v.Kind() == reflect.Ptr {
+				v = reflect.Zero(v.Type().Elem())
+			} else {
+				continue
+			}
 		}
 
 		k, err := enc.keyToString(iter.Key())
