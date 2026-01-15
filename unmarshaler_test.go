@@ -4416,6 +4416,10 @@ func (c *customTable873) UnmarshalTOML(data []byte) error {
 			continue
 		}
 		key := string(bytes.TrimSpace(line[:eqIdx]))
+		// Remove quotes from quoted keys
+		if len(key) >= 2 && key[0] == '"' && key[len(key)-1] == '"' {
+			key = key[1 : len(key)-1]
+		}
 		valueBytes := bytes.TrimSpace(line[eqIdx+1:])
 		// Remove quotes from string values
 		if len(valueBytes) >= 2 && valueBytes[0] == '"' && valueBytes[len(valueBytes)-1] == '"' {
@@ -4433,11 +4437,6 @@ func (c *customTable873) UnmarshalTOML(data []byte) error {
 // and [a.b] and [a.d] are defined with another table [x] in between,
 // A should receive content for both b and d, but not x.
 func TestIssue873_SplitTables(t *testing.T) {
-	// splitTableUnmarshaler collects sub-table names it sees
-	type splitTableUnmarshaler struct {
-		SubTables map[string]map[string]string
-	}
-
 	// For this test, we expect each sub-table to be handled separately
 	// The parent doesn't receive the sub-tables directly - each sub-table
 	// (b and d) gets its own call to handleKeyValues
@@ -4496,4 +4495,54 @@ version = "1.0"
 	// RawMessage should contain the raw key-value bytes
 	expected := "name = \"example\"\nversion = \"1.0\"\n"
 	assert.Equal(t, expected, string(cfg.Plugin))
+}
+
+// Test keys that need quoting (contain special characters)
+func TestIssue873_QuotedKeys(t *testing.T) {
+	type Config struct {
+		Section customTable873 `toml:"section"`
+	}
+
+	doc := `
+[section]
+"key with spaces" = "value1"
+"key.with.dots" = "value2"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(cfg.Section.Keys))
+	assert.Equal(t, "value1", cfg.Section.Values["key with spaces"])
+	assert.Equal(t, "value2", cfg.Section.Values["key.with.dots"])
+}
+
+// errorUnmarshaler873 is used to test error propagation from UnmarshalTOML
+type errorUnmarshaler873 struct{}
+
+func (e *errorUnmarshaler873) UnmarshalTOML([]byte) error {
+	return errors.New("intentional error")
+}
+
+// Test error propagation from UnmarshalTOML
+func TestIssue873_UnmarshalerError(t *testing.T) {
+	doc := `
+[section]
+key = "value"
+`
+
+	type Config struct {
+		Section errorUnmarshaler873 `toml:"section"`
+	}
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "intentional error"))
 }

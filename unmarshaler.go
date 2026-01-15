@@ -749,8 +749,8 @@ func keyNeedsQuoting(key []byte) bool {
 	}
 	for _, b := range key {
 		// Bare keys can only contain A-Za-z0-9_-
-		if !((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') ||
-			(b >= '0' && b <= '9') || b == '_' || b == '-') {
+		if (b < 'A' || b > 'Z') && (b < 'a' || b > 'z') &&
+			(b < '0' || b > '9') && b != '_' && b != '-' {
 			return true
 		}
 	}
