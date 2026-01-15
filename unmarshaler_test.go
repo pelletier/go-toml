@@ -3900,8 +3900,8 @@ type CustomUnmarshalerKey struct {
 	A int64
 }
 
-func (k *CustomUnmarshalerKey) UnmarshalTOML(value *unstable.Node) error {
-	item, err := strconv.ParseInt(string(value.Data), 10, 64)
+func (k *CustomUnmarshalerKey) UnmarshalTOML(data []byte) error {
+	item, err := strconv.ParseInt(string(data), 10, 64)
 	if err != nil {
 		return fmt.Errorf("error converting to int64, %w", err)
 	}
@@ -3989,7 +3989,7 @@ foo = "bar"`,
 
 type doc994 struct{}
 
-func (d *doc994) UnmarshalTOML(*unstable.Node) error {
+func (d *doc994) UnmarshalTOML([]byte) error {
 	return errors.New("expected-error")
 }
 
@@ -4012,8 +4012,8 @@ type doc994ok struct {
 	S string
 }
 
-func (d *doc994ok) UnmarshalTOML(value *unstable.Node) error {
-	d.S = string(value.Data) + " from unmarshaler"
+func (d *doc994ok) UnmarshalTOML(data []byte) error {
+	d.S = string(data) + " from unmarshaler"
 	return nil
 }
 
@@ -4026,7 +4026,8 @@ func TestIssue994_OK(t *testing.T) {
 		Decode(&d)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "bar from unmarshaler", d.S)
+	// With bytes-based interface, raw TOML bytes are passed including quotes
+	assert.Equal(t, "\"bar\" from unmarshaler", d.S)
 }
 
 func TestIssue995(t *testing.T) {
@@ -4384,4 +4385,115 @@ func TestIssue1028(t *testing.T) {
 		err := toml.Unmarshal([]byte(`items = 10:20:30`), &c)
 		assert.Error(t, err)
 	})
+}
+
+// Tests for issue #873 - Bring back toml.Unmarshaler for tables and arrays
+
+type customTable873 struct {
+	Keys   []string
+	Values map[string]string
+}
+
+func (c *customTable873) UnmarshalTOML(data []byte) error {
+	c.Keys = []string{}
+	c.Values = make(map[string]string)
+
+	// Parse the raw TOML bytes into a map to extract keys in order
+	// For this test, we use a simple line-by-line parser to preserve order
+	lines := bytes.Split(data, []byte{'\n'})
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		// Skip table headers
+		if line[0] == '[' {
+			continue
+		}
+		// Parse key = value
+		eqIdx := bytes.Index(line, []byte{'='})
+		if eqIdx < 0 {
+			continue
+		}
+		key := string(bytes.TrimSpace(line[:eqIdx]))
+		valueBytes := bytes.TrimSpace(line[eqIdx+1:])
+		// Remove quotes from string values
+		if len(valueBytes) >= 2 && valueBytes[0] == '"' && valueBytes[len(valueBytes)-1] == '"' {
+			valueBytes = valueBytes[1 : len(valueBytes)-1]
+		}
+		c.Keys = append(c.Keys, key)
+		c.Values[key] = string(valueBytes)
+	}
+
+	return nil
+}
+
+// Test for split tables - when the same parent table is defined in multiple places
+// This is a key requirement for issue #873: if type A implements Unmarshaler,
+// and [a.b] and [a.d] are defined with another table [x] in between,
+// A should receive content for both b and d, but not x.
+func TestIssue873_SplitTables(t *testing.T) {
+	// splitTableUnmarshaler collects sub-table names it sees
+	type splitTableUnmarshaler struct {
+		SubTables map[string]map[string]string
+	}
+
+	// For this test, we expect each sub-table to be handled separately
+	// The parent doesn't receive the sub-tables directly - each sub-table
+	// (b and d) gets its own call to handleKeyValues
+	type Config struct {
+		A struct {
+			B customTable873 `toml:"b"`
+			D customTable873 `toml:"d"`
+		} `toml:"a"`
+		X customTable873 `toml:"x"`
+	}
+
+	doc := `
+[a.b]
+C = "1"
+
+[x]
+Y = "100"
+
+[a.d]
+E = "2"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	// Each sub-table should have received its own key-values
+	assert.Equal(t, []string{"C"}, cfg.A.B.Keys)
+	assert.Equal(t, "1", cfg.A.B.Values["C"])
+	assert.Equal(t, []string{"E"}, cfg.A.D.Keys)
+	assert.Equal(t, "2", cfg.A.D.Values["E"])
+	assert.Equal(t, []string{"Y"}, cfg.X.Keys)
+	assert.Equal(t, "100", cfg.X.Values["Y"])
+}
+
+// Test using RawMessage to capture raw TOML bytes
+func TestIssue873_RawMessage(t *testing.T) {
+	type Config struct {
+		Plugin unstable.RawMessage `toml:"plugin"`
+	}
+
+	doc := `
+[plugin]
+name = "example"
+version = "1.0"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	// RawMessage should contain the raw key-value bytes
+	expected := "name = \"example\"\nversion = \"1.0\"\n"
+	assert.Equal(t, expected, string(cfg.Plugin))
 }
