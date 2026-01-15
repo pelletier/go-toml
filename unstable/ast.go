@@ -143,3 +143,49 @@ func (n *Node) Value() *Node {
 func (n *Node) Children() Iterator {
 	return Iterator{nodes: n.nodes, idx: n.child}
 }
+
+// SetNodeSlice sets the backing nodes slice for a node.
+// This is used when building synthetic nodes.
+func SetNodeSlice(n *Node, nodes *[]Node) {
+	n.nodes = nodes
+}
+
+// SetNodeChild sets the child index for a node.
+// This is used when building synthetic nodes.
+func SetNodeChild(n *Node, child int32) {
+	n.child = child
+}
+
+// SetNodeNext sets the next sibling index for a node.
+// This is used when building synthetic nodes.
+func SetNodeNext(n *Node, next int32) {
+	n.next = next
+}
+
+// GetNodeChild returns the child index for a node.
+// This is used when copying nodes.
+func GetNodeChild(n *Node) int32 {
+	return n.child
+}
+
+// GetNodeNext returns the next sibling index for a node.
+// This is used when copying nodes.
+func GetNodeNext(n *Node) int32 {
+	return n.next
+}
+
+// GetNodeIndex returns the index of node n in the backing slice,
+// using relativeTo's nodes slice as reference.
+// Returns -1 if n is not in the slice.
+func GetNodeIndex(n *Node, relativeTo *Node) int32 {
+	if relativeTo.nodes == nil || n == nil {
+		return -1
+	}
+	nodes := *relativeTo.nodes
+	for i := range nodes {
+		if &nodes[i] == n {
+			return int32(i)
+		}
+	}
+	return -1
+}
