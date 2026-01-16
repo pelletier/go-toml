@@ -4546,3 +4546,27 @@ key = "value"
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "intentional error"))
 }
+
+// Test dotted keys in a table (e.g., a.b = value)
+func TestIssue873_DottedKeys(t *testing.T) {
+	type Config struct {
+		Section customTable873 `toml:"section"`
+	}
+
+	doc := `
+[section]
+sub.key = "value1"
+another.nested.key = "value2"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(cfg.Section.Keys))
+	// The dotted keys should be preserved in the raw output
+	assert.Equal(t, "value1", cfg.Section.Values["sub.key"])
+	assert.Equal(t, "value2", cfg.Section.Values["another.nested.key"])
+}
