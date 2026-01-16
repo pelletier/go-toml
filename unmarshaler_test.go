@@ -4570,3 +4570,26 @@ another.nested.key = "value2"
 	assert.Equal(t, "value1", cfg.Section.Values["sub.key"])
 	assert.Equal(t, "value2", cfg.Section.Values["another.nested.key"])
 }
+
+// Test pointer to pointer to Unmarshaler (covers pointer dereferencing loop)
+func TestIssue873_DoublePointerUnmarshaler(t *testing.T) {
+	type Config struct {
+		Section **customTable873 `toml:"section"`
+	}
+
+	doc := `
+[section]
+key = "value"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.True(t, cfg.Section != nil)
+	assert.True(t, *cfg.Section != nil)
+	assert.Equal(t, []string{"key"}, (*cfg.Section).Keys)
+	assert.Equal(t, "value", (*cfg.Section).Values["key"])
+}
