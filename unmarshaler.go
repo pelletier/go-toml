@@ -729,8 +729,15 @@ func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Va
 		// Get the raw value bytes
 		value := expr.Value()
 		if value != nil {
-			raw := d.p.Raw(value.Raw)
-			buf = append(buf, raw...)
+			if value.Raw.Length > 0 {
+				// Use raw bytes from the original document
+				raw := d.p.Raw(value.Raw)
+				buf = append(buf, raw...)
+			} else {
+				// Some value types (like Bool) don't have Raw set,
+				// use Data which contains the value representation
+				buf = append(buf, value.Data...)
+			}
 		}
 		buf = append(buf, '\n')
 	}

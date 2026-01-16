@@ -96,6 +96,132 @@ func ExampleUnmarshal() {
 	// tags: [go toml]
 }
 
+// pluginConfig demonstrates how to implement dynamic unmarshaling
+// based on a "type" field. This pattern is useful for plugin systems
+// or polymorphic configuration.
+type pluginConfig struct {
+	Type   string
+	Config any
+}
+
+func (p *pluginConfig) UnmarshalTOML(data []byte) error {
+	// First, decode just the type field
+	var typeOnly struct {
+		Type string `toml:"type"`
+	}
+	if err := toml.Unmarshal(data, &typeOnly); err != nil {
+		return err
+	}
+	p.Type = typeOnly.Type
+
+	// Now decode the config based on the type
+	switch typeOnly.Type {
+	case "database":
+		var cfg struct {
+			Type string `toml:"type"`
+			Host string `toml:"host"`
+			Port int    `toml:"port"`
+		}
+		if err := toml.Unmarshal(data, &cfg); err != nil {
+			return err
+		}
+		p.Config = map[string]any{"host": cfg.Host, "port": cfg.Port}
+	case "cache":
+		var cfg struct {
+			Type string `toml:"type"`
+			TTL  int    `toml:"ttl"`
+		}
+		if err := toml.Unmarshal(data, &cfg); err != nil {
+			return err
+		}
+		p.Config = map[string]any{"ttl": cfg.TTL}
+	}
+	return nil
+}
+
+// This example demonstrates dynamic unmarshaling based on a discriminator
+// field. The pluginConfig type uses UnmarshalTOML to first read the "type"
+// field, then decode the rest of the configuration based on that type.
+// This pattern is useful for plugin systems or configuration that varies
+// by type.
+func ExampleDecoder_EnableUnmarshalerInterface_dynamicConfig() {
+	doc := `
+[[plugins]]
+type = "database"
+host = "localhost"
+port = 5432
+
+[[plugins]]
+type = "cache"
+ttl = 300
+`
+	type Config struct {
+		Plugins []pluginConfig `toml:"plugins"`
+	}
+
+	var cfg Config
+	err := toml.NewDecoder(strings.NewReader(doc)).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, p := range cfg.Plugins {
+		fmt.Printf("type=%s config=%v\n", p.Type, p.Config)
+	}
+	// Output:
+	// type=database config=map[host:localhost port:5432]
+	// type=cache config=map[ttl:300]
+}
+
+// This example demonstrates using RawMessage to capture raw TOML bytes
+// for later processing. RawMessage is similar to json.RawMessage - it
+// delays decoding so you can inspect the raw content or decode it
+// differently based on context.
+func ExampleDecoder_EnableUnmarshalerInterface_rawMessage() {
+	doc := `
+[plugin]
+name = "example"
+version = "1.0"
+enabled = true
+`
+
+	type Config struct {
+		Plugin unstable.RawMessage `toml:"plugin"`
+	}
+
+	var cfg Config
+	err := toml.NewDecoder(strings.NewReader(doc)).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	// cfg.Plugin contains the raw TOML bytes
+	fmt.Printf("Raw TOML captured:\n%s", cfg.Plugin)
+
+	// You can later decode it into a specific type
+	var plugin struct {
+		Name    string `toml:"name"`
+		Version string `toml:"version"`
+		Enabled bool   `toml:"enabled"`
+	}
+	if err := toml.Unmarshal(cfg.Plugin, &plugin); err != nil {
+		panic(err)
+	}
+	fmt.Printf("Decoded: name=%s version=%s enabled=%v\n",
+		plugin.Name, plugin.Version, plugin.Enabled)
+
+	// Output:
+	// Raw TOML captured:
+	// name = "example"
+	// version = "1.0"
+	// enabled = true
+	// Decoded: name=example version=1.0 enabled=true
+}
+
 type badReader struct{}
 
 func (r *badReader) Read([]byte) (int, error) {
