@@ -4719,3 +4719,58 @@ key = "value"
 	assert.Equal(t, []string{"key"}, (*cfg.Section).Keys)
 	assert.Equal(t, "value", (*cfg.Section).Values["key"])
 }
+
+// formattingCapture captures the raw TOML bytes to verify formatting preservation
+type formattingCapture struct {
+	RawBytes string
+}
+
+func (f *formattingCapture) UnmarshalTOML(data []byte) error {
+	f.RawBytes = string(data)
+	return nil
+}
+
+func TestIssue873_FormattingPreservation(t *testing.T) {
+	type Config struct {
+		Section *formattingCapture `toml:"section"`
+	}
+
+	// Test that various formatting styles are preserved:
+	// - Extra spaces around '='
+	// - Literal strings (single quotes)
+	// - Hex numbers
+	// - Inline tables
+	doc := `[section]
+key1   =   "value with spaces"
+key2 = 'literal string'
+hex_val = 0xDEADBEEF
+inline = { a = 1, b = 2 }
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.True(t, cfg.Section != nil)
+
+	// The raw bytes should preserve original formatting
+	raw := cfg.Section.RawBytes
+
+	// Check that extra spaces around '=' are preserved
+	assert.True(t, strings.Contains(raw, "key1   =   \"value with spaces\""),
+		"Expected spacing to be preserved, got: %s", raw)
+
+	// Check that literal string style is preserved
+	assert.True(t, strings.Contains(raw, "key2 = 'literal string'"),
+		"Expected literal string to be preserved, got: %s", raw)
+
+	// Check that hex format is preserved
+	assert.True(t, strings.Contains(raw, "hex_val = 0xDEADBEEF"),
+		"Expected hex format to be preserved, got: %s", raw)
+
+	// Check that inline table is preserved
+	assert.True(t, strings.Contains(raw, "inline = { a = 1, b = 2 }"),
+		"Expected inline table to be preserved, got: %s", raw)
+}

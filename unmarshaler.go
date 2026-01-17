@@ -690,8 +690,8 @@ func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
 // and passes them to the Unmarshaler as raw TOML bytes.
 func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Value, error) {
 	// Collect raw bytes from all key-value expressions for this table.
-	// We build a valid TOML document by reconstructing each key-value line
-	// from the key names and the value's raw bytes.
+	// We use the Raw field on each KeyValue expression to preserve the
+	// original formatting (whitespace, quoting style, etc.) from the document.
 	var buf []byte
 
 	for d.nextExpr() {
@@ -706,38 +706,10 @@ func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Va
 			return reflect.Value{}, err
 		}
 
-		// Reconstruct the key-value line from the key(s) and value
-		keyIt := expr.Key()
-		first := true
-		for keyIt.Next() {
-			if !first {
-				buf = append(buf, '.')
-			}
-			keyNode := keyIt.Node()
-			// Check if key needs quoting
-			if keyNeedsQuoting(keyNode.Data) {
-				buf = append(buf, '"')
-				buf = append(buf, keyNode.Data...)
-				buf = append(buf, '"')
-			} else {
-				buf = append(buf, keyNode.Data...)
-			}
-			first = false
-		}
-		buf = append(buf, " = "...)
-
-		// Get the raw value bytes
-		value := expr.Value()
-		if value != nil {
-			if value.Raw.Length > 0 {
-				// Use raw bytes from the original document
-				raw := d.p.Raw(value.Raw)
-				buf = append(buf, raw...)
-			} else {
-				// Some value types (like Bool) don't have Raw set,
-				// use Data which contains the value representation
-				buf = append(buf, value.Data...)
-			}
+		// Use the raw bytes from the original document to preserve formatting
+		if expr.Raw.Length > 0 {
+			raw := d.p.Raw(expr.Raw)
+			buf = append(buf, raw...)
 		}
 		buf = append(buf, '\n')
 	}
@@ -747,21 +719,6 @@ func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Va
 	}
 
 	return reflect.Value{}, nil
-}
-
-// keyNeedsQuoting returns true if the key needs to be quoted in TOML.
-func keyNeedsQuoting(key []byte) bool {
-	if len(key) == 0 {
-		return true
-	}
-	for _, b := range key {
-		// Bare keys can only contain A-Za-z0-9_-
-		if (b < 'A' || b > 'Z') && (b < 'a' || b > 'z') &&
-			(b < '0' || b > '9') && b != '_' && b != '-' {
-			return true
-		}
-	}
-	return false
 }
 
 type (

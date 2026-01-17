@@ -539,7 +539,7 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 6:1->6:22 (105->126)      | Comment [# Above simple value.]
 	// ---
-	// 1:1->1:1 (0->0)           | KeyValue []
+	// 7:1->7:14 (127->140)      | KeyValue []
 	// 7:7->7:14 (133->140)      |   String [value]
 	// 7:1->7:4 (127->130)       |   Key [key]
 	// 7:15->7:38 (141->164)     | Comment [# Next to simple value.]
@@ -552,12 +552,12 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 14:1->14:22 (252->273)    | Comment [# Above inline table.]
 	// ---
-	// 1:1->1:1 (0->0)           | KeyValue []
+	// 15:1->15:50 (274->323)    | KeyValue []
 	// 15:8->15:9 (281->282)     |   InlineTable []
-	// 1:1->1:1 (0->0)           |     KeyValue []
+	// 15:10->15:23 (283->296)   |     KeyValue []
 	// 15:18->15:23 (291->296)   |       String [Tom]
 	// 15:10->15:15 (283->288)   |       Key [first]
-	// 1:1->1:1 (0->0)           |     KeyValue []
+	// 15:25->15:48 (298->321)   |     KeyValue []
 	// 15:32->15:48 (305->321)   |       String [Preston-Werner]
 	// 15:25->15:29 (298->302)   |       Key [last]
 	// 15:1->15:5 (274->278)     |   Key [name]
@@ -567,7 +567,7 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 18:1->18:15 (371->385)    | Comment [# Above array.]
 	// ---
-	// 1:1->1:1 (0->0)           | KeyValue []
+	// 19:1->19:20 (386->405)    | KeyValue []
 	// 1:1->1:1 (0->0)           |   Array []
 	// 19:11->19:12 (396->397)   |     Integer [1]
 	// 19:14->19:15 (399->400)   |     Integer [2]
@@ -579,7 +579,7 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 22:1->22:26 (448->473)    | Comment [# Above multi-line array.]
 	// ---
-	// 1:1->1:1 (0->0)           | KeyValue []
+	// 23:1->31:2 (474->694)     | KeyValue []
 	// 1:1->1:1 (0->0)           |   Array []
 	// 23:10->23:42 (483->515)   |     Comment [# Next to start of inline array.]
 	// 24:3->24:38 (518->553)    |       Comment [# Second line before array content.]
