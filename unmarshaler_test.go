@@ -4344,3 +4344,44 @@ value = "b"
 		},
 	}, cfg)
 }
+
+func TestIssue1028(t *testing.T) {
+	// Datetime values assigned to incompatible types should return an error,
+	// not panic.
+
+	type Item struct {
+		Name string `toml:"name"`
+	}
+
+	type Config struct {
+		Items map[string]Item `toml:"items"`
+	}
+
+	// Error: "cannot decode TOML datetime into struct field Config.Items of type map[string]Item"
+	t.Run("OffsetDateTime", func(t *testing.T) {
+		var c Config
+		err := toml.Unmarshal([]byte(`items = 2023-01-01T10:20:30Z`), &c)
+		assert.Error(t, err)
+	})
+
+	// Error: "cannot decode TOML local datetime into struct field Config.Items of type map[string]Item"
+	t.Run("LocalDateTime", func(t *testing.T) {
+		var c Config
+		err := toml.Unmarshal([]byte(`items = 2023-01-01T10:20:30`), &c)
+		assert.Error(t, err)
+	})
+
+	// Error: "cannot decode TOML local date into struct field Config.Items of type map[string]Item"
+	t.Run("LocalDate", func(t *testing.T) {
+		var c Config
+		err := toml.Unmarshal([]byte(`items = 2023-01-01`), &c)
+		assert.Error(t, err)
+	})
+
+	// Error: "cannot decode TOML local time into struct field Config.Items of type map[string]Item"
+	t.Run("LocalTime", func(t *testing.T) {
+		var c Config
+		err := toml.Unmarshal([]byte(`items = 10:20:30`), &c)
+		assert.Error(t, err)
+	})
+}

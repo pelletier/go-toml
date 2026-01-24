@@ -852,6 +852,9 @@ func (d *decoder) unmarshalDateTime(value *unstable.Node, v reflect.Value) error
 		return err
 	}
 
+	if v.Kind() != reflect.Interface && v.Type() != timeType {
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("datetime", v.Type()))
+	}
 	v.Set(reflect.ValueOf(dt))
 	return nil
 }
@@ -862,14 +865,14 @@ func (d *decoder) unmarshalLocalDate(value *unstable.Node, v reflect.Value) erro
 		return err
 	}
 
+	if v.Kind() != reflect.Interface && v.Type() != timeType {
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local date", v.Type()))
+	}
 	if v.Type() == timeType {
-		cast := ld.AsTime(time.Local)
-		v.Set(reflect.ValueOf(cast))
+		v.Set(reflect.ValueOf(ld.AsTime(time.Local)))
 		return nil
 	}
-
 	v.Set(reflect.ValueOf(ld))
-
 	return nil
 }
 
@@ -883,6 +886,9 @@ func (d *decoder) unmarshalLocalTime(value *unstable.Node, v reflect.Value) erro
 		return unstable.NewParserError(rest, "extra characters at the end of a local time")
 	}
 
+	if v.Kind() != reflect.Interface {
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local time", v.Type()))
+	}
 	v.Set(reflect.ValueOf(lt))
 	return nil
 }
@@ -897,15 +903,14 @@ func (d *decoder) unmarshalLocalDateTime(value *unstable.Node, v reflect.Value) 
 		return unstable.NewParserError(rest, "extra characters at the end of a local date time")
 	}
 
+	if v.Kind() != reflect.Interface && v.Type() != timeType {
+		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local datetime", v.Type()))
+	}
 	if v.Type() == timeType {
-		cast := ldt.AsTime(time.Local)
-
-		v.Set(reflect.ValueOf(cast))
+		v.Set(reflect.ValueOf(ldt.AsTime(time.Local)))
 		return nil
 	}
-
 	v.Set(reflect.ValueOf(ldt))
-
 	return nil
 }
 
