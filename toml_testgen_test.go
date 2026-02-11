@@ -420,10 +420,8 @@ func TestTOMLTest_Invalid_Tests_Invalid_Datetime_NoLeads(t *testing.T) {
 	testgenInvalid(t, input)
 }
 
-func TestTOMLTest_Invalid_Tests_Invalid_Datetime_NoSecs(t *testing.T) {
-	input := "# No seconds in time.\nno-secs = 1987-07-05T17:45Z\n"
-	testgenInvalid(t, input)
-}
+// TestTOMLTest_Invalid_Tests_Invalid_Datetime_NoSecs is removed because
+// TOML v1.1.0 makes seconds optional in date-time values.
 
 func TestTOMLTest_Invalid_Tests_Invalid_Datetime_NoT(t *testing.T) {
 	input := "# No \"t\" or \"T\" between the date and time.\nno-t = 1987-07-0517:45:00Z\n"
@@ -1325,10 +1323,8 @@ func TestTOMLTest_Invalid_Tests_Invalid_LocalDatetime_NoLeads(t *testing.T) {
 	testgenInvalid(t, input)
 }
 
-func TestTOMLTest_Invalid_Tests_Invalid_LocalDatetime_NoSecs(t *testing.T) {
-	input := "# No seconds in time.\nno-secs = 1987-07-05T17:45\n"
-	testgenInvalid(t, input)
-}
+// TestTOMLTest_Invalid_Tests_Invalid_LocalDatetime_NoSecs is removed because
+// TOML v1.1.0 makes seconds optional in date-time values.
 
 func TestTOMLTest_Invalid_Tests_Invalid_LocalDatetime_NoT(t *testing.T) {
 	input := "# No \"t\" or \"T\" between the date and time.\nno-t = 1987-07-0517:45:00\n"
@@ -1360,10 +1356,8 @@ func TestTOMLTest_Invalid_Tests_Invalid_LocalTime_MinuteOver(t *testing.T) {
 	testgenInvalid(t, input)
 }
 
-func TestTOMLTest_Invalid_Tests_Invalid_LocalTime_NoSecs(t *testing.T) {
-	input := "# No seconds in time.\nno-secs = 17:45\n"
-	testgenInvalid(t, input)
-}
+// TestTOMLTest_Invalid_Tests_Invalid_LocalTime_NoSecs is removed because
+// TOML v1.1.0 makes seconds optional in time values.
 
 func TestTOMLTest_Invalid_Tests_Invalid_LocalTime_SecondOver(t *testing.T) {
 	input := "# time-second     = 2DIGIT  ; 00-58, 00-59, 00-60 based on leap second\n#                           ; rules\nd = 00:00:61\n"
@@ -1515,10 +1509,8 @@ func TestTOMLTest_Invalid_Tests_Invalid_String_BadUniEsc7(t *testing.T) {
 	testgenInvalid(t, input)
 }
 
-func TestTOMLTest_Invalid_Tests_Invalid_String_BasicByteEscapes(t *testing.T) {
-	input := "answer = \"\\x33\"\n"
-	testgenInvalid(t, input)
-}
+// TestTOMLTest_Invalid_Tests_Invalid_String_BasicByteEscapes is removed because
+// TOML v1.1.0 adds \xHH escape sequence support.
 
 func TestTOMLTest_Invalid_Tests_Invalid_String_BasicMultilineOutOfRangeUnicodeEscape1(t *testing.T) {
 	input := "a = \"\"\"\\UFFFFFFFF\"\"\"\n"

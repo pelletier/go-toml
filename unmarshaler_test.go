@@ -601,6 +601,96 @@ foo = "bar"`,
 			},
 		},
 		{
+			desc:  "local-time without seconds",
+			input: `a = 14:15`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalTime{Hour: 14, Minute: 15},
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-datetime without seconds using T",
+			input: `a = 2010-02-03T14:15`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalDateTime{
+							LocalDate: toml.LocalDate{2010, 2, 3},
+							LocalTime: toml.LocalTime{Hour: 14, Minute: 15},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-datetime without seconds using space",
+			input: `a = 2010-02-03 14:15`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalDateTime{
+							LocalDate: toml.LocalDate{2010, 2, 3},
+							LocalTime: toml.LocalTime{Hour: 14, Minute: 15},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "datetime without seconds with Z",
+			input: `a = 2010-02-03T14:15Z`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(2010, 2, 3, 14, 15, 0, 0, time.UTC),
+					},
+				}
+			},
+		},
+		{
+			desc:  "datetime without seconds with offset",
+			input: `a = 2010-02-03T14:15+05:00`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(2010, 2, 3, 14, 15, 0, 0, time.FixedZone("", 5*3600)),
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-time with seconds and fractional regression",
+			input: `a = 14:15:30.123`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalTime{Hour: 14, Minute: 15, Second: 30, Nanosecond: 123000000, Precision: 3},
+					},
+				}
+			},
+		},
+		{
 			desc:  "local-time missing digit",
 			input: `a = 12:08:0`,
 			gen: func() test {
@@ -3243,7 +3333,7 @@ world'`,
 		{
 			desc: "bad char between minutes and seconds",
 			data: `a = 2021-03-30 21:312:0`,
-			msg:  `expecting colon between minutes and seconds`,
+			msg:  `extra characters at the end of a local date time`,
 		},
 		{
 			desc: "invalid hour value",
