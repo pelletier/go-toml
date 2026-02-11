@@ -760,6 +760,48 @@ huey = 'dewey'
 			},
 		},
 		{
+			desc:  "basic string escape character",
+			input: `A = "\e"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x1B"},
+				}
+			},
+		},
+		{
+			desc: "multiline basic string escape character",
+			input: `A = """\e"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x1B"},
+				}
+			},
+		},
+		{
+			desc:  "escape character combined with bracket",
+			input: `A = "\e["`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x1B["},
+				}
+			},
+		},
+		{
 			desc:  "basic string hex escape lowercase letter",
 			input: `A = "\x61"`,
 			gen: func() test {
