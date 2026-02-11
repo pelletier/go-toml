@@ -96,6 +96,132 @@ func ExampleUnmarshal() {
 	// tags: [go toml]
 }
 
+// pluginConfig demonstrates how to implement dynamic unmarshaling
+// based on a "type" field. This pattern is useful for plugin systems
+// or polymorphic configuration.
+type pluginConfig struct {
+	Type   string
+	Config any
+}
+
+func (p *pluginConfig) UnmarshalTOML(data []byte) error {
+	// First, decode just the type field
+	var typeOnly struct {
+		Type string `toml:"type"`
+	}
+	if err := toml.Unmarshal(data, &typeOnly); err != nil {
+		return err
+	}
+	p.Type = typeOnly.Type
+
+	// Now decode the config based on the type
+	switch typeOnly.Type {
+	case "database":
+		var cfg struct {
+			Type string `toml:"type"`
+			Host string `toml:"host"`
+			Port int    `toml:"port"`
+		}
+		if err := toml.Unmarshal(data, &cfg); err != nil {
+			return err
+		}
+		p.Config = map[string]any{"host": cfg.Host, "port": cfg.Port}
+	case "cache":
+		var cfg struct {
+			Type string `toml:"type"`
+			TTL  int    `toml:"ttl"`
+		}
+		if err := toml.Unmarshal(data, &cfg); err != nil {
+			return err
+		}
+		p.Config = map[string]any{"ttl": cfg.TTL}
+	}
+	return nil
+}
+
+// This example demonstrates dynamic unmarshaling based on a discriminator
+// field. The pluginConfig type uses UnmarshalTOML to first read the "type"
+// field, then decode the rest of the configuration based on that type.
+// This pattern is useful for plugin systems or configuration that varies
+// by type.
+func ExampleDecoder_EnableUnmarshalerInterface_dynamicConfig() {
+	doc := `
+[[plugins]]
+type = "database"
+host = "localhost"
+port = 5432
+
+[[plugins]]
+type = "cache"
+ttl = 300
+`
+	type Config struct {
+		Plugins []pluginConfig `toml:"plugins"`
+	}
+
+	var cfg Config
+	err := toml.NewDecoder(strings.NewReader(doc)).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, p := range cfg.Plugins {
+		fmt.Printf("type=%s config=%v\n", p.Type, p.Config)
+	}
+	// Output:
+	// type=database config=map[host:localhost port:5432]
+	// type=cache config=map[ttl:300]
+}
+
+// This example demonstrates using RawMessage to capture raw TOML bytes
+// for later processing. RawMessage is similar to json.RawMessage - it
+// delays decoding so you can inspect the raw content or decode it
+// differently based on context.
+func ExampleDecoder_EnableUnmarshalerInterface_rawMessage() {
+	doc := `
+[plugin]
+name = "example"
+version = "1.0"
+enabled = true
+`
+
+	type Config struct {
+		Plugin unstable.RawMessage `toml:"plugin"`
+	}
+
+	var cfg Config
+	err := toml.NewDecoder(strings.NewReader(doc)).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	// cfg.Plugin contains the raw TOML bytes
+	fmt.Printf("Raw TOML captured:\n%s", cfg.Plugin)
+
+	// You can later decode it into a specific type
+	var plugin struct {
+		Name    string `toml:"name"`
+		Version string `toml:"version"`
+		Enabled bool   `toml:"enabled"`
+	}
+	if err := toml.Unmarshal(cfg.Plugin, &plugin); err != nil {
+		panic(err)
+	}
+	fmt.Printf("Decoded: name=%s version=%s enabled=%v\n",
+		plugin.Name, plugin.Version, plugin.Enabled)
+
+	// Output:
+	// Raw TOML captured:
+	// name = "example"
+	// version = "1.0"
+	// enabled = true
+	// Decoded: name=example version=1.0 enabled=true
+}
+
 type badReader struct{}
 
 func (r *badReader) Read([]byte) (int, error) {
@@ -3900,8 +4026,8 @@ type CustomUnmarshalerKey struct {
 	A int64
 }
 
-func (k *CustomUnmarshalerKey) UnmarshalTOML(value *unstable.Node) error {
-	item, err := strconv.ParseInt(string(value.Data), 10, 64)
+func (k *CustomUnmarshalerKey) UnmarshalTOML(data []byte) error {
+	item, err := strconv.ParseInt(string(data), 10, 64)
 	if err != nil {
 		return fmt.Errorf("error converting to int64, %w", err)
 	}
@@ -3989,7 +4115,7 @@ foo = "bar"`,
 
 type doc994 struct{}
 
-func (d *doc994) UnmarshalTOML(*unstable.Node) error {
+func (d *doc994) UnmarshalTOML([]byte) error {
 	return errors.New("expected-error")
 }
 
@@ -4012,8 +4138,8 @@ type doc994ok struct {
 	S string
 }
 
-func (d *doc994ok) UnmarshalTOML(value *unstable.Node) error {
-	d.S = string(value.Data) + " from unmarshaler"
+func (d *doc994ok) UnmarshalTOML(data []byte) error {
+	d.S = string(data) + " from unmarshaler"
 	return nil
 }
 
@@ -4026,7 +4152,8 @@ func TestIssue994_OK(t *testing.T) {
 		Decode(&d)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "bar from unmarshaler", d.S)
+	// With bytes-based interface, raw TOML bytes are passed including quotes
+	assert.Equal(t, "\"bar\" from unmarshaler", d.S)
 }
 
 func TestIssue995(t *testing.T) {
@@ -4384,4 +4511,266 @@ func TestIssue1028(t *testing.T) {
 		err := toml.Unmarshal([]byte(`items = 10:20:30`), &c)
 		assert.Error(t, err)
 	})
+}
+
+// Tests for issue #873 - Bring back toml.Unmarshaler for tables and arrays
+
+type customTable873 struct {
+	Keys   []string
+	Values map[string]string
+}
+
+func (c *customTable873) UnmarshalTOML(data []byte) error {
+	c.Keys = []string{}
+	c.Values = make(map[string]string)
+
+	// Parse the raw TOML bytes into a map to extract keys in order
+	// For this test, we use a simple line-by-line parser to preserve order
+	lines := bytes.Split(data, []byte{'\n'})
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		// Skip table headers
+		if line[0] == '[' {
+			continue
+		}
+		// Parse key = value
+		eqIdx := bytes.Index(line, []byte{'='})
+		if eqIdx < 0 {
+			continue
+		}
+		key := string(bytes.TrimSpace(line[:eqIdx]))
+		// Remove quotes from quoted keys
+		if len(key) >= 2 && key[0] == '"' && key[len(key)-1] == '"' {
+			key = key[1 : len(key)-1]
+		}
+		valueBytes := bytes.TrimSpace(line[eqIdx+1:])
+		// Remove quotes from string values
+		if len(valueBytes) >= 2 && valueBytes[0] == '"' && valueBytes[len(valueBytes)-1] == '"' {
+			valueBytes = valueBytes[1 : len(valueBytes)-1]
+		}
+		c.Keys = append(c.Keys, key)
+		c.Values[key] = string(valueBytes)
+	}
+
+	return nil
+}
+
+// Test for split tables - when the same parent table is defined in multiple places
+// This is a key requirement for issue #873: if type A implements Unmarshaler,
+// and [a.b] and [a.d] are defined with another table [x] in between,
+// A should receive content for both b and d, but not x.
+func TestIssue873_SplitTables(t *testing.T) {
+	// For this test, we expect each sub-table to be handled separately
+	// The parent doesn't receive the sub-tables directly - each sub-table
+	// (b and d) gets its own call to handleKeyValues
+	type Config struct {
+		A struct {
+			B customTable873 `toml:"b"`
+			D customTable873 `toml:"d"`
+		} `toml:"a"`
+		X customTable873 `toml:"x"`
+	}
+
+	doc := `
+[a.b]
+C = "1"
+
+[x]
+Y = "100"
+
+[a.d]
+E = "2"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	// Each sub-table should have received its own key-values
+	assert.Equal(t, []string{"C"}, cfg.A.B.Keys)
+	assert.Equal(t, "1", cfg.A.B.Values["C"])
+	assert.Equal(t, []string{"E"}, cfg.A.D.Keys)
+	assert.Equal(t, "2", cfg.A.D.Values["E"])
+	assert.Equal(t, []string{"Y"}, cfg.X.Keys)
+	assert.Equal(t, "100", cfg.X.Values["Y"])
+}
+
+// Test using RawMessage to capture raw TOML bytes
+func TestIssue873_RawMessage(t *testing.T) {
+	type Config struct {
+		Plugin unstable.RawMessage `toml:"plugin"`
+	}
+
+	doc := `
+[plugin]
+name = "example"
+version = "1.0"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	// RawMessage should contain the raw key-value bytes
+	expected := "name = \"example\"\nversion = \"1.0\"\n"
+	assert.Equal(t, expected, string(cfg.Plugin))
+}
+
+// Test keys that need quoting (contain special characters)
+func TestIssue873_QuotedKeys(t *testing.T) {
+	type Config struct {
+		Section customTable873 `toml:"section"`
+	}
+
+	doc := `
+[section]
+"key with spaces" = "value1"
+"key.with.dots" = "value2"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(cfg.Section.Keys))
+	assert.Equal(t, "value1", cfg.Section.Values["key with spaces"])
+	assert.Equal(t, "value2", cfg.Section.Values["key.with.dots"])
+}
+
+// errorUnmarshaler873 is used to test error propagation from UnmarshalTOML
+type errorUnmarshaler873 struct{}
+
+func (e *errorUnmarshaler873) UnmarshalTOML([]byte) error {
+	return errors.New("intentional error")
+}
+
+// Test error propagation from UnmarshalTOML
+func TestIssue873_UnmarshalerError(t *testing.T) {
+	doc := `
+[section]
+key = "value"
+`
+
+	type Config struct {
+		Section errorUnmarshaler873 `toml:"section"`
+	}
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "intentional error"))
+}
+
+// Test dotted keys in a table (e.g., a.b = value)
+func TestIssue873_DottedKeys(t *testing.T) {
+	type Config struct {
+		Section customTable873 `toml:"section"`
+	}
+
+	doc := `
+[section]
+sub.key = "value1"
+another.nested.key = "value2"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(cfg.Section.Keys))
+	// The dotted keys should be preserved in the raw output
+	assert.Equal(t, "value1", cfg.Section.Values["sub.key"])
+	assert.Equal(t, "value2", cfg.Section.Values["another.nested.key"])
+}
+
+// Test pointer to pointer to Unmarshaler (covers pointer dereferencing loop)
+func TestIssue873_DoublePointerUnmarshaler(t *testing.T) {
+	type Config struct {
+		Section **customTable873 `toml:"section"`
+	}
+
+	doc := `
+[section]
+key = "value"
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.True(t, cfg.Section != nil)
+	assert.True(t, *cfg.Section != nil)
+	assert.Equal(t, []string{"key"}, (*cfg.Section).Keys)
+	assert.Equal(t, "value", (*cfg.Section).Values["key"])
+}
+
+// formattingCapture captures the raw TOML bytes to verify formatting preservation
+type formattingCapture struct {
+	RawBytes string
+}
+
+func (f *formattingCapture) UnmarshalTOML(data []byte) error {
+	f.RawBytes = string(data)
+	return nil
+}
+
+func TestIssue873_FormattingPreservation(t *testing.T) {
+	type Config struct {
+		Section *formattingCapture `toml:"section"`
+	}
+
+	// Test that various formatting styles are preserved:
+	// - Extra spaces around '='
+	// - Literal strings (single quotes)
+	// - Hex numbers
+	// - Inline tables
+	doc := `[section]
+key1   =   "value with spaces"
+key2 = 'literal string'
+hex_val = 0xDEADBEEF
+inline = { a = 1, b = 2 }
+`
+
+	var cfg Config
+	err := toml.NewDecoder(bytes.NewReader([]byte(doc))).
+		EnableUnmarshalerInterface().
+		Decode(&cfg)
+
+	assert.NoError(t, err)
+	assert.True(t, cfg.Section != nil)
+
+	// The raw bytes should preserve original formatting
+	raw := cfg.Section.RawBytes
+
+	// Check that extra spaces around '=' are preserved
+	assert.True(t, strings.Contains(raw, "key1   =   \"value with spaces\""),
+		"Expected spacing to be preserved, got: %s", raw)
+
+	// Check that literal string style is preserved
+	assert.True(t, strings.Contains(raw, "key2 = 'literal string'"),
+		"Expected literal string to be preserved, got: %s", raw)
+
+	// Check that hex format is preserved
+	assert.True(t, strings.Contains(raw, "hex_val = 0xDEADBEEF"),
+		"Expected hex format to be preserved, got: %s", raw)
+
+	// Check that inline table is preserved
+	assert.True(t, strings.Contains(raw, "inline = { a = 1, b = 2 }"),
+		"Expected inline table to be preserved, got: %s", raw)
 }

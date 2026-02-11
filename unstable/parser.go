@@ -328,6 +328,9 @@ func (p *Parser) parseStdTable(b []byte) (reference, []byte, error) {
 
 func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	// keyval = key keyval-sep val
+	// Track the start position for Raw range
+	startB := b
+
 	ref := p.builder.Push(Node{
 		Kind: KeyValue,
 	})
@@ -359,6 +362,10 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 
 	p.builder.Chain(valRef, key)
 	p.builder.AttachChild(ref, valRef)
+
+	// Set Raw to span the entire key-value expression
+	node := p.builder.NodeAt(ref)
+	node.Raw = p.rangeOfToken(startB[:len(startB)-len(b)], b)
 
 	return ref, b, err
 }

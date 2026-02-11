@@ -56,13 +56,18 @@ func (d *Decoder) DisallowUnknownFields() *Decoder {
 
 // EnableUnmarshalerInterface allows to enable unmarshaler interface.
 //
-// With this feature enabled, types implementing the unstable/Unmarshaler
+// With this feature enabled, types implementing the unstable.Unmarshaler
 // interface can be decoded from any structure of the document. It allows types
 // that don't have a straightforward TOML representation to provide their own
 // decoding logic.
 //
-// Currently, types can only decode from a single value. Tables and array tables
-// are not supported.
+// The UnmarshalTOML method receives raw TOML bytes:
+//   - For single values: the raw value bytes (e.g., `"hello"` for a string)
+//   - For tables: all key-value lines belonging to that table
+//   - For inline tables/arrays: the raw bytes of the inline structure
+//
+// The unstable.RawMessage type can be used to capture raw TOML bytes for
+// later processing, similar to json.RawMessage.
 //
 // *Unstable:* This method does not follow the compatibility guarantees of
 // semver. It can be changed or removed without a new major version being
@@ -599,18 +604,28 @@ func (d *decoder) handleArrayTablePart(key unstable.Iterator, v reflect.Value) (
 // cannot handle it.
 func (d *decoder) handleTable(key unstable.Iterator, v reflect.Value) (reflect.Value, error) {
 	if v.Kind() == reflect.Slice {
-		if v.Len() == 0 {
-			return reflect.Value{}, unstable.NewParserError(key.Node().Data, "cannot store a table in a slice")
+		// For non-empty slices, work with the last element
+		if v.Len() > 0 {
+			elem := v.Index(v.Len() - 1)
+			x, err := d.handleTable(key, elem)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			if x.IsValid() {
+				elem.Set(x)
+			}
+			return reflect.Value{}, nil
 		}
-		elem := v.Index(v.Len() - 1)
-		x, err := d.handleTable(key, elem)
-		if err != nil {
-			return reflect.Value{}, err
+		// Empty slice - check if it implements Unmarshaler (e.g., RawMessage)
+		// and we're at the end of the key path
+		if d.unmarshalerInterface && !key.Next() {
+			if v.CanAddr() && v.Addr().CanInterface() {
+				if outi, ok := v.Addr().Interface().(unstable.Unmarshaler); ok {
+					return d.handleKeyValuesUnmarshaler(outi)
+				}
+			}
 		}
-		if x.IsValid() {
-			elem.Set(x)
-		}
-		return reflect.Value{}, nil
+		return reflect.Value{}, unstable.NewParserError(key.Node().Data, "cannot store a table in a slice")
 	}
 	if key.Next() {
 		// Still scoping the key
@@ -624,6 +639,24 @@ func (d *decoder) handleTable(key unstable.Iterator, v reflect.Value) (reflect.V
 // Handle root expressions until the end of the document or the next
 // non-key-value.
 func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
+	// Check if target implements Unmarshaler before processing key-values.
+	// This allows types to handle entire tables themselves.
+	if d.unmarshalerInterface {
+		vv := v
+		for vv.Kind() == reflect.Ptr {
+			if vv.IsNil() {
+				vv.Set(reflect.New(vv.Type().Elem()))
+			}
+			vv = vv.Elem()
+		}
+		if vv.CanAddr() && vv.Addr().CanInterface() {
+			if outi, ok := vv.Addr().Interface().(unstable.Unmarshaler); ok {
+				// Collect all key-value expressions for this table
+				return d.handleKeyValuesUnmarshaler(outi)
+			}
+		}
+	}
+
 	var rv reflect.Value
 	for d.nextExpr() {
 		expr := d.expr()
@@ -651,6 +684,41 @@ func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
 		}
 	}
 	return rv, nil
+}
+
+// handleKeyValuesUnmarshaler collects all key-value expressions for a table
+// and passes them to the Unmarshaler as raw TOML bytes.
+func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Value, error) {
+	// Collect raw bytes from all key-value expressions for this table.
+	// We use the Raw field on each KeyValue expression to preserve the
+	// original formatting (whitespace, quoting style, etc.) from the document.
+	var buf []byte
+
+	for d.nextExpr() {
+		expr := d.expr()
+		if expr.Kind != unstable.KeyValue {
+			d.stashExpr()
+			break
+		}
+
+		_, err := d.seen.CheckExpression(expr)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		// Use the raw bytes from the original document to preserve formatting
+		if expr.Raw.Length > 0 {
+			raw := d.p.Raw(expr.Raw)
+			buf = append(buf, raw...)
+		}
+		buf = append(buf, '\n')
+	}
+
+	if err := u.UnmarshalTOML(buf); err != nil {
+		return reflect.Value{}, err
+	}
+
+	return reflect.Value{}, nil
 }
 
 type (
@@ -697,7 +765,8 @@ func (d *decoder) handleValue(value *unstable.Node, v reflect.Value) error {
 	if d.unmarshalerInterface {
 		if v.CanAddr() && v.Addr().CanInterface() {
 			if outi, ok := v.Addr().Interface().(unstable.Unmarshaler); ok {
-				return outi.UnmarshalTOML(value)
+				// Pass raw bytes from the original document
+				return outi.UnmarshalTOML(d.p.Raw(value.Raw))
 			}
 		}
 	}
@@ -1201,7 +1270,8 @@ func (d *decoder) handleKeyValuePart(key unstable.Iterator, value *unstable.Node
 			if d.unmarshalerInterface {
 				if v.CanAddr() && v.Addr().CanInterface() {
 					if outi, ok := v.Addr().Interface().(unstable.Unmarshaler); ok {
-						return reflect.Value{}, outi.UnmarshalTOML(value)
+						// Pass raw bytes from the original document
+						return reflect.Value{}, outi.UnmarshalTOML(d.p.Raw(value.Raw))
 					}
 				}
 			}
