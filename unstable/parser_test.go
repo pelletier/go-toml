@@ -331,6 +331,87 @@ func TestParser_AST(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:  "multiline inline table",
+			input: "name = {\n  first = \"Tom\",\n  last = \"Preston-Werner\"\n}",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Preston-Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with trailing comma",
+			input: `name = { first = "Tom", last = "Preston-Werner", }`,
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Preston-Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "empty inline table with newline",
+			input: "name = {\n}",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind:     InlineTable,
+						Children: nil,
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
 	}
 
 	for _, e := range examples {

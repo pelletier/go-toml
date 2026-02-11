@@ -743,25 +743,8 @@ func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Empty3(t *testing.T) {
 	testgenInvalid(t, input)
 }
 
-func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Linebreak1(t *testing.T) {
-	input := "# No newlines are allowed between the curly braces unless they are valid within\n# a value.\nsimple = { a = 1 \n}\n"
-	testgenInvalid(t, input)
-}
-
-func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Linebreak2(t *testing.T) {
-	input := "t = {a=1,\nb=2}\n"
-	testgenInvalid(t, input)
-}
-
-func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Linebreak3(t *testing.T) {
-	input := "t = {a=1\n,b=2}\n"
-	testgenInvalid(t, input)
-}
-
-func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Linebreak4(t *testing.T) {
-	input := "json_like = {\n          first = \"Tom\",\n          last = \"Preston-Werner\"\n}\n"
-	testgenInvalid(t, input)
-}
+// TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Linebreak1 through Linebreak4
+// are removed because TOML v1.1.0 allows newlines in inline tables.
 
 func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_NoClose1(t *testing.T) {
 	input := "a={\n"
@@ -833,10 +816,8 @@ func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_Overwrite10(t *testing.T) {
 	testgenInvalid(t, input)
 }
 
-func TestTOMLTest_Invalid_Tests_Invalid_InlineTable_TrailingComma(t *testing.T) {
-	input := "# A terminating comma (also called trailing comma) is not permitted after the\n# last key/value pair in an inline table\nabc = { abc = 123, }\n"
-	testgenInvalid(t, input)
-}
+// TestTOMLTest_Invalid_Tests_Invalid_InlineTable_TrailingComma is removed
+// because TOML v1.1.0 allows trailing commas in inline tables.
 
 func TestTOMLTest_Invalid_Tests_Invalid_Integer_CapitalBin(t *testing.T) {
 	input := "capital-bin = 0B0\n"

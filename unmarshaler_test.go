@@ -1095,6 +1095,87 @@ B = "data"`,
 			},
 		},
 		{
+			desc:  "multiline inline table",
+			input: "Name = {\n  First = \"hello\",\n  Last = \"world\"\n}",
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "inline table with trailing comma",
+			input: `Name = {First = "hello", Last = "world",}`,
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "multiline inline table with trailing comma and comments",
+			input: "Name = {\n  # first name\n  First = \"hello\",\n  # last name\n  Last = \"world\",\n}",
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "nested multiline inline tables",
+			input: "A = {\n  B = {\n    C = 1,\n  },\n}",
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"A": map[string]interface{}{
+							"B": map[string]interface{}{
+								"C": int64(1),
+							},
+						},
+					},
+				}
+			},
+		},
+		{
 			desc:  "inline table inside array",
 			input: `Names = [{First = "hello", Last = "world"}, {First = "ab", Last = "cd"}]`,
 			gen: func() test {
