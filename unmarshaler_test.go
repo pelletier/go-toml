@@ -760,6 +760,62 @@ huey = 'dewey'
 			},
 		},
 		{
+			desc:  "basic string hex escape lowercase letter",
+			input: `A = "\x61"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "a"},
+				}
+			},
+		},
+		{
+			desc:  "basic string hex escape null byte",
+			input: `A = "\x00"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x00"},
+				}
+			},
+		},
+		{
+			desc:  "basic string hex escape max value",
+			input: `A = "\xFF"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\u00FF"},
+				}
+			},
+		},
+		{
+			desc: "multiline basic string hex escape",
+			input: `A = """\x61"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "a"},
+				}
+			},
+		},
+		{
 			desc:  "spaces around dotted keys",
 			input: "a . b = 1",
 			gen: func() test {
@@ -3259,6 +3315,18 @@ world'`,
 		{
 			desc: `invalid escape char basic multiline string`,
 			data: `A = """\z"""`,
+		},
+		{
+			desc: `invalid hex escape non-hex character in basic string`,
+			data: `A = "\xGG"`,
+		},
+		{
+			desc: `incomplete hex escape in basic string`,
+			data: `A = "\x6"`,
+		},
+		{
+			desc: `invalid hex escape non-hex character in multiline basic string`,
+			data: `A = """\xGG"""`,
 		},
 		{
 			desc: `invalid inf`,
