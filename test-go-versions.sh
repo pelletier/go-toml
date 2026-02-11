@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Go versions to test (1.11 through 1.25)
+# Go versions to test (1.11 through 1.26)
 GO_VERSIONS=(
     "1.11"
     "1.12"
@@ -26,6 +26,7 @@ GO_VERSIONS=(
     "1.23"
     "1.24"
     "1.25"
+    "1.26"
 )
 
 # Default values
@@ -64,7 +65,7 @@ EXAMPLES:
     $0                          # Test all Go versions in parallel
     $0 --sequential             # Test all Go versions sequentially
     $0 1.21 1.22 1.23          # Test specific versions
-    $0 --verbose --output ./results 1.24 1.25  # Verbose output to custom directory
+    $0 --verbose --output ./results 1.25 1.26  # Verbose output to custom directory
 
 EXIT CODES:
     0                   Recent Go versions pass (good compatibility)
@@ -136,8 +137,8 @@ fi
 
 # Validate Go versions
 for version in "${GO_VERSIONS[@]}"; do
-    if ! [[ "$version" =~ ^1\.(1[1-9]|2[0-5])$ ]]; then
-        log_error "Invalid Go version: $version. Supported versions: 1.11-1.25"
+    if ! [[ "$version" =~ ^1\.(1[1-9]|2[0-6])$ ]]; then
+        log_error "Invalid Go version: $version. Supported versions: 1.11-1.26"
         exit 1
     fi
 done
