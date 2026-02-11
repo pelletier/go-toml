@@ -73,8 +73,9 @@ type Node struct {
 	Data []byte // Node value (either allocated or referencing the input).
 
 	// Absolute indices into the backing nodes slice. -1 means none.
-	next  int32
-	child int32
+	next    int32
+	child   int32
+	comment int32
 
 	// Reference to the backing nodes slice for navigation.
 	nodes *[]Node
@@ -106,6 +107,18 @@ func (n *Node) Child() *Node {
 	child := &(*n.nodes)[n.child]
 	child.nodes = n.nodes
 	return child
+}
+
+// Comment returns a pointer to the trailing comment node associated with this
+// node, or nil if there is no trailing comment. A trailing comment is a comment
+// on the same line as the node, appearing after the node's value.
+func (n *Node) Comment() *Node {
+	if n.comment < 0 {
+		return nil
+	}
+	c := &(*n.nodes)[n.comment]
+	c.nodes = n.nodes
+	return c
 }
 
 // Valid returns true if the node's kind is set (not to Invalid).

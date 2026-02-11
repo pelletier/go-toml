@@ -163,6 +163,7 @@ type (
 		Kind     Kind
 		Data     []byte
 		Children []astNode
+		Comment  *astNode
 	}
 )
 
@@ -172,6 +173,16 @@ func compareNode(t *testing.T, e astNode, n *Node) {
 	assert.Equal(t, e.Data, n.Data)
 
 	compareIterator(t, e.Children, n.Children())
+
+	if e.Comment != nil {
+		c := n.Comment()
+		if c == nil {
+			t.Fatal("expected comment but got nil")
+		}
+		compareNode(t, *e.Comment, c)
+	} else if n.Comment() != nil {
+		t.Fatalf("unexpected comment: %s", n.Comment().Data)
+	}
 }
 
 func compareIterator(t *testing.T, expected []astNode, actual Iterator) {
@@ -586,6 +597,7 @@ key5 = [ # Next to start of inline array.
 		x := fmt.Sprintf("%d:%d->%d:%d (%d->%d)", s.Start.Line, s.Start.Column, s.End.Line, s.End.Column, s.Start.Offset, s.End.Offset)
 		fmt.Printf("%-25s | %s%s [%s]\n", x, strings.Repeat("  ", indent), e.Kind, e.Data)
 		printGeneric(p, indent+1, e.Child())
+		printGeneric(p, indent+1, e.Comment())
 		printGeneric(p, indent, e.Next())
 	}
 
@@ -616,14 +628,14 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 1:1->1:1 (0->0)           | Table []
 	// 5:2->5:7 (81->86)         |   Key [table]
-	// 5:9->5:25 (88->104)       | Comment [# Next to table.]
+	// 5:9->5:25 (88->104)       |   Comment [# Next to table.]
 	// ---
 	// 6:1->6:22 (105->126)      | Comment [# Above simple value.]
 	// ---
 	// 1:1->1:1 (0->0)           | KeyValue []
 	// 7:7->7:14 (133->140)      |   String [value]
 	// 7:1->7:4 (127->130)       |   Key [key]
-	// 7:15->7:38 (141->164)     | Comment [# Next to simple value.]
+	// 7:15->7:38 (141->164)     |   Comment [# Next to simple value.]
 	// ---
 	// 8:1->8:22 (165->186)      | Comment [# Below simple value.]
 	// ---
@@ -642,7 +654,7 @@ key5 = [ # Next to start of inline array.
 	// 15:32->15:48 (305->321)   |       String [Preston-Werner]
 	// 15:25->15:29 (298->302)   |       Key [last]
 	// 15:1->15:5 (274->278)     |   Key [name]
-	// 15:51->15:74 (324->347)   | Comment [# Next to inline table.]
+	// 15:51->15:74 (324->347)   |   Comment [# Next to inline table.]
 	// ---
 	// 16:1->16:22 (348->369)    | Comment [# Below inline table.]
 	// ---
@@ -654,7 +666,7 @@ key5 = [ # Next to start of inline array.
 	// 19:14->19:15 (399->400)   |     Integer [2]
 	// 19:17->19:18 (402->403)   |     Integer [3]
 	// 19:1->19:6 (386->391)     |   Key [array]
-	// 19:21->19:46 (406->431)   | Comment [# Next to one-line array.]
+	// 19:21->19:46 (406->431)   |   Comment [# Next to one-line array.]
 	// ---
 	// 20:1->20:15 (432->446)    | Comment [# Below array.]
 	// ---
@@ -662,18 +674,18 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 1:1->1:1 (0->0)           | KeyValue []
 	// 1:1->1:1 (0->0)           |   Array []
-	// 23:10->23:42 (483->515)   |     Comment [# Next to start of inline array.]
-	// 24:3->24:38 (518->553)    |       Comment [# Second line before array content.]
+	// 24:3->24:38 (518->553)    |     Comment [# Second line before array content.]
 	// 25:3->25:4 (556->557)     |     Integer [1]
-	// 25:6->25:30 (559->583)    |     Comment [# Next to first element.]
-	// 26:3->26:25 (586->608)    |       Comment [# After first element.]
+	// 25:6->25:30 (559->583)    |       Comment [# Next to first element.]
+	// 26:3->26:25 (586->608)    |     Comment [# After first element.]
 	// 27:3->27:27 (611->635)    |       Comment [# Before second element.]
 	// 28:3->28:4 (638->639)     |     Integer [2]
 	// 29:3->29:4 (643->644)     |     Integer [3]
-	// 29:6->29:28 (646->668)    |     Comment [# Next to last element]
-	// 30:3->30:24 (671->692)    |       Comment [# After last element.]
+	// 29:6->29:28 (646->668)    |       Comment [# Next to last element]
+	// 30:3->30:24 (671->692)    |     Comment [# After last element.]
+	// 23:10->23:42 (483->515)   |     Comment [# Next to start of inline array.]
 	// 23:1->23:5 (474->478)     |   Key [key5]
-	// 31:3->31:26 (695->718)    | Comment [# Next to end of array.]
+	// 31:3->31:26 (695->718)    |   Comment [# Next to end of array.]
 	// ---
 	// 32:1->32:26 (719->744)    | Comment [# Below multi-line array.]
 	// ---
@@ -681,7 +693,7 @@ key5 = [ # Next to start of inline array.
 	// ---
 	// 1:1->1:1 (0->0)           | ArrayTable []
 	// 35:3->35:11 (770->778)    |   Key [products]
-	// 35:14->35:36 (781->803)   | Comment [# Next to array table.]
+	// 35:14->35:36 (781->803)   |   Comment [# Next to array table.]
 	// ---
 	// 36:1->36:21 (804->824)    | Comment [# After array table.]
 }
@@ -775,4 +787,182 @@ func ExampleParser() {
 	// hello -> (String) world
 	// Expression: KeyValue
 	// value -> (Integer) 42
+}
+
+//nolint:funlen
+func TestParser_TrailingComments(t *testing.T) {
+	examples := []struct {
+		desc  string
+		input string
+		ast   astNode
+	}{
+		{
+			desc:  "keyvalue trailing comment",
+			input: `key = "value" # trailer`,
+			ast: astNode{
+				Kind: KeyValue,
+				Comment: &astNode{
+					Kind: Comment,
+					Data: []byte(`# trailer`),
+				},
+				Children: []astNode{
+					{Kind: String, Data: []byte(`value`)},
+					{Kind: Key, Data: []byte(`key`)},
+				},
+			},
+		},
+		{
+			desc:  "keyvalue no trailing comment",
+			input: `key = "value"`,
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{Kind: String, Data: []byte(`value`)},
+					{Kind: Key, Data: []byte(`key`)},
+				},
+			},
+		},
+		{
+			desc:  "table trailing comment",
+			input: `[table] # trailer`,
+			ast: astNode{
+				Kind: Table,
+				Comment: &astNode{
+					Kind: Comment,
+					Data: []byte(`# trailer`),
+				},
+				Children: []astNode{
+					{Kind: Key, Data: []byte(`table`)},
+				},
+			},
+		},
+		{
+			desc:  "array table trailing comment",
+			input: `[[products]] # trailer`,
+			ast: astNode{
+				Kind: ArrayTable,
+				Comment: &astNode{
+					Kind: Comment,
+					Data: []byte(`# trailer`),
+				},
+				Children: []astNode{
+					{Kind: Key, Data: []byte(`products`)},
+				},
+			},
+		},
+		{
+			desc:  "array element trailing comments",
+			input: "key = [\n  1, # first\n  2, # second\n  3 # third\n]",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: Array,
+						Children: []astNode{
+							{Kind: Integer, Data: []byte(`1`), Comment: &astNode{Kind: Comment, Data: []byte(`# first`)}},
+							{Kind: Integer, Data: []byte(`2`), Comment: &astNode{Kind: Comment, Data: []byte(`# second`)}},
+							{Kind: Integer, Data: []byte(`3`), Comment: &astNode{Kind: Comment, Data: []byte(`# third`)}},
+						},
+					},
+					{Kind: Key, Data: []byte(`key`)},
+				},
+			},
+		},
+		{
+			desc:  "array opening bracket trailing comment",
+			input: "key = [ # bracket comment\n  1,\n  2\n]",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: Array,
+						Comment: &astNode{
+							Kind: Comment,
+							Data: []byte(`# bracket comment`),
+						},
+						Children: []astNode{
+							{Kind: Integer, Data: []byte(`1`)},
+							{Kind: Integer, Data: []byte(`2`)},
+						},
+					},
+					{Kind: Key, Data: []byte(`key`)},
+				},
+			},
+		},
+		{
+			desc:  "inline table keyval trailing comments",
+			input: "name = {\n  first = \"Tom\", # c1\n  last = \"Werner\" # c2\n}",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Comment: &astNode{
+									Kind: Comment,
+									Data: []byte(`# c1`),
+								},
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Comment: &astNode{
+									Kind: Comment,
+									Data: []byte(`# c2`),
+								},
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{Kind: Key, Data: []byte(`name`)},
+				},
+			},
+		},
+		{
+			desc:  "inline table opening brace trailing comment",
+			input: "name = { # brace comment\n  first = \"Tom\"\n}",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Comment: &astNode{
+							Kind: Comment,
+							Data: []byte(`# brace comment`),
+						},
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+						},
+					},
+					{Kind: Key, Data: []byte(`name`)},
+				},
+			},
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			p := Parser{KeepComments: true}
+			p.Reset([]byte(e.input))
+			p.NextExpression()
+			err := p.Error()
+			assert.NoError(t, err)
+			compareNode(t, e.ast, p.Expression())
+		})
+	}
 }

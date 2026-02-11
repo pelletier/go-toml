@@ -218,6 +218,14 @@ func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
 	return ref, rest, err
 }
 
+func (p *Parser) parseTrailingComment(b []byte) (reference, []byte, error) {
+	b = p.parseWhitespace(b)
+	if len(b) > 0 && b[0] == '#' {
+		return p.parseComment(b)
+	}
+	return invalidReference, b, nil
+}
+
 func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
@@ -250,14 +258,12 @@ func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 		return ref, nil, err
 	}
 
-	b = p.parseWhitespace(b)
-
-	if len(b) > 0 && b[0] == '#' {
-		cref, rest, err := p.parseComment(b)
-		if cref != invalidReference {
-			p.builder.Chain(ref, cref)
-		}
-		return ref, rest, err
+	cref, b, err := p.parseTrailingComment(b)
+	if err != nil {
+		return ref, nil, err
+	}
+	if cref != invalidReference {
+		p.builder.AttachComment(ref, cref)
 	}
 
 	return ref, b, nil
@@ -473,7 +479,19 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 		Raw:  p.rangeOfToken(b[:1], b[1:]),
 	})
 
+	b = b[1:]
+
+	// Trailing comment on the opening brace line.
+	cref, b, err := p.parseTrailingComment(b)
+	if err != nil {
+		return parent, nil, err
+	}
+	if cref != invalidReference {
+		p.builder.AttachComment(parent, cref)
+	}
+
 	first := true
+	seenComma := false
 
 	lastChild := invalidReference
 
@@ -486,12 +504,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 		lastChild = ref
 	}
 
-	b = b[1:]
-
-	var err error
-
 	for len(b) > 0 {
-		var cref reference
 		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
@@ -509,11 +522,16 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 			break
 		}
 
+		// Handle comma that was not on the same line as the previous value.
 		if b[0] == ',' {
 			if first {
 				return parent, nil, NewParserError(b[0:1], "inline table cannot start with comma")
 			}
+			if seenComma {
+				return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
+			}
 			b = b[1:]
+			seenComma = true
 
 			cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
@@ -522,13 +540,15 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 			if cref != invalidReference {
 				addChild(cref)
 			}
-		} else if !first {
-			return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
+
+			// Trailing comma: if '}' follows, stop.
+			if len(b) > 0 && b[0] == '}' {
+				break
+			}
 		}
 
-		// trailing comma: if '}' follows, stop
-		if len(b) > 0 && b[0] == '}' {
-			break
+		if !first && !seenComma {
+			return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
 		}
 
 		var kv reference
@@ -539,12 +559,22 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 
 		addChild(kv)
 
-		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		// Consume optional same-line comma and trailing comment.
+		b = p.parseWhitespace(b)
+
+		if len(b) > 0 && b[0] == ',' {
+			b = b[1:]
+			seenComma = true
+		} else {
+			seenComma = false
+		}
+
+		cref, b, err = p.parseTrailingComment(b)
 		if err != nil {
 			return parent, nil, err
 		}
 		if cref != invalidReference {
-			addChild(cref)
+			p.builder.AttachComment(kv, cref)
 		}
 
 		first = false
@@ -571,9 +601,19 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		Kind: Array,
 	})
 
-	// First indicates whether the parser is looking for the first element
-	// (non-comment) of the array.
+	// Trailing comment on the opening bracket line.
+	cref, b, err := p.parseTrailingComment(b)
+	if err != nil {
+		return parent, nil, err
+	}
+	if cref != invalidReference {
+		p.builder.AttachComment(parent, cref)
+	}
+
+	// Variable first indicates whether the parser is looking for the first
+	// element (non-comment) of the array.
 	first := true
+	seenComma := false
 
 	lastChild := invalidReference
 
@@ -586,9 +626,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		lastChild = valueRef
 	}
 
-	var err error
 	for len(b) > 0 {
-		var cref reference
 		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
@@ -606,11 +644,16 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			break
 		}
 
+		// Handle comma that was not on the same line as the previous value.
 		if b[0] == ',' {
 			if first {
 				return parent, nil, NewParserError(b[0:1], "array cannot start with comma")
 			}
+			if seenComma {
+				return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
+			}
 			b = b[1:]
+			seenComma = true
 
 			cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
@@ -619,13 +662,15 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			if cref != invalidReference {
 				addChild(cref)
 			}
-		} else if !first {
-			return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
+
+			// Trailing comma: if ']' follows, stop.
+			if len(b) > 0 && b[0] == ']' {
+				break
+			}
 		}
 
-		// TOML allows trailing commas in arrays.
-		if len(b) > 0 && b[0] == ']' {
-			break
+		if !first && !seenComma {
+			return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
 		}
 
 		var valueRef reference
@@ -636,12 +681,22 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 
 		addChild(valueRef)
 
-		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		// Consume optional same-line comma and trailing comment.
+		b = p.parseWhitespace(b)
+
+		if len(b) > 0 && b[0] == ',' {
+			b = b[1:]
+			seenComma = true
+		} else {
+			seenComma = false
+		}
+
+		cref, b, err = p.parseTrailingComment(b)
 		if err != nil {
 			return parent, nil, err
 		}
 		if cref != invalidReference {
-			addChild(cref)
+			p.builder.AttachComment(valueRef, cref)
 		}
 
 		first = false
