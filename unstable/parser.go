@@ -50,8 +50,8 @@ func NewParserError(highlight []byte, format string, args ...interface{}) error 
 // given to the parser.
 type Parser struct {
 	data    []byte
-	builder builder
-	ref     reference
+	builder Builder
+	ref     Reference
 	left    []byte
 	err     error
 	first   bool
@@ -98,7 +98,7 @@ func (p *Parser) Raw(raw Range) []byte {
 // reuses internal storage to reduce allocation.
 func (p *Parser) Reset(b []byte) {
 	p.builder.Reset()
-	p.ref = invalidReference
+	p.ref = InvalidReference
 	p.data = b
 	p.left = b
 	p.err = nil
@@ -116,7 +116,7 @@ func (p *Parser) NextExpression() bool {
 	}
 
 	p.builder.Reset()
-	p.ref = invalidReference
+	p.ref = InvalidReference
 
 	for {
 		if len(p.left) == 0 || p.err != nil {
@@ -205,8 +205,8 @@ func (p *Parser) parseNewline(b []byte) ([]byte, error) {
 	return nil, NewParserError(b[0:1], "expected newline but got %#U", b[0])
 }
 
-func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
-	ref := invalidReference
+func (p *Parser) parseComment(b []byte) (Reference, []byte, error) {
+	ref := InvalidReference
 	data, rest, err := scanComment(b)
 	if p.KeepComments && err == nil {
 		ref = p.builder.Push(Node{
@@ -218,19 +218,19 @@ func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
 	return ref, rest, err
 }
 
-func (p *Parser) parseTrailingComment(b []byte) (reference, []byte, error) {
+func (p *Parser) parseTrailingComment(b []byte) (Reference, []byte, error) {
 	b = p.parseWhitespace(b)
 	if len(b) > 0 && b[0] == '#' {
 		return p.parseComment(b)
 	}
-	return invalidReference, b, nil
+	return InvalidReference, b, nil
 }
 
-func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
+func (p *Parser) parseExpression(b []byte) (Reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
 	// expression =/ ws table ws [ comment ]
-	ref := invalidReference
+	ref := InvalidReference
 
 	b = p.parseWhitespace(b)
 
@@ -262,14 +262,14 @@ func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	if err != nil {
 		return ref, nil, err
 	}
-	if cref != invalidReference {
+	if cref != InvalidReference {
 		p.builder.AttachComment(ref, cref)
 	}
 
 	return ref, b, nil
 }
 
-func (p *Parser) parseTable(b []byte) (reference, []byte, error) {
+func (p *Parser) parseTable(b []byte) (Reference, []byte, error) {
 	// table = std-table / array-table
 	if len(b) > 1 && b[1] == '[' {
 		return p.parseArrayTable(b)
@@ -278,7 +278,7 @@ func (p *Parser) parseTable(b []byte) (reference, []byte, error) {
 	return p.parseStdTable(b)
 }
 
-func (p *Parser) parseArrayTable(b []byte) (reference, []byte, error) {
+func (p *Parser) parseArrayTable(b []byte) (Reference, []byte, error) {
 	// array-table = array-table-open key array-table-close
 	// array-table-open  = %x5B.5B ws  ; [[ Double left square bracket
 	// array-table-close = ws %x5D.5D  ; ]] Double right square bracket
@@ -307,7 +307,7 @@ func (p *Parser) parseArrayTable(b []byte) (reference, []byte, error) {
 	return ref, b, err
 }
 
-func (p *Parser) parseStdTable(b []byte) (reference, []byte, error) {
+func (p *Parser) parseStdTable(b []byte) (Reference, []byte, error) {
 	// std-table = std-table-open key std-table-close
 	// std-table-open  = %x5B ws     ; [ Left square bracket
 	// std-table-close = ws %x5D     ; ] Right square bracket
@@ -332,7 +332,7 @@ func (p *Parser) parseStdTable(b []byte) (reference, []byte, error) {
 	return ref, b, err
 }
 
-func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
+func (p *Parser) parseKeyval(b []byte) (Reference, []byte, error) {
 	// keyval = key keyval-sep val
 	ref := p.builder.Push(Node{
 		Kind: KeyValue,
@@ -340,7 +340,7 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 
 	key, b, err := p.parseKey(b)
 	if err != nil {
-		return invalidReference, nil, err
+		return InvalidReference, nil, err
 	}
 
 	// keyval-sep = ws %x3D ws ; =
@@ -348,12 +348,12 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) == 0 {
-		return invalidReference, nil, NewParserError(b, "expected = after a key, but the document ends there")
+		return InvalidReference, nil, NewParserError(b, "expected = after a key, but the document ends there")
 	}
 
 	b, err = expect('=', b)
 	if err != nil {
-		return invalidReference, nil, err
+		return InvalidReference, nil, err
 	}
 
 	b = p.parseWhitespace(b)
@@ -370,9 +370,9 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 }
 
 //nolint:cyclop,funlen
-func (p *Parser) parseVal(b []byte) (reference, []byte, error) {
+func (p *Parser) parseVal(b []byte) (Reference, []byte, error) {
 	// val = string / boolean / array / inline-table / date-time / float / integer
-	ref := invalidReference
+	ref := InvalidReference
 
 	if len(b) == 0 {
 		return ref, nil, NewParserError(b, "expected value, not eof")
@@ -467,7 +467,7 @@ func (p *Parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 }
 
 //nolint:funlen,cyclop
-func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
+func (p *Parser) parseInlineTable(b []byte) (Reference, []byte, error) {
 	// inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	// inline-table-open  = %x7B ws     ; {
 	// inline-table-close = ws %x7D     ; }
@@ -486,17 +486,17 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	if err != nil {
 		return parent, nil, err
 	}
-	if cref != invalidReference {
+	if cref != InvalidReference {
 		p.builder.AttachComment(parent, cref)
 	}
 
 	first := true
 	seenComma := false
 
-	lastChild := invalidReference
+	lastChild := InvalidReference
 
-	addChild := func(ref reference) {
-		if lastChild == invalidReference {
+	addChild := func(ref Reference) {
+		if lastChild == InvalidReference {
 			p.builder.AttachChild(parent, ref)
 		} else {
 			p.builder.Chain(lastChild, ref)
@@ -510,7 +510,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 			return parent, nil, err
 		}
 
-		if cref != invalidReference {
+		if cref != InvalidReference {
 			addChild(cref)
 		}
 
@@ -537,7 +537,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 			if err != nil {
 				return parent, nil, err
 			}
-			if cref != invalidReference {
+			if cref != InvalidReference {
 				addChild(cref)
 			}
 
@@ -551,7 +551,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 			return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
 		}
 
-		var kv reference
+		var kv Reference
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
 			return parent, nil, err
@@ -573,7 +573,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 		if err != nil {
 			return parent, nil, err
 		}
-		if cref != invalidReference {
+		if cref != InvalidReference {
 			p.builder.AttachComment(kv, cref)
 		}
 
@@ -586,7 +586,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 }
 
 //nolint:funlen,cyclop
-func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
+func (p *Parser) parseValArray(b []byte) (Reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
 	// array-close = %x5D ; ]
@@ -606,7 +606,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	if err != nil {
 		return parent, nil, err
 	}
-	if cref != invalidReference {
+	if cref != InvalidReference {
 		p.builder.AttachComment(parent, cref)
 	}
 
@@ -615,10 +615,10 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	first := true
 	seenComma := false
 
-	lastChild := invalidReference
+	lastChild := InvalidReference
 
-	addChild := func(valueRef reference) {
-		if lastChild == invalidReference {
+	addChild := func(valueRef Reference) {
+		if lastChild == InvalidReference {
 			p.builder.AttachChild(parent, valueRef)
 		} else {
 			p.builder.Chain(lastChild, valueRef)
@@ -632,7 +632,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			return parent, nil, err
 		}
 
-		if cref != invalidReference {
+		if cref != InvalidReference {
 			addChild(cref)
 		}
 
@@ -659,7 +659,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			if err != nil {
 				return parent, nil, err
 			}
-			if cref != invalidReference {
+			if cref != InvalidReference {
 				addChild(cref)
 			}
 
@@ -673,7 +673,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
 		}
 
-		var valueRef reference
+		var valueRef Reference
 		valueRef, b, err = p.parseVal(b)
 		if err != nil {
 			return parent, nil, err
@@ -695,7 +695,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		if err != nil {
 			return parent, nil, err
 		}
-		if cref != invalidReference {
+		if cref != InvalidReference {
 			p.builder.AttachComment(valueRef, cref)
 		}
 
@@ -707,15 +707,15 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []byte, error) {
-	rootCommentRef := invalidReference
-	latestCommentRef := invalidReference
+func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (Reference, []byte, error) {
+	rootCommentRef := InvalidReference
+	latestCommentRef := InvalidReference
 
-	addComment := func(ref reference) {
+	addComment := func(ref Reference) {
 		switch {
-		case rootCommentRef == invalidReference:
+		case rootCommentRef == InvalidReference:
 			rootCommentRef = ref
-		case latestCommentRef == invalidReference:
+		case latestCommentRef == InvalidReference:
 			p.builder.AttachChild(rootCommentRef, ref)
 			latestCommentRef = ref
 		default:
@@ -729,12 +729,12 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []b
 		b = p.parseWhitespace(b)
 
 		if len(b) > 0 && b[0] == '#' {
-			var ref reference
+			var ref Reference
 			ref, b, err = p.parseComment(b)
 			if err != nil {
-				return invalidReference, nil, err
+				return InvalidReference, nil, err
 			}
-			if ref != invalidReference {
+			if ref != InvalidReference {
 				addComment(ref)
 			}
 		}
@@ -746,7 +746,7 @@ func (p *Parser) parseOptionalWhitespaceCommentNewline(b []byte) (reference, []b
 		if b[0] == '\n' || b[0] == '\r' {
 			b, err = p.parseNewline(b)
 			if err != nil {
-				return invalidReference, nil, err
+				return InvalidReference, nil, err
 			}
 		} else {
 			break
@@ -913,7 +913,7 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	return token, builder.Bytes(), rest, nil
 }
 
-func (p *Parser) parseKey(b []byte) (reference, []byte, error) {
+func (p *Parser) parseKey(b []byte) (Reference, []byte, error) {
 	// key = simple-key / dotted-key
 	// simple-key = quoted-key / unquoted-key
 	//
@@ -924,7 +924,7 @@ func (p *Parser) parseKey(b []byte) (reference, []byte, error) {
 	// dot-sep   = ws %x2E ws  ; . Period
 	raw, key, b, err := p.parseSimpleKey(b)
 	if err != nil {
-		return invalidReference, nil, err
+		return InvalidReference, nil, err
 	}
 
 	ref := p.builder.Push(Node{
@@ -1119,11 +1119,11 @@ func (p *Parser) parseWhitespace(b []byte) []byte {
 }
 
 //nolint:cyclop
-func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) {
+func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (Reference, []byte, error) {
 	switch b[0] {
 	case 'i':
 		if !scanFollowsInf(b) {
-			return invalidReference, nil, NewParserError(atmost(b, 3), "expected 'inf'")
+			return InvalidReference, nil, NewParserError(atmost(b, 3), "expected 'inf'")
 		}
 
 		return p.builder.Push(Node{
@@ -1133,7 +1133,7 @@ func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) 
 		}), b[3:], nil
 	case 'n':
 		if !scanFollowsNan(b) {
-			return invalidReference, nil, NewParserError(atmost(b, 3), "expected 'nan'")
+			return InvalidReference, nil, NewParserError(atmost(b, 3), "expected 'nan'")
 		}
 
 		return p.builder.Push(Node{
@@ -1169,7 +1169,7 @@ func (p *Parser) parseIntOrFloatOrDateTime(b []byte) (reference, []byte, error) 
 	return p.scanIntOrFloat(b)
 }
 
-func (p *Parser) scanDateTime(b []byte) (reference, []byte, error) {
+func (p *Parser) scanDateTime(b []byte) (Reference, []byte, error) {
 	// scans for contiguous characters in [0-9T:Z.+-], and up to one space if
 	// followed by a digit.
 	hasDate := false
@@ -1235,7 +1235,7 @@ byteLoop:
 }
 
 //nolint:funlen,gocognit,cyclop
-func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
+func (p *Parser) scanIntOrFloat(b []byte) (Reference, []byte, error) {
 	i := 0
 
 	if len(b) > 2 && b[0] == '0' && b[1] != '.' && b[1] != 'e' && b[1] != 'E' {
@@ -1292,7 +1292,7 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return invalidReference, nil, NewParserError(b[i:i+1], "unexpected character 'i' while scanning for a number")
+			return InvalidReference, nil, NewParserError(b[i:i+1], "unexpected character 'i' while scanning for a number")
 		}
 
 		if c == 'n' {
@@ -1304,14 +1304,14 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 				}), b[i+3:], nil
 			}
 
-			return invalidReference, nil, NewParserError(b[i:i+1], "unexpected character 'n' while scanning for a number")
+			return InvalidReference, nil, NewParserError(b[i:i+1], "unexpected character 'n' while scanning for a number")
 		}
 
 		break
 	}
 
 	if i == 0 {
-		return invalidReference, b, NewParserError(b, "incomplete number")
+		return InvalidReference, b, NewParserError(b, "incomplete number")
 	}
 
 	kind := Integer
