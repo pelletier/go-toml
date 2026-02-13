@@ -225,10 +225,12 @@ This API does not yet follow the backward compatibility guarantees of this
 library. They provide early access to features that may have rough edges or an
 API subject to change.
 
-### Parser
+### Parser, Builder, Printer
 
-Parser is the unstable API that allows iterative parsing of a TOML document at
-the AST level. See https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable.
+The unstable package provides AST-level access to TOML documents. `Parser`
+iterates over expressions, `Builder` programmatically constructs AST nodes, and
+`Printer` serializes them back to TOML. See
+https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable.
 
 ## Benchmarks
 
