@@ -9,14 +9,14 @@ import (
 
 // Printer writes a TOML representation of AST nodes to an output stream.
 //
-// Each call to Print writes one top-level expression (Comment, Table,
+// Each call to Format writes one top-level expression (Comment, Table,
 // ArrayTable, or KeyValue) followed by a newline. Typical usage:
 //
 //	p := &unstable.Parser{KeepComments: true}
 //	p.Reset(input)
 //	pr := unstable.NewPrinter(w)
 //	for p.NextExpression() {
-//	    if err := pr.Print(p.Expression()); err != nil { ... }
+//	    if err := pr.Format(p.Expression()); err != nil { ... }
 //	}
 type Printer struct {
 	w   io.Writer
@@ -28,10 +28,10 @@ func NewPrinter(w io.Writer) *Printer {
 	return &Printer{w: w}
 }
 
-// Print writes the TOML representation of a single top-level expression node
+// Format writes the TOML representation of a single top-level expression node
 // to the printer's writer. The node must be of kind Comment, Table,
 // ArrayTable, or KeyValue.
-func (p *Printer) Print(n *Node) error {
+func (p *Printer) Format(n *Node) error {
 	p.buf = p.buf[:0]
 	p.printNode(n)
 	_, err := p.w.Write(p.buf)
