@@ -727,6 +727,96 @@ foo = "bar"`,
 			},
 		},
 		{
+			desc:  "local-time without seconds",
+			input: `a = 14:15`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalTime{Hour: 14, Minute: 15},
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-datetime without seconds using T",
+			input: `a = 2010-02-03T14:15`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalDateTime{
+							LocalDate: toml.LocalDate{2010, 2, 3},
+							LocalTime: toml.LocalTime{Hour: 14, Minute: 15},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-datetime without seconds using space",
+			input: `a = 2010-02-03 14:15`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalDateTime{
+							LocalDate: toml.LocalDate{2010, 2, 3},
+							LocalTime: toml.LocalTime{Hour: 14, Minute: 15},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:  "datetime without seconds with Z",
+			input: `a = 2010-02-03T14:15Z`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(2010, 2, 3, 14, 15, 0, 0, time.UTC),
+					},
+				}
+			},
+		},
+		{
+			desc:  "datetime without seconds with offset",
+			input: `a = 2010-02-03T14:15+05:00`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					expected: &map[string]time.Time{
+						"a": time.Date(2010, 2, 3, 14, 15, 0, 0, time.FixedZone("", 5*3600)),
+					},
+				}
+			},
+		},
+		{
+			desc:  "local-time with seconds and fractional regression",
+			input: `a = 14:15:30.123`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"a": toml.LocalTime{Hour: 14, Minute: 15, Second: 30, Nanosecond: 123000000, Precision: 3},
+					},
+				}
+			},
+		},
+		{
 			desc:  "local-time missing digit",
 			input: `a = 12:08:0`,
 			gen: func() test {
@@ -886,6 +976,104 @@ huey = 'dewey'
 			},
 		},
 		{
+			desc:  "basic string escape character",
+			input: `A = "\e"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x1B"},
+				}
+			},
+		},
+		{
+			desc: "multiline basic string escape character",
+			input: `A = """\e"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x1B"},
+				}
+			},
+		},
+		{
+			desc:  "escape character combined with bracket",
+			input: `A = "\e["`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x1B["},
+				}
+			},
+		},
+		{
+			desc:  "basic string hex escape lowercase letter",
+			input: `A = "\x61"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "a"},
+				}
+			},
+		},
+		{
+			desc:  "basic string hex escape null byte",
+			input: `A = "\x00"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\x00"},
+				}
+			},
+		},
+		{
+			desc:  "basic string hex escape max value",
+			input: `A = "\xFF"`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "\u00FF"},
+				}
+			},
+		},
+		{
+			desc: "multiline basic string hex escape",
+			input: `A = """\x61"""`,
+			gen: func() test {
+				type doc struct {
+					A string
+				}
+
+				return test{
+					target:   &doc{},
+					expected: &doc{A: "a"},
+				}
+			},
+		},
+		{
 			desc:  "spaces around dotted keys",
 			input: "a . b = 1",
 			gen: func() test {
@@ -1029,6 +1217,87 @@ B = "data"`,
 				return test{
 					target:   &v,
 					expected: &map[string]interface{}{`A`: map[string]interface{}{}},
+				}
+			},
+		},
+		{
+			desc:  "multiline inline table",
+			input: "Name = {\n  First = \"hello\",\n  Last = \"world\"\n}",
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "inline table with trailing comma",
+			input: `Name = {First = "hello", Last = "world",}`,
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "multiline inline table with trailing comma and comments",
+			input: "Name = {\n  # first name\n  First = \"hello\",\n  # last name\n  Last = \"world\",\n}",
+			gen: func() test {
+				type name struct {
+					First string
+					Last  string
+				}
+				type doc struct {
+					Name name
+				}
+
+				return test{
+					target: &doc{},
+					expected: &doc{Name: name{
+						First: "hello",
+						Last:  "world",
+					}},
+				}
+			},
+		},
+		{
+			desc:  "nested multiline inline tables",
+			input: "A = {\n  B = {\n    C = 1,\n  },\n}",
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					expected: &map[string]interface{}{
+						"A": map[string]interface{}{
+							"B": map[string]interface{}{
+								"C": int64(1),
+							},
+						},
+					},
 				}
 			},
 		},
@@ -3271,7 +3540,7 @@ world'`,
 		{
 			desc: "bad char between minutes and seconds",
 			data: `a = 2021-03-30 21:312:0`,
-			msg:  `expecting colon between minutes and seconds`,
+			msg:  `extra characters at the end of a local date time`,
 		},
 		{
 			desc: "invalid hour value",
@@ -3385,6 +3654,18 @@ world'`,
 		{
 			desc: `invalid escape char basic multiline string`,
 			data: `A = """\z"""`,
+		},
+		{
+			desc: `invalid hex escape non-hex character in basic string`,
+			data: `A = "\xGG"`,
+		},
+		{
+			desc: `incomplete hex escape in basic string`,
+			data: `A = "\x6"`,
+		},
+		{
+			desc: `invalid hex escape non-hex character in multiline basic string`,
+			data: `A = """\xGG"""`,
 		},
 		{
 			desc: `invalid inf`,
