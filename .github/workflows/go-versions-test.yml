@@ -28,7 +28,7 @@ jobs:
           ./test-go-versions.sh --output ./test-results $VERSIONS
 
       - name: Upload test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: go-versions-test-results
           path: |
