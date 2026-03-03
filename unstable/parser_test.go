@@ -412,6 +412,73 @@ func TestParser_AST(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:  "inline table with leading comma",
+			input: "name = { first = \"Tom\"\n, last = \"Werner\" }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with leading trailing comma",
+			input: "name = { first = \"Tom\"\n, }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table comma at start is error",
+			input: "name = { , first = \"Tom\" }",
+			err:   true,
+		},
+		{
+			desc:  "inline table double comma across newline is error",
+			input: "name = { first = \"Tom\",\n, last = \"Werner\" }",
+			err:   true,
+		},
 	}
 
 	for _, e := range examples {
