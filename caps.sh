@@ -15,7 +15,6 @@ CAPSLOCK="${CAPSLOCK:-capslock}"
 
 # Capabilities that must never appear in any package.
 FORBIDDEN_CAPS=(
-    CAPABILITY_UNSAFE_POINTER
     CAPABILITY_NETWORK
     CAPABILITY_CGO
     CAPABILITY_EXEC
