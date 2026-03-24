@@ -15,13 +15,20 @@ CAPSLOCK="${CAPSLOCK:-capslock}"
 
 # Capabilities that must never appear in any package.
 FORBIDDEN_CAPS=(
+    CAPABILITY_UNSAFE_POINTER
     CAPABILITY_NETWORK
     CAPABILITY_CGO
     CAPABILITY_EXEC
 )
 
+# Capabilities to exclude from capslock analysis. UNSAFE_POINTER is excluded
+# because go-toml has no direct unsafe imports — capslock reports it only due
+# to stdlib internals (e.g. reflect -> unsafe) which is outside our control.
+CAPSLOCK_IGNORE="-CAPABILITY_UNSAFE_POINTER"
+
 capslock_to_baseline() {
     "$CAPSLOCK" -packages=./... -output=package -granularity=package \
+        -capabilities="$CAPSLOCK_IGNORE" \
         | jq -r 'to_entries | sort_by(.key) | .[] | .key + ": " + (.value | sort | join(", "))'
 }
 
