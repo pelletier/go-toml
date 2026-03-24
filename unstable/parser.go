@@ -363,9 +363,10 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	p.builder.Chain(valRef, key)
 	p.builder.AttachChild(ref, valRef)
 
-	// Set Raw to span the entire key-value expression
-	node := p.builder.NodeAt(ref)
-	node.Raw = p.rangeOfToken(startB[:len(startB)-len(b)], b)
+	// Set Raw to span the entire key-value expression.
+	// Access the node directly in the slice to avoid the write barrier
+	// that NodeAt's nodes-pointer setup would trigger.
+	p.builder.tree.nodes[ref].Raw = p.rangeOfToken(startB[:len(startB)-len(b)], b)
 
 	return ref, b, err
 }
