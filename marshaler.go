@@ -706,7 +706,7 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 
 		// Handle nil values: convert nil pointers to zero value,
 		// skip nil interfaces and nil maps.
-		switch v.Kind() {
+		switch v.Kind() { //exhaustive:ignore
 		case reflect.Ptr, reflect.Interface, reflect.Map:
 			if v.IsNil() {
 				if v.Kind() == reflect.Ptr {
