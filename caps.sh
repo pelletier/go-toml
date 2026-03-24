@@ -18,6 +18,7 @@ FORBIDDEN_CAPS=(
     CAPABILITY_NETWORK
     CAPABILITY_CGO
     CAPABILITY_EXEC
+    CAPABILITY_UNSAFE_POINTER
 )
 
 capslock_to_baseline() {
@@ -43,19 +44,6 @@ check() {
 
     failed=0
 
-    # Verify go-toml source never directly imports "unsafe".
-    # Capslock may report CAPABILITY_UNSAFE_POINTER due to stdlib internals
-    # (e.g. reflect -> unsafe), which is a false positive. Instead of relying
-    # on capslock for this, we check the source directly.
-    unsafe_imports=$(find . -name '*.go' -not -name '*_test.go' \
-        -not -path './vendor/*' -not -path './cmd/*' -not -path './internal/*' \
-        -exec grep -l '"unsafe"' {} +) || true
-    if [ -n "$unsafe_imports" ]; then
-        echo "FORBIDDEN: direct unsafe import found in:"
-        echo "$unsafe_imports"
-        failed=1
-    fi
-
     # Check for forbidden capabilities in current output.
     for cap in "${FORBIDDEN_CAPS[@]}"; do
         if grep -q "$cap" "$current"; then
@@ -66,13 +54,8 @@ check() {
     done
 
     # Extract all unique capability names from baseline and current.
-    # Exclude CAPABILITY_UNSAFE_POINTER from comparison — capslock reports it
-    # as a false positive from stdlib internals (reflect, sync, etc. use
-    # unsafe.Pointer internally). Go 1.26+ triggers this due to changes in
-    # how capslock traces through unclassified reflect functions. The direct
-    # source check above is the real guard against unsafe usage.
-    baseline_caps=$(grep -oE 'CAPABILITY_[A-Z_]+' "$BASELINE" | grep -v CAPABILITY_UNSAFE_POINTER | sort -u)
-    current_caps=$(grep -oE 'CAPABILITY_[A-Z_]+' "$current" | grep -v CAPABILITY_UNSAFE_POINTER | sort -u)
+    baseline_caps=$(grep -oE 'CAPABILITY_[A-Z_]+' "$BASELINE" | sort -u)
+    current_caps=$(grep -oE 'CAPABILITY_[A-Z_]+' "$current" | sort -u)
 
     # Check for new capability names not in the baseline.
     new_caps=$(comm -13 <(echo "$baseline_caps") <(echo "$current_caps"))
@@ -91,7 +74,7 @@ check() {
             continue
         fi
         # Check each capability in current for this package
-        for cap in $(echo "$caps" | tr ', ' '\n' | grep -v '^$' | grep -v CAPABILITY_UNSAFE_POINTER); do
+        for cap in $(echo "$caps" | tr ', ' '\n' | grep -v '^$'); do
             if ! echo "$baseline_pkg_caps" | grep -q "$cap"; then
                 echo "NEW capability for $pkg: $cap"
                 failed=1
