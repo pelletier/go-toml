@@ -259,6 +259,12 @@ func TestDecodeError_Position(t *testing.T) {
 			expectedRow: 3,
 			minCol:      5,
 		},
+		{
+			name:        "missing equals on last line without trailing newline",
+			doc:         "a = 1\nb = 2\nc",
+			expectedRow: 3,
+			minCol:      1,
+		},
 	}
 
 	for _, e := range examples {
