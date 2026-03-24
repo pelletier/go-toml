@@ -22,4 +22,4 @@ jobs:
       - name: Install capslock
         run: go install github.com/google/capslock/cmd/capslock@latest
       - name: Check for new capabilities
-        run: capslock -packages=./... -output=compare -granularity=package capability_baseline.json
+        run: ./caps.sh check
