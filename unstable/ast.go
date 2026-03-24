@@ -28,12 +28,16 @@ func (c *Iterator) Next() bool {
 	if c.nodes == nil {
 		return false
 	}
+	nodes := *c.nodes
 	if !c.started {
 		c.started = true
-	} else if c.idx >= 0 {
-		c.idx = (*c.nodes)[c.idx].next
+	} else {
+		idx := c.idx
+		if idx >= 0 && int(idx) < len(nodes) {
+			c.idx = nodes[idx].next
+		}
 	}
-	return c.idx >= 0 && int(c.idx) < len(*c.nodes)
+	return c.idx >= 0 && int(c.idx) < len(nodes)
 }
 
 // IsLast returns true if the current node of the iterator is the last

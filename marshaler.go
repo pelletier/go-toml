@@ -704,15 +704,18 @@ func (enc *Encoder) encodeMap(b []byte, ctx encoderCtx, v reflect.Value) ([]byte
 	for iter.Next() {
 		v := iter.Value()
 
-		if isNil(v) {
-			// For nil pointers, convert to zero value of the element type.
-			// This allows round-trip marshaling of maps with nil pointer values.
-			// For nil interfaces and nil maps, skip since we can't derive a type.
-			if v.Kind() == reflect.Ptr {
+		// Handle nil values: convert nil pointers to zero value,
+		// skip nil interfaces and nil maps.
+		switch v.Kind() {
+		case reflect.Ptr:
+			if v.IsNil() {
 				v = reflect.Zero(v.Type().Elem())
-			} else {
+			}
+		case reflect.Interface, reflect.Map:
+			if v.IsNil() {
 				continue
 			}
+		default:
 		}
 
 		k, err := enc.keyToString(iter.Key())
@@ -936,7 +939,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		if shouldOmitEmpty(kv.Options, kv.Value) {
 			continue
 		}
-		if shouldOmitZero(kv.Options, kv.Value) {
+		if kv.Options.omitzero && shouldOmitZero(kv.Options, kv.Value) {
 			continue
 		}
 		hasNonEmptyKV = true
@@ -958,7 +961,7 @@ func (enc *Encoder) encodeTable(b []byte, ctx encoderCtx, t table) ([]byte, erro
 		if shouldOmitEmpty(table.Options, table.Value) {
 			continue
 		}
-		if shouldOmitZero(table.Options, table.Value) {
+		if table.Options.omitzero && shouldOmitZero(table.Options, table.Value) {
 			continue
 		}
 		if first {
@@ -995,7 +998,7 @@ func (enc *Encoder) encodeTableInline(b []byte, ctx encoderCtx, t table) ([]byte
 		if shouldOmitEmpty(kv.Options, kv.Value) {
 			continue
 		}
-		if shouldOmitZero(kv.Options, kv.Value) {
+		if kv.Options.omitzero && shouldOmitZero(kv.Options, kv.Value) {
 			continue
 		}
 
