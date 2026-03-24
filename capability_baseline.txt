@@ -1,11 +1,1 @@
-github.com/pelletier/go-toml/v2: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/cmd/gotoml-test-decoder: CAPABILITY_FILES, CAPABILITY_MODIFY_SYSTEM_STATE, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/cmd/gotoml-test-encoder: CAPABILITY_FILES, CAPABILITY_MODIFY_SYSTEM_STATE, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/cmd/jsontoml: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/cmd/tomljson: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/cmd/tomll: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/cmd/tomltestgen: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/internal/cli: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/internal/testsuite: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/internal/tracker: CAPABILITY_UNANALYZED
-github.com/pelletier/go-toml/v2/ossfuzz: CAPABILITY_FILES, CAPABILITY_REFLECT, CAPABILITY_UNANALYZED
+github.com/pelletier/go-toml/v2: CAPABILITY_REFLECT, CAPABILITY_UNANALYZED

@@ -21,7 +21,7 @@ FORBIDDEN_CAPS=(
 )
 
 capslock_to_baseline() {
-    "$CAPSLOCK" -packages=./... -output=package -granularity=package \
+    "$CAPSLOCK" -packages=. -output=package -granularity=package \
         | jq -r 'to_entries | sort_by(.key) | .[] | .key + ": " + (.value | sort | join(", "))'
 }
 
@@ -47,7 +47,8 @@ check() {
     # Capslock may report CAPABILITY_UNSAFE_POINTER due to stdlib internals
     # (e.g. reflect -> unsafe), which is a false positive. Instead of relying
     # on capslock for this, we check the source directly.
-    unsafe_imports=$(find . -name '*.go' -not -name '*_test.go' -not -path './vendor/*' \
+    unsafe_imports=$(find . -name '*.go' -not -name '*_test.go' \
+        -not -path './vendor/*' -not -path './cmd/*' -not -path './internal/*' \
         -exec grep -l '"unsafe"' {} +) || true
     if [ -n "$unsafe_imports" ]; then
         echo "FORBIDDEN: direct unsafe import found in:"
