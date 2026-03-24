@@ -345,7 +345,7 @@ func (p *Parser) parseKeyval(b []byte) (reference, []byte, error) {
 	b = p.parseWhitespace(b)
 
 	if len(b) == 0 {
-		return invalidReference, nil, NewParserError(b, "expected = after a key, but the document ends there")
+		return invalidReference, nil, NewParserError(startB[:len(startB)-len(b)], "expected = after a key, but the document ends there")
 	}
 
 	b, err = expect('=', b)
