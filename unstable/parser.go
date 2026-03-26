@@ -218,6 +218,14 @@ func (p *Parser) parseComment(b []byte) (reference, []byte, error) {
 	return ref, rest, err
 }
 
+func (p *Parser) parseTrailingComment(b []byte) (reference, []byte, error) {
+	b = p.parseWhitespace(b)
+	if len(b) > 0 && b[0] == '#' {
+		return p.parseComment(b)
+	}
+	return invalidReference, b, nil
+}
+
 func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 	// expression =  ws [ comment ]
 	// expression =/ ws keyval ws [ comment ]
@@ -250,14 +258,12 @@ func (p *Parser) parseExpression(b []byte) (reference, []byte, error) {
 		return ref, nil, err
 	}
 
-	b = p.parseWhitespace(b)
-
-	if len(b) > 0 && b[0] == '#' {
-		cref, rest, err := p.parseComment(b)
-		if cref != invalidReference {
-			p.builder.Chain(ref, cref)
-		}
-		return ref, rest, err
+	cref, b, err := p.parseTrailingComment(b)
+	if err != nil {
+		return ref, nil, err
+	}
+	if cref != invalidReference {
+		p.builder.AttachComment(ref, cref)
 	}
 
 	return ref, b, nil
@@ -468,58 +474,116 @@ func (p *Parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	return v, v[1 : len(v)-1], rest, nil
 }
 
+//nolint:funlen,cyclop
 func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	// inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	// inline-table-open  = %x7B ws     ; {
 	// inline-table-close = ws %x7D     ; }
 	// inline-table-sep   = ws %x2C ws  ; , Comma
 	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
+	tableStart := b
 	parent := p.builder.Push(Node{
 		Kind: InlineTable,
 		Raw:  p.rangeOfToken(b[:1], b[1:]),
 	})
 
-	first := true
-
-	var child reference
-
 	b = b[1:]
 
-	var err error
+	// Trailing comment on the opening brace line.
+	cref, b, err := p.parseTrailingComment(b)
+	if err != nil {
+		return parent, nil, err
+	}
+	if cref != invalidReference {
+		p.builder.AttachComment(parent, cref)
+	}
+
+	first := true
+	seenComma := false
+
+	lastChild := invalidReference
+
+	addChild := func(ref reference) {
+		if lastChild == invalidReference {
+			p.builder.AttachChild(parent, ref)
+		} else {
+			p.builder.Chain(lastChild, ref)
+		}
+		lastChild = ref
+	}
 
 	for len(b) > 0 {
-		previousB := b
-		b = p.parseWhitespace(b)
+		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return parent, nil, err
+		}
+
+		if cref != invalidReference {
+			addChild(cref)
+		}
 
 		if len(b) == 0 {
-			return parent, nil, NewParserError(previousB[:1], "inline table is incomplete")
+			return parent, nil, NewParserError(tableStart[:1], "inline table is incomplete")
 		}
 
 		if b[0] == '}' {
 			break
 		}
 
-		if !first {
-			b, err = expect(',', b)
+		// Handle comma that was not on the same line as the previous value.
+		if b[0] == ',' {
+			if first {
+				return parent, nil, NewParserError(b[0:1], "inline table cannot start with comma")
+			}
+			if seenComma {
+				return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
+			}
+			b = b[1:]
+			seenComma = true
+
+			cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
 				return parent, nil, err
 			}
-			b = p.parseWhitespace(b)
+			if cref != invalidReference {
+				addChild(cref)
+			}
+
+			// Trailing comma: if '}' follows, stop.
+			if len(b) > 0 && b[0] == '}' {
+				break
+			}
+		}
+
+		if !first && !seenComma {
+			return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
 		}
 
 		var kv reference
-
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
 			return parent, nil, err
 		}
 
-		if first {
-			p.builder.AttachChild(parent, kv)
+		addChild(kv)
+
+		// Consume optional same-line comma and trailing comment.
+		b = p.parseWhitespace(b)
+
+		if len(b) > 0 && b[0] == ',' {
+			b = b[1:]
+			seenComma = true
 		} else {
-			p.builder.Chain(child, kv)
+			seenComma = false
 		}
-		child = kv
+
+		cref, b, err = p.parseTrailingComment(b)
+		if err != nil {
+			return parent, nil, err
+		}
+		if cref != invalidReference {
+			p.builder.AttachComment(kv, cref)
+		}
 
 		first = false
 	}
@@ -545,9 +609,19 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		Kind: Array,
 	})
 
-	// First indicates whether the parser is looking for the first element
-	// (non-comment) of the array.
+	// Trailing comment on the opening bracket line.
+	cref, b, err := p.parseTrailingComment(b)
+	if err != nil {
+		return parent, nil, err
+	}
+	if cref != invalidReference {
+		p.builder.AttachComment(parent, cref)
+	}
+
+	// Variable first indicates whether the parser is looking for the first
+	// element (non-comment) of the array.
 	first := true
+	seenComma := false
 
 	lastChild := invalidReference
 
@@ -560,9 +634,7 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 		lastChild = valueRef
 	}
 
-	var err error
 	for len(b) > 0 {
-		var cref reference
 		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 		if err != nil {
 			return parent, nil, err
@@ -580,11 +652,16 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			break
 		}
 
+		// Handle comma that was not on the same line as the previous value.
 		if b[0] == ',' {
 			if first {
 				return parent, nil, NewParserError(b[0:1], "array cannot start with comma")
 			}
+			if seenComma {
+				return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
+			}
 			b = b[1:]
+			seenComma = true
 
 			cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
@@ -593,13 +670,15 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 			if cref != invalidReference {
 				addChild(cref)
 			}
-		} else if !first {
-			return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
+
+			// Trailing comma: if ']' follows, stop.
+			if len(b) > 0 && b[0] == ']' {
+				break
+			}
 		}
 
-		// TOML allows trailing commas in arrays.
-		if len(b) > 0 && b[0] == ']' {
-			break
+		if !first && !seenComma {
+			return parent, nil, NewParserError(b[0:1], "array elements must be separated by commas")
 		}
 
 		var valueRef reference
@@ -610,12 +689,22 @@ func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 
 		addChild(valueRef)
 
-		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		// Consume optional same-line comma and trailing comment.
+		b = p.parseWhitespace(b)
+
+		if len(b) > 0 && b[0] == ',' {
+			b = b[1:]
+			seenComma = true
+		} else {
+			seenComma = false
+		}
+
+		cref, b, err = p.parseTrailingComment(b)
 		if err != nil {
 			return parent, nil, err
 		}
 		if cref != invalidReference {
-			addChild(cref)
+			p.builder.AttachComment(valueRef, cref)
 		}
 
 		first = false
@@ -793,6 +882,13 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 				builder.WriteByte('\t')
 			case 'e':
 				builder.WriteByte(0x1B)
+			case 'x':
+				x, err := hexToRune(atmost(token[i+1:], 2), 2)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				builder.WriteRune(x)
+				i += 2
 			case 'u':
 				x, err := hexToRune(atmost(token[i+1:], 4), 4)
 				if err != nil {
@@ -952,6 +1048,13 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 				builder.WriteByte('\t')
 			case 'e':
 				builder.WriteByte(0x1B)
+			case 'x':
+				x, err := hexToRune(token[i+1:len(token)-1], 2)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				builder.WriteRune(x)
+				i += 2
 			case 'u':
 				x, err := hexToRune(token[i+1:len(token)-1], 4)
 				if err != nil {

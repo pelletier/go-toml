@@ -39,6 +39,7 @@ func (b *builder) Push(n Node) reference {
 	b.lastIdx = len(b.tree.nodes)
 	n.next = -1
 	n.child = -1
+	n.comment = -1
 	b.tree.nodes = append(b.tree.nodes, n)
 	return reference(b.lastIdx)
 }
@@ -47,6 +48,7 @@ func (b *builder) PushAndChain(n Node) reference {
 	newIdx := len(b.tree.nodes)
 	n.next = -1
 	n.child = -1
+	n.comment = -1
 	b.tree.nodes = append(b.tree.nodes, n)
 	if b.lastIdx >= 0 {
 		b.tree.nodes[b.lastIdx].next = int32(newIdx) //nolint:gosec // TOML ASTs are small
@@ -61,4 +63,8 @@ func (b *builder) AttachChild(parent reference, child reference) {
 
 func (b *builder) Chain(from reference, to reference) {
 	b.tree.nodes[from].next = int32(to) //nolint:gosec // TOML ASTs are small
+}
+
+func (b *builder) AttachComment(node reference, comment reference) {
+	b.tree.nodes[node].comment = int32(comment) //nolint:gosec // TOML ASTs are small
 }
