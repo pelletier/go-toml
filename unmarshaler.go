@@ -48,7 +48,7 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // In that case, the Decoder returns a StrictMissingError that can be used to
 // retrieve the individual errors as well as generate a human readable
-// description of the missing fields.
+// description of the unknown fields.
 func (d *Decoder) DisallowUnknownFields() *Decoder {
 	d.strict = true
 	return d
