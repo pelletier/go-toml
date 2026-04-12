@@ -695,3 +695,27 @@ func ExampleParser() {
 	// Expression: KeyValue
 	// value -> (Integer) 42
 }
+
+func TestParser_ErrorPositionAfterComment(t *testing.T) {
+	// Regression test for https://github.com/pelletier/go-toml/issues/1047
+	// Error position should point to the "=" at byte offset 10 (line 2, column 1),
+	// not to a wrong offset computed by assuming the highlight is a suffix of the input.
+	input := []byte("# comment\n= \"value\"")
+
+	p := Parser{}
+	p.Reset(input)
+	for p.NextExpression() {
+	}
+	err := p.Error()
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+
+	perr := err.(*ParserError)
+	r := p.Range(perr.Highlight)
+	shape := p.Shape(r)
+
+	assert.Equal(t, uint32(10), r.Offset)
+	assert.Equal(t, 2, shape.Start.Line)
+	assert.Equal(t, 1, shape.Start.Column)
+}
