@@ -1159,6 +1159,35 @@ func TestEncoderOmitempty(t *testing.T) {
 	assert.Equal(t, expected, string(b))
 }
 
+// TestEncoderOmitemptyTextMarshalerNonZero is a regression test for
+// https://github.com/pelletier/go-toml/issues/955.
+// A struct that implements encoding.TextMarshaler but has no exported fields
+// (e.g. netip.Addr) must not be considered "empty" by omitempty when it holds
+// a non-zero value.
+func TestEncoderOmitemptyTextMarshalerNonZero(t *testing.T) {
+	type doc struct {
+		IP netip.Addr `toml:"ip,omitempty"`
+	}
+
+	d := doc{IP: netip.MustParseAddr("192.168.178.35")}
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "ip = '192.168.178.35'\n", string(b))
+}
+
+// TestEncoderOmitemptyTextMarshalerZero verifies that a zero netip.Addr is
+// still omitted when omitempty is set.
+func TestEncoderOmitemptyTextMarshalerZero(t *testing.T) {
+	type doc struct {
+		IP netip.Addr `toml:"ip,omitempty"`
+	}
+
+	d := doc{} // zero netip.Addr
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(b))
+}
+
 func TestEncoderOmitzero(t *testing.T) {
 	type doc struct {
 		String  string            `toml:",omitzero,multiline"`

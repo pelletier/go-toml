@@ -386,7 +386,41 @@ func isNil(v reflect.Value) bool {
 }
 
 func shouldOmitEmpty(options valueOptions, v reflect.Value) bool {
-	return options.omitempty && isEmptyValue(v)
+	if !options.omitempty {
+		return false
+	}
+
+	// If the value implements IsZero() use it, like shouldOmitZero does.
+	// This is important for types such as netip.Addr that have no exported
+	// fields (making isEmptyStruct incorrectly report them as empty) but do
+	// implement a meaningful zero check.
+	if v.Type().Implements(isZeroerType) {
+		return v.Interface().(isZeroer).IsZero()
+	}
+	if reflect.PointerTo(v.Type()).Implements(isZeroerType) {
+		if v.CanAddr() {
+			return v.Addr().Interface().(isZeroer).IsZero()
+		}
+		pv := reflect.New(v.Type())
+		pv.Elem().Set(v)
+		return pv.Interface().(isZeroer).IsZero()
+	}
+
+	// If the value implements TextMarshaler, fall back to reflect.Value.IsZero
+	// rather than the struct-field scan in isEmptyStruct.  A struct with no
+	// exported fields (e.g. netip.Addr) would otherwise always be considered
+	// empty even when it holds a meaningful value.
+	if v.Kind() == reflect.Struct {
+		hasMarshaler := v.Type().Implements(textMarshalerType)
+		if !hasMarshaler && v.CanAddr() {
+			hasMarshaler = reflect.PointerTo(v.Type()).Implements(textMarshalerType)
+		}
+		if hasMarshaler {
+			return v.IsZero()
+		}
+	}
+
+	return isEmptyValue(v)
 }
 
 func shouldOmitZero(options valueOptions, v reflect.Value) bool {
