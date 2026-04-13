@@ -449,8 +449,21 @@ func (enc *Encoder) commented(commented bool, b []byte) []byte {
 }
 
 func isEmptyValue(v reflect.Value) bool {
+	// For types that implement isZeroer (custom IsZero), defer to that.
+	if v.Type().Implements(isZeroerType) {
+		return v.Interface().(isZeroer).IsZero()
+	}
+	if v.CanAddr() && reflect.PointerTo(v.Type()).Implements(isZeroerType) {
+		return v.Addr().Interface().(isZeroer).IsZero()
+	}
+
 	switch v.Kind() {
 	case reflect.Struct:
+		// Types that implement TextMarshaler (e.g. netip.Addr) may have no
+		// exported fields. Fall back to reflect.IsZero instead of checking fields.
+		if v.Type().Implements(textMarshalerType) || reflect.PointerTo(v.Type()).Implements(textMarshalerType) {
+			return v.IsZero()
+		}
 		return isEmptyStruct(v)
 	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
 		return v.Len() == 0
