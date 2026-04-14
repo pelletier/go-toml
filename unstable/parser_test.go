@@ -695,3 +695,34 @@ func ExampleParser() {
 	// Expression: KeyValue
 	// value -> (Integer) 42
 }
+
+// TestRangeOffsetAfterComment is a regression test for #1047.
+// A comment line followed by a line starting with "=" (invalid key start).
+// subsliceOffset must use pointer arithmetic, not length subtraction, so that
+// non-suffix sub-slices (e.g. b[0:1]) still return the correct offset.
+func TestRangeOffsetAfterComment(t *testing.T) {
+	// "# comment\n" is 10 bytes; "=" starts at byte 10.
+	input := []byte("# comment\n= \"value\"")
+
+	p := Parser{}
+	p.Reset(input)
+	for p.NextExpression() {
+	}
+	err := p.Error()
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	perr, ok := err.(*ParserError)
+	if !ok {
+		t.Fatalf("expected *ParserError, got %T", err)
+	}
+	r := p.Range(perr.Highlight)
+	shape := p.Shape(r)
+
+	if r.Offset != 10 {
+		t.Errorf("Range.Offset: got %d, want 10", r.Offset)
+	}
+	if shape.Start.Line != 2 || shape.Start.Column != 1 {
+		t.Errorf("position: got %d:%d, want 2:1", shape.Start.Line, shape.Start.Column)
+	}
+}
