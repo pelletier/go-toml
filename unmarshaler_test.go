@@ -65,7 +65,7 @@ key3 = "value3"
 	// strict mode: fields in the document are missing in the target struct
 	// 2| key1 = "value1"
 	// 3| key2 = "value2"
-	//  | ~~~~ missing field
+	//  | ~~~~ unknown field
 	// 4| key3 = "value3"
 }
 
@@ -2387,14 +2387,14 @@ key4 = "value4"
 `,
 			expected: `2| key1 = "value1"
 3| key2 = "missing2"
- | ~~~~ missing field
+ | ~~~~ unknown field
 4| key3 = "missing3"
 5| key4 = "value4"
 ---
 2| key1 = "value1"
 3| key2 = "missing2"
 4| key3 = "missing3"
- | ~~~~ missing field
+ | ~~~~ unknown field
 5| key4 = "value4"`,
 			target: &struct {
 				Key1 string
@@ -2405,7 +2405,7 @@ key4 = "value4"
 			desc:  "multi-part key",
 			input: `a.short.key="foo"`,
 			expected: `1| a.short.key="foo"
- | ~~~~~~~~~~~ missing field`,
+ | ~~~~~~~~~~~ unknown field`,
 		},
 		{
 			desc: "missing table",
