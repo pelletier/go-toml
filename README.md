@@ -21,8 +21,6 @@ documentation.
 import "github.com/pelletier/go-toml/v2"
 ```
 
-See [Modules](#Modules).
-
 ## Features
 
 ### Stdlib behavior
