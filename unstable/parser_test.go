@@ -1,6 +1,7 @@
 package unstable
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -759,8 +760,8 @@ func TestParserErrorPosition(t *testing.T) {
 				t.Fatal("expected an error")
 			}
 
-			perr, ok := err.(*ParserError)
-			if !ok {
+			var perr *ParserError
+			if !errors.As(err, &perr) {
 				t.Fatalf("expected *ParserError, got %T", err)
 			}
 

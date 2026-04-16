@@ -390,8 +390,8 @@ func TestErrorPositionConsistency(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected parser error")
 			}
-			perr, ok := err.(*unstable.ParserError)
-			if !ok {
+			var perr *unstable.ParserError
+			if !errors.As(err, &perr) {
 				t.Fatalf("expected *ParserError, got %T", err)
 			}
 			r := p.Range(perr.Highlight)
