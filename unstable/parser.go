@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"unicode"
-	"unsafe"
 
 	"github.com/pelletier/go-toml/v2/internal/characters"
 )
@@ -84,17 +83,12 @@ func (p *Parser) rangeOfToken(token, rest []byte) Range {
 }
 
 // subsliceOffset returns the byte offset of subslice b within p.data.
-// b must be a subslice of p.data (i.e. its backing array must be within p.data).
+// b must be a subslice of p.data (same backing array).
 func (p *Parser) subsliceOffset(b []byte) int {
-	if len(p.data) == 0 || len(b) == 0 {
-		// Fall back to length-based computation for empty slices.
+	if len(b) == 0 {
 		return len(p.data) - len(b)
 	}
-	// Use pointer arithmetic so that non-suffix sub-slices (e.g. b[0:1]) are
-	// handled correctly. This fixes a regression introduced in #1041 where
-	// highlight slices like b[0:1] returned the wrong offset because the
-	// old length-subtraction formula only works for tail (suffix) slices.
-	return int(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(&p.data[0])))
+	return cap(p.data) - cap(b)
 }
 
 // Raw returns the slice corresponding to the bytes in the given range.

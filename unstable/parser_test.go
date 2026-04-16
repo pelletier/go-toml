@@ -1,6 +1,7 @@
 package unstable
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -698,8 +699,7 @@ func ExampleParser() {
 
 // TestRangeOffsetAfterComment is a regression test for #1047.
 // A comment line followed by a line starting with "=" (invalid key start).
-// subsliceOffset must use pointer arithmetic, not length subtraction, so that
-// non-suffix sub-slices (e.g. b[0:1]) still return the correct offset.
+// Verifies that non-suffix highlight subslices produce the correct offset.
 func TestRangeOffsetAfterComment(t *testing.T) {
 	// "# comment\n" is 10 bytes; "=" starts at byte 10.
 	input := []byte("# comment\n= \"value\"")
@@ -712,8 +712,8 @@ func TestRangeOffsetAfterComment(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	perr, ok := err.(*ParserError)
-	if !ok {
+	var perr *ParserError
+	if !errors.As(err, &perr) {
 		t.Fatalf("expected *ParserError, got %T", err)
 	}
 	r := p.Range(perr.Highlight)
