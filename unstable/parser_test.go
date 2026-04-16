@@ -1,6 +1,7 @@
 package unstable
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -694,4 +695,88 @@ func ExampleParser() {
 	// hello -> (String) world
 	// Expression: KeyValue
 	// value -> (Integer) 42
+}
+
+func TestParserErrorPosition(t *testing.T) {
+	examples := []struct {
+		name           string
+		input          string
+		expectedOffset int
+		expectedLine   int
+		expectedColumn int
+	}{
+		{
+			name:           "comment then invalid key start",
+			input:          "# comment\n= \"value\"",
+			expectedOffset: 10,
+			expectedLine:   2,
+			expectedColumn: 1,
+		},
+		{
+			name:           "no comment invalid key start",
+			input:          "= \"value\"",
+			expectedOffset: 0,
+			expectedLine:   1,
+			expectedColumn: 1,
+		},
+		{
+			name:           "multiple comments then error",
+			input:          "# c1\n# c2\n= \"val\"",
+			expectedOffset: 10,
+			expectedLine:   3,
+			expectedColumn: 1,
+		},
+		{
+			name:           "valid line then invalid key start",
+			input:          "a = 1\n= \"val\"",
+			expectedOffset: 6,
+			expectedLine:   2,
+			expectedColumn: 1,
+		},
+		{
+			name:           "blank lines then error",
+			input:          "\n\n= \"val\"",
+			expectedOffset: 2,
+			expectedLine:   3,
+			expectedColumn: 1,
+		},
+		{
+			name:           "expected newline but got invalid char",
+			input:          "a = 1 b = 2",
+			expectedOffset: 6,
+			expectedLine:   1,
+			expectedColumn: 7,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.name, func(t *testing.T) {
+			p := Parser{}
+			p.Reset([]byte(e.input))
+			for p.NextExpression() {
+			}
+			err := p.Error()
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+
+			var perr *ParserError
+			if !errors.As(err, &perr) {
+				t.Fatalf("expected *ParserError, got %T", err)
+			}
+
+			r := p.Range(perr.Highlight)
+			shape := p.Shape(r)
+
+			if int(r.Offset) != e.expectedOffset {
+				t.Errorf("offset: got %d, want %d", r.Offset, e.expectedOffset)
+			}
+			if shape.Start.Line != e.expectedLine {
+				t.Errorf("line: got %d, want %d", shape.Start.Line, e.expectedLine)
+			}
+			if shape.Start.Column != e.expectedColumn {
+				t.Errorf("column: got %d, want %d", shape.Start.Column, e.expectedColumn)
+			}
+		})
+	}
 }

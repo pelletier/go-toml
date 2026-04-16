@@ -301,6 +301,123 @@ OtherMissing = 1
 	assert.Equal(t, 2, len(strictErr.Unwrap()))
 }
 
+func TestDecodeError_PositionAfterComments(t *testing.T) {
+	examples := []struct {
+		name        string
+		doc         string
+		expectedRow int
+		expectedCol int
+	}{
+		{
+			name:        "comment then invalid key start",
+			doc:         "# comment\n= \"value\"",
+			expectedRow: 2,
+			expectedCol: 1,
+		},
+		{
+			name:        "no comment invalid key start",
+			doc:         "= \"value\"",
+			expectedRow: 1,
+			expectedCol: 1,
+		},
+		{
+			name:        "multiple comments then error",
+			doc:         "# c1\n# c2\n= \"val\"",
+			expectedRow: 3,
+			expectedCol: 1,
+		},
+		{
+			name:        "valid line then invalid key start",
+			doc:         "a = 1\n= \"val\"",
+			expectedRow: 2,
+			expectedCol: 1,
+		},
+		{
+			name:        "blank lines then error",
+			doc:         "\n\n= \"val\"",
+			expectedRow: 3,
+			expectedCol: 1,
+		},
+		{
+			name:        "expected newline but got invalid char",
+			doc:         "a = 1 b = 2",
+			expectedRow: 1,
+			expectedCol: 7,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.name, func(t *testing.T) {
+			var v interface{}
+			err := Unmarshal([]byte(e.doc), &v)
+
+			var derr *DecodeError
+			if !errors.As(err, &derr) {
+				t.Fatal("error not in expected format")
+			}
+
+			row, col := derr.Position()
+			if row != e.expectedRow {
+				t.Errorf("row: got %d, want %d", row, e.expectedRow)
+			}
+			if col != e.expectedCol {
+				t.Errorf("col: got %d, want %d", col, e.expectedCol)
+			}
+		})
+	}
+}
+
+func TestErrorPositionConsistency(t *testing.T) {
+	// Verify that the unstable parser API and the public Unmarshal API
+	// report the same error positions for identical documents.
+	documents := []string{
+		"# comment\n= \"value\"",
+		"= \"value\"",
+		"# c1\n# c2\n= \"val\"",
+		"a = 1\n= \"val\"",
+		"\n\n= \"val\"",
+		"a = 1 b = 2",
+	}
+
+	for _, doc := range documents {
+		t.Run(doc, func(t *testing.T) {
+			// Get position from unstable API
+			p := unstable.Parser{}
+			p.Reset([]byte(doc))
+			for p.NextExpression() {
+			}
+			err := p.Error()
+			if err == nil {
+				t.Fatal("expected parser error")
+			}
+			var perr *unstable.ParserError
+			if !errors.As(err, &perr) {
+				t.Fatalf("expected *ParserError, got %T", err)
+			}
+			r := p.Range(perr.Highlight)
+			shape := p.Shape(r)
+			unstableLine := shape.Start.Line
+			unstableCol := shape.Start.Column
+
+			// Get position from public API
+			var v interface{}
+			pubErr := Unmarshal([]byte(doc), &v)
+			var derr *DecodeError
+			if !errors.As(pubErr, &derr) {
+				t.Fatal("error not in expected format")
+			}
+			pubRow, pubCol := derr.Position()
+
+			if unstableLine != pubRow {
+				t.Errorf("line mismatch: unstable=%d, public=%d", unstableLine, pubRow)
+			}
+			if unstableCol != pubCol {
+				t.Errorf("column mismatch: unstable=%d, public=%d", unstableCol, pubCol)
+			}
+		})
+	}
+}
+
 func ExampleDecodeError() {
 	doc := `name = 123__456`
 
