@@ -864,7 +864,7 @@ huey = 'dewey'
 			},
 		},
 		{
-			desc: "multiline basic string escape character",
+			desc:  "multiline basic string escape character",
 			input: `A = """\e"""`,
 			gen: func() test {
 				type doc struct {
@@ -934,7 +934,7 @@ huey = 'dewey'
 			},
 		},
 		{
-			desc: "multiline basic string hex escape",
+			desc:  "multiline basic string hex escape",
 			input: `A = """\x61"""`,
 			gen: func() test {
 				type doc struct {
