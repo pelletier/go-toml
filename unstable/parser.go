@@ -460,7 +460,7 @@ func (p *Parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	return v, v[1 : len(v)-1], rest, nil
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop,dupl
 func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	// inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	// inline-table-open  = %x7B ws     ; {
@@ -555,7 +555,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop,dupl
 func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
