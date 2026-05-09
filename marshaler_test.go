@@ -1159,6 +1159,34 @@ func TestEncoderOmitempty(t *testing.T) {
 	assert.Equal(t, expected, string(b))
 }
 
+// TestEncoderOmitemptyTextMarshaler checks that omitempty respects types that
+// implement encoding.TextMarshaler but have no exported fields (e.g. netip.Addr).
+// Before the fix, isEmptyStruct would return true for such types because it only
+// inspected exported fields, causing non-zero values to be silently dropped.
+func TestEncoderOmitemptyTextMarshaler(t *testing.T) {
+	type doc struct {
+		IP netip.Addr `toml:"ip,omitempty"`
+	}
+
+	t.Run("non-zero address is marshaled", func(t *testing.T) {
+		d := doc{IP: netip.MustParseAddr("192.168.178.35")}
+		b, err := toml.Marshal(d)
+		assert.NoError(t, err)
+		assert.Equal(t, "ip = '192.168.178.35'\n", string(b))
+	})
+
+	t.Run("zero address is still marshaled", func(t *testing.T) {
+		// netip.Addr has no exported IsZero method, so we cannot determine
+		// emptiness from the value alone.  For types that control their own
+		// serialization via TextMarshaler we fall back to "not empty" to avoid
+		// silently dropping values.  A zero Addr marshals to the empty string.
+		d := doc{}
+		b, err := toml.Marshal(d)
+		assert.NoError(t, err)
+		assert.Equal(t, "ip = ''\n", string(b))
+	})
+}
+
 func TestEncoderOmitzero(t *testing.T) {
 	type doc struct {
 		String  string            `toml:",omitzero,multiline"`

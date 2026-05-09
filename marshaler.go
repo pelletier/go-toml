@@ -470,6 +470,29 @@ func isEmptyValue(v reflect.Value) bool {
 }
 
 func isEmptyStruct(v reflect.Value) bool {
+	// If the type has an IsZero() bool method, delegate to it.
+	// This covers types like netip.Addr that have no exported fields but carry
+	// meaningful state (e.g. a non-zero address should not be omitted).
+	if v.Type().Implements(isZeroerType) {
+		return v.MethodByName("IsZero").Call(nil)[0].Bool()
+	}
+	if v.CanAddr() && v.Addr().Type().Implements(isZeroerType) {
+		return v.Addr().MethodByName("IsZero").Call(nil)[0].Bool()
+	}
+
+	// If the type implements encoding.TextMarshaler it controls its own
+	// serialization; we cannot reliably determine emptiness from exported
+	// fields alone (which may be zero even for a non-zero value).  Treat any
+	// such value as non-empty so that omitempty only suppresses truly default
+	// zero-value instances — callers that need different behavior should
+	// implement IsZero() bool.
+	if v.Type().Implements(textMarshalerType) {
+		return false
+	}
+	if v.CanAddr() && v.Addr().Type().Implements(textMarshalerType) {
+		return false
+	}
+
 	// TODO: merge with walkStruct and cache.
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
