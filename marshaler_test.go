@@ -1159,6 +1159,41 @@ func TestEncoderOmitempty(t *testing.T) {
 	assert.Equal(t, expected, string(b))
 }
 
+// Regression for #955. A struct that marshals through TextMarshaler
+// (netip.Addr is the canonical example, time.Time another) has no
+// exported fields, so the previous isEmptyStruct walk always reported
+// it as empty and the value was dropped with `omitempty`.
+func TestEncoderOmitempty_TextMarshaler(t *testing.T) {
+	t.Run("netip.Addr present is kept", func(t *testing.T) {
+		type doc struct {
+			IP netip.Addr `toml:"ip,omitempty"`
+		}
+		b, err := toml.Marshal(doc{IP: netip.MustParseAddr("192.168.178.35")})
+		assert.NoError(t, err)
+		assert.Equal(t, "ip = '192.168.178.35'\n", string(b))
+	})
+
+	t.Run("zero netip.Addr is omitted", func(t *testing.T) {
+		type doc struct {
+			IP netip.Addr `toml:"ip,omitempty"`
+		}
+		b, err := toml.Marshal(doc{})
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(b))
+	})
+
+	t.Run("time.Time present is kept", func(t *testing.T) {
+		type doc struct {
+			When time.Time `toml:"when,omitempty"`
+		}
+		when, err := time.Parse(time.RFC3339, "2026-05-16T12:34:56Z")
+		assert.NoError(t, err)
+		b, err := toml.Marshal(doc{When: when})
+		assert.NoError(t, err)
+		assert.Equal(t, "when = 2026-05-16T12:34:56Z\n", string(b))
+	})
+}
+
 func TestEncoderOmitzero(t *testing.T) {
 	type doc struct {
 		String  string            `toml:",omitzero,multiline"`

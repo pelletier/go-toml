@@ -470,6 +470,19 @@ func isEmptyValue(v reflect.Value) bool {
 }
 
 func isEmptyStruct(v reflect.Value) bool {
+	// A struct that marshals via TextMarshaler (netip.Addr, time.Time, ...)
+	// has no exported fields the field-walk below can see, so it would
+	// always look empty. Defer to MarshalText and treat a zero-length
+	// result as empty.
+	if v.Type().Implements(textMarshalerType) {
+		text, err := v.Interface().(encoding.TextMarshaler).MarshalText()
+		return err == nil && len(text) == 0
+	}
+	if v.CanAddr() && reflect.PointerTo(v.Type()).Implements(textMarshalerType) {
+		text, err := v.Addr().Interface().(encoding.TextMarshaler).MarshalText()
+		return err == nil && len(text) == 0
+	}
+
 	// TODO: merge with walkStruct and cache.
 	typ := v.Type()
 	for i := 0; i < typ.NumField(); i++ {
