@@ -28,6 +28,11 @@ import "github.com/pelletier/go-toml/v2"
 As much as possible, this library is designed to behave similarly as the
 standard library's `encoding/json`.
 
+When encoding structs, fields tagged with `omitempty` are omitted if they are
+empty. For `time.Time`, the zero value is considered empty, so timestamps such
+as `created_at` or `updated_at` are not written unless you remove `omitempty`
+from the struct tag or use a pointer type (`*time.Time`).
+
 ### Performance
 
 While go-toml favors usability, it is written with performance in mind. Most
