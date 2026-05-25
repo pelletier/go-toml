@@ -1221,6 +1221,10 @@ func (p *Parser) scanIntOrFloat(b []byte) (reference, []byte, error) {
 			return invalidReference, nil, NewParserError(b[i:i+1], "unexpected character 'n' while scanning for a number")
 		}
 
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			return invalidReference, nil, NewParserError(b[i:i+1], "strings must be quoted")
+		}
+
 		break
 	}
 

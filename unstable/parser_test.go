@@ -780,3 +780,24 @@ func TestParserErrorPosition(t *testing.T) {
 		})
 	}
 }
+
+func TestUnquotedStringValueRequiresQuotes(t *testing.T) {
+	p := Parser{}
+	p.Reset([]byte(`timeout = 20s`))
+	for p.NextExpression() {
+	}
+
+	err := p.Error()
+	if err == nil {
+		t.Fatal("expected parse error")
+	}
+
+	var perr *ParserError
+	if !errors.As(err, &perr) {
+		t.Fatalf("expected *ParserError, got %T", err)
+	}
+
+	if perr.Message != "strings must be quoted" {
+		t.Fatalf("expected %q, got %q", "strings must be quoted", perr.Message)
+	}
+}
