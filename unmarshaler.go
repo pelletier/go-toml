@@ -191,6 +191,14 @@ func (d *decoder) typeMismatchString(toml string, target reflect.Type) string {
 	return fmt.Sprintf("cannot decode TOML %s into a Go value of type %s", toml, target)
 }
 
+func (d *decoder) newParserError(highlight []byte, format string, args ...interface{}) error {
+	return &unstable.ParserError{
+		Highlight: highlight,
+		Message:   fmt.Errorf(format, args...).Error(),
+		Key:       d.strict.key.Key(),
+	}
+}
+
 func (d *decoder) expr() *unstable.Node {
 	return d.p.Expression()
 }
@@ -625,7 +633,7 @@ func (d *decoder) handleTable(key unstable.Iterator, v reflect.Value) (reflect.V
 				}
 			}
 		}
-		return reflect.Value{}, unstable.NewParserError(key.Node().Data, "cannot store a table in a slice")
+		return reflect.Value{}, d.newParserError(key.Node().Data, "cannot store a table in a slice")
 	}
 	if key.Next() {
 		// Still scoping the key
@@ -748,7 +756,7 @@ func (d *decoder) tryTextUnmarshaler(node *unstable.Node, v reflect.Value) (bool
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(node.Data)
 		if err != nil {
-			return false, unstable.NewParserError(d.p.Raw(node.Raw), "%w", err)
+			return false, d.newParserError(d.p.Raw(node.Raw), "%w", err)
 		}
 
 		return true, nil
@@ -896,7 +904,7 @@ func (d *decoder) unmarshalInlineTable(itable *unstable.Node, v reflect.Value) e
 		}
 		return d.unmarshalInlineTable(itable, elem)
 	default:
-		return unstable.NewParserError(d.p.Raw(itable.Raw), "cannot store inline table in Go type %s", v.Kind())
+		return d.newParserError(d.p.Raw(itable.Raw), "cannot store inline table in Go type %s", v.Kind())
 	}
 
 	it := itable.Children()
@@ -922,7 +930,7 @@ func (d *decoder) unmarshalDateTime(value *unstable.Node, v reflect.Value) error
 	}
 
 	if v.Kind() != reflect.Interface && v.Type() != timeType {
-		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("datetime", v.Type()))
+		return d.newParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("datetime", v.Type()))
 	}
 	v.Set(reflect.ValueOf(dt))
 	return nil
@@ -935,7 +943,7 @@ func (d *decoder) unmarshalLocalDate(value *unstable.Node, v reflect.Value) erro
 	}
 
 	if v.Kind() != reflect.Interface && v.Type() != timeType {
-		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local date", v.Type()))
+		return d.newParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local date", v.Type()))
 	}
 	if v.Type() == timeType {
 		v.Set(reflect.ValueOf(ld.AsTime(time.Local)))
@@ -952,11 +960,11 @@ func (d *decoder) unmarshalLocalTime(value *unstable.Node, v reflect.Value) erro
 	}
 
 	if len(rest) > 0 {
-		return unstable.NewParserError(rest, "extra characters at the end of a local time")
+		return d.newParserError(rest, "extra characters at the end of a local time")
 	}
 
 	if v.Kind() != reflect.Interface {
-		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local time", v.Type()))
+		return d.newParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local time", v.Type()))
 	}
 	v.Set(reflect.ValueOf(lt))
 	return nil
@@ -969,11 +977,11 @@ func (d *decoder) unmarshalLocalDateTime(value *unstable.Node, v reflect.Value) 
 	}
 
 	if len(rest) > 0 {
-		return unstable.NewParserError(rest, "extra characters at the end of a local date time")
+		return d.newParserError(rest, "extra characters at the end of a local date time")
 	}
 
 	if v.Kind() != reflect.Interface && v.Type() != timeType {
-		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local datetime", v.Type()))
+		return d.newParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("local datetime", v.Type()))
 	}
 	if v.Type() == timeType {
 		v.Set(reflect.ValueOf(ldt.AsTime(time.Local)))
@@ -992,7 +1000,7 @@ func (d *decoder) unmarshalBool(value *unstable.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(b))
 	default:
-		return unstable.NewParserError(value.Data, "cannot assign boolean to a %t", b)
+		return d.newParserError(value.Data, "cannot assign boolean to a %t", b)
 	}
 
 	return nil
@@ -1009,13 +1017,13 @@ func (d *decoder) unmarshalFloat(value *unstable.Node, v reflect.Value) error {
 		v.SetFloat(f)
 	case reflect.Float32:
 		if f > math.MaxFloat32 {
-			return unstable.NewParserError(value.Data, "number %f does not fit in a float32", f)
+			return d.newParserError(value.Data, "number %f does not fit in a float32", f)
 		}
 		v.SetFloat(f)
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(f))
 	default:
-		return unstable.NewParserError(value.Data, "float cannot be assigned to %s", v.Kind())
+		return d.newParserError(value.Data, "float cannot be assigned to %s", v.Kind())
 	}
 
 	return nil
@@ -1116,7 +1124,7 @@ func (d *decoder) unmarshalInteger(value *unstable.Node, v reflect.Value) error 
 	case reflect.Interface:
 		r = reflect.ValueOf(i)
 	default:
-		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("integer", v.Type()))
+		return d.newParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("integer", v.Type()))
 	}
 
 	if !r.Type().AssignableTo(v.Type()) {
@@ -1135,7 +1143,7 @@ func (d *decoder) unmarshalString(value *unstable.Node, v reflect.Value) error {
 	case reflect.Interface:
 		v.Set(reflect.ValueOf(string(value.Data)))
 	default:
-		return unstable.NewParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("string", v.Type()))
+		return d.newParserError(d.p.Raw(value.Raw), "%s", d.typeMismatchString("string", v.Type()))
 	}
 
 	return nil
