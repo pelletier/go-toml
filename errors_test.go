@@ -418,6 +418,31 @@ func TestErrorPositionConsistency(t *testing.T) {
 	}
 }
 
+func TestDecodeErrorRedefinition(t *testing.T) {
+	t.Run("duplicate top-level key", func(t *testing.T) {
+		m := map[string]interface{}{}
+		err := Unmarshal([]byte("a = 1\nb = 2\nb = 3\n"), &m)
+
+		var de *DecodeError
+		if !errors.As(err, &de) {
+			t.Fatalf("expected *DecodeError, got %T (%v)", err, err)
+		}
+		assert.Equal(t, Key{"b"}, de.Key())
+		assert.Equal(t, "toml: key b is already defined", de.Error())
+	})
+
+	t.Run("duplicate nested key", func(t *testing.T) {
+		m := map[string]interface{}{}
+		err := Unmarshal([]byte("foo.bar = 1\nfoo.bar = 2\n"), &m)
+
+		var de *DecodeError
+		if !errors.As(err, &de) {
+			t.Fatalf("expected *DecodeError, got %T (%v)", err, err)
+		}
+		assert.Equal(t, Key{"foo", "bar"}, de.Key())
+	})
+}
+
 func ExampleDecodeError() {
 	doc := `name = 123__456`
 

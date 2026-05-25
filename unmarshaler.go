@@ -191,6 +191,30 @@ func (d *decoder) typeMismatchString(toml string, target reflect.Type) string {
 	return fmt.Sprintf("cannot decode TOML %s into a Go value of type %s", toml, target)
 }
 
+func keyFromNode(node *unstable.Node) Key {
+	it := node.Key()
+	var key Key
+	for it.Next() {
+		key = append(key, string(it.Node().Data))
+	}
+	return key
+}
+
+func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	msg := err.Error()
+	msg = strings.TrimPrefix(msg, "toml: ")
+
+	return wrapDecodeError(d.p.Data(), &unstable.ParserError{
+		Highlight: d.p.Raw(node.Raw),
+		Message:   msg,
+		Key:       keyFromNode(node),
+	})
+}
+
 func (d *decoder) expr() *unstable.Node {
 	return d.p.Expression()
 }
@@ -281,7 +305,7 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) err
 	if !d.skipUntilTable || expr.Kind != unstable.KeyValue {
 		first, err = d.seen.CheckExpression(expr)
 		if err != nil {
-			return err
+			return d.wrapSeenError(expr, err)
 		}
 	}
 
@@ -671,7 +695,7 @@ func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
 
 		_, err := d.seen.CheckExpression(expr)
 		if err != nil {
-			return reflect.Value{}, err
+			return reflect.Value{}, d.wrapSeenError(expr, err)
 		}
 
 		x, err := d.handleKeyValue(expr, v)
@@ -703,7 +727,7 @@ func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Va
 
 		_, err := d.seen.CheckExpression(expr)
 		if err != nil {
-			return reflect.Value{}, err
+			return reflect.Value{}, d.wrapSeenError(expr, err)
 		}
 
 		// Use the raw bytes from the original document to preserve formatting
