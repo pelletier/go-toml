@@ -18,6 +18,7 @@ var (
 	timeType               = reflect.TypeOf(time.Time{})
 	textMarshalerType      = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 	textUnmarshalerType    = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
+	binaryUnmarshalerType  = reflect.TypeOf(new(encoding.BinaryUnmarshaler)).Elem()
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}(nil))
 	sliceInterfaceType     = reflect.TypeOf([]interface{}(nil))
 	stringType             = reflect.TypeOf("")

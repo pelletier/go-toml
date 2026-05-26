@@ -1308,10 +1308,26 @@ func makeMapKey(kt reflect.Type, name string) (reflect.Value, error) {
 			}
 			return k, nil
 		}
+		if kt.Implements(binaryUnmarshalerType) {
+			k := reflect.New(kt.Elem())
+			err := k.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(name))
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
+			}
+			return k, nil
+		}
 	default:
 		if reflect.PtrTo(kt).Implements(textUnmarshalerType) {
 			k := reflect.New(kt)
 			err := k.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(name))
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
+			}
+			return k.Elem(), nil
+		}
+		if reflect.PtrTo(kt).Implements(binaryUnmarshalerType) {
+			k := reflect.New(kt)
+			err := k.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(name))
 			if err != nil {
 				return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
 			}
@@ -1705,6 +1721,12 @@ func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.V
 		}
 		return v, nil
 	}
+	if ok, err := tryBinaryUnmarshaler(v, value.Data); ok {
+		if err != nil {
+			return reflect.Value{}, unstable.NewParserError(d.p.Raw(value.Raw), "%s", err)
+		}
+		return v, nil
+	}
 	return reflect.Value{}, d.typeMismatchError("string", v.Type(), d.p.Raw(value.Raw))
 }
 
@@ -1751,6 +1773,16 @@ func (d *decoder) assignInteger(v reflect.Value, value *unstable.Node) (reflect.
 func tryTextUnmarshaler(v reflect.Value, text []byte) (bool, error) {
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		return true, v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(text)
+	}
+	return false, nil
+}
+
+func tryBinaryUnmarshaler(v reflect.Value, data []byte) (bool, error) {
+	if v.Type() == timeType {
+		return false, nil
+	}
+	if v.CanAddr() && v.Addr().Type().Implements(binaryUnmarshalerType) {
+		return true, v.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary(data)
 	}
 	return false, nil
 }
