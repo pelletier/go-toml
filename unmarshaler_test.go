@@ -37,6 +37,12 @@ func (k *unmarshalBadTextKey) UnmarshalText([]byte) error {
 	return errors.New("error")
 }
 
+type unmarshalBadBinaryValueKey struct{}
+
+func (unmarshalBadBinaryValueKey) UnmarshalBinary([]byte) error {
+	return errors.New("error")
+}
+
 func ExampleDecoder_DisallowUnknownFields() {
 	type S struct {
 		Key1 string
@@ -569,6 +575,18 @@ foo = "bar"`,
 			input: `a-1 = "foo"`,
 			gen: func() test {
 				type doc = map[*unmarshalBadTextKey]string
+
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "kv bad binary value key",
+			input: `a = "foo"`,
+			gen: func() test {
+				type doc = map[unmarshalBadBinaryValueKey]string
 
 				return test{
 					target: &doc{},
