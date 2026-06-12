@@ -225,3 +225,18 @@ significantly faster than baseline.
 Remaining (non-goal) ideas if ever needed: intern repeated map key strings;
 arena for unescaped strings; SIMD-ish utf8 run validation; entries freelist
 in encoder.
+
+### 2026-06-12 (later): real-world usage benchmarks (v2 vs reimpl)
+Researched open-source consumers: Viper (generic map read + Marshal
+write-back), Hugo (front-matter batches), containerd (daemon config, deep
+quoted-key plugin tables; go.mod requires go-toml/v2), gitleaks-style rule
+files (nested [[rules.allowlists]]; origin of issue 995), pyproject.toml
+readers, golangci-lint-style strict struct configs.
+Added benchmark/realworld_bench_test.go (7 benchmarks). Result, v2 branch vs
+reimpl (count=10, files bench-realworld-{v2,reimpl}.txt):
+  containerd -23%, ViperRead -33%, ViperWrite -13%, HugoBatch -41%,
+  Gitleaks -18%, Pyproject -41%, GolangciStrict -30%; geomean -29% time,
+  -60% B/op. Only blemish: gitleaks allocs/op +8% (slice-growth of []Rule),
+  while its bytes are -47% and time -18%.
+Also: array-table counters now use pointer slots, zeroed instead of deleted
+on reset (repeat headers stopped allocating key strings).
