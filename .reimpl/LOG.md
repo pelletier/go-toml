@@ -70,3 +70,24 @@ strings only allocate when they contain escapes; own UTF-8 validator (RFC 3629).
 **Result**: `go test ./...` and `go test -race ./...` ALL PASS (root tests still
 run the old root impl on top of the new parser — full toml-test suite green).
 Benchmarks: baseline `.reimpl/bench-baseline.txt`, new `.reimpl/bench-parser-v1.txt`.
+
+**Benchmarks v1 vs baseline** (benchstat, count=10):
+- Unmarshal/ReferenceFile/struct -22.6%, map -14.9%; HugoFrontMatter -5.7%;
+  Dataset config/example ≈ -5.7%; canada/code ~flat; twitter/citm +2-3% (noise+memory).
+- BUG found & fixed (commit 2): escaped-string buffers were allocated with
+  cap = remaining document → twitter B/op +546%. Fix: find closing quote first
+  (backslash-aware IndexAny scan), allocate exact. After fix: twitter B/op back
+  to baseline, ReferenceFile/struct ~22.7µs (~-30% vs 32.7µs baseline), B/op
+  15814 vs 15882 baseline. Marshal unchanged (old marshaler still in place).
+- Remember: empty-highlight EOF errors must be extended (NextExpression does it).
+- Watch out: findBasicStringEnd needs `i > len(b)` guard after `i += 2`
+  (unfinished trailing escape panics otherwise) — caught by existing tests.
+
+### Next steps (phase 2)
+- Rewrite root decode layer clean-room: errors.go (wrapDecodeError formatting,
+  spec in errors_test.go), decode.go (datetime/number value parsing + range
+  validation messages like "hour cannot be greater 23"), unmarshaler.go,
+  strict.go, internal/tracker (entry ≤ 48 bytes!), internal/characters.
+- Then marshaler.go. Then perf phase: unstable parse benchmarks (scanComment,
+  parseLiteralString etc.) vs baseline + datasets; consider type-keyed cached
+  decode plans (sync.Map) for reflection, chunked string arenas, etc.
