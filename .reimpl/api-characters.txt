@@ -1,0 +1,27 @@
+package characters // import "github.com/pelletier/go-toml/v2/internal/characters"
+
+Package characters provides functions for working with string encodings.
+
+FUNCTIONS
+
+func InvalidASCII(b byte) bool
+func Utf8TomlValidAlreadyEscaped(p []byte) []byte
+    Utf8TomlValidAlreadyEscaped verifies that a given string is only made of
+    valid UTF-8 characters allowed by the TOML spec:
+
+    Any Unicode character may be used except those that must be escaped:
+    quotation mark, backslash, and the control characters other than tab (U+0000
+    to U+0008, U+000A to U+001F, U+007F).
+
+    It is a copy of the Go 1.17 utf8.Valid implementation, tweaked to exit early
+    when a character is not allowed.
+
+    The returned slice is empty if the string is valid, or contains the bytes of
+    the invalid character.
+
+    quotation mark => already checked backslash => already checked 0-0x8 =>
+    invalid 0x9 => tab, ok 0xA - 0x1F => invalid 0x7F => invalid
+
+func Utf8ValidNext(p []byte) int
+    Utf8ValidNext returns the size of the next rune if valid, 0 otherwise.
+

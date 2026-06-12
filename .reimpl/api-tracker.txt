@@ -1,0 +1,59 @@
+package tracker // import "github.com/pelletier/go-toml/v2/internal/tracker"
+
+Package tracker provides functions for keeping track of AST nodes.
+
+TYPES
+
+type KeyTracker struct {
+	// Has unexported fields.
+}
+    KeyTracker is a tracker that keeps track of the current Key as the AST is
+    walked.
+
+func (t *KeyTracker) Key() []string
+    Key returns the current key.
+
+func (t *KeyTracker) Pop(node *unstable.Node)
+    Pop key from stack.
+
+func (t *KeyTracker) Push(node *unstable.Node)
+    Push the given key on the stack.
+
+func (t *KeyTracker) UpdateArrayTable(node *unstable.Node)
+    UpdateArrayTable sets the state of the tracker with the AST array table
+    node.
+
+func (t *KeyTracker) UpdateTable(node *unstable.Node)
+    UpdateTable sets the state of the tracker with the AST table node.
+
+type SeenTracker struct {
+	// Has unexported fields.
+}
+    SeenTracker tracks which keys have been seen with which TOML type to flag
+    duplicates and mismatches according to the spec.
+
+    Each node in the visited tree is represented by an entry. Each entry has
+    an identifier, which is provided by a counter. Entries are stored in the
+    array entries. As new nodes are discovered (referenced for the first time
+    in the TOML document), entries are created and appended to the array.
+    An entry points to its parent using its id.
+
+    To find whether a given key (sequence of []byte) has already been visited,
+    the entries are linearly searched, looking for one with the right name and
+    parent id.
+
+    Given that all keys appear in the document after their parent, it is
+    guaranteed that all descendants of a node are stored after the node,
+    this speeds up the search process.
+
+    When encountering [[array tables]], the descendants of that node are removed
+    to allow that branch of the tree to be "rediscovered". To maintain the
+    invariant above, the deletion process needs to keep the order of entries.
+    This results in more copies in that case.
+
+func (s *SeenTracker) CheckExpression(node *unstable.Node) (bool, error)
+    CheckExpression takes a top-level node and checks that it does not contain
+    keys that have been seen in previous calls, and validates that types are
+    consistent. It returns true if it is the first time this node's key is seen.
+    Useful to clear array tables on first use.
+
