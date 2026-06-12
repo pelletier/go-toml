@@ -244,7 +244,9 @@ type decoder struct {
 
 	// arrayCounts tracks the number of elements appended to fixed-size
 	// arrays used as array tables, keyed by the NUL-joined key parts.
-	arrayCounts map[string]int
+	// Values are pointer slots so that updating an existing path does not
+	// allocate a new key string.
+	arrayCounts map[string]*int
 
 	// Cached target of the current table, so that key-values do not need to
 	// walk the document structure from the root for every expression.
@@ -339,14 +341,22 @@ func (d *decoder) arrayCount(key []byte) int {
 	if d.arrayCounts == nil {
 		return 0
 	}
-	return d.arrayCounts[string(key)] // does not allocate
+	if p := d.arrayCounts[string(key)]; p != nil { // does not allocate
+		return *p
+	}
+	return 0
 }
 
 func (d *decoder) setArrayCount(key []byte, n int) {
 	if d.arrayCounts == nil {
-		d.arrayCounts = map[string]int{}
+		d.arrayCounts = map[string]*int{}
 	}
-	d.arrayCounts[string(key)] = n
+	if p := d.arrayCounts[string(key)]; p != nil { // does not allocate
+		*p = n
+		return
+	}
+	v := n
+	d.arrayCounts[string(key)] = &v
 }
 
 // resetChildArrayCounts forgets the counts of all the array tables under
@@ -356,9 +366,11 @@ func (d *decoder) resetChildArrayCounts(key []byte) {
 		return
 	}
 	prefix := string(key) + "\x00"
-	for k := range d.arrayCounts {
+	for k, p := range d.arrayCounts {
 		if strings.HasPrefix(k, prefix) {
-			delete(d.arrayCounts, k)
+			// Zero instead of delete: the next element of the parent table
+			// will reuse the slot without allocating a new key.
+			*p = 0
 		}
 	}
 }
