@@ -1,0 +1,27 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/pelletier/go-toml/v2/benchmark
+BenchmarkUnmarshalDataset/config-8         	      86	  12634719 ns/op	  83.00 MB/s	 5160796 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      96	  12619185 ns/op	  83.10 MB/s	 5160613 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      94	  12480495 ns/op	  84.03 MB/s	 5160683 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      94	  13050295 ns/op	  80.36 MB/s	 5160801 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      98	  12555827 ns/op	  83.52 MB/s	 5160733 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      98	  12726453 ns/op	  82.40 MB/s	 5160614 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      94	  12594331 ns/op	  83.27 MB/s	 5160771 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      96	  12673332 ns/op	  82.75 MB/s	 5160667 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      97	  13060840 ns/op	  80.29 MB/s	 5160652 B/op	  190629 allocs/op
+BenchmarkUnmarshalDataset/config-8         	      92	  12622265 ns/op	  83.08 MB/s	 5160874 B/op	  190630 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20166340 ns/op	 109.16 MB/s	 6883202 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20206226 ns/op	 108.95 MB/s	 6883199 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20885003 ns/op	 105.40 MB/s	 5849500 B/op	  279298 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20128033 ns/op	 109.37 MB/s	 6883179 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20064474 ns/op	 109.71 MB/s	 6883182 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      57	  20932980 ns/op	 105.16 MB/s	 6901324 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20044859 ns/op	 109.82 MB/s	 6883199 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20143040 ns/op	 109.29 MB/s	 6883180 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      58	  20210698 ns/op	 108.92 MB/s	 6883199 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/canada-8         	      60	  20153238 ns/op	 109.23 MB/s	 6848734 B/op	  279299 allocs/op
+BenchmarkUnmarshalDataset/citm_catalog-8   	      92	  12134558 ns/op	  45.99 MB/s	 5621259 B/op	  121596 allocs/op
+BenchmarkUnmarshalDataset/citm_catalog-8   	      94	  12294166 ns/op	  45.39 MB/s	 5950468 B/op	  121596 allocs/op
+BenchmarkUnmarshalDataset/citm_catalog-8   	      98	  12209709 ns/op	  45.70 MB/s	 5937152 B/op	  121597 allocs/op
+BenchmarkUnmarshalDataset/citm_catalog-8   	

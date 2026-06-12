@@ -147,8 +147,48 @@ Commit c2b404a. Contracts:
 
 WHOLE LIBRARY NOW CLEAN-ROOM. No unsafe anywhere. -race clean.
 
-### Next: performance phase
-- bench-baseline.txt = original; bench-phase3.txt = full reimpl (running).
-- Ideas if needed: avoid per-expression table re-descent (cache resolved
-  table target between expressions when safe); reduce allocs in strings
-  (chunked arena); faster Unicode scanning; encoder buffer reuse.
+### 2026-06-12 (later): Phase 4 — decoder performance (commit after c2b404a)
+First full bench of naive functional decoder was CATASTROPHIC on deep docs:
+code dataset 488ms vs 64ms baseline (7.6x), 9.6M allocs — per-KV re-descent
+from root through interface unwrap + map elem copies + boxing multiplied
+allocs by table depth. Fixes, in order of impact:
+1. POOL DECODERS (sync.Pool) keeping parser node arena, tracker entries,
+   scratch buffers warm across Unmarshal calls. Parser.push arena warm-up
+   churn was 66% of all bytes (append's ~1.25x growth regime for big
+   expressions ≈ 5x churn). THE single biggest win. Beware: pooled decoder
+   retains references to the last document (accepted tradeoff).
+   tracker.SeenTracker gained exported Reset() for this.
+2. Cache the current table target between expressions: resolveCachedTarget
+   walks tableKey once per header, records flush-ops for map-element copies
+   (structs need copy+write-back; maps/slices are references — traverse
+   directly, NO copy). slotWriter structs instead of closures (closures
+   alloc). Flush on next table/end. Fallback to per-KV root descent when
+   resolution bails (must clear partial flush ops!).
+   GOTCHA: finalizeTable must eagerly replace interface-held non-map
+   content with fresh maps (the old per-KV descent did it lazily;
+   cached KVs skip that path). Also: empty array-table elements appended
+   to []interface{} must be empty maps, not nil (testsuite panics on nil).
+3. elemOrNewMap returns maps/slices DIRECTLY (no addressable copy).
+4. Reusable string map-key holder (refresh-before-use discipline: any
+   recursion can clobber it; re-SetString before each map op).
+5. Zero(interfaceType) instead of New().Elem() for fresh interface elems
+   (assignValue never mutates interface targets, boxInto returns concrete).
+6. boxInto returns the concrete value (caller's store does the conversion).
+7. Presize slices from element count; native scalar appends for
+   []interface{}; stack [4]pathPart for inline-table keys; byte-based
+   no-alloc struct plan lookup (map[string(bytes)]); joinPath into reused
+   buffer (map lookup via m[string(buf)] is alloc-free).
+8. SeenTracker.clear reuses scratch slices.
+
+UnmarshalDataset vs baseline after all of it (count=3 spot check):
+canada -62% (B/op 5.9MB vs 80MB!), twitter -44%, citm -23%, example -36%,
+config -7%, code ~parity (B/op 17.6 vs 21.3MB). ReferenceFile/struct ~30µs
+vs 32.7 baseline, map ~40µs vs 47.6.
+Full count=10 run in .reimpl/bench-phase4.txt; Marshal numbers from MY
+marshaler not yet analyzed — check those next.
+
+### Next steps
+- benchstat baseline vs phase4; check Marshal benchmarks (my encoder is
+  unoptimized: entries slices, fmt.Sprintf escapes, etc).
+- code dataset: 900k allocs remain (many small tables; per-header costs).
+- unstable parse benchmarks (scanComment etc) vs baseline.
