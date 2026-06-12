@@ -473,160 +473,15 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) 
 		d.skipUntilTable = false
 		d.captureIdx = -1
 		d.strict.EnterTable(expr)
-		err := d.handleTableExpression(expr, root, false, first)
-		if err == nil && !d.skipUntilTable && d.captureIdx < 0 {
-			d.resolveCachedTarget(root)
-		}
-		return err
+		return d.handleTableExpression(expr, root, false, first)
 	case unstable.ArrayTable:
 		d.flushTable()
 		d.skipUntilTable = false
 		d.captureIdx = -1
 		d.strict.EnterTable(expr)
-		err := d.handleTableExpression(expr, root, true, first)
-		if err == nil && !d.skipUntilTable && d.captureIdx < 0 {
-			d.resolveCachedTarget(root)
-		}
-		return err
+		return d.handleTableExpression(expr, root, true, first)
 	default:
 		return unstable.NewParserError(expr.Data, "unsupported expression kind %s", expr.Kind)
-	}
-}
-
-// resolveCachedTarget computes a direct reference to the container of the
-// current table, so that the key-values that follow can be stored without
-// walking the document structure from the root every time. Map values are
-// not addressable: they are copied, mutated in place by the key-values, and
-// stored back when the table changes (see flushTable).
-func (d *decoder) resolveCachedTarget(root reflect.Value) {
-	ok := false
-	defer func() {
-		if !ok {
-			// The copies registered during this resolution were never
-			// handed out: drop them so they cannot overwrite the values
-			// written by the fallback path.
-			d.tableFlush = d.tableFlush[:0]
-		}
-	}()
-
-	v := root
-	pf := slotWriter{kind: 1, slot: root}
-
-	idx := 0
-	for {
-		switch v.Kind() {
-		case reflect.Ptr:
-			if v.IsNil() {
-				return // bail out: fall back to per-expression descent
-			}
-			elem := v.Elem()
-			pf = slotWriter{kind: 1, slot: elem}
-			v = elem
-			continue
-		case reflect.Interface:
-			if v.IsNil() {
-				return
-			}
-			concrete := v.Elem()
-			switch concrete.Kind() {
-			case reflect.Map, reflect.Slice:
-				// Reference types: mutations are visible through the
-				// existing interface value. Replacements go to the same
-				// slot, which accepts the concrete type.
-				v = concrete
-				continue
-			default:
-				return
-			}
-		case reflect.Slice:
-			if v.Len() == 0 {
-				return
-			}
-			elem := v.Index(v.Len() - 1)
-			pf = slotWriter{kind: 1, slot: elem}
-			v = elem
-			continue
-		case reflect.Array:
-			cnt := d.arrayCount(d.joinPath(d.tableKey[:idx]))
-			if cnt == 0 {
-				cnt = 1
-			}
-			if cnt > v.Len() || !v.CanAddr() {
-				return
-			}
-			elem := v.Index(cnt - 1)
-			pf = slotWriter{kind: 1, slot: elem}
-			v = elem
-			continue
-		}
-
-		if idx >= len(d.tableKey) {
-			break
-		}
-
-		name := d.tableKey[idx]
-
-		switch v.Kind() {
-		case reflect.Map:
-			if v.IsNil() {
-				return
-			}
-			var key reflect.Value
-			var w slotWriter
-			if v.Type().Key() == stringType {
-				// tableKey strings are stable: the slot can reference them
-				// and materialize the key only when storing.
-				key = d.stringMapKey(name)
-				w = slotWriter{kind: 3, m: v, ks: name}
-			} else {
-				k, err := makeMapKey(v.Type().Key(), name)
-				if err != nil {
-					return
-				}
-				key = k
-				w = slotWriter{kind: 2, m: v, k: key}
-			}
-			elem := v.MapIndex(key)
-			if !elem.IsValid() {
-				return
-			}
-			ce := elem
-			if ce.Kind() == reflect.Interface && !ce.IsNil() {
-				ce = ce.Elem()
-			}
-			switch ce.Kind() {
-			case reflect.Map, reflect.Slice:
-				pf = w
-				v = ce
-			default:
-				tmp := reflect.New(elem.Type()).Elem()
-				tmp.Set(elem)
-				d.tableFlush = append(d.tableFlush, flushOp{w: w, val: tmp})
-				pf = slotWriter{kind: 1, slot: tmp}
-				v = tmp
-			}
-			idx++
-		case reflect.Struct:
-			plan := planForType(v.Type())
-			f, found := plan.lookup(name)
-			if !found {
-				return
-			}
-			fv := fieldByIndexAlloc(v, f.index)
-			pf = slotWriter{kind: 1, slot: fv}
-			v = fv
-			idx++
-		default:
-			return
-		}
-	}
-
-	switch v.Kind() {
-	case reflect.Map, reflect.Struct:
-		d.tableTarget = v
-		d.tableParentSlot = pf
-		d.tableTargetValid = true
-		ok = true
 	}
 }
 
@@ -640,10 +495,6 @@ func (d *decoder) updateTableKey(expr *unstable.Node) {
 	}
 }
 
-// handleTableExpression processes a [table] or [[array table]] expression:
-// it creates the intermediate containers, applies the strict policy, hooks
-// the unmarshaler interface captures, and saves the table key for the
-// key-values that follow.
 func (d *decoder) handleTableExpression(expr *unstable.Node, root reflect.Value, isArrayTable bool, first bool) error {
 	d.updateTableKey(expr)
 
@@ -661,14 +512,356 @@ func (d *decoder) handleTableExpression(expr *unstable.Node, root reflect.Value,
 		d.segIdx = append(d.segIdx, -1)
 	}
 
-	nv, err := d.descendTable(root, expr, 0, isArrayTable, first)
-	if err != nil {
-		return err
+	return d.walkTable(root, expr, isArrayTable, first)
+}
+
+// newContainerElem returns a fresh element for a slice of the given element
+// type. Plain interface elements start out as an empty table.
+func newContainerElem(et reflect.Type) reflect.Value {
+	if et == interfaceType {
+		return reflect.ValueOf(map[string]interface{}{})
 	}
-	if nv.IsValid() {
-		root.Set(nv)
+	return reflect.New(et).Elem()
+}
+
+// walkTable processes a [table] or [[array table]] header: it creates the
+// intermediate containers, appends array-table elements, applies the strict
+// policy, registers unmarshaler-interface captures, and caches the target
+// container so that the key-values that follow are stored directly.
+//
+// Map values are not addressable: when one needs in-place mutations (struct
+// or array values), a copy is made and registered to be stored back when the
+// table changes (see flushTable). Maps and slices are references and are
+// traversed without copies.
+func (d *decoder) walkTable(root reflect.Value, expr *unstable.Node, isArrayTable bool, first bool) error {
+	v := root
+	pf := slotWriter{kind: 1, slot: root}
+	idx := 0
+
+walk:
+	for {
+		// Dereference pointers in place.
+		for v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				v.Set(reflect.New(v.Type().Elem()))
+			}
+			elem := v.Elem()
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+		}
+
+		// Tables assigned to a type implementing the unmarshaler interface
+		// are captured as raw bytes, delivered once the document is read.
+		if d.unmarshalerInterface && hasUnmarshaler(v) {
+			d.startCapture(idx, expr)
+			return nil
+		}
+
+		if idx >= len(d.tableKey) {
+			break walk
+		}
+
+		name := d.tableKey[idx]
+
+		switch v.Kind() {
+		case reflect.Interface:
+			if !v.IsNil() {
+				c := v.Elem()
+				if k := c.Kind(); k == reflect.Map || k == reflect.Slice {
+					// Reference types: mutations are visible through the
+					// existing interface value.
+					v = c
+					continue
+				}
+			}
+			// Anything else is replaced by a fresh generic map.
+			if !mapStringInterfaceType.AssignableTo(v.Type()) {
+				return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Type())
+			}
+			fresh := reflect.ValueOf(map[string]interface{}{})
+			d.storeSlot(&pf, fresh)
+			v = fresh
+		case reflect.Slice:
+			if v.Len() == 0 {
+				// Implicit creation of the first element: the array table
+				// that would create it has not been seen yet (issue 995).
+				if v.IsNil() {
+					v = reflect.MakeSlice(v.Type(), 0, 4)
+				}
+				v = reflect.Append(v, newContainerElem(v.Type().Elem()))
+				d.storeSlot(&pf, v)
+			}
+			n := v.Len() - 1
+			d.segIdx[idx] = n
+			elem := v.Index(n)
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+		case reflect.Array:
+			key := d.joinPath(d.tableKey[:idx])
+			cnt := d.arrayCount(key)
+			if cnt == 0 {
+				cnt = 1
+				d.setArrayCount(key, 1)
+			}
+			if cnt > v.Len() {
+				return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot reach element %d of array of size %d", cnt-1, v.Len())
+			}
+			d.segIdx[idx] = cnt - 1
+			elem := v.Index(cnt - 1)
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+		case reflect.Map:
+			if v.IsNil() {
+				nm := reflect.MakeMap(v.Type())
+				d.storeSlot(&pf, nm)
+				v = nm
+			}
+			var key reflect.Value
+			var w slotWriter
+			if v.Type().Key() == stringType {
+				key = d.stringMapKey(name)
+				w = slotWriter{kind: 3, m: v, ks: name}
+			} else {
+				k, err := makeMapKey(v.Type().Key(), name)
+				if err != nil {
+					return err
+				}
+				key = k
+				w = slotWriter{kind: 2, m: v, k: k}
+			}
+
+			elem := v.MapIndex(key)
+
+			// The last part of an array table is finalized as a slice
+			// container: do not materialize a table for it.
+			if isArrayTable && idx == len(d.tableKey)-1 {
+				et := v.Type().Elem()
+				switch et.Kind() {
+				case reflect.Interface, reflect.Slice, reflect.Array:
+					if elem.IsValid() {
+						v = elem
+					} else {
+						v = reflect.Zero(et)
+					}
+					pf = w
+					idx++
+					continue
+				}
+			}
+
+			if elem.IsValid() {
+				ce := elem
+				ceIface := false
+				if ce.Kind() == reflect.Interface {
+					ceIface = true
+					if !ce.IsNil() {
+						ce = ce.Elem()
+					}
+				}
+				switch ce.Kind() {
+				case reflect.Map, reflect.Slice:
+					pf = w
+					v = ce
+				case reflect.Ptr:
+					if ce.IsNil() {
+						np := reflect.New(ce.Type().Elem())
+						d.storeSlot(&w, np)
+						ce = np
+					}
+					pf = w
+					v = ce
+				case reflect.Struct, reflect.Array:
+					if ceIface {
+						// Interface-held non-generic content is replaced.
+						fresh := reflect.ValueOf(map[string]interface{}{})
+						d.storeSlot(&w, fresh)
+						pf = w
+						v = fresh
+					} else {
+						tmp := reflect.New(elem.Type()).Elem()
+						tmp.Set(elem)
+						d.tableFlush = append(d.tableFlush, flushOp{w: w, val: tmp})
+						pf = slotWriter{kind: 1, slot: tmp}
+						v = tmp
+					}
+				default:
+					if !ceIface {
+						return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", ce.Type())
+					}
+					fresh := reflect.ValueOf(map[string]interface{}{})
+					d.storeSlot(&w, fresh)
+					pf = w
+					v = fresh
+				}
+			} else {
+				et := v.Type().Elem()
+				switch et.Kind() {
+				case reflect.Interface:
+					if !mapStringInterfaceType.AssignableTo(et) {
+						return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", et)
+					}
+					fresh := reflect.ValueOf(map[string]interface{}{})
+					d.storeSlot(&w, fresh)
+					pf = w
+					v = fresh
+				case reflect.Map:
+					nm := reflect.MakeMap(et)
+					d.storeSlot(&w, nm)
+					pf = w
+					v = nm
+				case reflect.Ptr:
+					np := reflect.New(et.Elem())
+					d.storeSlot(&w, np)
+					pf = w
+					v = np
+				case reflect.Struct, reflect.Array, reflect.Slice:
+					tmp := reflect.New(et).Elem()
+					d.tableFlush = append(d.tableFlush, flushOp{w: w, val: tmp})
+					pf = slotWriter{kind: 1, slot: tmp}
+					v = tmp
+				default:
+					return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", et)
+				}
+			}
+			idx++
+		case reflect.Struct:
+			plan := planForType(v.Type())
+			f, found := plan.lookup(name)
+			if !found {
+				d.strict.MissingTable(expr)
+				d.skipUntilTable = true
+				return nil
+			}
+			fv := fieldByIndexAlloc(v, f.index)
+			pf = slotWriter{kind: 1, slot: fv}
+			v = fv
+			idx++
+		default:
+			return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Kind())
+		}
 	}
-	return nil
+
+	if isArrayTable {
+		akey := d.joinPath(d.tableKey)
+		d.resetChildArrayCounts(akey)
+
+		// Unwrap an interface container.
+		if v.Kind() == reflect.Interface {
+			var slice []interface{}
+			if !v.IsNil() {
+				if s, ok := v.Elem().Interface().([]interface{}); ok {
+					slice = s
+				}
+			}
+			if first {
+				slice = slice[:0]
+			}
+			m := map[string]interface{}{}
+			slice = append(slice, m)
+			sv := reflect.ValueOf(slice)
+			d.storeSlot(&pf, sv)
+			d.setArrayCount(akey, len(slice))
+			d.segIdx[len(d.tableKey)] = len(slice) - 1
+			d.tableTarget = reflect.ValueOf(m)
+			d.tableParentSlot = slotWriter{kind: 1, slot: sv.Index(len(slice) - 1)}
+			d.tableTargetValid = true
+			return nil
+		}
+
+		switch v.Kind() {
+		case reflect.Slice:
+			if v.IsNil() {
+				v = reflect.MakeSlice(v.Type(), 0, 4)
+			} else if first {
+				v = v.Slice(0, 0)
+			}
+			v = reflect.Append(v, newContainerElem(v.Type().Elem()))
+			d.storeSlot(&pf, v)
+			n := v.Len() - 1
+			d.setArrayCount(akey, n+1)
+			d.segIdx[len(d.tableKey)] = n
+			elem := v.Index(n)
+			if d.unmarshalerInterface && hasUnmarshaler(elem) {
+				d.startCapture(len(d.tableKey), expr)
+				return nil
+			}
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+		case reflect.Array:
+			cnt := d.arrayCount(akey)
+			if first {
+				cnt = 0
+			}
+			if cnt >= v.Len() {
+				return unstable.NewParserError(d.p.Raw(expr.Raw), "array of size %d is too small to store this array table", v.Len())
+			}
+			v.Index(cnt).Set(reflect.Zero(v.Type().Elem()))
+			d.setArrayCount(akey, cnt+1)
+			d.segIdx[len(d.tableKey)] = cnt
+			elem := v.Index(cnt)
+			if d.unmarshalerInterface && hasUnmarshaler(elem) {
+				d.startCapture(len(d.tableKey), expr)
+				return nil
+			}
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+		default:
+			return fmt.Errorf("toml: cannot store an array table in a %s", v.Kind())
+		}
+	}
+
+	// Settle on the concrete container for the key-values that follow.
+	for {
+		switch v.Kind() {
+		case reflect.Ptr:
+			if v.IsNil() {
+				if !v.CanSet() {
+					return nil
+				}
+				v.Set(reflect.New(v.Type().Elem()))
+			}
+			elem := v.Elem()
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+			continue
+		case reflect.Interface:
+			if !v.IsNil() {
+				c := v.Elem()
+				if c.Type() == mapStringInterfaceType || c.Type() == sliceInterfaceType {
+					v = c
+					continue
+				}
+			}
+			if !mapStringInterfaceType.AssignableTo(v.Type()) {
+				return fmt.Errorf("toml: cannot store a table in a %s", v.Type())
+			}
+			fresh := reflect.ValueOf(map[string]interface{}{})
+			d.storeSlot(&pf, fresh)
+			v = fresh
+			continue
+		case reflect.Slice:
+			if v.Len() == 0 {
+				if v.IsNil() {
+					v = reflect.MakeSlice(v.Type(), 0, 4)
+				}
+				v = reflect.Append(v, newContainerElem(v.Type().Elem()))
+				d.storeSlot(&pf, v)
+			}
+			n := v.Len() - 1
+			d.segIdx[len(d.tableKey)] = n
+			elem := v.Index(n)
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+			continue
+		case reflect.Map, reflect.Struct:
+			d.tableTarget = v
+			d.tableParentSlot = pf
+			d.tableTargetValid = true
+			return nil
+		default:
+			return fmt.Errorf("toml: cannot store a table in a %s", v.Kind())
+		}
+	}
 }
 
 // resumeCapture looks for an existing capture this table expression belongs
@@ -860,252 +1053,6 @@ func (d *decoder) captureKeyValue(expr *unstable.Node) {
 	c := &d.captures[d.captureIdx]
 	c.buf = append(c.buf, d.p.Raw(expr.Raw)...)
 	c.buf = append(c.buf, '\n')
-}
-
-// descendTable walks the key of a table expression, creating the
-// intermediate containers on the way. It returns the value to write back at
-// this level, or an invalid value if the table turned out not to be
-// storable (strict mode bookkeeping happens inside).
-func (d *decoder) descendTable(v reflect.Value, expr *unstable.Node, idx int, isArrayTable bool, first bool) (reflect.Value, error) {
-	// pointers are allocated and traversed
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			v.Set(reflect.New(v.Type().Elem()))
-		}
-		nv, err := d.descendTable(v.Elem(), expr, idx, isArrayTable, first)
-		if err != nil || !nv.IsValid() {
-			return reflect.Value{}, err
-		}
-		v.Elem().Set(nv)
-		return v, nil
-	}
-
-	// Tables assigned to a type implementing the unmarshaler interface are
-	// captured as raw bytes, delivered once the document is fully read.
-	if d.unmarshalerInterface {
-		if hasUnmarshaler(v) {
-			d.startCapture(idx, expr)
-			return reflect.Value{}, nil
-		}
-	}
-
-	if idx >= len(d.tableKey) {
-		return d.finalizeTable(v, expr, isArrayTable, first)
-	}
-
-	name := d.tableKey[idx]
-
-	switch v.Kind() {
-	case reflect.Map:
-		var key reflect.Value
-		var err error
-		fastKey := v.Type().Key() == stringType
-		if fastKey {
-			key = d.stringMapKey(name)
-		} else {
-			key, err = makeMapKey(v.Type().Key(), name)
-			if err != nil {
-				return reflect.Value{}, err
-			}
-		}
-		if v.IsNil() {
-			v = reflect.MakeMap(v.Type())
-		}
-		elemType := v.Type().Elem()
-		existing := v.MapIndex(key)
-		var elem reflect.Value
-		if existing.IsValid() {
-			ce := existing
-			if ce.Kind() == reflect.Interface && !ce.IsNil() {
-				ce = ce.Elem()
-			}
-			if ce.Kind() == reflect.Map || ce.Kind() == reflect.Slice {
-				// Reference types do not need to be copied to be mutated.
-				elem = ce
-			} else {
-				elem = reflect.New(elemType).Elem()
-				elem.Set(existing)
-			}
-		} else if elemType.Kind() == reflect.Interface {
-			// A fresh interface element does not need to be materialized.
-			elem = reflect.Zero(elemType)
-		} else {
-			elem = reflect.New(elemType).Elem()
-		}
-		nv, err := d.descendTable(elem, expr, idx+1, isArrayTable, first)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		if nv.IsValid() {
-			if fastKey {
-				// The recursion may have overwritten the key buffer.
-				key = d.stringMapKey(name)
-			}
-			v.SetMapIndex(key, nv)
-		}
-		return v, nil
-	case reflect.Struct:
-		plan := planForType(v.Type())
-		f, found := plan.lookup(name)
-		if !found {
-			d.strict.MissingTable(expr)
-			d.skipUntilTable = true
-			return reflect.Value{}, nil
-		}
-		fv := fieldByIndexAlloc(v, f.index)
-		nv, err := d.descendTable(fv, expr, idx+1, isArrayTable, first)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		if nv.IsValid() && fv.CanSet() {
-			fv.Set(nv)
-		}
-		return v, nil
-	case reflect.Interface:
-		elem, err := elemOrNewMap(v)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		nv, err := d.descendTable(elem, expr, idx, isArrayTable, first)
-		if err != nil || !nv.IsValid() {
-			return reflect.Value{}, err
-		}
-		return nv, nil
-	case reflect.Slice:
-		if v.Len() == 0 {
-			// Implicit creation of the first element: the array table that
-			// would create it has not been seen yet (issue 995).
-			if v.IsNil() {
-				v = reflect.MakeSlice(v.Type(), 0, 4)
-			}
-			v = reflect.Append(v, reflect.New(v.Type().Elem()).Elem())
-		}
-		elemIdx := v.Len() - 1
-		d.segIdx[idx] = elemIdx
-		elem := v.Index(elemIdx)
-		nv, err := d.descendTable(elem, expr, idx, isArrayTable, first)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		if nv.IsValid() {
-			elem.Set(nv)
-		}
-		return v, nil
-	case reflect.Array:
-		key := d.joinPath(d.tableKey[:idx])
-		cnt := d.arrayCount(key)
-		if cnt == 0 {
-			// Implicit creation of the first element.
-			cnt = 1
-			d.setArrayCount(key, 1)
-		}
-		elemIdx := cnt - 1
-		if elemIdx >= v.Len() {
-			return reflect.Value{}, unstable.NewParserError(d.p.Raw(expr.Raw), "cannot reach element %d of array of size %d", elemIdx, v.Len())
-		}
-		d.segIdx[idx] = elemIdx
-		elem := v.Index(elemIdx)
-		nv, err := d.descendTable(elem, expr, idx, isArrayTable, first)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		if nv.IsValid() {
-			elem.Set(nv)
-		}
-		return v, nil
-	default:
-		return reflect.Value{}, unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Kind())
-	}
-}
-
-// finalizeTable applies the effect of a table expression once its key is
-// fully traversed: making sure containers exist, and appending an element
-// for array tables.
-func (d *decoder) finalizeTable(v reflect.Value, expr *unstable.Node, isArrayTable bool, first bool) (reflect.Value, error) {
-	if !isArrayTable {
-		switch v.Kind() {
-		case reflect.Map:
-			// Concrete maps are created lazily, when their first key is
-			// set: an empty table header leaves a nil map untouched.
-			return v, nil
-		case reflect.Struct:
-			return v, nil
-		case reflect.Interface:
-			if !v.IsNil() {
-				concrete := v.Elem()
-				t := concrete.Type()
-				if t == mapStringInterfaceType || t == sliceInterfaceType {
-					return v, nil
-				}
-			}
-			// Anything else held in the interface is replaced by a fresh
-			// generic map.
-			return reflect.ValueOf(map[string]interface{}{}), nil
-		default:
-			return reflect.Value{}, fmt.Errorf("toml: cannot store a table in a %s", v.Kind())
-		}
-	}
-
-	// Array table: append an element and reset the state of all the nested
-	// array tables.
-	key := d.joinPath(d.tableKey)
-	d.resetChildArrayCounts(key)
-
-	switch v.Kind() {
-	case reflect.Slice:
-		if v.IsNil() {
-			v = reflect.MakeSlice(v.Type(), 0, 4)
-		} else if first {
-			v = v.Slice(0, 0)
-		}
-		var elem reflect.Value
-		if v.Type().Elem() == interfaceType {
-			// Interface elements start as an empty table, like the
-			// interface branch below.
-			elem = reflect.ValueOf(map[string]interface{}{})
-		} else {
-			elem = reflect.New(v.Type().Elem()).Elem()
-		}
-		v = reflect.Append(v, elem)
-		elemIdx := v.Len() - 1
-		d.setArrayCount(key, elemIdx+1)
-		d.segIdx[len(d.tableKey)] = elemIdx
-		if d.unmarshalerInterface && hasUnmarshaler(v.Index(elemIdx)) {
-			d.startCapture(len(d.tableKey), expr)
-		}
-		return v, nil
-	case reflect.Array:
-		cnt := d.arrayCount(key)
-		if first {
-			cnt = 0
-		}
-		if cnt >= v.Len() {
-			return reflect.Value{}, unstable.NewParserError(d.p.Raw(expr.Raw), "array of size %d is too small to store this array table", v.Len())
-		}
-		v.Index(cnt).Set(reflect.Zero(v.Type().Elem()))
-		d.setArrayCount(key, cnt+1)
-		d.segIdx[len(d.tableKey)] = cnt
-		if d.unmarshalerInterface && hasUnmarshaler(v.Index(cnt)) {
-			d.startCapture(len(d.tableKey), expr)
-		}
-		return v, nil
-	case reflect.Interface:
-		var slice []interface{}
-		if !v.IsNil() {
-			if s, ok := v.Interface().([]interface{}); ok {
-				slice = s
-			}
-		}
-		if first {
-			slice = slice[:0]
-		}
-		slice = append(slice, map[string]interface{}{})
-		d.setArrayCount(key, len(slice))
-		d.segIdx[len(d.tableKey)] = len(slice) - 1
-		return reflect.ValueOf(slice), nil
-	default:
-		return reflect.Value{}, fmt.Errorf("toml: cannot store an array table in a %s", v.Kind())
-	}
 }
 
 // hasUnmarshaler reports whether v can provide an unstable.Unmarshaler,
