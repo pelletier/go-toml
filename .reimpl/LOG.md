@@ -253,3 +253,21 @@ marginal cases are now solid: ScanComments/10ValidUtf8 -11.5%,
 ParseBasicStringWithUnicode/4 -4.8%, Marshal/SimpleDocument/map -12.2%.
 Standouts: canada -59%, SimpleDocument/struct -55%, Pyproject -44%,
 HugoFrontMatterBatch -43%, Marshal/ReferenceFile/struct -41%.
+
+### 2026-06-12 (later): /goal round — further optimization, both platforms
+New infra: Linux benchmarking on holo0 (shared 64-core x86_64; GOMAXPROCS=8,
+toolchain+repo in ~/code/thomas, results always copied back here).
+Optimizations this round (all tests pass on go1.22rc1 AND go1.26.4, no unsafe):
+1. Key-string interning (decoder, survives pooling): code allocs -40%.
+2. Counter reset without prefix-string building.
+3. Encoder: pooled entry slices + shared key stack for headers:
+   Marshal/ReferenceFile/struct 85 -> 4 allocs/op.
+4. Parser arena grows 2x (halves giant-expression copy churn).
+FINAL vs v2, go1.26.4, count=10 (files: bench-go1.26.4-{v2,reimpl-final}.txt,
+bench-linux-{v2,reimpl-final}.txt):
+- macOS (M1 Pro):  time geomean -34.9%, B/op -73.8%, allocs -57.8%,
+  parser micros -70.3%. Marshal/ReferenceFile/struct -46.8%.
+- Linux (holo0):   time geomean -45.4%, B/op -73.4%, allocs -57.8%,
+  parser micros -64.1%. canada -73.7%, twitter -62.5%, SimpleDoc/struct -77.8%.
+Shared-box noise on holo0 is real (up to +-30%); all rows significant at
+p<=0.005 except tiny Marshal/SimpleDocument/map which sits inside the noise.
