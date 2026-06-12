@@ -265,6 +265,11 @@ type decoder struct {
 	// before each use: any recursive call may overwrite it.
 	strKey reflect.Value
 
+	// interned de-duplicates key strings: documents repeat the same keys
+	// over and over, and the table survives pooling, so repeated decodes
+	// of similar documents stop allocating key strings altogether.
+	interned map[string]string
+
 	// pathScratch is the buffer used by joinPath.
 	pathScratch []byte
 }
@@ -309,6 +314,35 @@ func (d *decoder) flushTable() {
 	d.tableTargetValid = false
 	d.tableParentSlot = slotWriter{}
 	d.tableTarget = reflect.Value{}
+}
+
+// intern returns the string corresponding to the given bytes, reusing a
+// previous allocation when the same key has been seen before.
+func (d *decoder) intern(b []byte) string {
+	if s, ok := d.interned[string(b)]; ok { // does not allocate
+		return s
+	}
+	if d.interned == nil {
+		d.interned = make(map[string]string, 64)
+	} else if len(d.interned) >= 1<<14 {
+		// Safety valve for adversarial inputs: do not let the table grow
+		// without bounds.
+		for k := range d.interned {
+			delete(d.interned, k)
+		}
+	}
+	s := string(b)
+	d.interned[s] = s
+	return s
+}
+
+// partString returns the name of a path part, interning it when it comes
+// from the document.
+func (d *decoder) partString(p *pathPart) string {
+	if p.node != nil {
+		return d.intern(p.node.Data)
+	}
+	return p.name
 }
 
 // stringMapKey returns a reflect.Value holding the given string, reusing the
@@ -365,9 +399,10 @@ func (d *decoder) resetChildArrayCounts(key []byte) {
 	if len(d.arrayCounts) == 0 {
 		return
 	}
-	prefix := string(key) + "\x00"
 	for k, p := range d.arrayCounts {
-		if strings.HasPrefix(k, prefix) {
+		// Prefix match without building the prefix string: same bytes as
+		// key, followed by the NUL separator.
+		if len(k) > len(key) && k[len(key)] == 0 && k[:len(key)] == string(key) {
 			// Zero instead of delete: the next element of the parent table
 			// will reuse the slot without allocating a new key.
 			*p = 0
@@ -503,7 +538,7 @@ func (d *decoder) updateTableKey(expr *unstable.Node) {
 	d.tableKey = d.tableKey[:0]
 	it := expr.Key()
 	for it.Next() {
-		d.tableKey = append(d.tableKey, string(it.Node().Data))
+		d.tableKey = append(d.tableKey, d.intern(it.Node().Data))
 	}
 }
 
@@ -1226,10 +1261,10 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		var err error
 		fastKey := v.Type().Key() == stringType
 		if fastKey {
-			name = part.str()
+			name = d.partString(&part)
 			key = d.stringMapKey(name)
 		} else {
-			key, err = makeMapKey(v.Type().Key(), part.str())
+			key, err = makeMapKey(v.Type().Key(), d.partString(&part))
 			if err != nil {
 				return reflect.Value{}, err
 			}
