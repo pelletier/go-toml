@@ -187,8 +187,41 @@ vs 32.7 baseline, map ~40µs vs 47.6.
 Full count=10 run in .reimpl/bench-phase4.txt; Marshal numbers from MY
 marshaler not yet analyzed — check those next.
 
-### Next steps
-- benchstat baseline vs phase4; check Marshal benchmarks (my encoder is
-  unoptimized: entries slices, fmt.Sprintf escapes, etc).
-- code dataset: 900k allocs remain (many small tables; per-header costs).
-- unstable parse benchmarks (scanComment etc) vs baseline.
+### 2026-06-12 (later): Phase 5 — marshaler perf + unified table walk + parser micros
+Marshaler: cached per-type encode plans (tags parsed once, embedded fields
+flattened statically with shadowing resolved), per-type props cache
+(TextMarshaler/value-kind — Implements() per value was the small-doc cost),
+pooled encoder buffers, map keys via reusable SetIterKey buffer (shared
+across an encode), typed sorter (sort.Slice's Swapper allocates), presized
+entries, skip sort for single entries, Marshal bypasses bytes.Buffer.
+
+Decoder: replaced descendTable+finalizeTable+resolveCachedTarget with ONE
+flush-based walkTable. The old pair walked the structure twice per header
+(2x MapIndex copyVal + immediate SetMapIndex assignTo per part). GOTCHA:
+the last key part of [[array tables]] must be kept as the slice container,
+not materialized as a table like intermediate parts.
+
+Parser: scanUtf8Run validates non-ASCII runs per call (rune-by-rune calls
+dominated short-unicode scans); scanComment checks >=0x80 first;
+findBasicStringEnd manual loop (IndexAny was slow for short strings).
+
+FuzzUnmarshal 25s/1.7M execs clean. All tests + -race pass.
+
+### FINAL RESULT (.reimpl/bench-final.txt vs bench-baseline.txt)
+ALL 35 benchmarks improved, all p<=0.008:
+- benchmark pkg geomean: time -32.6%, throughput +48%, B/op huge drops
+  (canada -91%, citm -83%, twitter -81%).
+- Unmarshal: SimpleDocument/struct -55%, canada -62%, twitter -46%,
+  code -31%, example -37%, ReferenceFile struct -29% / map -38%, Hugo -35%.
+- Marshal: SimpleDocument struct -14% / map -8%, ReferenceFile struct -35%
+  / map -10%, Hugo -13%.
+- unstable pkg geomean -71% (ScanComments ASCII -93%, mixed utf8 -76%).
+
+GOAL MET: full clean-room reimplementation (parser, decoder, encoder,
+internal/{characters,tracker}), identical public API, all existing tests
+pass unchanged (incl. -race + fuzz), zero unsafe, every benchmark
+significantly faster than baseline.
+
+Remaining (non-goal) ideas if ever needed: intern repeated map key strings;
+arena for unescaped strings; SIMD-ish utf8 run validation; entries freelist
+in encoder.
