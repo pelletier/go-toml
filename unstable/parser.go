@@ -1088,10 +1088,38 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 	}
 }
 
+// findBasicStringEnd returns the index of the quote closing a basic string,
+// or -1 if the string is not terminated. i is the index of the first
+// character after the opening quote. It does not validate the content: it
+// only skips over escape sequences so that escaped quotes do not terminate
+// the string.
+func findBasicStringEnd(b []byte, i int) int {
+	for {
+		j := bytes.IndexAny(b[i:], "\"\\")
+		if j < 0 {
+			return -1
+		}
+		i += j
+		if b[i] == '"' {
+			return i
+		}
+		i += 2
+		if i > len(b) {
+			return -1
+		}
+	}
+}
+
 // parseBasicStringEscaped continues parsing a basic string that contains
 // escape sequences. i is the index of the first backslash.
 func (p *Parser) parseBasicStringEscaped(b []byte, i int) ([]byte, []byte, []byte, error) {
-	buf := make([]byte, i-1, len(b)-1)
+	// Escape sequences only ever shrink, so the content length before
+	// unescaping is enough to never reallocate.
+	bufCap := len(b) - 1
+	if end := findBasicStringEnd(b, i); end >= 0 {
+		bufCap = end - 1
+	}
+	buf := make([]byte, i-1, bufCap)
 	copy(buf, b[1:i])
 
 	for i < len(b) {
@@ -1245,11 +1273,47 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 	return nil, nil, nil, NewParserError(b[len(b):], `multiline basic string not terminated by """`)
 }
 
+// findMultilineBasicStringEnd returns the index of the first quote of the
+// run of quotes closing a multi-line basic string, or -1 if the string is
+// not terminated. It does not validate the content: it only skips over
+// escape sequences so that escaped quotes do not terminate the string.
+func findMultilineBasicStringEnd(b []byte, i int) int {
+	for {
+		j := bytes.IndexAny(b[i:], "\"\\")
+		if j < 0 {
+			return -1
+		}
+		i += j
+		if b[i] == '\\' {
+			i += 2
+			if i > len(b) {
+				return -1
+			}
+			continue
+		}
+		j = i
+		for j < len(b) && b[j] == '"' {
+			j++
+		}
+		if j-i >= 3 {
+			return i
+		}
+		i = j
+	}
+}
+
 // parseMultilineBasicStringEscaped continues parsing a multi-line basic
 // string that contains escape sequences. i is the index of the first
 // backslash; content starts at contentStart.
 func (p *Parser) parseMultilineBasicStringEscaped(b []byte, contentStart, i int) ([]byte, []byte, []byte, error) {
-	buf := make([]byte, i-contentStart, len(b)-contentStart)
+	// Escape sequences only ever shrink, so the content length before
+	// unescaping is enough to never reallocate. The closing run of quotes
+	// can lend up to two quotes to the content.
+	bufCap := len(b) - contentStart
+	if end := findMultilineBasicStringEnd(b, i); end >= 0 {
+		bufCap = end + 2 - contentStart
+	}
+	buf := make([]byte, i-contentStart, bufCap)
 	copy(buf, b[contentStart:i])
 
 	for i < len(b) {
