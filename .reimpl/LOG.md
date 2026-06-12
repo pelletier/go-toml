@@ -240,3 +240,16 @@ reimpl (count=10, files bench-realworld-{v2,reimpl}.txt):
   while its bytes are -47% and time -18%.
 Also: array-table counters now use pointer slots, zeroed instead of deleted
 on reset (repeat headers stopped allocating key strings).
+
+### 2026-06-12 (later): reran everything on the latest Go (go1.26.4)
+Installed go1.26.4 (tarball into ~/sdk; the golang.org/dl wrapper built by
+go1.22rc1 lacks LC_UUID for current macOS dyld; also must clear
+GOEXPERIMENT=rangefunc from the environment — unknown to modern Go).
+All tests + -race pass on go1.26.4.
+Full matrix, both branches, count=10 (.reimpl/bench-go1.26.4-{v2,reimpl}.txt):
+ALL 42 benchmarks improved, all p=0.000. Geomeans: main suite -34.1% time
+(slightly better than on go1.22rc1), parser micros -70.3%. The previously
+marginal cases are now solid: ScanComments/10ValidUtf8 -11.5%,
+ParseBasicStringWithUnicode/4 -4.8%, Marshal/SimpleDocument/map -12.2%.
+Standouts: canada -59%, SimpleDocument/struct -55%, Pyproject -44%,
+HugoFrontMatterBatch -43%, Marshal/ReferenceFile/struct -41%.
