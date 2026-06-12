@@ -271,3 +271,9 @@ bench-linux-{v2,reimpl-final}.txt):
   parser micros -64.1%. canada -73.7%, twitter -62.5%, SimpleDoc/struct -77.8%.
 Shared-box noise on holo0 is real (up to +-30%); all rows significant at
 p<=0.005 except tiny Marshal/SimpleDocument/map which sits inside the noise.
+
+### 2026-06-12 (later): draft PR opened
+https://github.com/pelletier/go-toml/pull/1067 (base v2). Description has the
+improvement summary + collapsed benchstat tables (combined/linux/macos) built
+from bench-go1.26.4-{v2,reimpl-final}.txt and bench-linux-{v2,reimpl-final}.txt.
+B/s sections stripped to fit GitHub's 65536-char body limit (inverse of sec/op).
