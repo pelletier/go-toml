@@ -160,6 +160,17 @@ func (p *Parser) Expression() *Node {
 
 // push appends a node to the arena and returns its handle (1-based index).
 func (p *Parser) push(n Node) int32 {
+	if len(p.nodes) == cap(p.nodes) {
+		// Grow by 2x: large expressions (huge arrays) would otherwise grow
+		// the arena in small steps, copying it repeatedly.
+		newCap := 2 * cap(p.nodes)
+		if newCap < 64 {
+			newCap = 64
+		}
+		nodes := make([]Node, len(p.nodes), newCap)
+		copy(nodes, p.nodes)
+		p.nodes = nodes
+	}
 	n.parser = p
 	p.nodes = append(p.nodes, n)
 	return int32(len(p.nodes))

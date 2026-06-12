@@ -25,6 +25,7 @@ func Marshal(v interface{}) ([]byte, error) {
 	e := encoderStatePool.Get().(*encoderState)
 	e.Encoder = &enc
 	e.buf = e.buf[:0]
+	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
 
 	err := e.encodeRoot(v)
@@ -183,6 +184,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 	e := encoderStatePool.Get().(*encoderState)
 	e.Encoder = enc
 	e.buf = e.buf[:0]
+	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
 
 	err := e.encodeRoot(v)
@@ -207,6 +209,13 @@ type encoderState struct {
 	*Encoder
 
 	buf []byte
+
+	// keyStack is the dotted key of the table being encoded, shared by the
+	// whole encode as a stack.
+	keyStack []string
+
+	// entriesPool recycles entry slices across tables of the same encode.
+	entriesPool [][]entry
 
 	// lastWasHeader is true when the last line written was a table header,
 	// used to avoid empty lines between consecutive table definitions.
@@ -250,7 +259,7 @@ func (e *encoderState) encodeRoot(v interface{}) error {
 		if isValueKind(rv) {
 			return fmt.Errorf("toml: cannot encode a %s as a document root", rv.Type())
 		}
-		return e.encodeTable(nil, rv, false, 0)
+		return e.encodeTable(rv, false, 0)
 	default:
 		return fmt.Errorf("toml: cannot encode a %s as a document root", rv.Type())
 	}
@@ -366,37 +375,38 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 }
 
 // encodeTable writes the content of a table at the given key path.
-func (e *encoderState) encodeTable(key []string, v reflect.Value, commented bool, indent int) error {
+func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) error {
 	entries, err := e.collectEntries(v)
 	if err != nil {
 		return err
 	}
 
-	var tables []entry
-
-	// First pass: emit all key-values, and collect the tables.
+	// First pass: emit all key-values; tables are handled by the second
+	// pass.
 	for _, ent := range entries {
-		if !e.tablesInline && !ent.options.inline && (e.isTableLike(ent.value) || e.isArrayOfTables(ent.value)) {
-			tables = append(tables, ent)
+		if e.entryIsTable(&ent) {
 			continue
 		}
-
 		err := e.encodeKeyValue(ent, commented, indent)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Second pass: emit the sub-tables.
-	for _, ent := range tables {
+	// Second pass: emit the sub-tables, extending the shared key stack.
+	for _, ent := range entries {
+		if !e.entryIsTable(&ent) {
+			continue
+		}
 		entCommented := commented || ent.options.commented
-		subKey := append(key, ent.key) //nolint:gocritic
+		e.keyStack = append(e.keyStack, ent.key)
 
 		if e.isArrayOfTables(ent.value) {
-			err := e.encodeArrayTable(subKey, ent, entCommented, indent)
+			err := e.encodeArrayTable(ent, entCommented, indent)
 			if err != nil {
 				return err
 			}
+			e.keyStack = e.keyStack[:len(e.keyStack)-1]
 			continue
 		}
 
@@ -410,19 +420,44 @@ func (e *encoderState) encodeTable(key []string, v reflect.Value, commented bool
 			tv = reflect.New(t).Elem()
 		}
 
-		e.writeTableHeader(subKey, ent.options.comment, entCommented, false, indent)
+		e.writeTableHeader(ent.options.comment, entCommented, false, indent)
 
-		err := e.encodeTable(subKey, tv, entCommented, indent+1)
+		err := e.encodeTable(tv, entCommented, indent+1)
 		if err != nil {
 			return err
 		}
+		e.keyStack = e.keyStack[:len(e.keyStack)-1]
 	}
 
+	e.putEntries(entries)
 	return nil
 }
 
+// entryIsTable reports whether the entry is emitted as a (sub-)table rather
+// than a key-value.
+func (e *encoderState) entryIsTable(ent *entry) bool {
+	return !e.tablesInline && !ent.options.inline && (e.isTableLike(ent.value) || e.isArrayOfTables(ent.value))
+}
+
+// getEntries returns a reusable entry slice.
+func (e *encoderState) getEntries() []entry {
+	if n := len(e.entriesPool); n > 0 {
+		s := e.entriesPool[n-1]
+		e.entriesPool = e.entriesPool[:n-1]
+		return s[:0]
+	}
+	return nil
+}
+
+// putEntries returns an entry slice to the pool.
+func (e *encoderState) putEntries(s []entry) {
+	if cap(s) > 0 {
+		e.entriesPool = append(e.entriesPool, s)
+	}
+}
+
 // encodeArrayTable writes all the elements of an array of tables.
-func (e *encoderState) encodeArrayTable(key []string, ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) error {
 	v, _ := resolve(ent.value)
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
@@ -431,11 +466,11 @@ func (e *encoderState) encodeArrayTable(key []string, ent entry, commented bool,
 			return fmt.Errorf("toml: cannot encode a nil element in an array of tables")
 		}
 
-		e.writeTableHeader(key, comment, commented, true, indent)
+		e.writeTableHeader(comment, commented, true, indent)
 		// The comment is only present before the first element.
 		comment = ""
 
-		err := e.encodeTable(key, elem, commented, indent+1)
+		err := e.encodeTable(elem, commented, indent+1)
 		if err != nil {
 			return err
 		}
@@ -445,7 +480,8 @@ func (e *encoderState) encodeArrayTable(key []string, ent entry, commented bool,
 
 // writeTableHeader emits a [table] or [[array table]] header line, preceded
 // by an empty line and comments as needed.
-func (e *encoderState) writeTableHeader(key []string, comment string, commented bool, array bool, indent int) {
+func (e *encoderState) writeTableHeader(comment string, commented bool, array bool, indent int) {
+	key := e.keyStack
 	if len(e.buf) > 0 && !e.lastWasHeader {
 		e.buf = append(e.buf, '\n')
 	}
@@ -528,7 +564,7 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 	case reflect.Map:
 		return e.collectMapEntries(v)
 	case reflect.Struct:
-		entries := make([]entry, 0, len(encPlanForType(v.Type()).fields))
+		entries := e.getEntries()
 		_, err := e.collectStructEntries(&entries, v)
 		if err != nil {
 			return nil, err
@@ -540,7 +576,7 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 }
 
 func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
-	entries := make([]entry, 0, v.Len())
+	entries := e.getEntries()
 
 	// Keys are converted to strings right away: read them into a reusable
 	// buffer to avoid one allocation per key.
@@ -1079,6 +1115,7 @@ func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) 
 			return nil, err
 		}
 	}
+	e.putEntries(entries)
 	return append(b, '}'), nil
 }
 
