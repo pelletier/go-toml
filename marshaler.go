@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -19,15 +20,23 @@ import (
 //
 // It is a shortcut for Encoder.Encode() with the default options.
 func Marshal(v interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := NewEncoder(&buf)
+	enc := Encoder{indentSymbol: "  "}
 
-	err := enc.Encode(v)
+	e := encoderStatePool.Get().(*encoderState)
+	e.Encoder = &enc
+	e.buf = e.buf[:0]
+	e.lastWasHeader = false
+
+	err := e.encodeRoot(v)
 	if err != nil {
+		encoderStatePool.Put(e)
 		return nil, err
 	}
 
-	return buf.Bytes(), nil
+	out := make([]byte, len(e.buf))
+	copy(out, e.buf)
+	encoderStatePool.Put(e)
+	return out, nil
 }
 
 // Encoder writes a TOML document to an output stream.
@@ -171,18 +180,27 @@ func (enc *Encoder) SetMarshalJSONNumbers(indent bool) *Encoder {
 // inside inline tables. For array tables, the comment is only present before
 // the first element of the array.
 func (enc *Encoder) Encode(v interface{}) error {
-	e := encoderState{Encoder: enc}
+	e := encoderStatePool.Get().(*encoderState)
+	e.Encoder = enc
+	e.buf = e.buf[:0]
+	e.lastWasHeader = false
 
 	err := e.encodeRoot(v)
 	if err != nil {
+		encoderStatePool.Put(e)
 		return err
 	}
 
 	_, err = enc.w.Write(e.buf)
+	encoderStatePool.Put(e)
 	if err != nil {
 		return fmt.Errorf("toml: cannot write: %w", err)
 	}
 	return nil
+}
+
+var encoderStatePool = sync.Pool{
+	New: func() interface{} { return &encoderState{} },
 }
 
 type encoderState struct {
@@ -255,23 +273,50 @@ func resolve(v reflect.Value) (reflect.Value, bool) {
 	}
 }
 
+// typeEncProps caches the per-type facts used on every value encode.
+type typeEncProps struct {
+	// 0: not a TextMarshaler, 1: the type implements it, 2: its pointer does
+	text uint8
+	// encoded as a TOML value (as opposed to a table)
+	isValue bool
+}
+
+var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
+
+func encPropsForType(t reflect.Type) typeEncProps {
+	if p, ok := typeEncPropsCache.Load(t); ok {
+		return p.(typeEncProps)
+	}
+	var p typeEncProps
+	switch {
+	case t.Implements(textMarshalerType):
+		p.text = 1
+	case reflect.PtrTo(t).Implements(textMarshalerType):
+		p.text = 2
+	}
+	switch t {
+	case timeType, localDateType, localTimeType, localDateTimeType:
+		p.isValue = true
+	default:
+		if p.text != 0 {
+			p.isValue = true
+		} else {
+			switch t.Kind() {
+			case reflect.Map, reflect.Struct:
+				p.isValue = false
+			default:
+				p.isValue = true
+			}
+		}
+	}
+	typeEncPropsCache.Store(t, p)
+	return p
+}
+
 // isValueKind returns true when the resolved value is encoded as a TOML
 // value (as opposed to a table).
 func isValueKind(v reflect.Value) bool {
-	t := v.Type()
-	switch t {
-	case timeType, localDateType, localTimeType, localDateTimeType:
-		return true
-	}
-	if t.Implements(textMarshalerType) || reflect.PtrTo(t).Implements(textMarshalerType) {
-		return true
-	}
-	switch v.Kind() {
-	case reflect.Map, reflect.Struct:
-		return false
-	default:
-		return true
-	}
+	return encPropsForType(v.Type()).isValue
 }
 
 // isTableLike returns true when the value should be encoded as a table (or
@@ -479,12 +524,12 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 	case reflect.Map:
 		return e.collectMapEntries(v)
 	case reflect.Struct:
-		var entries []entry
-		err := e.collectStructEntries(&entries, v)
+		entries := make([]entry, 0, len(encPlanForType(v.Type()).fields))
+		_, err := e.collectStructEntries(&entries, v)
 		if err != nil {
 			return nil, err
 		}
-		return dedupEntries(entries), nil
+		return entries, nil
 	default:
 		return nil, fmt.Errorf("toml: cannot encode a %s as a table", v.Type())
 	}
@@ -493,9 +538,14 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	entries := make([]entry, 0, v.Len())
 
+	// Keys are converted to strings right away: read them into a reusable
+	// buffer to avoid one allocation per key.
+	kbuf := reflect.New(v.Type().Key()).Elem()
+
 	iter := v.MapRange()
 	for iter.Next() {
-		key, err := mapKeyString(iter.Key())
+		kbuf.SetIterKey(iter)
+		key, err := mapKeyString(kbuf)
 		if err != nil {
 			return nil, err
 		}
@@ -511,12 +561,18 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 		entries = append(entries, entry{key: key, value: value})
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].key < entries[j].key
-	})
+	if len(entries) > 1 {
+		sort.Sort(entriesByKey(entries))
+	}
 
 	return entries, nil
 }
+
+type entriesByKey []entry
+
+func (e entriesByKey) Len() int           { return len(e) }
+func (e entriesByKey) Less(i, j int) bool { return e[i].key < e[j].key }
+func (e entriesByKey) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 
 // mapKeyString converts a map key to its string representation.
 func mapKeyString(k reflect.Value) (string, error) {
@@ -564,13 +620,44 @@ func mapKeyString(k reflect.Value) (string, error) {
 	}
 }
 
-// collectStructEntries appends the entries of a struct, flattening embedded
-// structs in place.
-func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) error {
-	t := v.Type()
+// encPlanField is the static encoding information of one field of a struct.
+type encPlanField struct {
+	name    string
+	index   []int
+	depth   int
+	options valueOptions
+}
+
+// encPlan caches the per-type information needed to encode a struct:
+// flattened fields with parsed tags, in order of definition, with shadowed
+// duplicates already removed.
+type encPlan struct {
+	fields []encPlanField
+}
+
+var encPlans sync.Map // reflect.Type -> *encPlan
+
+func encPlanForType(t reflect.Type) *encPlan {
+	if plan, ok := encPlans.Load(t); ok {
+		return plan.(*encPlan)
+	}
+	plan := &encPlan{}
+	visited := map[reflect.Type]bool{}
+	buildEncPlan(plan, t, nil, 0, visited)
+	dedupEncPlan(plan)
+	encPlans.Store(t, plan)
+	return plan
+}
+
+func buildEncPlan(plan *encPlan, t reflect.Type, prefix []int, depth int, visited map[reflect.Type]bool) {
+	if visited[t] {
+		return
+	}
+	visited[t] = true
+	defer delete(visited, t)
+
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		fv := v.Field(i)
 
 		tag, tagged := f.Tag.Lookup("toml")
 		if tag == "-" {
@@ -611,27 +698,20 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) e
 		}
 		opts.comment = f.Tag.Get("comment")
 
+		index := make([]int, 0, len(prefix)+1)
+		index = append(index, prefix...)
+		index = append(index, i)
+
 		if f.Anonymous {
 			ft := f.Type
 			if ft.Kind() == reflect.Ptr {
 				ft = ft.Elem()
 			}
 			if ft.Kind() == reflect.Struct && (!tagged || tagName(tag) == "") {
-				sub, ok := resolve(fv)
-				if !ok {
-					// nil embedded pointer: skipped
-					continue
-				}
-				err := e.collectStructEntries(entries, sub)
-				if err != nil {
-					return err
-				}
+				buildEncPlan(plan, ft, index, depth+1, visited)
 				continue
 			}
-			if ft.Kind() == reflect.Interface && fv.IsNil() {
-				continue
-			}
-			if f.PkgPath != "" {
+			if f.PkgPath != "" && ft.Kind() != reflect.Interface {
 				continue
 			}
 		} else if f.PkgPath != "" {
@@ -639,21 +719,97 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) e
 			continue
 		}
 
-		// nil values in struct fields are skipped
-		if (fv.Kind() == reflect.Interface || fv.Kind() == reflect.Ptr || fv.Kind() == reflect.Map) && fv.IsNil() {
-			continue
-		}
-
-		if opts.omitempty && isEmptyValue(fv) {
-			continue
-		}
-		if opts.omitzero && isZeroValue(fv) {
-			continue
-		}
-
-		*entries = append(*entries, entry{key: name, value: fv, options: opts})
+		plan.fields = append(plan.fields, encPlanField{
+			name:    name,
+			index:   index,
+			depth:   depth,
+			options: opts,
+		})
 	}
-	return nil
+}
+
+// dedupEncPlan removes the fields shadowed by another one with the same
+// name (the shallowest wins), keeping the order of first appearance.
+func dedupEncPlan(plan *encPlan) {
+	byName := make(map[string]int, len(plan.fields))
+	drop := false
+	for i := range plan.fields {
+		f := &plan.fields[i]
+		j, seen := byName[f.name]
+		if !seen {
+			byName[f.name] = i
+			continue
+		}
+		drop = true
+		// Shallowest wins; on equal depth, the first in order wins.
+		if f.depth < plan.fields[j].depth {
+			plan.fields[j].name = ""
+			byName[f.name] = i
+		} else {
+			f.name = ""
+		}
+	}
+	if !drop {
+		return
+	}
+	out := plan.fields[:0]
+	for _, f := range plan.fields {
+		if f.name != "" {
+			out = append(out, f)
+		}
+	}
+	plan.fields = out
+}
+
+// collectStructEntries appends the entries of a struct, flattening embedded
+// structs in place.
+func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) (bool, error) {
+	plan := encPlanForType(v.Type())
+
+	for i := range plan.fields {
+		f := &plan.fields[i]
+		fv, ok := fieldByIndexSkipNil(v, f.index)
+		if !ok {
+			// nil embedded pointer on the way: skipped
+			continue
+		}
+
+		// Anonymous interface fields that are nil are skipped.
+		if fv.Kind() == reflect.Interface && fv.IsNil() {
+			continue
+		}
+		// nil values in struct fields are skipped
+		if (fv.Kind() == reflect.Ptr || fv.Kind() == reflect.Map) && fv.IsNil() {
+			continue
+		}
+
+		if f.options.omitempty && isEmptyValue(fv) {
+			continue
+		}
+		if f.options.omitzero && isZeroValue(fv) {
+			continue
+		}
+
+		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options})
+	}
+	return false, nil
+}
+
+// fieldByIndexSkipNil returns the field at the given index path, reporting
+// false if a nil embedded pointer is found on the way.
+func fieldByIndexSkipNil(v reflect.Value, index []int) (reflect.Value, bool) {
+	for i, x := range index {
+		if i > 0 {
+			for v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					return v, false
+				}
+				v = v.Elem()
+			}
+		}
+		v = v.Field(x)
+	}
+	return v, true
 }
 
 func tagName(tag string) string {
@@ -661,33 +817,6 @@ func tagName(tag string) string {
 		return tag[:idx]
 	}
 	return tag
-}
-
-// dedupEntries removes the entries shadowed by another one with the same
-// name, keeping the order of first appearance.
-func dedupEntries(entries []entry) []entry {
-	seen := make(map[string]int, len(entries))
-	for _, ent := range entries {
-		seen[ent.key]++
-	}
-	if len(seen) == len(entries) {
-		return entries
-	}
-	out := entries[:0]
-	for _, ent := range entries {
-		if seen[ent.key] > 1 {
-			// Multiple fields with the same name: this can only come from
-			// embedding, where the shallowest field wins. Entries from the
-			// outer struct are collected before the embedded ones, so the
-			// first one wins.
-			if seen[ent.key+"\x00done"] > 0 {
-				continue
-			}
-			seen[ent.key+"\x00done"] = 1
-		}
-		out = append(out, ent)
-	}
-	return out
 }
 
 // isEmptyValue implements the omitempty rules.
@@ -774,10 +903,12 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 		}
 	}
 
-	if t.Implements(textMarshalerType) && t.Kind() != reflect.String {
-		return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
-	}
-	if reflect.PtrTo(t).Implements(textMarshalerType) {
+	switch encPropsForType(t).text {
+	case 1:
+		if t.Kind() != reflect.String {
+			return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
+		}
+	case 2:
 		if v.CanAddr() {
 			return e.appendTextMarshaler(b, v.Addr().Interface().(encoding.TextMarshaler))
 		}
