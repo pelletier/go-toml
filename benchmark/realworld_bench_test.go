@@ -324,7 +324,12 @@ stopwords = ["example", "test"]
 		{"jwt", "JSON Web Token", `ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*`},
 	}
 	for _, r := range rules {
-		buf.WriteString("\n[[rules]]\nid = \"" + r.id + "\"\ndescription = \"" + r.desc + "\"\nregex = '''" + r.regex + "'''\nentropy = 3.5\nsecretGroup = 1\nkeywords = [\"" + r.id + "\"]\ntags = [\"key\", \"" + r.id + "\"]\n\n[[rules.allowlists]]\ndescription = \"test files\"\npaths = ['''(.*?)_test\\.go''', '''testdata/''']\nstopwords = [\"example\"]\n\n[[rules.allowlists]]\ndescription = \"docs\"\nregexes = ['''docs?/''']\n")
+		buf.WriteString("\n[[rules]]\nid = \"" + r.id + "\"\ndescription = \"" + r.desc + "\"\n")
+		buf.WriteString("regex = '''" + r.regex + "'''\nentropy = 3.5\nsecretGroup = 1\n")
+		buf.WriteString("keywords = [\"" + r.id + "\"]\ntags = [\"key\", \"" + r.id + "\"]\n")
+		buf.WriteString("\n[[rules.allowlists]]\ndescription = \"test files\"\n")
+		buf.WriteString("paths = ['''(.*?)_test\\.go''', '''testdata/''']\nstopwords = [\"example\"]\n")
+		buf.WriteString("\n[[rules.allowlists]]\ndescription = \"docs\"\nregexes = ['''docs?/''']\n")
 	}
 	return buf.Bytes()
 }()

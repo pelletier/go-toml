@@ -2,6 +2,7 @@ package toml
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -434,7 +435,7 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		return fmt.Errorf("toml: decoding can only be performed into a pointer, not %s", r.Kind())
 	}
 	if r.IsNil() {
-		return fmt.Errorf("toml: decoding pointer target cannot be nil")
+		return errors.New("toml: decoding pointer target cannot be nil")
 	}
 
 	root := r.Elem()
@@ -448,7 +449,8 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		}
 	}
 	if err := d.p.Error(); err != nil {
-		if perr, ok := err.(*unstable.ParserError); ok {
+		var perr *unstable.ParserError
+		if errors.As(err, &perr) {
 			return wrapDecodeError(data, perr)
 		}
 		return err
@@ -478,6 +480,7 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		if root.IsNil() {
 			root.Set(reflect.ValueOf(map[string]interface{}{}))
 		}
+	default:
 	}
 
 	return d.strict.Error(data)
@@ -486,17 +489,18 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 // wrapError gives document context to errors generated while processing an
 // expression.
 func (d *decoder) wrapError(data []byte, err error) error {
-	switch e := err.(type) {
-	case *unstable.ParserError:
-		return wrapDecodeError(data, e)
-	case *typeMismatchError:
-		return wrapDecodeError(data, &unstable.ParserError{
-			Highlight: e.highlight,
-			Message:   e.Error(),
-		})
-	default:
-		return err
+	var perr *unstable.ParserError
+	if errors.As(err, &perr) {
+		return wrapDecodeError(data, perr)
 	}
+	var mm *typeMismatchError
+	if errors.As(err, &mm) {
+		return wrapDecodeError(data, &unstable.ParserError{
+			Highlight: mm.highlight,
+			Message:   mm.Error(),
+		})
+	}
+	return err
 }
 
 func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) error {
@@ -693,6 +697,7 @@ walk:
 					pf = w
 					idx++
 					continue
+				default:
 				}
 			}
 
@@ -1020,7 +1025,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 	if !indexed && (v.Kind() == reflect.Slice || v.Kind() == reflect.Array) && c.indexes[idx] >= 0 {
 		i := c.indexes[idx]
 		if i >= v.Len() {
-			return reflect.Value{}, fmt.Errorf("toml: internal error: capture index out of range")
+			return reflect.Value{}, errors.New("toml: internal error: capture index out of range")
 		}
 		elem := v.Index(i)
 		nv, err := d.resolveCapture(elem, c, idx, true)
@@ -1036,7 +1041,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 	if idx == len(c.names) {
 		u, ok := unmarshalerOf(v)
 		if !ok {
-			return reflect.Value{}, fmt.Errorf("toml: internal error: capture target does not implement UnmarshalTOML")
+			return reflect.Value{}, errors.New("toml: internal error: capture target does not implement UnmarshalTOML")
 		}
 		return v, u.UnmarshalTOML(c.buf)
 	}
@@ -1080,10 +1085,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		}
 		return v, nil
 	case reflect.Interface:
-		elem, err := elemOrNewMap(v)
-		if err != nil {
-			return reflect.Value{}, err
-		}
+		elem := elemOrNewMap(v)
 		nv, err := d.resolveCapture(elem, c, idx, indexed)
 		if err != nil || !nv.IsValid() {
 			return reflect.Value{}, err
@@ -1171,15 +1173,15 @@ func makeMapKey(kt reflect.Type, name string) (reflect.Value, error) {
 // can hold a table (generic maps and slices) are kept; anything else is
 // replaced by a fresh map[string]interface{}. Maps and slices are reference
 // types: they are returned directly, not copied.
-func elemOrNewMap(v reflect.Value) (reflect.Value, error) {
+func elemOrNewMap(v reflect.Value) reflect.Value {
 	if !v.IsNil() {
 		concrete := v.Elem()
 		t := concrete.Type()
 		if t == mapStringInterfaceType || t == sliceInterfaceType {
-			return concrete, nil
+			return concrete
 		}
 	}
-	return reflect.ValueOf(map[string]interface{}{}), nil
+	return reflect.ValueOf(map[string]interface{}{})
 }
 
 // handleKeyValueExpression stores the value of a top-level key-value
@@ -1275,14 +1277,15 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		elemType := v.Type().Elem()
 		existing := v.MapIndex(key)
 		var elem reflect.Value
-		if existing.IsValid() {
+		switch {
+		case existing.IsValid():
 			elem = reflect.New(elemType).Elem()
 			elem.Set(existing)
-		} else if idx+1 == len(path) && elemType.Kind() == reflect.Interface {
+		case idx+1 == len(path) && elemType.Kind() == reflect.Interface:
 			// Fast path: a fresh interface element does not need to be
 			// materialized, the assigned value is stored directly.
 			elem = reflect.Zero(elemType)
-		} else {
+		default:
 			elem = reflect.New(elemType).Elem()
 		}
 		nv, err := d.descend(elem, path, idx+1, expr, value)
@@ -1309,7 +1312,8 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		fv := fieldByIndexAlloc(v, f.index)
 		nv, err := d.descend(fv, path, idx+1, expr, value)
 		if err != nil {
-			if mm, ok := err.(*typeMismatchError); ok {
+			var mm *typeMismatchError
+			if errors.As(err, &mm) {
 				err = &unstable.ParserError{
 					Highlight: mm.highlight,
 					Message: fmt.Sprintf("cannot decode TOML %s into struct field %s.%s of type %s",
@@ -1323,10 +1327,7 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		}
 		return v, nil
 	case reflect.Interface:
-		elem, err := elemOrNewMap(v)
-		if err != nil {
-			return reflect.Value{}, err
-		}
+		elem := elemOrNewMap(v)
 		nv, err := d.descend(elem, path, idx, expr, value)
 		if err != nil || !nv.IsValid() {
 			return reflect.Value{}, err
@@ -1359,7 +1360,8 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		}
 		elemIdx := cnt - 1
 		if elemIdx >= v.Len() {
-			return reflect.Value{}, unstable.NewParserError(keyHighlight(d.p.Data(), part.node), "cannot reach element %d of array of size %d", elemIdx, v.Len())
+			return reflect.Value{}, unstable.NewParserError(keyHighlight(d.p.Data(), part.node),
+				"cannot reach element %d of array of size %d", elemIdx, v.Len())
 		}
 		elem := v.Index(elemIdx)
 		nv, err := d.descend(elem, path, idx, expr, value)
@@ -1434,7 +1436,7 @@ var unmarshalerType = reflect.TypeOf(new(unstable.Unmarshaler)).Elem()
 
 // assignValue stores the TOML value carried by the node into v.
 func (d *decoder) assignValue(v reflect.Value, expr *unstable.Node, value *unstable.Node) (reflect.Value, error) {
-	for v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Ptr {
 		if d.unmarshalerInterface {
 			if u, ok := unmarshalerOf(v); ok {
 				return v, u.UnmarshalTOML(d.rawValue(expr, value))
@@ -1490,6 +1492,7 @@ func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.V
 		return v, nil
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(string(value.Data)))
+	default:
 	}
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
 		err := v.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText(value.Data)
@@ -1534,6 +1537,7 @@ func (d *decoder) assignInteger(v reflect.Value, value *unstable.Node) (reflect.
 		return v, nil
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(i))
+	default:
 	}
 	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
 		return v, err
@@ -1568,6 +1572,7 @@ func (d *decoder) assignFloat(v reflect.Value, value *unstable.Node) (reflect.Va
 		return v, nil
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(f))
+	default:
 	}
 	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
 		return v, err
@@ -1584,6 +1589,7 @@ func (d *decoder) assignBool(v reflect.Value, value *unstable.Node) (reflect.Val
 		return v, nil
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(b))
+	default:
 	}
 	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
 		return v, err
@@ -1753,6 +1759,7 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 			case unstable.Bool:
 				slice = append(slice, n.Data[0] == 't')
 				continue
+			default:
 			}
 			elem := reflect.New(interfaceType).Elem()
 			nv, err := d.assignValue(elem, nil, n)
@@ -1762,6 +1769,7 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 			slice = append(slice, nv.Interface())
 		}
 		return boxInto(v, reflect.ValueOf(slice))
+	default:
 	}
 	return reflect.Value{}, d.typeMismatchError("array", v.Type(), d.rawValue(expr, value))
 }
@@ -1816,10 +1824,12 @@ func boxInto(v reflect.Value, c reflect.Value) (reflect.Value, error) {
 	return c, nil
 }
 
-var interfaceType = reflect.TypeOf(new(interface{})).Elem()
-var localDateType = reflect.TypeOf(LocalDate{})
-var localTimeType = reflect.TypeOf(LocalTime{})
-var localDateTimeType = reflect.TypeOf(LocalDateTime{})
+var (
+	interfaceType     = reflect.TypeOf(new(interface{})).Elem()
+	localDateType     = reflect.TypeOf(LocalDate{})
+	localTimeType     = reflect.TypeOf(LocalTime{})
+	localDateTimeType = reflect.TypeOf(LocalDateTime{})
+)
 
 // structPlan caches the mapping between TOML keys and the fields of a struct
 // type.

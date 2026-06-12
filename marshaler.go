@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -245,13 +246,13 @@ type entry struct {
 
 func (e *encoderState) encodeRoot(v interface{}) error {
 	if v == nil {
-		return fmt.Errorf("toml: cannot encode a nil interface")
+		return errors.New("toml: cannot encode a nil interface")
 	}
 
 	rv := reflect.ValueOf(v)
 	rv, ok := resolve(rv)
 	if !ok {
-		return fmt.Errorf("toml: cannot encode a nil pointer")
+		return errors.New("toml: cannot encode a nil pointer")
 	}
 
 	switch rv.Kind() {
@@ -383,18 +384,20 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 
 	// First pass: emit all key-values; tables are handled by the second
 	// pass.
-	for _, ent := range entries {
-		if e.entryIsTable(&ent) {
+	for i := range entries {
+		ent := &entries[i]
+		if e.entryIsTable(ent) {
 			continue
 		}
-		err := e.encodeKeyValue(ent, commented, indent)
+		err := e.encodeKeyValue(*ent, commented, indent)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Second pass: emit the sub-tables, extending the shared key stack.
-	for _, ent := range entries {
+	for i := range entries {
+		ent := entries[i]
 		if !e.entryIsTable(&ent) {
 			continue
 		}
@@ -463,7 +466,7 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 	for i := 0; i < v.Len(); i++ {
 		elem, ok := resolve(v.Index(i))
 		if !ok {
-			return fmt.Errorf("toml: cannot encode a nil element in an array of tables")
+			return errors.New("toml: cannot encode a nil element in an array of tables")
 		}
 
 		e.writeTableHeader(comment, commented, true, indent)
@@ -565,10 +568,7 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 		return e.collectMapEntries(v)
 	case reflect.Struct:
 		entries := e.getEntries()
-		_, err := e.collectStructEntries(&entries, v)
-		if err != nil {
-			return nil, err
-		}
+		e.collectStructEntries(&entries, v)
 		return entries, nil
 	default:
 		return nil, fmt.Errorf("toml: cannot encode a %s as a table", v.Type())
@@ -626,7 +626,7 @@ func (e entriesByKey) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func mapKeyString(k reflect.Value) (string, error) {
 	kr, ok := resolve(k)
 	if !ok {
-		return "", fmt.Errorf("toml: cannot encode a nil map key")
+		return "", errors.New("toml: cannot encode a nil map key")
 	}
 	if kr.Type().Implements(textMarshalerType) {
 		b, err := kr.Interface().(encoding.TextMarshaler).MarshalText()
@@ -734,14 +734,15 @@ func buildEncPlan(plan *encPlan, t reflect.Type, prefix []int, depth int, visite
 				}
 			}
 		}
-		// Standalone boolean tags.
-		if f.Tag.Get("multiline") == "true" {
+		// Standalone boolean tags, e.g. multiline:"true".
+		const tagTrue = "true"
+		if f.Tag.Get("multiline") == tagTrue {
 			opts.multiline = true
 		}
-		if f.Tag.Get("inline") == "true" {
+		if f.Tag.Get("inline") == tagTrue {
 			opts.inline = true
 		}
-		if f.Tag.Get("commented") == "true" {
+		if f.Tag.Get("commented") == tagTrue {
 			opts.commented = true
 		}
 		opts.comment = f.Tag.Get("comment")
@@ -811,7 +812,7 @@ func dedupEncPlan(plan *encPlan) {
 
 // collectStructEntries appends the entries of a struct, flattening embedded
 // structs in place.
-func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) (bool, error) {
+func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) {
 	plan := encPlanForType(v.Type())
 
 	for i := range plan.fields {
@@ -840,7 +841,6 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) (
 
 		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options})
 	}
-	return false, nil
 }
 
 // fieldByIndexSkipNil returns the field at the given index path, reporting
@@ -886,8 +886,9 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.IsNil()
 	case reflect.Struct:
 		return v.IsZero()
+	default:
+		return false
 	}
-	return false
 }
 
 // isZeroValue implements the omitzero rules: the type's own IsZero() when
@@ -975,7 +976,7 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 		return e.appendValue(b, v.Elem(), opts, indent)
 	case reflect.Interface:
 		if v.IsNil() {
-			return nil, fmt.Errorf("toml: cannot encode a nil interface")
+			return nil, errors.New("toml: cannot encode a nil interface")
 		}
 		return e.appendValue(b, v.Elem(), opts, indent)
 	case reflect.String:
@@ -1039,7 +1040,7 @@ func appendFloat(b []byte, f float64, bitSize int) []byte {
 	start := len(b)
 	b = strconv.AppendFloat(b, f, 'f', -1, bitSize)
 	// TOML floats must have a fractional part or an exponent.
-	if bytes.IndexAny(b[start:], ".eE") < 0 {
+	if !bytes.ContainsAny(b[start:], ".eE") {
 		b = append(b, ".0"...)
 	}
 	return b

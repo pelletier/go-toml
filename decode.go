@@ -88,9 +88,9 @@ func parseIntDec(b []byte) (int64, error) {
 		i++
 	}
 
-	var max uint64 = math.MaxInt64
+	var limit uint64 = math.MaxInt64
 	if neg {
-		max = math.MaxInt64 + 1
+		limit = math.MaxInt64 + 1
 	}
 
 	var v uint64
@@ -99,18 +99,18 @@ func parseIntDec(b []byte) (int64, error) {
 		if c == '_' {
 			continue
 		}
-		if v > max/10 {
+		if v > limit/10 {
 			return 0, unstable.NewParserError(b, "decimal number is too large to fit in a 64-bit signed integer")
 		}
 		v = v*10 + uint64(c-'0')
-		if v > max {
+		if v > limit {
 			return 0, unstable.NewParserError(b, "decimal number is too large to fit in a 64-bit signed integer")
 		}
 	}
 	if neg {
-		return -int64(v), nil
+		return -int64(v), nil //nolint:gosec // v <= MaxInt64+1, the conversion wraps to the intended negative value
 	}
-	return int64(v), nil
+	return int64(v), nil //nolint:gosec // v <= MaxInt64
 }
 
 func parseFloat(b []byte) (float64, error) {
@@ -119,14 +119,14 @@ func parseFloat(b []byte) (float64, error) {
 		i = 1
 	}
 	if len(b) == i+3 {
-		switch {
-		case b[i] == 'i':
+		switch b[i] {
+		case 'i':
 			// inf
 			if b[0] == '-' {
 				return math.Inf(-1), nil
 			}
 			return math.Inf(1), nil
-		case b[i] == 'n':
+		case 'n':
 			// nan
 			return math.NaN(), nil
 		}

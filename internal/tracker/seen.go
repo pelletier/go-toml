@@ -107,7 +107,7 @@ func (s *SeenTracker) find(parent int32, name []byte) int32 {
 	for i := int(parent) + 1; i < len(s.entries); i++ {
 		e := &s.entries[i]
 		if e.parent == parent && e.kind != anonymousKind && bytes.Equal(e.name, name) {
-			return int32(i)
+			return int32(i) //nolint:gosec // entry counts are bounded by document size
 		}
 	}
 	return -1
@@ -115,7 +115,7 @@ func (s *SeenTracker) find(parent int32, name []byte) int32 {
 
 // create appends a new entry and returns its id.
 func (s *SeenTracker) create(parent int32, name []byte, kind keyKind, explicit bool) int32 {
-	id := int32(len(s.entries))
+	id := int32(len(s.entries)) //nolint:gosec // entry counts are bounded by document size
 	s.entries = append(s.entries, entry{
 		parent:   parent,
 		kind:     kind,
@@ -148,7 +148,7 @@ func (s *SeenTracker) clear(id int32) {
 			continue
 		}
 		remap[i] = n
-		if int32(i) != n {
+		if int32(i) != n { //nolint:gosec // entry counts are bounded by document size
 			e := s.entries[i]
 			e.parent = remap[e.parent]
 			s.entries[n] = e
@@ -318,6 +318,7 @@ func (s *SeenTracker) checkValue(id int32, value *unstable.Node) error {
 				}
 			}
 		}
+	default:
 	}
 	return nil
 }

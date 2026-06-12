@@ -1,7 +1,7 @@
 package toml
 
 import (
-	"fmt"
+	"errors"
 	"strconv"
 	"strings"
 
@@ -63,6 +63,7 @@ func (s *StrictMissingError) Unwrap() []error {
 	return errs
 }
 
+// Key represents a TOML key as a sequence of key parts.
 type Key []string
 
 // Error returns the error message contained in the DecodeError.
@@ -122,7 +123,7 @@ func subsliceOffset(document, b []byte) int {
 	// start and the end of the backing array.
 	offset := cap(document) - cap(b)
 	if offset < 0 || offset+len(b) > len(document) {
-		panic(fmt.Errorf("highlight is not a subslice of the document"))
+		panic(errors.New("highlight is not a subslice of the document"))
 	}
 	return offset
 }
@@ -209,8 +210,8 @@ func buildHumanContext(document []byte, errLineIdx, errColumn, highlightLen int,
 	// The highlight cannot extend past the end of its line.
 	tildes := highlightLen
 	if errLineIdx < len(lines) {
-		if max := len(lines[errLineIdx]) - errColumn + 1; tildes > max {
-			tildes = max
+		if avail := len(lines[errLineIdx]) - errColumn + 1; tildes > avail {
+			tildes = avail
 		}
 	}
 	if tildes < 1 {

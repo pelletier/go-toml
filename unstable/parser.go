@@ -3,6 +3,7 @@ package unstable
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"unicode/utf8"
 )
@@ -71,11 +72,11 @@ func (p *Parser) Range(b []byte) Range {
 	// (its capacity) identifies the offset of b within data.
 	offset := cap(p.data) - cap(b)
 	if offset < 0 || offset+len(b) > len(p.data) {
-		panic(fmt.Errorf("not a slice of the data slice"))
+		panic(errors.New("not a slice of the data slice"))
 	}
 	return Range{
-		Offset: uint32(offset),
-		Length: uint32(len(b)),
+		Offset: uint32(offset), //nolint:gosec // TOML documents are small
+		Length: uint32(len(b)), //nolint:gosec // TOML documents are small
 	}
 }
 
@@ -173,7 +174,7 @@ func (p *Parser) push(n Node) int32 {
 	}
 	n.parser = p
 	p.nodes = append(p.nodes, n)
-	return int32(len(p.nodes))
+	return int32(len(p.nodes)) //nolint:gosec // node counts are bounded by document size
 }
 
 // at returns a pointer to the node with the given handle. Only valid until
@@ -194,8 +195,8 @@ func (p *Parser) rangeFrom(from, to []byte) Range {
 	start := p.offsetOf(from)
 	end := p.offsetOf(to)
 	return Range{
-		Offset: uint32(start),
-		Length: uint32(end - start),
+		Offset: uint32(start),       //nolint:gosec // TOML documents are small
+		Length: uint32(end - start), //nolint:gosec // TOML documents are small
 	}
 }
 
@@ -267,7 +268,8 @@ func (p *Parser) NextExpression() bool {
 		// Errors at the end of the input have an empty highlight. Extend
 		// them to the last byte of the input so that they carry a usable
 		// position.
-		if perr, ok := err.(*ParserError); ok && len(perr.Highlight) == 0 {
+		var perr *ParserError
+		if errors.As(err, &perr) && len(perr.Highlight) == 0 {
 			if offset := p.offsetOf(perr.Highlight); offset > 0 && offset == len(p.data) {
 				perr.Highlight = p.data[offset-1 : offset]
 			}
@@ -587,12 +589,13 @@ func (p *Parser) parseValArray(b []byte) (int32, []byte, error) {
 			}
 			if p.KeepComments {
 				h := p.push(Node{Kind: Comment, Raw: p.Range(comment), Data: comment})
-				if runFirst == 0 {
+				switch {
+				case runFirst == 0:
 					appendChild(h)
 					runFirst = h
-				} else if runLast == runFirst {
+				case runLast == runFirst:
 					p.at(runFirst).child = h
-				} else {
+				default:
 					p.at(runLast).next = h
 				}
 				runLast = h
@@ -1472,65 +1475,4 @@ func scanUtf8Run(b []byte, i int) (int, bool) {
 		}
 	}
 	return i, true
-}
-
-// utf8ValidNext returns the size of the next valid UTF-8 rune at the start of
-// b, or 0 if b does not start with a valid rune. ASCII bytes are valid runes
-// of size 1.
-func utf8ValidNext(b []byte) int {
-	c := b[0]
-	switch {
-	case c < 0x80:
-		return 1
-	case c < 0xC2:
-		// continuation byte or overlong encoding
-		return 0
-	case c < 0xE0:
-		if len(b) < 2 || b[1]&0xC0 != 0x80 {
-			return 0
-		}
-		return 2
-	case c < 0xF0:
-		if len(b) < 3 || b[2]&0xC0 != 0x80 {
-			return 0
-		}
-		b1 := b[1]
-		switch c {
-		case 0xE0:
-			if b1 < 0xA0 || b1 > 0xBF {
-				return 0
-			}
-		case 0xED:
-			// exclude surrogates
-			if b1 < 0x80 || b1 > 0x9F {
-				return 0
-			}
-		default:
-			if b1&0xC0 != 0x80 {
-				return 0
-			}
-		}
-		return 3
-	case c < 0xF5:
-		if len(b) < 4 || b[2]&0xC0 != 0x80 || b[3]&0xC0 != 0x80 {
-			return 0
-		}
-		b1 := b[1]
-		switch c {
-		case 0xF0:
-			if b1 < 0x90 || b1 > 0xBF {
-				return 0
-			}
-		case 0xF4:
-			if b1 < 0x80 || b1 > 0x8F {
-				return 0
-			}
-		default:
-			if b1&0xC0 != 0x80 {
-				return 0
-			}
-		}
-		return 4
-	}
-	return 0
 }
