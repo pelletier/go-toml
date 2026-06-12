@@ -22,6 +22,13 @@ type decodeError struct {
 	message   string
 }
 
+// Reset clears the state of the tracker so it can be reused for another
+// document.
+func (s *strict) Reset() {
+	s.key = tracker.KeyTracker{}
+	s.missing = s.missing[:0]
+}
+
 // EnterTable is called when a new table or array table expression starts
 // being processed.
 func (s *strict) EnterTable(node *unstable.Node) {

@@ -343,4 +343,18 @@ BenchmarkParseBasicStringsEasy/16-8                    	205534515	         5.831
 BenchmarkParseBasicStringsEasy/16-8                    	205104334	         5.832 ns/op	3086.38 MB/s	       0 B/op	       0 allocs/op
 BenchmarkParseBasicStringsEasy/16-8                    	204013497	         6.050 ns/op	2975.05 MB/s	       0 B/op	       0 allocs/op
 BenchmarkParseBasicStringsEasy/16-8                    	204311047	         5.858 ns/op	3072.70 MB/s	       0 B/op	       0 allocs/op
-BenchmarkParseBasicStringsEasy/16-8                    	
+BenchmarkParseBasicStringsEasy/16-8                    	204424845	         5.891 ns/op	3055.29 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	204011416	         5.871 ns/op	3065.68 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	191134846	         5.882 ns/op	3060.13 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.09 ns/op	2074.72 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.08 ns/op	2074.92 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.11 ns/op	2071.00 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.08 ns/op	2075.94 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.51 ns/op	1997.60 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.13 ns/op	2067.13 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.13 ns/op	2066.79 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.12 ns/op	2069.23 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.04 ns/op	2083.47 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/21-8                    	100000000	        11.44 ns/op	2009.98 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/pelletier/go-toml/v2/unstable	279.991s

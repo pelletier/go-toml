@@ -15,12 +15,53 @@ import (
 	"github.com/pelletier/go-toml/v2/unstable"
 )
 
+// decoderPool recycles decoders (and their internal buffers: parser arena,
+// seen-tracker entries, scratch buffers) across calls to Unmarshal and
+// Decode.
+var decoderPool = sync.Pool{
+	New: func() interface{} { return &decoder{} },
+}
+
+func getDecoder(strictMode, unmarshalerInterface bool) *decoder {
+	d := decoderPool.Get().(*decoder)
+	d.reset()
+	d.strict.Enabled = strictMode
+	d.unmarshalerInterface = unmarshalerInterface
+	return d
+}
+
+func putDecoder(d *decoder) {
+	decoderPool.Put(d)
+}
+
+// reset clears the per-document state of the decoder, keeping the allocated
+// buffers for reuse.
+func (d *decoder) reset() {
+	d.seen.Reset()
+	d.tableKey = d.tableKey[:0]
+	d.skipUntilTable = false
+	d.path = d.path[:0]
+	d.captures = d.captures[:0]
+	d.captureIdx = -1
+	d.segIdx = d.segIdx[:0]
+	for k := range d.arrayCounts {
+		delete(d.arrayCounts, k)
+	}
+	d.tableTarget = reflect.Value{}
+	d.tableTargetValid = false
+	d.tableFlush = d.tableFlush[:0]
+	d.tableParentSlot = slotWriter{}
+	d.strict.Reset()
+}
+
 // Unmarshal deserializes a TOML document into a Go value.
 //
 // It is a shortcut for Decoder.Decode() with the default options.
 func Unmarshal(data []byte, v interface{}) error {
-	d := decoder{}
-	return d.unmarshal(data, v)
+	d := getDecoder(false, false)
+	err := d.unmarshal(data, v)
+	putDecoder(d)
+	return err
 }
 
 // Decoder reads and decode a TOML document from an input stream.
@@ -122,22 +163,35 @@ func (d *Decoder) Decode(v interface{}) error {
 		return fmt.Errorf("toml: %w", err)
 	}
 
-	dec := decoder{
-		strict: strict{
-			Enabled: d.strict,
-		},
-		unmarshalerInterface: d.unmarshalerInterface,
-	}
-
-	return dec.unmarshal(b, v)
+	dec := getDecoder(d.strict, d.unmarshalerInterface)
+	err = dec.unmarshal(b, v)
+	putDecoder(dec)
+	return err
 }
 
 // pathPart is one part of the key path leading to a value. Parts that come
 // from the current table header only carry a name; parts that come from the
-// key of the current key-value expression also carry the AST node.
+// key of the current key-value expression also carry the AST node, and their
+// name is materialized lazily to avoid allocations.
 type pathPart struct {
 	name string
 	node *unstable.Node
+}
+
+// bytes returns the raw bytes of the key part.
+func (p *pathPart) bytes() []byte {
+	if p.node != nil {
+		return p.node.Data
+	}
+	return []byte(p.name)
+}
+
+// str returns the key part as a string, possibly allocating.
+func (p *pathPart) str() string {
+	if p.node != nil {
+		return string(p.node.Data)
+	}
+	return p.name
 }
 
 // rawCapture accumulates the raw bytes fed to a type implementing
@@ -191,32 +245,117 @@ type decoder struct {
 	// arrayCounts tracks the number of elements appended to fixed-size
 	// arrays used as array tables, keyed by the NUL-joined key parts.
 	arrayCounts map[string]int
+
+	// Cached target of the current table, so that key-values do not need to
+	// walk the document structure from the root for every expression.
+	// tableFlush holds the write-backs to perform when leaving the table
+	// (for targets reached through map values, which are copies).
+	// tableParentSlot stores a replacement of the target itself (e.g. a nil
+	// map that was allocated) into its parent.
+	tableTarget      reflect.Value
+	tableTargetValid bool
+	tableFlush       []flushOp
+	tableParentSlot  slotWriter
+
+	// strKey is a reusable string value used as map key, so that map
+	// operations with string keys do not need to allocate a boxed key for
+	// every access. It must be refreshed with stringMapKey immediately
+	// before each use: any recursive call may overwrite it.
+	strKey reflect.Value
+
+	// pathScratch is the buffer used by joinPath.
+	pathScratch []byte
 }
 
-func joinPath(parts []string) string {
-	return strings.Join(parts, "\x00")
+// slotWriter remembers how to store a value at some location of the target
+// structure. Implemented as a struct instead of a closure to avoid
+// allocations.
+type slotWriter struct {
+	kind uint8 // 0: none, 1: slot.Set, 2: m.SetMapIndex(k, ...), 3: m.SetMapIndex(string key ks, ...)
+	slot reflect.Value
+	m    reflect.Value
+	k    reflect.Value
+	ks   string
+}
+
+func (d *decoder) storeSlot(s *slotWriter, nv reflect.Value) {
+	switch s.kind {
+	case 1:
+		if s.slot.CanSet() {
+			s.slot.Set(nv)
+		}
+	case 2:
+		s.m.SetMapIndex(s.k, nv)
+	case 3:
+		s.m.SetMapIndex(d.stringMapKey(s.ks), nv)
+	}
+}
+
+// flushOp stores val using w when the table is flushed.
+type flushOp struct {
+	w   slotWriter
+	val reflect.Value
+}
+
+// flushTable performs the pending write-backs of the cached table target, in
+// reverse order so that inner copies land before their parents are stored.
+func (d *decoder) flushTable() {
+	for i := len(d.tableFlush) - 1; i >= 0; i-- {
+		d.storeSlot(&d.tableFlush[i].w, d.tableFlush[i].val)
+	}
+	d.tableFlush = d.tableFlush[:0]
+	d.tableTargetValid = false
+	d.tableParentSlot = slotWriter{}
+	d.tableTarget = reflect.Value{}
+}
+
+// stringMapKey returns a reflect.Value holding the given string, reusing the
+// same allocation every time. The result must be used (the map operation
+// performed) before any recursive call, which may overwrite the buffer.
+func (d *decoder) stringMapKey(s string) reflect.Value {
+	if !d.strKey.IsValid() {
+		d.strKey = reflect.New(stringType).Elem()
+	}
+	d.strKey.SetString(s)
+	return d.strKey
+}
+
+// joinPath builds the NUL-joined representation of a key path in the
+// decoder's scratch buffer. The result is only valid until the next call.
+func (d *decoder) joinPath(parts []string) []byte {
+	d.pathScratch = d.pathScratch[:0]
+	for i, p := range parts {
+		if i > 0 {
+			d.pathScratch = append(d.pathScratch, 0)
+		}
+		d.pathScratch = append(d.pathScratch, p...)
+	}
+	return d.pathScratch
 }
 
 // arrayCount returns the number of elements appended so far to the array
 // table at the given path.
-func (d *decoder) arrayCount(key string) int {
+func (d *decoder) arrayCount(key []byte) int {
 	if d.arrayCounts == nil {
 		return 0
 	}
-	return d.arrayCounts[key]
+	return d.arrayCounts[string(key)] // does not allocate
 }
 
-func (d *decoder) setArrayCount(key string, n int) {
+func (d *decoder) setArrayCount(key []byte, n int) {
 	if d.arrayCounts == nil {
 		d.arrayCounts = map[string]int{}
 	}
-	d.arrayCounts[key] = n
+	d.arrayCounts[string(key)] = n
 }
 
 // resetChildArrayCounts forgets the counts of all the array tables under
 // the given path, so that a new element starts fresh.
-func (d *decoder) resetChildArrayCounts(key string) {
-	prefix := key + "\x00"
+func (d *decoder) resetChildArrayCounts(key []byte) {
+	if len(d.arrayCounts) == 0 {
+		return
+	}
+	prefix := string(key) + "\x00"
 	for k := range d.arrayCounts {
 		if strings.HasPrefix(k, prefix) {
 			delete(d.arrayCounts, k)
@@ -267,6 +406,8 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		}
 		return err
 	}
+
+	d.flushTable()
 
 	// Deliver the accumulated raw documents to the unmarshaler-interface
 	// targets.
@@ -328,17 +469,164 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) 
 		}
 		return d.handleKeyValueExpression(expr, root)
 	case unstable.Table:
+		d.flushTable()
 		d.skipUntilTable = false
 		d.captureIdx = -1
 		d.strict.EnterTable(expr)
-		return d.handleTableExpression(expr, root, false, first)
+		err := d.handleTableExpression(expr, root, false, first)
+		if err == nil && !d.skipUntilTable && d.captureIdx < 0 {
+			d.resolveCachedTarget(root)
+		}
+		return err
 	case unstable.ArrayTable:
+		d.flushTable()
 		d.skipUntilTable = false
 		d.captureIdx = -1
 		d.strict.EnterTable(expr)
-		return d.handleTableExpression(expr, root, true, first)
+		err := d.handleTableExpression(expr, root, true, first)
+		if err == nil && !d.skipUntilTable && d.captureIdx < 0 {
+			d.resolveCachedTarget(root)
+		}
+		return err
 	default:
 		return unstable.NewParserError(expr.Data, "unsupported expression kind %s", expr.Kind)
+	}
+}
+
+// resolveCachedTarget computes a direct reference to the container of the
+// current table, so that the key-values that follow can be stored without
+// walking the document structure from the root every time. Map values are
+// not addressable: they are copied, mutated in place by the key-values, and
+// stored back when the table changes (see flushTable).
+func (d *decoder) resolveCachedTarget(root reflect.Value) {
+	ok := false
+	defer func() {
+		if !ok {
+			// The copies registered during this resolution were never
+			// handed out: drop them so they cannot overwrite the values
+			// written by the fallback path.
+			d.tableFlush = d.tableFlush[:0]
+		}
+	}()
+
+	v := root
+	pf := slotWriter{kind: 1, slot: root}
+
+	idx := 0
+	for {
+		switch v.Kind() {
+		case reflect.Ptr:
+			if v.IsNil() {
+				return // bail out: fall back to per-expression descent
+			}
+			elem := v.Elem()
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+			continue
+		case reflect.Interface:
+			if v.IsNil() {
+				return
+			}
+			concrete := v.Elem()
+			switch concrete.Kind() {
+			case reflect.Map, reflect.Slice:
+				// Reference types: mutations are visible through the
+				// existing interface value. Replacements go to the same
+				// slot, which accepts the concrete type.
+				v = concrete
+				continue
+			default:
+				return
+			}
+		case reflect.Slice:
+			if v.Len() == 0 {
+				return
+			}
+			elem := v.Index(v.Len() - 1)
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+			continue
+		case reflect.Array:
+			cnt := d.arrayCount(d.joinPath(d.tableKey[:idx]))
+			if cnt == 0 {
+				cnt = 1
+			}
+			if cnt > v.Len() || !v.CanAddr() {
+				return
+			}
+			elem := v.Index(cnt - 1)
+			pf = slotWriter{kind: 1, slot: elem}
+			v = elem
+			continue
+		}
+
+		if idx >= len(d.tableKey) {
+			break
+		}
+
+		name := d.tableKey[idx]
+
+		switch v.Kind() {
+		case reflect.Map:
+			if v.IsNil() {
+				return
+			}
+			var key reflect.Value
+			var w slotWriter
+			if v.Type().Key() == stringType {
+				// tableKey strings are stable: the slot can reference them
+				// and materialize the key only when storing.
+				key = d.stringMapKey(name)
+				w = slotWriter{kind: 3, m: v, ks: name}
+			} else {
+				k, err := makeMapKey(v.Type().Key(), name)
+				if err != nil {
+					return
+				}
+				key = k
+				w = slotWriter{kind: 2, m: v, k: key}
+			}
+			elem := v.MapIndex(key)
+			if !elem.IsValid() {
+				return
+			}
+			ce := elem
+			if ce.Kind() == reflect.Interface && !ce.IsNil() {
+				ce = ce.Elem()
+			}
+			switch ce.Kind() {
+			case reflect.Map, reflect.Slice:
+				pf = w
+				v = ce
+			default:
+				tmp := reflect.New(elem.Type()).Elem()
+				tmp.Set(elem)
+				d.tableFlush = append(d.tableFlush, flushOp{w: w, val: tmp})
+				pf = slotWriter{kind: 1, slot: tmp}
+				v = tmp
+			}
+			idx++
+		case reflect.Struct:
+			plan := planForType(v.Type())
+			f, found := plan.lookup(name)
+			if !found {
+				return
+			}
+			fv := fieldByIndexAlloc(v, f.index)
+			pf = slotWriter{kind: 1, slot: fv}
+			v = fv
+			idx++
+		default:
+			return
+		}
+	}
+
+	switch v.Kind() {
+	case reflect.Map, reflect.Struct:
+		d.tableTarget = v
+		d.tableParentSlot = pf
+		d.tableTargetValid = true
+		ok = true
 	}
 }
 
@@ -560,9 +848,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		if err != nil || !nv.IsValid() {
 			return reflect.Value{}, err
 		}
-		boxed := reflect.New(v.Type()).Elem()
-		boxed.Set(nv)
-		return boxed, nil
+		return nv, nil
 	default:
 		return reflect.Value{}, fmt.Errorf("toml: internal error: cannot resolve capture target through %s", v.Kind())
 	}
@@ -611,22 +897,50 @@ func (d *decoder) descendTable(v reflect.Value, expr *unstable.Node, idx int, is
 
 	switch v.Kind() {
 	case reflect.Map:
-		key, err := makeMapKey(v.Type().Key(), name)
-		if err != nil {
-			return reflect.Value{}, err
+		var key reflect.Value
+		var err error
+		fastKey := v.Type().Key() == stringType
+		if fastKey {
+			key = d.stringMapKey(name)
+		} else {
+			key, err = makeMapKey(v.Type().Key(), name)
+			if err != nil {
+				return reflect.Value{}, err
+			}
 		}
 		if v.IsNil() {
 			v = reflect.MakeMap(v.Type())
 		}
-		elem := reflect.New(v.Type().Elem()).Elem()
-		if existing := v.MapIndex(key); existing.IsValid() {
-			elem.Set(existing)
+		elemType := v.Type().Elem()
+		existing := v.MapIndex(key)
+		var elem reflect.Value
+		if existing.IsValid() {
+			ce := existing
+			if ce.Kind() == reflect.Interface && !ce.IsNil() {
+				ce = ce.Elem()
+			}
+			if ce.Kind() == reflect.Map || ce.Kind() == reflect.Slice {
+				// Reference types do not need to be copied to be mutated.
+				elem = ce
+			} else {
+				elem = reflect.New(elemType).Elem()
+				elem.Set(existing)
+			}
+		} else if elemType.Kind() == reflect.Interface {
+			// A fresh interface element does not need to be materialized.
+			elem = reflect.Zero(elemType)
+		} else {
+			elem = reflect.New(elemType).Elem()
 		}
 		nv, err := d.descendTable(elem, expr, idx+1, isArrayTable, first)
 		if err != nil {
 			return reflect.Value{}, err
 		}
 		if nv.IsValid() {
+			if fastKey {
+				// The recursion may have overwritten the key buffer.
+				key = d.stringMapKey(name)
+			}
 			v.SetMapIndex(key, nv)
 		}
 		return v, nil
@@ -656,9 +970,7 @@ func (d *decoder) descendTable(v reflect.Value, expr *unstable.Node, idx int, is
 		if err != nil || !nv.IsValid() {
 			return reflect.Value{}, err
 		}
-		boxed := reflect.New(v.Type()).Elem()
-		boxed.Set(nv)
-		return boxed, nil
+		return nv, nil
 	case reflect.Slice:
 		if v.Len() == 0 {
 			// Implicit creation of the first element: the array table that
@@ -680,7 +992,7 @@ func (d *decoder) descendTable(v reflect.Value, expr *unstable.Node, idx int, is
 		}
 		return v, nil
 	case reflect.Array:
-		key := joinPath(d.tableKey[:idx])
+		key := d.joinPath(d.tableKey[:idx])
 		cnt := d.arrayCount(key)
 		if cnt == 0 {
 			// Implicit creation of the first element.
@@ -719,10 +1031,16 @@ func (d *decoder) finalizeTable(v reflect.Value, expr *unstable.Node, isArrayTab
 		case reflect.Struct:
 			return v, nil
 		case reflect.Interface:
-			if v.IsNil() {
-				return reflect.ValueOf(map[string]interface{}{}), nil
+			if !v.IsNil() {
+				concrete := v.Elem()
+				t := concrete.Type()
+				if t == mapStringInterfaceType || t == sliceInterfaceType {
+					return v, nil
+				}
 			}
-			return v, nil
+			// Anything else held in the interface is replaced by a fresh
+			// generic map.
+			return reflect.ValueOf(map[string]interface{}{}), nil
 		default:
 			return reflect.Value{}, fmt.Errorf("toml: cannot store a table in a %s", v.Kind())
 		}
@@ -730,7 +1048,7 @@ func (d *decoder) finalizeTable(v reflect.Value, expr *unstable.Node, isArrayTab
 
 	// Array table: append an element and reset the state of all the nested
 	// array tables.
-	key := joinPath(d.tableKey)
+	key := d.joinPath(d.tableKey)
 	d.resetChildArrayCounts(key)
 
 	switch v.Kind() {
@@ -740,7 +1058,14 @@ func (d *decoder) finalizeTable(v reflect.Value, expr *unstable.Node, isArrayTab
 		} else if first {
 			v = v.Slice(0, 0)
 		}
-		elem := reflect.New(v.Type().Elem()).Elem()
+		var elem reflect.Value
+		if v.Type().Elem() == interfaceType {
+			// Interface elements start as an empty table, like the
+			// interface branch below.
+			elem = reflect.ValueOf(map[string]interface{}{})
+		} else {
+			elem = reflect.New(v.Type().Elem()).Elem()
+		}
 		v = reflect.Append(v, elem)
 		elemIdx := v.Len() - 1
 		d.setArrayCount(key, elemIdx+1)
@@ -850,16 +1175,14 @@ func makeMapKey(kt reflect.Type, name string) (reflect.Value, error) {
 
 // elemOrNewMap unwraps an interface value to descend into it. Contents that
 // can hold a table (generic maps and slices) are kept; anything else is
-// replaced by a fresh map[string]interface{}. The result is an addressable
-// copy of the content.
+// replaced by a fresh map[string]interface{}. Maps and slices are reference
+// types: they are returned directly, not copied.
 func elemOrNewMap(v reflect.Value) (reflect.Value, error) {
 	if !v.IsNil() {
 		concrete := v.Elem()
 		t := concrete.Type()
 		if t == mapStringInterfaceType || t == sliceInterfaceType {
-			tmp := reflect.New(t).Elem()
-			tmp.Set(concrete)
-			return tmp, nil
+			return concrete, nil
 		}
 	}
 	return reflect.ValueOf(map[string]interface{}{}), nil
@@ -869,21 +1192,40 @@ func elemOrNewMap(v reflect.Value) (reflect.Value, error) {
 // expression, relative to the current table.
 func (d *decoder) handleKeyValueExpression(expr *unstable.Node, root reflect.Value) error {
 	d.path = d.path[:0]
-	for _, name := range d.tableKey {
-		d.path = append(d.path, pathPart{name: name})
-	}
-	it := expr.Key()
-	for it.Next() {
-		n := it.Node()
-		d.path = append(d.path, pathPart{name: string(n.Data), node: n})
+
+	target := root
+	useCache := d.tableTargetValid && len(d.tableKey) > 0
+	if useCache {
+		target = d.tableTarget
+	} else {
+		for _, name := range d.tableKey {
+			d.path = append(d.path, pathPart{name: name})
+		}
 	}
 
-	nv, err := d.descend(root, d.path, 0, expr, expr.Value())
+	it := expr.Key()
+	for it.Next() {
+		d.path = append(d.path, pathPart{node: it.Node()})
+	}
+
+	nv, err := d.descend(target, d.path, 0, expr, expr.Value())
 	if err != nil {
 		return err
 	}
-	if nv.IsValid() {
-		root.Set(nv)
+	if !nv.IsValid() {
+		return nil
+	}
+	if useCache {
+		// The target may have been replaced (e.g. a nil map allocated):
+		// re-link it into its parent.
+		if nv.Kind() == reflect.Map && nv.Pointer() != d.tableTarget.Pointer() {
+			d.storeSlot(&d.tableParentSlot, nv)
+			d.tableTarget = nv
+		}
+	} else {
+		if root.CanSet() {
+			root.Set(nv)
+		}
 	}
 	return nil
 }
@@ -920,28 +1262,50 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 
 	switch v.Kind() {
 	case reflect.Map:
-		key, err := makeMapKey(v.Type().Key(), part.name)
-		if err != nil {
-			return reflect.Value{}, err
+		var name string
+		var key reflect.Value
+		var err error
+		fastKey := v.Type().Key() == stringType
+		if fastKey {
+			name = part.str()
+			key = d.stringMapKey(name)
+		} else {
+			key, err = makeMapKey(v.Type().Key(), part.str())
+			if err != nil {
+				return reflect.Value{}, err
+			}
 		}
 		if v.IsNil() {
 			v = reflect.MakeMap(v.Type())
 		}
-		elem := reflect.New(v.Type().Elem()).Elem()
-		if existing := v.MapIndex(key); existing.IsValid() {
+		elemType := v.Type().Elem()
+		existing := v.MapIndex(key)
+		var elem reflect.Value
+		if existing.IsValid() {
+			elem = reflect.New(elemType).Elem()
 			elem.Set(existing)
+		} else if idx+1 == len(path) && elemType.Kind() == reflect.Interface {
+			// Fast path: a fresh interface element does not need to be
+			// materialized, the assigned value is stored directly.
+			elem = reflect.Zero(elemType)
+		} else {
+			elem = reflect.New(elemType).Elem()
 		}
 		nv, err := d.descend(elem, path, idx+1, expr, value)
 		if err != nil {
 			return reflect.Value{}, err
 		}
 		if nv.IsValid() {
+			if fastKey {
+				// The recursion may have overwritten the key buffer.
+				key = d.stringMapKey(name)
+			}
 			v.SetMapIndex(key, nv)
 		}
 		return v, nil
 	case reflect.Struct:
 		plan := planForType(v.Type())
-		f, found := plan.lookup(part.name)
+		f, found := plan.lookupBytes(part.bytes())
 		if !found {
 			if part.node != nil {
 				d.strict.MissingField(expr)
@@ -973,9 +1337,7 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		if err != nil || !nv.IsValid() {
 			return reflect.Value{}, err
 		}
-		boxed := reflect.New(v.Type()).Elem()
-		boxed.Set(nv)
-		return boxed, nil
+		return nv, nil
 	case reflect.Slice:
 		if v.Len() == 0 {
 			if v.IsNil() {
@@ -995,9 +1357,9 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 	case reflect.Array:
 		names := make([]string, idx)
 		for i := range names {
-			names[i] = path[i].name
+			names[i] = path[i].str()
 		}
-		cnt := d.arrayCount(joinPath(names))
+		cnt := d.arrayCount(d.joinPath(names))
 		if cnt == 0 {
 			cnt = 1
 		}
@@ -1318,10 +1680,19 @@ func (d *decoder) assignLocalTime(v reflect.Value, value *unstable.Node) (reflec
 }
 
 func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unstable.Node) (reflect.Value, error) {
+	// Count the elements to allocate the target in one go.
+	count := 0
+	cit := value.Children()
+	for cit.Next() {
+		if cit.Node().Kind != unstable.Comment {
+			count++
+		}
+	}
+
 	switch v.Kind() {
 	case reflect.Slice:
 		elemType := v.Type().Elem()
-		slice := reflect.MakeSlice(v.Type(), 0, 4)
+		slice := reflect.MakeSlice(v.Type(), 0, count)
 		it := value.Children()
 		for it.Next() {
 			n := it.Node()
@@ -1359,11 +1730,34 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 		}
 		return v, nil
 	case reflect.Interface:
-		slice := []interface{}{}
+		slice := make([]interface{}, 0, count)
 		it := value.Children()
 		for it.Next() {
 			n := it.Node()
-			if n.Kind == unstable.Comment {
+			// Fast paths for scalar elements: a single interface boxing
+			// instead of a reflect round-trip.
+			switch n.Kind {
+			case unstable.Comment:
+				continue
+			case unstable.String:
+				slice = append(slice, string(n.Data))
+				continue
+			case unstable.Integer:
+				i, err := parseInteger(n.Data)
+				if err != nil {
+					return reflect.Value{}, err
+				}
+				slice = append(slice, i)
+				continue
+			case unstable.Float:
+				f, err := parseFloat(n.Data)
+				if err != nil {
+					return reflect.Value{}, err
+				}
+				slice = append(slice, f)
+				continue
+			case unstable.Bool:
+				slice = append(slice, n.Data[0] == 't')
 				continue
 			}
 			elem := reflect.New(interfaceType).Elem()
@@ -1399,12 +1793,13 @@ func (d *decoder) assignInlineTable(v reflect.Value, expr *unstable.Node, value 
 	it := value.Children()
 	for it.Next() {
 		kv := it.Node()
-		// Build the path from the key of this key-value.
-		path := make([]pathPart, 0, 2)
+		// Build the path from the key of this key-value. Keys of inline
+		// tables rarely have more than a few parts.
+		var pathBuf [4]pathPart
+		path := pathBuf[:0]
 		kit := kv.Key()
 		for kit.Next() {
-			n := kit.Node()
-			path = append(path, pathPart{name: string(n.Data), node: n})
+			path = append(path, pathPart{node: kit.Node()})
 		}
 		nv, err := d.descend(v, path, 0, kv, kv.Value())
 		if err != nil {
@@ -1417,14 +1812,14 @@ func (d *decoder) assignInlineTable(v reflect.Value, expr *unstable.Node, value 
 	return v, nil
 }
 
-// boxInto stores the concrete value c into the interface value v.
+// boxInto returns the value to store in place of the interface value v. The
+// caller stores the result in the slot v was found in, which performs the
+// interface conversion, so the concrete value can be returned as-is.
 func boxInto(v reflect.Value, c reflect.Value) (reflect.Value, error) {
-	boxed := reflect.New(v.Type()).Elem()
 	if !c.Type().AssignableTo(v.Type()) {
 		return reflect.Value{}, fmt.Errorf("toml: cannot store %s into %s", c.Type(), v.Type())
 	}
-	boxed.Set(c)
-	return boxed, nil
+	return c, nil
 }
 
 var interfaceType = reflect.TypeOf(new(interface{})).Elem()
@@ -1450,6 +1845,17 @@ func (p *structPlan) lookup(name string) (structField, bool) {
 		return f, true
 	}
 	f, ok = p.byFold[strings.ToLower(name)]
+	return f, ok
+}
+
+// lookupBytes is like lookup but avoids allocating in the common case where
+// the name matches exactly.
+func (p *structPlan) lookupBytes(name []byte) (structField, bool) {
+	f, ok := p.byName[string(name)] // does not allocate
+	if ok {
+		return f, true
+	}
+	f, ok = p.byFold[strings.ToLower(string(name))]
 	return f, ok
 }
 

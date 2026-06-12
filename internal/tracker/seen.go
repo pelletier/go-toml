@@ -79,6 +79,16 @@ type entry struct {
 type SeenTracker struct {
 	entries      []entry
 	currentTable int32
+
+	// scratch buffers for clear()
+	removedBuf []bool
+	remapBuf   []int32
+}
+
+// Reset brings the tracker to its initial state, with just a root table, so
+// that it can be reused across documents.
+func (s *SeenTracker) Reset() {
+	s.reset()
 }
 
 // reset brings the tracker to its initial state, with just a root table.
@@ -120,8 +130,15 @@ func (s *SeenTracker) create(parent int32, name []byte, kind keyKind, explicit b
 func (s *SeenTracker) clear(id int32) {
 	// Compute which entries are removed. Given that children always appear
 	// after their parent, a single forward pass is enough.
-	removed := make([]bool, len(s.entries))
-	remap := make([]int32, len(s.entries))
+	if cap(s.removedBuf) < len(s.entries) {
+		s.removedBuf = make([]bool, len(s.entries))
+		s.remapBuf = make([]int32, len(s.entries))
+	}
+	removed := s.removedBuf[:len(s.entries)]
+	remap := s.remapBuf[:len(s.entries)]
+	for i := range removed {
+		removed[i] = false
+	}
 
 	n := int32(0)
 	for i := 0; i < len(s.entries); i++ {
