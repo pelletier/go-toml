@@ -83,11 +83,72 @@ Benchmarks: baseline `.reimpl/bench-baseline.txt`, new `.reimpl/bench-parser-v1.
 - Watch out: findBasicStringEnd needs `i > len(b)` guard after `i += 2`
   (unfinished trailing escape panics otherwise) — caught by existing tests.
 
-### Next steps (phase 2)
-- Rewrite root decode layer clean-room: errors.go (wrapDecodeError formatting,
-  spec in errors_test.go), decode.go (datetime/number value parsing + range
-  validation messages like "hour cannot be greater 23"), unmarshaler.go,
-  strict.go, internal/tracker (entry ≤ 48 bytes!), internal/characters.
-- Then marshaler.go. Then perf phase: unstable parse benchmarks (scanComment,
-  parseLiteralString etc.) vs baseline + datasets; consider type-keyed cached
-  decode plans (sync.Map) for reflection, chunked string arenas, etc.
+### 2026-06-12 (later): Phase 2 — decode layer rewritten (DONE, all tests green)
+Deleted unread & rewrote: decode.go, errors.go, localtime.go, strict.go,
+types.go, unmarshaler.go, doc.go, internal/characters, internal/tracker.
+Commit e893dad. Key contracts discovered:
+- Strict mode: StrictMissingError.Error() = "strict mode: fields in the
+  document are missing in the target struct"; String() joins DecodeErrors with
+  "\n---\n"; messages "unknown field" (kv, highlight = whole dotted key span)
+  and "missing table" (once per table, kvs under it skipped).
+- DecodeError fields: message/line/column/key/human; Error() = "toml: "+msg.
+- Human render: window 3 lines before/after; right-aligned line numbers; empty
+  lines at window EDGES dropped unless the error is there; tildes clamped to
+  the error line; empty lines render as "2|" (no trailing space).
+- Field matching CASE-INSENSITIVE fallback (lowercase map). Tag "-" drops,
+  "-," names "-". Untagged embedded structs flatten EVEN IF unexported type
+  (508); tagged embedded = named (915; guard fv.Set with CanSet — embed RO).
+  Anonymous non-struct fields are SKIPPED entirely (3977).
+- Map keys: string kinds + all int/uint kinds + floats + TextUnmarshaler.
+- Integer→float target parses as FLOAT (huge ints OK into float64) (fast_test).
+- TextUnmarshaler accepts raw text of bool/int/float scalars too (intWrapper).
+- interface{} containing anything but map[string]interface{} / []interface{}
+  is REPLACED by fresh map on descent (fast_test existing map[string]int).
+- Nil maps NOT initialized by empty [table] headers (TestEmptytomlUnmarshal
+  expects nil); but empty doc into map/interface root → initialized empty.
+- Implicit slice/array element creation when [[a.b]] appears without [[a]]
+  (issue 995). Fixed arrays as array tables need per-path append counters
+  (reset child counters on each append); value arrays into fixed arrays
+  TRUNCATE extras silently; array tables overflowing fixed arrays ERROR.
+- Datetime validation messages in decode.go: "impossible date", "hour cannot
+  be greater 23", "expected digit (0-9)", "expecting colon between hours and
+  minutes"/"minutes and seconds", "seconds cannot be greater than 59",
+  "invalid date-time timezone", "extra characters at the end of a local
+  date time"/"local time", "dates are expected to have the format YYYY-MM-DD".
+- EnableUnmarshalerInterface: table targets captured as raw kv lines (Raw of
+  KeyValue + '\n'), split tables resumed, child tables get adjusted headers
+  "[rel]"; captures resolved at END by re-walking path with recorded
+  array-element indexes (slice growth invalidates pointers!); [[x]] with
+  Unmarshaler ELEMENTS: new capture per element; kv-level targets get raw
+  VALUE bytes immediately (994: key is dropped!). Value span for inline
+  tables/arrays reconstructed: after '=' .. end of kv Raw.
+
+### 2026-06-12 (later): Phase 3 — marshaler rewritten (DONE, all tests green)
+Commit c2b404a. Contracts:
+- Strings literal-first ('...'); basic when ', newline, or control chars;
+  multiline: quotes runs ≥3 escaped, 1-2 kept raw even at closing edge.
+- Tables: values first then tables (field order kept within groups); blank
+  line before header unless previous line was a header; map keys sorted by
+  formatted string; intermediate tables always printed.
+- Header indent == parent body indent; body = parent+1 (SetIndentTables).
+- nil: root/array-interface error; struct fields with nil ptr/iface/MAP are
+  SKIPPED; map values: nil iface skipped, nil ptr → ZERO VALUE (empty table
+  for structs); nil ptr ARRAY ELEMENTS → zero value.
+- floats: strconv 'f' -1 (bitsize 32 for float32), append ".0" if no dot/exp;
+  inf/-inf/nan. uint > MaxInt64 errors. time.Time layout
+  2006-01-02T15:04:05.999999999Z07:00; Local* via String(); time.Duration is
+  just int64. json.Number: flag → Int64 else Float64 (reformatted, "" → 0).
+- comment tag → "# line" per line (never doubled); commented → "# " prefix on
+  kv or header AND all children; array-table comment on first element only.
+- omitempty = json-like empties (struct: reflect IsZero); omitzero = IsZero
+  incl. custom isZeroer (value or ptr receiver, non-addressable copies).
+- Separate bool tags multiline:"true", inline:"true", commented:"true" also
+  honored alongside toml:",opts".
+
+WHOLE LIBRARY NOW CLEAN-ROOM. No unsafe anywhere. -race clean.
+
+### Next: performance phase
+- bench-baseline.txt = original; bench-phase3.txt = full reimpl (running).
+- Ideas if needed: avoid per-expression table re-descent (cache resolved
+  table target between expressions when safe); reduce allocs in strings
+  (chunked arena); faster Unicode scanning; encoder buffer reuse.

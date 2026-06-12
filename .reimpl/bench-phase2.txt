@@ -313,4 +313,34 @@ BenchmarkParseBasicStringsEasy/1-8                     	307575553	         3.888
 BenchmarkParseBasicStringsEasy/1-8                     	300633772	         4.020 ns/op	 746.20 MB/s	       0 B/op	       0 allocs/op
 BenchmarkParseBasicStringsEasy/1-8                     	312038678	         3.851 ns/op	 779.04 MB/s	       0 B/op	       0 allocs/op
 BenchmarkParseBasicStringsEasy/1-8                     	311601608	         3.853 ns/op	 778.58 MB/s	       0 B/op	       0 allocs/op
-BenchmarkParseBasicStringsEasy/1-8                     	
+BenchmarkParseBasicStringsEasy/1-8                     	312032425	         3.797 ns/op	 790.20 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/1-8                     	313380975	         3.901 ns/op	 769.02 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/1-8                     	319174932	         3.787 ns/op	 792.11 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	183356091	         6.587 ns/op	 910.83 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	181621195	         6.551 ns/op	 915.85 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	172648693	         6.581 ns/op	 911.67 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	178562194	         6.671 ns/op	 899.42 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	177372338	         6.731 ns/op	 891.41 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	167211409	         6.750 ns/op	 888.94 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	178113146	         6.753 ns/op	 888.45 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	178156954	         6.757 ns/op	 887.98 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	177938074	         6.956 ns/op	 862.54 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/4-8                     	178156678	         6.734 ns/op	 891.05 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	287418150	         4.177 ns/op	2394.33 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	288336256	         4.321 ns/op	2314.42 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	287325416	         4.174 ns/op	2395.72 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	288190636	         4.179 ns/op	2392.75 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	287879694	         4.199 ns/op	2381.35 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	285500187	         4.363 ns/op	2292.02 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	284770362	         4.229 ns/op	2364.76 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	285769113	         4.220 ns/op	2369.90 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	285110575	         4.198 ns/op	2381.99 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/8-8                     	284063196	         4.239 ns/op	2359.13 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	206019547	         5.821 ns/op	3092.06 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	206314557	         6.436 ns/op	2796.87 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	190813230	         6.088 ns/op	2956.57 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	205534515	         5.831 ns/op	3087.01 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	205104334	         5.832 ns/op	3086.38 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	204013497	         6.050 ns/op	2975.05 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	204311047	         5.858 ns/op	3072.70 MB/s	       0 B/op	       0 allocs/op
+BenchmarkParseBasicStringsEasy/16-8                    	
