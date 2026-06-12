@@ -924,6 +924,14 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 		}
 
 		c := b[i]
+		if c >= 0x80 {
+			var ok bool
+			i, ok = scanUtf8Run(b, i)
+			if !ok {
+				return nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in comment")
+			}
+			continue
+		}
 		switch {
 		case c >= 0x20 && c < 0x7f:
 			i++
@@ -936,14 +944,8 @@ func scanComment(b []byte) ([]byte, []byte, error) {
 			return nil, nil, NewParserError(b[i:i+1], "carriage returns are not allowed in comments")
 		case c == '\t':
 			i++
-		case c < 0x80:
-			return nil, nil, NewParserError(b[i:i+1], "control characters are not allowed in comments")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
-				return nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in comment")
-			}
-			i += size
+			return nil, nil, NewParserError(b[i:i+1], "control characters are not allowed in comments")
 		}
 	}
 	return b[:i], b[i:], nil
@@ -980,11 +982,11 @@ func (p *Parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 		case c < 0x80:
 			return nil, nil, nil, NewParserError(b[i:i+1], "literal strings cannot have control characters")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
+			var ok bool
+			i, ok = scanUtf8Run(b, i)
+			if !ok {
 				return nil, nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in literal string")
 			}
-			i += size
 		}
 	}
 }
@@ -1034,11 +1036,11 @@ func (p *Parser) parseMultilineLiteralString(b []byte) ([]byte, []byte, []byte, 
 		case c < 0x80:
 			return nil, nil, nil, NewParserError(b[i:i+1], "multiline literal strings cannot have control characters")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
+			var ok bool
+			i, ok = scanUtf8Run(b, i)
+			if !ok {
 				return nil, nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in multiline literal string")
 			}
-			i += size
 		}
 	}
 	return nil, nil, nil, NewParserError(b[len(b):], "multiline literal string not terminated by '''")
@@ -1079,11 +1081,11 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 		case c < 0x80:
 			return nil, nil, nil, NewParserError(b[i:i+1], "basic strings cannot have control characters")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
+			var ok bool
+			i, ok = scanUtf8Run(b, i)
+			if !ok {
 				return nil, nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in basic string")
 			}
-			i += size
 		}
 	}
 }
@@ -1094,20 +1096,17 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 // only skips over escape sequences so that escaped quotes do not terminate
 // the string.
 func findBasicStringEnd(b []byte, i int) int {
-	for {
-		j := bytes.IndexAny(b[i:], "\"\\")
-		if j < 0 {
-			return -1
-		}
-		i += j
-		if b[i] == '"' {
+	for i < len(b) {
+		switch b[i] {
+		case '"':
 			return i
-		}
-		i += 2
-		if i > len(b) {
-			return -1
+		case '\\':
+			i += 2
+		default:
+			i++
 		}
 	}
+	return -1
 }
 
 // parseBasicStringEscaped continues parsing a basic string that contains
@@ -1148,12 +1147,12 @@ func (p *Parser) parseBasicStringEscaped(b []byte, i int) ([]byte, []byte, []byt
 		case c < 0x80:
 			return nil, nil, nil, NewParserError(b[i:i+1], "basic strings cannot have control characters")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
+			j, ok := scanUtf8Run(b, i)
+			if !ok {
 				return nil, nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in basic string")
 			}
-			buf = append(buf, b[i:i+size]...)
-			i += size
+			buf = append(buf, b[i:j]...)
+			i = j
 		}
 	}
 	return nil, nil, nil, NewParserError(b[len(b):], "unterminated basic string")
@@ -1263,11 +1262,11 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 		case c < 0x80:
 			return nil, nil, nil, NewParserError(b[i:i+1], "multiline basic strings cannot have control characters")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
+			var ok bool
+			i, ok = scanUtf8Run(b, i)
+			if !ok {
 				return nil, nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in multiline basic string")
 			}
-			i += size
 		}
 	}
 	return nil, nil, nil, NewParserError(b[len(b):], `multiline basic string not terminated by """`)
@@ -1388,15 +1387,80 @@ func (p *Parser) parseMultilineBasicStringEscaped(b []byte, contentStart, i int)
 		case c < 0x80:
 			return nil, nil, nil, NewParserError(b[i:i+1], "multiline basic strings cannot have control characters")
 		default:
-			size := utf8ValidNext(b[i:])
-			if size == 0 {
+			j, ok := scanUtf8Run(b, i)
+			if !ok {
 				return nil, nil, nil, NewParserError(b[i:i+1], "invalid UTF-8 character in multiline basic string")
 			}
-			buf = append(buf, b[i:i+size]...)
-			i += size
+			buf = append(buf, b[i:j]...)
+			i = j
 		}
 	}
 	return nil, nil, nil, NewParserError(b[len(b):], `multiline basic string not terminated by """`)
+}
+
+// scanUtf8Run consumes a run of valid non-ASCII UTF-8 runes starting at
+// b[i]. It returns the index of the first byte after the run, and whether
+// the run was entirely valid. Processing whole runs amortizes the cost of
+// the call compared to validating rune by rune.
+func scanUtf8Run(b []byte, i int) (int, bool) {
+	for i < len(b) {
+		c := b[i]
+		switch {
+		case c < 0x80:
+			return i, true
+		case c < 0xC2:
+			return i, false
+		case c < 0xE0:
+			if i+1 >= len(b) || b[i+1]&0xC0 != 0x80 {
+				return i, false
+			}
+			i += 2
+		case c < 0xF0:
+			if i+2 >= len(b) || b[i+2]&0xC0 != 0x80 {
+				return i, false
+			}
+			b1 := b[i+1]
+			switch c {
+			case 0xE0:
+				if b1 < 0xA0 || b1 > 0xBF {
+					return i, false
+				}
+			case 0xED:
+				// exclude surrogates
+				if b1 < 0x80 || b1 > 0x9F {
+					return i, false
+				}
+			default:
+				if b1&0xC0 != 0x80 {
+					return i, false
+				}
+			}
+			i += 3
+		case c < 0xF5:
+			if i+3 >= len(b) || b[i+2]&0xC0 != 0x80 || b[i+3]&0xC0 != 0x80 {
+				return i, false
+			}
+			b1 := b[i+1]
+			switch c {
+			case 0xF0:
+				if b1 < 0x90 || b1 > 0xBF {
+					return i, false
+				}
+			case 0xF4:
+				if b1 < 0x80 || b1 > 0x8F {
+					return i, false
+				}
+			default:
+				if b1&0xC0 != 0x80 {
+					return i, false
+				}
+			}
+			i += 4
+		default:
+			return i, false
+		}
+	}
+	return i, true
 }
 
 // utf8ValidNext returns the size of the next valid UTF-8 rune at the start of
