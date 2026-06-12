@@ -211,6 +211,10 @@ type encoderState struct {
 	// lastWasHeader is true when the last line written was a table header,
 	// used to avoid empty lines between consecutive table definitions.
 	lastWasHeader bool
+
+	// stringKeyBuf is a reusable buffer to read string map keys without
+	// allocating one per map.
+	stringKeyBuf reflect.Value
 }
 
 // valueOptions are the encoding options attached to one entry of a table.
@@ -540,7 +544,15 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 
 	// Keys are converted to strings right away: read them into a reusable
 	// buffer to avoid one allocation per key.
-	kbuf := reflect.New(v.Type().Key()).Elem()
+	var kbuf reflect.Value
+	if v.Type().Key() == stringType {
+		if !e.stringKeyBuf.IsValid() {
+			e.stringKeyBuf = reflect.New(stringType).Elem()
+		}
+		kbuf = e.stringKeyBuf
+	} else {
+		kbuf = reflect.New(v.Type().Key()).Elem()
+	}
 
 	iter := v.MapRange()
 	for iter.Next() {
