@@ -549,10 +549,52 @@ func (d *decoder) wrapError(data []byte, err error) error {
 	return err
 }
 
+// wrapSeenError turns an error returned by SeenTracker.CheckExpression into a
+// ParserError carrying the position and key of the offending expression, so
+// that redefinition and duplicate-key errors are reported as a DecodeError
+// with context (see issue #668).
+//
+// The highlight spans the expression's key. Unlike Node.Raw, key nodes always
+// carry a Raw range, so this works for tables and array tables too (whose own
+// Raw range is not set by the parser). For a duplicate detected inside an
+// inline table, node is the enclosing key-value expression, so the error
+// points at that expression's key.
+func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var key Key
+	var start, end unstable.Range
+	it := node.Key()
+	for it.Next() {
+		n := it.Node()
+		key = append(key, string(n.Data))
+		if len(key) == 1 {
+			start = n.Raw
+		}
+		end = n.Raw
+	}
+
+	var highlight []byte
+	if len(key) > 0 {
+		highlight = d.p.Raw(unstable.Range{
+			Offset: start.Offset,
+			Length: end.Offset + end.Length - start.Offset,
+		})
+	}
+
+	return &unstable.ParserError{
+		Highlight: highlight,
+		Message:   strings.TrimPrefix(err.Error(), "toml: "),
+		Key:       key,
+	}
+}
+
 func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) error {
-	first, err := d.seen.CheckExpression(d.p.Data(), expr)
+	first, err := d.seen.CheckExpression(expr)
 	if err != nil {
-		return err
+		return d.wrapSeenError(expr, err)
 	}
 
 	switch expr.Kind {

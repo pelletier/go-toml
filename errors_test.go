@@ -418,6 +418,119 @@ func TestErrorPositionConsistency(t *testing.T) {
 	}
 }
 
+// TestDecodeErrorRedefinition checks that errors raised by the duplicate-key
+// tracker are reported as DecodeError, carrying the key path and a position
+// pointing at the offending key (see issue #668).
+func TestDecodeErrorRedefinition(t *testing.T) {
+	examples := []struct {
+		desc  string
+		doc   string
+		msg   string
+		key   Key
+		row   int
+		col   int
+		human string
+	}{
+		{
+			desc: "duplicate key",
+			doc:  "a = 1\nb = 2\nb = 3\n",
+			msg:  "toml: key b is already defined",
+			key:  Key{"b"},
+			row:  3,
+			col:  1,
+			human: `
+1| a = 1
+2| b = 2
+3| b = 3
+ | ~ key b is already defined`,
+		},
+		{
+			desc: "duplicate dotted key",
+			doc:  "foo.bar = 1\nfoo.bar = 2\n",
+			msg:  "toml: key bar is already defined",
+			key:  Key{"foo", "bar"},
+			row:  2,
+			col:  1,
+			human: `
+1| foo.bar = 1
+2| foo.bar = 2
+ | ~~~~~~~ key bar is already defined`,
+		},
+		{
+			desc: "redefined table",
+			doc:  "[a]\nx = 1\n[a]\ny = 2\n",
+			msg:  "toml: table a already exists",
+			key:  Key{"a"},
+			row:  3,
+			col:  2,
+		},
+		{
+			desc: "duplicate key in table body",
+			doc:  "[a]\nx = 1\nx = 2\n",
+			msg:  "toml: key x is already defined",
+			key:  Key{"x"},
+			row:  3,
+			col:  1,
+		},
+		{
+			desc: "redefined nested table",
+			doc:  "[a.b]\n[a.b]\n",
+			msg:  "toml: table b already exists",
+			key:  Key{"a", "b"},
+			row:  2,
+			col:  2,
+		},
+		{
+			desc: "table over value",
+			doc:  "a = 1\n[a]\n",
+			msg:  "toml: key a should be a table, not a value",
+			key:  Key{"a"},
+			row:  2,
+			col:  2,
+		},
+		{
+			desc: "array table over table",
+			doc:  "[t]\n[[t]]\n",
+			msg:  "toml: key t already exists as a table, but should be an array table",
+			key:  Key{"t"},
+			row:  2,
+			col:  3,
+		},
+		{
+			desc: "duplicate key in inline table",
+			doc:  "a = { b = 1, b = 2 }\n",
+			msg:  "toml: key b is already defined",
+			key:  Key{"a"},
+			row:  1,
+			col:  1,
+		},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			m := map[string]interface{}{}
+			err := Unmarshal([]byte(e.doc), &m)
+
+			var de *DecodeError
+			if !errors.As(err, &de) {
+				t.Fatalf("expected *DecodeError, got %T (%v)", err, err)
+			}
+
+			assert.Equal(t, e.msg, de.Error())
+			assert.Equal(t, e.key, de.Key())
+
+			row, col := de.Position()
+			if row != e.row || col != e.col {
+				t.Errorf("position = (%d, %d), want (%d, %d)", row, col, e.row, e.col)
+			}
+
+			if e.human != "" {
+				assert.Equal(t, e.human[1:], de.String())
+			}
+		})
+	}
+}
+
 func ExampleDecodeError() {
 	doc := `name = 123__456`
 

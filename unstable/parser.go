@@ -915,6 +915,15 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 		kind = Float
 	}
 
+	// A letter right after the number means it was meant to be a string that
+	// was left unquoted (e.g. "20s"). Report that instead of the misleading
+	// "expected newline" raised later (issue #413).
+	if i < len(b) {
+		if c := b[i]; (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			return 0, nil, NewParserError(b[i:i+1], "strings must be quoted")
+		}
+	}
+
 	h := p.push(Node{Kind: kind, Raw: p.Range(b[:i]), Data: b[:i]})
 	return h, b[i:], nil
 }
