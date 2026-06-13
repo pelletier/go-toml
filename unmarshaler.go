@@ -1996,7 +1996,12 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 		// plain Go map operations and decode each value with decodeAny. The
 		// seen-tracker has already rejected duplicate or conflicting keys, so
 		// intermediate parts can be created/merged without revalidation.
-		m := make(map[string]interface{})
+		count := 0
+		cit := n.Children()
+		for cit.Next() {
+			count++
+		}
+		m := make(map[string]interface{}, count)
 		it := n.Children()
 		for it.Next() {
 			kv := it.Node()
