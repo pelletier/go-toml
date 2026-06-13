@@ -2153,6 +2153,11 @@ func addFields(plan *structPlan, t reflect.Type, prefix []int) {
 // fieldByIndexAlloc returns the field of v at the given index path,
 // allocating intermediate embedded pointers as needed.
 func fieldByIndexAlloc(v reflect.Value, index []int) reflect.Value {
+	// Fast path for non-embedded fields, which have a single-element index:
+	// no intermediate pointer dereferencing is possible.
+	if len(index) == 1 {
+		return v.Field(index[0])
+	}
 	for i, x := range index {
 		if i > 0 {
 			for v.Kind() == reflect.Ptr {
