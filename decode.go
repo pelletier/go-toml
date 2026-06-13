@@ -132,6 +132,16 @@ func parseFloat(b []byte) (float64, error) {
 		}
 	}
 
+	// Fast path: a plain decimal whose significand fits in 53 bits and whose
+	// base-10 exponent is within [-22, 22] is parsed exactly with a single
+	// rounding (Clinger's method) straight from the bytes, with no string
+	// allocation and no full strconv parse. This is the common shape for
+	// numeric data (e.g. coordinate lists). Anything outside those bounds, or
+	// with underscores, falls through to strconv, which is the reference.
+	if f, ok := fastParseFloat(b); ok {
+		return f, nil
+	}
+
 	// strconv.ParseFloat is the reference implementation for parsing
 	// floating point numbers. The position of underscores has already been
 	// validated by the parser; strip them so that they do not interfere with
@@ -151,6 +161,112 @@ func parseFloat(b []byte) (float64, error) {
 		return 0, unstable.NewParserError(b, "unable to parse float: %s", err)
 	}
 	return f, nil
+}
+
+// float64pow10 holds the powers of ten that are exactly representable as a
+// float64 (10^0 .. 10^22).
+var float64pow10 = [...]float64{
+	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11,
+	1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+}
+
+// fastParseFloat parses b as a float64 using Clinger's exact method and reports
+// whether it applied. It accepts only plain decimal numbers (optional sign,
+// digits, one optional '.', optional 'e'/'E' exponent) whose significand fits
+// in 53 bits and whose effective base-10 exponent is within [-22, 22]; under
+// those conditions float64(significand) * 10^exp (or / 10^-exp) is the exact,
+// correctly-rounded result, identical to strconv.ParseFloat. It returns
+// ok=false (deferring to strconv) for underscores, hexadecimal floats, large
+// significands or exponents, and any other shape.
+func fastParseFloat(b []byte) (float64, bool) {
+	i := 0
+	neg := false
+	if i < len(b) && (b[i] == '+' || b[i] == '-') {
+		neg = b[i] == '-'
+		i++
+	}
+
+	var mantissa uint64
+	digits := 0
+	fracDigits := 0
+	sawDot := false
+	sawDigit := false
+	for ; i < len(b); i++ {
+		c := b[i]
+		switch {
+		case c >= '0' && c <= '9':
+			if digits >= 19 {
+				// Too many significant digits to accumulate without risking a
+				// uint64 overflow (and well past the 53-bit exact range).
+				return 0, false
+			}
+			mantissa = mantissa*10 + uint64(c-'0')
+			digits++
+			if sawDot {
+				fracDigits++
+			}
+			sawDigit = true
+		case c == '.':
+			if sawDot {
+				return 0, false
+			}
+			sawDot = true
+		default:
+			goto exponent
+		}
+	}
+exponent:
+	if !sawDigit {
+		return 0, false
+	}
+	exp := -fracDigits
+	if i < len(b) && (b[i] == 'e' || b[i] == 'E') {
+		i++
+		esign := 1
+		if i < len(b) && (b[i] == '+' || b[i] == '-') {
+			if b[i] == '-' {
+				esign = -1
+			}
+			i++
+		}
+		if i >= len(b) {
+			return 0, false
+		}
+		eval := 0
+		for ; i < len(b); i++ {
+			c := b[i]
+			if c < '0' || c > '9' {
+				return 0, false
+			}
+			eval = eval*10 + int(c-'0')
+			if eval > 1000 {
+				return 0, false
+			}
+		}
+		exp += esign * eval
+	}
+	if i != len(b) {
+		// Trailing bytes (an underscore, a hexadecimal marker, ...).
+		return 0, false
+	}
+	if mantissa > 1<<53 {
+		return 0, false
+	}
+
+	f := float64(mantissa)
+	switch {
+	case exp == 0:
+	case exp > 0 && exp <= 22:
+		f *= float64pow10[exp]
+	case exp < 0 && exp >= -22:
+		f /= float64pow10[-exp]
+	default:
+		return 0, false
+	}
+	if neg {
+		f = -f
+	}
+	return f, true
 }
 
 func isDecimalDigit(c byte) bool {
