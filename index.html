@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>go-toml v2 — benchmark history</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root { --fg:#1f2328; --muted:#656d76; --line:#d0d7de; --accent:#0969da; --bg:#ffffff; --panel:#f6f8fa; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; color:var(--fg); background:var(--bg); }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:20px; }
+  .sub { color:var(--muted); font-size:13px; line-height:1.5; }
+  .sub a { color:var(--accent); text-decoration:none; }
+  main { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
+  .controls { display:flex; flex-wrap:wrap; gap:14px 20px; align-items:flex-end; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; margin-bottom:18px; }
+  .ctl { display:flex; flex-direction:column; gap:4px; }
+  .ctl label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
+  select, button { font-size:14px; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--fg); }
+  .platforms { display:flex; gap:12px; }
+  .platforms label { font-size:13px; text-transform:none; letter-spacing:0; color:var(--fg); font-weight:400; display:flex; align-items:center; gap:5px; }
+  .chartwrap { position:relative; height:460px; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+  .cell { border:1px solid var(--line); border-radius:8px; padding:8px 8px 4px; }
+  .cell h3 { margin:2px 6px 6px; font-size:12px; font-weight:600; color:var(--fg); }
+  .cell .mini { position:relative; height:170px; }
+  .hint { font-size:12px; color:var(--muted); margin:8px 2px 0; }
+  section.block { margin-top:34px; }
+  section.block h2 { font-size:16px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { position:sticky; top:0; background:#fff; }
+  td.subj { white-space:normal; }
+  .tag { display:inline-block; background:#ddf4ff; color:#0969da; border-radius:10px; padding:0 8px; font-size:11px; font-weight:600; }
+  .tablewrap { max-height:520px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+  code { background:var(--panel); padding:1px 5px; border-radius:4px; font-size:12px; }
+  .filterbox { margin-bottom:10px; }
+  .filterbox input { font-size:13px; padding:6px 10px; border:1px solid var(--line); border-radius:6px; width:260px; }
+  .meta dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; font-size:13px; }
+  .meta dt { color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>go-toml v2 — benchmark history</h1>
+  <div class="sub">
+    Performance of <a href="https://github.com/pelletier/go-toml">github.com/pelletier/go-toml/v2</a>
+    across the <code>v2</code> branch, measured with the frozen benchmark suite from
+    <a href="https://github.com/pelletier/go-toml/pull/1067">PR&nbsp;#1067</a> overlaid on every commit.
+    Lower is better. <span id="genline"></span>
+  </div>
+</header>
+<main>
+  <div class="controls">
+    <div class="ctl">
+      <label for="bench">Benchmark</label>
+      <select id="bench"></select>
+    </div>
+    <div class="ctl">
+      <label for="metric">Metric</label>
+      <select id="metric">
+        <option value="ns">time (ns/op)</option>
+        <option value="B">memory (B/op)</option>
+        <option value="allocs">allocations (allocs/op)</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Platforms</label>
+      <div class="platforms" id="platforms"></div>
+    </div>
+    <div class="ctl">
+      <label for="view">View</label>
+      <select id="view">
+        <option value="single">Single benchmark</option>
+        <option value="grid">All benchmarks (grid)</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="singleView">
+    <div class="chartwrap"><canvas id="chart"></canvas></div>
+    <div class="hint">X axis = commit order on <code>v2</code> (oldest → newest). ★ = release tag. Hover for commit details; click a point to open it on GitHub.</div>
+  </div>
+  <div id="gridView" style="display:none">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <section class="block">
+    <h2>Full results</h2>
+    <p class="sub">Per-commit raw <code>go test -bench</code> output and the aggregated dataset.
+      Download <a href="data.json" download>data.json</a>.</p>
+    <div class="filterbox"><input id="filter" placeholder="filter commits (sha, subject, tag)…"></div>
+    <div class="tablewrap">
+      <table id="restable">
+        <thead><tr><th>#</th><th>commit</th><th>date</th><th>subject</th><th>tag</th><th>linux</th><th>macos</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block meta">
+    <h2>Methodology</h2>
+    <dl id="methodology"></dl>
+    <p class="sub" style="margin-top:10px">
+      Each commit is checked out, the frozen #1067 benchmark harness is overlaid (so only the
+      library implementation varies), and the suite is built and run with a single fixed Go
+      toolchain. Numbers are the median of the samples. macOS and Linux are different machines —
+      compare each series against itself, never across platforms. Commits before the suite's
+      required API existed (e.g. <code>Decoder.DisallowUnknownFields</code>) do not build and are
+      reported as skipped.
+    </p>
+  </section>
+</main>
+
+<script>
+const GH = "https://github.com/pelletier/go-toml/commit/";
+const COLORS = { linux: "#0969da", macos: "#cf222e" };
+const METRIC_LABEL = { ns: "ns/op", B: "B/op", allocs: "allocs/op" };
+let DATA, chart, gridCharts = [];
+
+function fmt(metric, v) {
+  if (v == null) return "—";
+  if (metric === "ns") {
+    if (v >= 1e6) return (v/1e6).toFixed(2) + " ms";
+    if (v >= 1e3) return (v/1e3).toFixed(2) + " µs";
+    return v.toFixed(0) + " ns";
+  }
+  if (metric === "B") {
+    if (v >= 1e6) return (v/1e6).toFixed(2) + " MB";
+    if (v >= 1e3) return (v/1e3).toFixed(1) + " KB";
+    return v + " B";
+  }
+  return v.toLocaleString();
+}
+
+function points(bench, metric, platform) {
+  const pts = [];
+  for (const c of DATA.commits) {
+    const r = c.results[platform];
+    if (r && r[bench] && r[bench][metric] != null) {
+      pts.push({ x: c.order, y: r[bench][metric], c });
+    }
+  }
+  return pts;
+}
+
+function datasets(bench, metric, platforms) {
+  return platforms.map(p => {
+    const pts = points(bench, metric, p);
+    return {
+      label: p,
+      data: pts,
+      borderColor: COLORS[p],
+      backgroundColor: COLORS[p],
+      borderWidth: 1.5,
+      tension: 0.1,
+      pointRadius: ctx => ctx.raw && ctx.raw.c.tags.length ? 4.5 : 1.8,
+      pointStyle: ctx => ctx.raw && ctx.raw.c.tags.length ? "star" : "circle",
+      pointHoverRadius: 6,
+      spanGaps: true,
+    };
+  });
+}
+
+function selectedPlatforms() {
+  return DATA.platforms.filter(p => document.getElementById("pf_" + p).checked);
+}
+
+function baseOptions(metric, withLegend) {
+  return {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "nearest", intersect: false },
+    onClick: (e, els) => { if (els.length) { const r = els[0].element.$context.raw; if (r) window.open(GH + r.c.sha, "_blank"); } },
+    scales: {
+      x: { type: "linear", title: { display: true, text: "commit order (v2 branch)" },
+           ticks: { precision: 0 } },
+      y: { title: { display: true, text: METRIC_LABEL[metric] }, beginAtZero: false,
+           ticks: { callback: v => fmt(metric, v) } },
+    },
+    plugins: {
+      legend: { display: withLegend },
+      tooltip: {
+        callbacks: {
+          title: items => items.length ? items[0].raw.c.subject : "",
+          label: item => `${item.dataset.label}: ${fmt(metric, item.raw.y)}`,
+          afterBody: items => {
+            if (!items.length) return "";
+            const c = items[0].raw.c;
+            const t = c.tags.length ? "\ntag: " + c.tags.join(", ") : "";
+            return `${c.short}  ·  ${c.date.slice(0,10)}${t}`;
+          },
+        },
+      },
+    },
+  };
+}
+
+function renderSingle() {
+  const bench = document.getElementById("bench").value;
+  const metric = document.getElementById("metric").value;
+  const pf = selectedPlatforms();
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: { datasets: datasets(bench, metric, pf) },
+    options: baseOptions(metric, true),
+  });
+}
+
+function renderGrid() {
+  const metric = document.getElementById("metric").value;
+  const pf = selectedPlatforms();
+  const grid = document.getElementById("grid");
+  gridCharts.forEach(c => c.destroy()); gridCharts = []; grid.innerHTML = "";
+  for (const bench of DATA.benchmarks) {
+    const cell = document.createElement("div"); cell.className = "cell";
+    const h = document.createElement("h3"); h.textContent = bench; cell.appendChild(h);
+    const box = document.createElement("div"); box.className = "mini";
+    const cv = document.createElement("canvas"); box.appendChild(cv); cell.appendChild(box);
+    grid.appendChild(cell);
+    const opt = baseOptions(metric, false);
+    opt.scales.x.title.display = false; opt.scales.y.title.display = false;
+    gridCharts.push(new Chart(cv, { type: "line", data: { datasets: datasets(bench, metric, pf) }, options: opt }));
+  }
+}
+
+function render() {
+  const grid = document.getElementById("view").value === "grid";
+  document.getElementById("singleView").style.display = grid ? "none" : "";
+  document.getElementById("gridView").style.display = grid ? "" : "none";
+  grid ? renderGrid() : renderSingle();
+}
+
+function buildTable() {
+  const tb = document.querySelector("#restable tbody");
+  const rows = [];
+  for (const c of DATA.commits) {
+    const tag = c.tags.length ? `<span class="tag">${c.tags.join(", ")}</span>` : "";
+    const cell = p => {
+      const st = c.status[p];
+      if (st === "OK") return `<a href="raw/${p}/${c.sha}.txt">raw</a>`;
+      return st ? `<span style="color:#a40e26">${st.toLowerCase()}</span>` : "—";
+    };
+    rows.push(`<tr data-k="${(c.short+' '+c.subject+' '+c.tags.join(' ')).toLowerCase()}">
+      <td>${c.order}</td>
+      <td><a href="${GH}${c.sha}"><code>${c.short}</code></a></td>
+      <td>${c.date.slice(0,10)}</td>
+      <td class="subj">${c.subject.replace(/</g,"&lt;")}</td>
+      <td>${tag}</td><td>${cell("linux")}</td><td>${cell("macos")}</td></tr>`);
+  }
+  tb.innerHTML = rows.join("");
+  document.getElementById("filter").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    tb.querySelectorAll("tr").forEach(tr => {
+      tr.style.display = tr.dataset.k.includes(q) ? "" : "none";
+    });
+  });
+}
+
+function buildMethodology() {
+  const c = DATA.counts;
+  const tot = p => Object.values(c[p]).reduce((a,b)=>a+b,0);
+  const m = document.getElementById("methodology");
+  const rows = [
+    ["Toolchain", DATA.toolchain + " (both platforms)"],
+    ["Benchmark config", DATA.config],
+    ["Harness", DATA.harness],
+    ["Linux", `holo0 · amd64 · taskset-pinned — ${c.linux.OK} ok / ${c.linux.BUILD_FAIL} skipped / ${tot('linux')} attempted`],
+    ["macOS", `local · arm64 · caffeinate — ${c.macos.OK} ok / ${c.macos.BUILD_FAIL} skipped / ${tot('macos')} attempted`],
+    ["Benchmarks", DATA.benchmarks.length + " cases"],
+  ];
+  m.innerHTML = rows.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+fetch("data.json").then(r => r.json()).then(d => {
+  DATA = d;
+  document.getElementById("genline").textContent = "Generated " + d.generated.replace("T"," ").replace("+00:00"," UTC") + ".";
+  const bsel = document.getElementById("bench");
+  d.benchmarks.forEach(b => { const o = document.createElement("option"); o.value = o.textContent = b; bsel.appendChild(o); });
+  const pdiv = document.getElementById("platforms");
+  d.platforms.forEach(p => {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox" id="pf_${p}" checked> ${p}`;
+    pdiv.appendChild(l);
+  });
+  ["bench","metric","view"].forEach(id => document.getElementById(id).addEventListener("change", render));
+  d.platforms.forEach(p => document.getElementById("pf_"+p).addEventListener("change", render));
+  buildMethodology();
+  buildTable();
+  render();
+});
+</script>
+</body>
+</html>
