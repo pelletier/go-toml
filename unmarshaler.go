@@ -1855,12 +1855,35 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 		}
 		return slice, nil
 	case unstable.InlineTable:
-		elem := reflect.New(interfaceType).Elem()
-		nv, err := d.assignInlineTable(elem, nil, n)
-		if err != nil {
-			return nil, err
+		// Build the map natively: navigate each (possibly dotted) key with
+		// plain Go map operations and decode each value with decodeAny. The
+		// seen-tracker has already rejected duplicate or conflicting keys, so
+		// intermediate parts can be created/merged without revalidation.
+		m := make(map[string]interface{})
+		it := n.Children()
+		for it.Next() {
+			kv := it.Node()
+			cur := m
+			kit := kv.Key()
+			for kit.Next() {
+				name := d.intern(kit.Node().Data)
+				if kit.IsLast() {
+					av, err := d.decodeAny(kv.Value())
+					if err != nil {
+						return nil, err
+					}
+					cur[name] = av
+					break
+				}
+				child, _ := cur[name].(map[string]interface{})
+				if child == nil {
+					child = make(map[string]interface{})
+					cur[name] = child
+				}
+				cur = child
+			}
 		}
-		return nv.Interface(), nil
+		return m, nil
 	case unstable.DateTime:
 		t, err := parseDateTime(n.Data)
 		return t, err
