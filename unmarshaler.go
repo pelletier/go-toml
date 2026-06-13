@@ -45,8 +45,17 @@ func (d *decoder) reset() {
 	d.captures = d.captures[:0]
 	d.captureIdx = -1
 	d.segIdx = d.segIdx[:0]
-	for k := range d.arrayCounts {
-		delete(d.arrayCounts, k)
+	// Reuse the array-table counter slots across documents instead of
+	// deleting them: a zeroed slot is indistinguishable from an absent one,
+	// and keeping it alive means setArrayCount does not have to allocate a new
+	// *int every time the same path reappears. A safety valve bounds the table
+	// for adversarial inputs that introduce unboundedly many distinct paths.
+	if len(d.arrayCounts) > 1<<14 {
+		d.arrayCounts = nil
+	} else {
+		for _, p := range d.arrayCounts {
+			*p = 0
+		}
 	}
 	d.tableTarget = reflect.Value{}
 	d.tableTargetValid = false
@@ -1258,6 +1267,13 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 
 	switch v.Kind() {
 	case reflect.Map:
+		// Native fast path for the most common generic target: walk the
+		// remaining dotted-key path with plain Go map operations and decode
+		// the value directly, skipping the reflect.Value round-trips
+		// (stringMapKey, MapIndex, New, SetMapIndex) entirely.
+		if !d.unmarshalerInterface && v.Type() == mapStringInterfaceType {
+			return d.descendStrMap(v, path, idx, value)
+		}
 		var name string
 		var key reflect.Value
 		var err error
@@ -1310,7 +1326,16 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 			return v, nil
 		}
 		fv := fieldByIndexAlloc(v, f.index)
-		nv, err := d.descend(fv, path, idx+1, expr, value)
+		var nv reflect.Value
+		var err error
+		if idx+1 == len(path) {
+			// Leaf field: assign directly. descend's first action for a
+			// fully-consumed path is exactly this call, so skipping the extra
+			// frame is equivalent and avoids a call per scalar field.
+			nv, err = d.assignValue(fv, expr, value)
+		} else {
+			nv, err = d.descend(fv, path, idx+1, expr, value)
+		}
 		if err != nil {
 			var mm *typeMismatchError
 			if errors.As(err, &mm) {
@@ -1375,6 +1400,42 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 	default:
 		return reflect.Value{}, d.typeMismatchError("table", v.Type(), keyHighlight(d.p.Data(), part.node))
 	}
+}
+
+// descendStrMap assigns into a native map[string]interface{} target, following
+// the remaining dotted-key parts with plain Go map operations and decoding the
+// value with decodeAny. It returns the map to store back at this level: a new
+// map when v was nil, otherwise v unchanged, since maps are reference types and
+// are mutated in place.
+func (d *decoder) descendStrMap(v reflect.Value, path []pathPart, idx int, value *unstable.Node) (reflect.Value, error) {
+	var m map[string]interface{}
+	if v.IsNil() {
+		m = make(map[string]interface{})
+		v = reflect.ValueOf(m)
+	} else {
+		m = v.Interface().(map[string]interface{})
+	}
+
+	// Walk intermediate parts, creating or reusing nested generic maps. A
+	// non-map value at an intermediate key can only occur in a document the
+	// seen-tracker has already rejected; replacing it mirrors the reflect
+	// path (elemOrNewMap).
+	for ; idx < len(path)-1; idx++ {
+		name := d.partString(&path[idx])
+		child, _ := m[name].(map[string]interface{})
+		if child == nil {
+			child = make(map[string]interface{})
+			m[name] = child
+		}
+		m = child
+	}
+
+	av, err := d.decodeAny(value)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	m[d.partString(&path[idx])] = av
+	return v, nil
 }
 
 // keyHighlight returns a highlight for the given key part node, falling back
@@ -1688,20 +1749,26 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 
 	switch v.Kind() {
 	case reflect.Slice:
-		elemType := v.Type().Elem()
-		slice := reflect.MakeSlice(v.Type(), 0, count)
+		// Allocate the backing array once at its final length and assign each
+		// element in place. This avoids a reflect.New allocation per element
+		// and the repeated growth checks of reflect.Append.
+		slice := reflect.MakeSlice(v.Type(), count, count)
+		i := 0
 		it := value.Children()
 		for it.Next() {
 			n := it.Node()
 			if n.Kind == unstable.Comment {
 				continue
 			}
-			elem := reflect.New(elemType).Elem()
+			elem := slice.Index(i)
 			nv, err := d.assignValue(elem, nil, n)
 			if err != nil {
 				return reflect.Value{}, err
 			}
-			slice = reflect.Append(slice, nv)
+			if nv.IsValid() {
+				elem.Set(nv)
+			}
+			i++
 		}
 		return slice, nil
 	case reflect.Array:
@@ -1727,48 +1794,100 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 		}
 		return v, nil
 	case reflect.Interface:
+		// Build the []interface{} natively: each element is decoded straight
+		// into a Go value with no intermediate addressable reflect.Value and
+		// no reflect round-trip, and nested arrays recurse the same way.
 		slice := make([]interface{}, 0, count)
 		it := value.Children()
 		for it.Next() {
 			n := it.Node()
-			// Fast paths for scalar elements: a single interface boxing
-			// instead of a reflect round-trip.
-			switch n.Kind {
-			case unstable.Comment:
+			if n.Kind == unstable.Comment {
 				continue
-			case unstable.String:
-				slice = append(slice, string(n.Data))
-				continue
-			case unstable.Integer:
-				i, err := parseInteger(n.Data)
-				if err != nil {
-					return reflect.Value{}, err
-				}
-				slice = append(slice, i)
-				continue
-			case unstable.Float:
-				f, err := parseFloat(n.Data)
-				if err != nil {
-					return reflect.Value{}, err
-				}
-				slice = append(slice, f)
-				continue
-			case unstable.Bool:
-				slice = append(slice, n.Data[0] == 't')
-				continue
-			default:
 			}
-			elem := reflect.New(interfaceType).Elem()
-			nv, err := d.assignValue(elem, nil, n)
+			ev, err := d.decodeAny(n)
 			if err != nil {
 				return reflect.Value{}, err
 			}
-			slice = append(slice, nv.Interface())
+			slice = append(slice, ev)
 		}
 		return boxInto(v, reflect.ValueOf(slice))
 	default:
 	}
 	return reflect.Value{}, d.typeMismatchError("array", v.Type(), d.rawValue(expr, value))
+}
+
+// decodeAny decodes a value node into a native Go value (the representation
+// used for interface{} targets), without going through reflect. Scalars and
+// arrays are handled directly; inline tables still defer to the reflect-based
+// path so that their dotted-key merge semantics remain identical.
+func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
+	switch n.Kind {
+	case unstable.String:
+		return string(n.Data), nil
+	case unstable.Integer:
+		i, err := parseInteger(n.Data)
+		return i, err
+	case unstable.Float:
+		f, err := parseFloat(n.Data)
+		return f, err
+	case unstable.Bool:
+		return n.Data[0] == 't', nil
+	case unstable.Array:
+		count := 0
+		cit := n.Children()
+		for cit.Next() {
+			if cit.Node().Kind != unstable.Comment {
+				count++
+			}
+		}
+		slice := make([]interface{}, 0, count)
+		it := n.Children()
+		for it.Next() {
+			c := it.Node()
+			if c.Kind == unstable.Comment {
+				continue
+			}
+			ev, err := d.decodeAny(c)
+			if err != nil {
+				return nil, err
+			}
+			slice = append(slice, ev)
+		}
+		return slice, nil
+	case unstable.InlineTable:
+		elem := reflect.New(interfaceType).Elem()
+		nv, err := d.assignInlineTable(elem, nil, n)
+		if err != nil {
+			return nil, err
+		}
+		return nv.Interface(), nil
+	case unstable.DateTime:
+		t, err := parseDateTime(n.Data)
+		return t, err
+	case unstable.LocalDateTime:
+		dt, rest, err := parseLocalDateTime(n.Data)
+		if err != nil {
+			return nil, err
+		}
+		if len(rest) > 0 {
+			return nil, unstable.NewParserError(rest, "extra characters at the end of a local date time")
+		}
+		return dt, nil
+	case unstable.LocalDate:
+		date, err := parseLocalDate(n.Data)
+		return date, err
+	case unstable.LocalTime:
+		t, rest, err := parseLocalTime(n.Data)
+		if err != nil {
+			return nil, err
+		}
+		if len(rest) > 0 {
+			return nil, unstable.NewParserError(rest, "extra characters at the end of a local time")
+		}
+		return t, nil
+	default:
+		return nil, unstable.NewParserError(n.Data, "unsupported value kind %s", n.Kind)
+	}
 }
 
 func (d *decoder) assignInlineTable(v reflect.Value, expr *unstable.Node, value *unstable.Node) (reflect.Value, error) {
@@ -1829,7 +1948,9 @@ var (
 )
 
 // structPlan caches the mapping between TOML keys and the fields of a struct
-// type.
+// type. byName holds the exact field/tag names and is consulted first so that
+// an exact match always wins; byFold is keyed by the lowercased name and
+// provides the case-insensitive fallback.
 type structPlan struct {
 	byName map[string]structField
 	byFold map[string]structField
@@ -1840,23 +1961,76 @@ type structField struct {
 	fieldName string
 }
 
+// foldBufSize bounds the stack buffer used to lowercase keys without
+// allocating. Keys longer than this (extremely rare) take the strings.ToLower
+// fallback.
+const foldBufSize = 68
+
+// lookup and lookupBytes keep the exact-match fast path tiny (a single map
+// lookup) so it stays inlinable; the case-folded fallback lives in separate
+// methods that are only called on an exact miss.
 func (p *structPlan) lookup(name string) (structField, bool) {
-	f, ok := p.byName[name]
-	if ok {
+	if f, ok := p.byName[name]; ok {
 		return f, true
 	}
-	f, ok = p.byFold[strings.ToLower(name)]
+	return p.lookupFoldStr(name)
+}
+
+func (p *structPlan) lookupBytes(name []byte) (structField, bool) {
+	if f, ok := p.byName[string(name)]; ok { // does not allocate
+		return f, true
+	}
+	return p.lookupFold(name)
+}
+
+// lookupFold resolves name case-insensitively. It lowercases ASCII keys into a
+// stack buffer so the common path does not allocate; only non-ASCII or
+// oversized keys fall back to strings.ToLower. The fold loop is inlined so buf
+// provably stays on the stack.
+func (p *structPlan) lookupFold(name []byte) (structField, bool) {
+	if len(name) <= foldBufSize {
+		var buf [foldBufSize]byte
+		ascii := true
+		for i, c := range name {
+			if c >= 0x80 {
+				ascii = false
+				break
+			}
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			buf[i] = c
+		}
+		if ascii {
+			f, ok := p.byFold[string(buf[:len(name)])] // does not allocate
+			return f, ok
+		}
+	}
+	f, ok := p.byFold[strings.ToLower(string(name))]
 	return f, ok
 }
 
-// lookupBytes is like lookup but avoids allocating in the common case where
-// the name matches exactly.
-func (p *structPlan) lookupBytes(name []byte) (structField, bool) {
-	f, ok := p.byName[string(name)] // does not allocate
-	if ok {
-		return f, true
+func (p *structPlan) lookupFoldStr(name string) (structField, bool) {
+	if len(name) <= foldBufSize {
+		var buf [foldBufSize]byte
+		ascii := true
+		for i := 0; i < len(name); i++ {
+			c := name[i]
+			if c >= 0x80 {
+				ascii = false
+				break
+			}
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			buf[i] = c
+		}
+		if ascii {
+			f, ok := p.byFold[string(buf[:len(name)])] // does not allocate
+			return f, ok
+		}
 	}
-	f, ok = p.byFold[strings.ToLower(string(name))]
+	f, ok := p.byFold[strings.ToLower(name)]
 	return f, ok
 }
 
