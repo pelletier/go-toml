@@ -9,7 +9,7 @@ import (
 	"io"
 	"math"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -593,17 +593,15 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	}
 
 	if len(entries) > 1 {
-		sort.Sort(entriesByKey(entries))
+		// slices.SortFunc avoids boxing the slice into a sort.Interface (an
+		// allocation that sort.Sort incurs for every table).
+		slices.SortFunc(entries, func(a, b entry) int {
+			return strings.Compare(a.key, b.key)
+		})
 	}
 
 	return entries, nil
 }
-
-type entriesByKey []entry
-
-func (e entriesByKey) Len() int           { return len(e) }
-func (e entriesByKey) Less(i, j int) bool { return e[i].key < e[j].key }
-func (e entriesByKey) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 
 // mapKeyString converts a map key to its string representation.
 func mapKeyString(k reflect.Value) (string, error) {

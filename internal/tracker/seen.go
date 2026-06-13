@@ -179,6 +179,131 @@ func (s *SeenTracker) CheckExpression(node *unstable.Node) (bool, error) {
 	}
 }
 
+// CheckTable validates a [table] header given the decoded parts of its key.
+// It mirrors checkTable but is driven directly from the key parts instead of
+// an AST, for callers that decode without building one. It returns whether the
+// table is seen for the first time.
+func (s *SeenTracker) CheckTable(parts [][]byte) (bool, error) {
+	parent := int32(0)
+	for k := 0; k < len(parts); k++ {
+		name := parts[k]
+		if k == len(parts)-1 {
+			// Final part of the key.
+			i := s.find(parent, name)
+			if i < 0 {
+				i = s.create(parent, name, tableKind, true)
+				s.currentTable = i
+				return true, nil
+			}
+			e := &s.entries[i]
+			switch e.kind {
+			case tableKind:
+				if e.explicit {
+					return false, fmt.Errorf("toml: table %s already exists", name)
+				}
+				e.explicit = true
+				s.currentTable = i
+				return false, nil
+			case kvTableKind:
+				return false, fmt.Errorf("toml: table %s already exists as defined by a dotted key", name)
+			case arrayTableKind:
+				return false, fmt.Errorf("toml: table %s already exists as an array of tables", name)
+			default:
+				return false, fmt.Errorf("toml: key %s should be a table, not a %s", name, e.kind)
+			}
+		}
+
+		i := s.find(parent, name)
+		if i < 0 {
+			i = s.create(parent, name, tableKind, false)
+		} else {
+			switch s.entries[i].kind {
+			case tableKind, arrayTableKind, kvTableKind:
+				// Tables created by dotted keys can receive new sub-tables,
+				// but cannot be redefined (handled by the last-part case).
+			default:
+				return false, fmt.Errorf("toml: key %s already exists as a value", name)
+			}
+		}
+		parent = i
+	}
+	panic("unreachable: table expression without key")
+}
+
+// CheckArrayTable validates a [[array table]] header given the decoded parts
+// of its key. It mirrors checkArrayTable but is driven directly from the key
+// parts. It returns whether the array table is seen for the first time.
+func (s *SeenTracker) CheckArrayTable(parts [][]byte) (bool, error) {
+	parent := int32(0)
+	for k := 0; k < len(parts); k++ {
+		name := parts[k]
+		if k == len(parts)-1 {
+			i := s.find(parent, name)
+			if i < 0 {
+				i = s.create(parent, name, arrayTableKind, true)
+				s.currentTable = i
+				return true, nil
+			}
+			if s.entries[i].kind != arrayTableKind {
+				return false, fmt.Errorf("toml: key %s already exists as a %s, but should be an array table", name, s.entries[i].kind)
+			}
+			// Make the descendants of this array table re-discoverable for
+			// the new element.
+			s.clear(i)
+			s.currentTable = i
+			return false, nil
+		}
+
+		i := s.find(parent, name)
+		if i < 0 {
+			i = s.create(parent, name, tableKind, false)
+		} else {
+			switch s.entries[i].kind {
+			case tableKind, arrayTableKind, kvTableKind:
+				// Tables created by dotted keys can receive new sub-tables,
+				// but cannot be redefined (handled by the last-part case).
+			default:
+				return false, fmt.Errorf("toml: key %s already exists as a value", name)
+			}
+		}
+		parent = i
+	}
+	panic("unreachable: array table expression without key")
+}
+
+// CheckKeyValue validates the (possibly dotted) key of a key-value under the
+// current table, WITHOUT validating its value. It returns the id of the leaf
+// entry, so the caller can validate a container value with CheckValueUnder.
+func (s *SeenTracker) CheckKeyValue(parts [][]byte) (int32, error) {
+	parent := s.currentTable
+	for k := 0; k < len(parts); k++ {
+		name := parts[k]
+		if k == len(parts)-1 {
+			if i := s.find(parent, name); i >= 0 {
+				return -1, fmt.Errorf("toml: key %s is already defined", name)
+			}
+			return s.create(parent, name, valueKind, false), nil
+		}
+
+		i := s.find(parent, name)
+		if i < 0 {
+			i = s.create(parent, name, kvTableKind, false)
+		} else if s.entries[i].kind != kvTableKind {
+			return -1, fmt.Errorf("toml: key %s is already defined", name)
+		}
+		parent = i
+	}
+	panic("unreachable: key-value expression without key")
+}
+
+// CheckValueUnder validates the content of a value stored under the given
+// entry (typically the leaf returned by CheckKeyValue): inline tables cannot
+// contain duplicate keys, including in the inline tables and arrays they
+// contain.
+func (s *SeenTracker) CheckValueUnder(parent int32, value *unstable.Node) error {
+	return s.checkValue(parent, value)
+}
+
 func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
 	parent := int32(0)
 

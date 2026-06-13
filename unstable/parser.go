@@ -438,35 +438,36 @@ func isUnquotedKeyChar(c byte) bool {
 
 // parseSimpleKey parses one key part: either a bare key or a quoted key.
 func (p *Parser) parseSimpleKey(b []byte) (int32, []byte, error) {
+	raw, value, rest, err := p.scanSimpleKey(b)
+	if err != nil {
+		return 0, nil, err
+	}
+	h := p.push(Node{Kind: Key, Raw: p.Range(raw), Data: value})
+	return h, rest, nil
+}
+
+// scanSimpleKey scans one key part (bare or quoted) without building an AST
+// node. It returns the raw bytes, the decoded key value, and the rest of the
+// input.
+func (p *Parser) scanSimpleKey(b []byte) (raw, value, rest []byte, err error) {
 	if len(b) == 0 {
-		return 0, nil, NewParserError(b, "expected key but reached end of input")
+		return nil, nil, nil, NewParserError(b, "expected key but reached end of input")
 	}
 
 	switch b[0] {
 	case '\'':
-		raw, value, rest, err := p.parseLiteralString(b)
-		if err != nil {
-			return 0, nil, err
-		}
-		h := p.push(Node{Kind: Key, Raw: p.Range(raw), Data: value})
-		return h, rest, nil
+		return p.parseLiteralString(b)
 	case '"':
-		raw, value, rest, err := p.parseBasicString(b)
-		if err != nil {
-			return 0, nil, err
-		}
-		h := p.push(Node{Kind: Key, Raw: p.Range(raw), Data: value})
-		return h, rest, nil
+		return p.parseBasicString(b)
 	default:
 		i := 0
 		for i < len(b) && isUnquotedKeyChar(b[i]) {
 			i++
 		}
 		if i == 0 {
-			return 0, nil, NewParserError(b[:1], "invalid character at start of key: %#U", b[0])
+			return nil, nil, nil, NewParserError(b[:1], "invalid character at start of key: %#U", b[0])
 		}
-		h := p.push(Node{Kind: Key, Raw: p.Range(b[:i]), Data: b[:i]})
-		return h, b[i:], nil
+		return b[:i], b[:i], b[i:], nil
 	}
 }
 
@@ -528,16 +529,142 @@ func (p *Parser) parseVal(b []byte) (int32, []byte, error) {
 	}
 }
 
+// ScanScalar scans a single scalar TOML value (string, integer, float,
+// boolean, or date/time) without building any AST node. It returns the kind of
+// the value, its raw bytes, its decoded value bytes (for strings: quotes
+// removed and escapes resolved; identical to raw for the other kinds), and the
+// rest of the input. Arrays and inline tables are not scalars and produce an
+// error: use ParseValue for those.
+//
+// This is a lower-level companion to NextExpression for callers that decode
+// values directly and do not need an AST.
+//
+// *Unstable:* This function does not follow the compatibility guarantees of
+// semver. It can be changed or removed without a new major version being
+// issued.
+func (p *Parser) ScanScalar(b []byte) (kind Kind, raw, value, rest []byte, err error) {
+	if len(b) == 0 {
+		return Invalid, nil, nil, nil, NewParserError(b, "expected value, not end of input")
+	}
+
+	c := b[0]
+	switch {
+	case c == '"':
+		if len(b) > 2 && b[1] == '"' && b[2] == '"' {
+			raw, value, rest, err = p.parseMultilineBasicString(b)
+		} else {
+			raw, value, rest, err = p.parseBasicString(b)
+		}
+		return String, raw, value, rest, err
+	case c == '\'':
+		if len(b) > 2 && b[1] == '\'' && b[2] == '\'' {
+			raw, value, rest, err = p.parseMultilineLiteralString(b)
+		} else {
+			raw, value, rest, err = p.parseLiteralString(b)
+		}
+		return String, raw, value, rest, err
+	case c == 't':
+		return scanKeyword(b, "true", Bool)
+	case c == 'f':
+		return scanKeyword(b, "false", Bool)
+	case c == 'i':
+		return scanKeyword(b, "inf", Float)
+	case c == 'n':
+		return scanKeyword(b, "nan", Float)
+	case c == '+' || c == '-':
+		return scanIntOrFloat(b)
+	case c >= '0' && c <= '9':
+		if isDateTimeStart(b) {
+			return scanDateTime(b)
+		}
+		return scanIntOrFloat(b)
+	default:
+		return Invalid, nil, nil, nil, NewParserError(b[:1], "unexpected character %#U at start of value", c)
+	}
+}
+
+// ScanKey scans a potentially dotted key without building AST nodes,
+// appending the decoded value of each part to dst (pass dst[:0] to reuse a
+// buffer). It consumes the whitespace following the key, so the caller can
+// directly check for the next expected character ('=', ']', ...). It returns
+// the parts, the raw bytes spanning the whole key (from the first part to the
+// end of the last one, excluding trailing whitespace, usable as an error
+// highlight), the rest of the input, and any error.
+//
+// *Unstable:* This function does not follow the compatibility guarantees of
+// semver. It can be changed or removed without a new major version being
+// issued.
+func (p *Parser) ScanKey(b []byte, dst [][]byte) (parts [][]byte, raw, rest []byte, err error) {
+	parts = dst
+	start := b
+	for {
+		_, value, r, err := p.scanSimpleKey(b)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		parts = append(parts, value)
+
+		// r points just past the current part: the key spans from start to
+		// here, ignoring any whitespace that follows.
+		raw = start[:len(start)-len(r)]
+
+		b = skipWhitespace(r)
+		if len(b) > 0 && b[0] == '.' {
+			b = skipWhitespace(b[1:])
+			continue
+		}
+		return parts, raw, b, nil
+	}
+}
+
+// ScanComment scans a comment starting at the '#' character, returning the
+// comment bytes (including '#', excluding the line ending) and the rest of the
+// input.
+//
+// *Unstable:* This function does not follow the compatibility guarantees of
+// semver. It can be changed or removed without a new major version being
+// issued.
+func (p *Parser) ScanComment(b []byte) (comment, rest []byte, err error) {
+	return scanComment(b)
+}
+
+// ParseValue parses a single TOML value, which may be an array or inline table,
+// into the parser's arena. It returns the root node of the value and the rest
+// of the input. It resets the arena, so any node returned by a previous call to
+// ParseValue, Expression, or NextExpression is invalidated.
+//
+// *Unstable:* This function does not follow the compatibility guarantees of
+// semver. It can be changed or removed without a new major version being
+// issued.
+func (p *Parser) ParseValue(b []byte) (*Node, []byte, error) {
+	p.nodes = p.nodes[:0]
+	h, rest, err := p.parseVal(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &p.nodes[h-1], rest, nil
+}
+
 func (p *Parser) parseKeyword(b []byte, kw string, kind Kind) (int32, []byte, error) {
+	k, raw, _, rest, err := scanKeyword(b, kw, kind)
+	if err != nil {
+		return 0, nil, err
+	}
+	h := p.push(Node{Kind: k, Raw: p.Range(raw), Data: raw})
+	return h, rest, nil
+}
+
+// scanKeyword scans a keyword value (true, false, inf, nan) without building
+// an AST node. raw and value are identical (the keyword bytes).
+func scanKeyword(b []byte, kw string, kind Kind) (Kind, []byte, []byte, []byte, error) {
 	if len(b) < len(kw) || string(b[:len(kw)]) != kw {
 		n := len(kw)
 		if len(b) < n {
 			n = len(b)
 		}
-		return 0, nil, NewParserError(b[:n], "expected keyword %q", kw)
+		return Invalid, nil, nil, nil, NewParserError(b[:n], "expected keyword %q", kw)
 	}
-	h := p.push(Node{Kind: kind, Raw: p.Range(b[:len(kw)]), Data: b[:len(kw)]})
-	return h, b[len(kw):], nil
+	return kind, b[:len(kw)], b[:len(kw)], b[len(kw):], nil
 }
 
 // parseValArray parses an array value. b starts at '['.
@@ -747,6 +874,17 @@ func isDateTimeStart(b []byte) bool {
 // in one piece, so that errors about its content can point at the right
 // place.
 func (p *Parser) parseDateTime(b []byte) (int32, []byte, error) {
+	kind, raw, _, rest, err := scanDateTime(b)
+	if err != nil {
+		return 0, nil, err
+	}
+	h := p.push(Node{Kind: kind, Raw: p.Range(raw), Data: raw})
+	return h, rest, nil
+}
+
+// scanDateTime classifies and delimits a date/time value without building an
+// AST node. raw and value are identical (the token bytes).
+func scanDateTime(b []byte) (Kind, []byte, []byte, []byte, error) {
 	// Greedily scan the characters that may compose a date/time value. A
 	// space is part of the value only when it serves as the delimiter
 	// between the date and the time, which is approximated by requiring a
@@ -782,8 +920,7 @@ func (p *Parser) parseDateTime(b []byte) (int32, []byte, error) {
 		kind = LocalDateTime
 	}
 
-	h := p.push(Node{Kind: kind, Raw: p.Range(tok), Data: tok})
-	return h, b[i:], nil
+	return kind, tok, tok, b[i:], nil
 }
 
 // scanDigitsWithUnderscores scans a run of digits potentially separated by
@@ -815,12 +952,24 @@ func scanDigitsWithUnderscores(b []byte, i int, isInRange func(byte) bool) (int,
 // parseIntOrFloat parses integer and float values, including the special
 // values inf and nan with an optional sign.
 func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
+	kind, raw, _, rest, err := scanIntOrFloat(b)
+	if err != nil {
+		return 0, nil, err
+	}
+	h := p.push(Node{Kind: kind, Raw: p.Range(raw), Data: raw})
+	return h, rest, nil
+}
+
+// scanIntOrFloat delimits and classifies an integer or float value (including
+// the special floats inf and nan with an optional sign) without building an
+// AST node. raw and value are identical (the token bytes).
+func scanIntOrFloat(b []byte) (Kind, []byte, []byte, []byte, error) {
 	i := 0
 	if b[i] == '+' || b[i] == '-' {
 		i++
 	}
 	if i >= len(b) {
-		return 0, nil, NewParserError(b, "expected number after sign")
+		return Invalid, nil, nil, nil, NewParserError(b, "expected number after sign")
 	}
 
 	// special floats
@@ -830,21 +979,20 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 			kw = "nan"
 		}
 		if len(b) < i+3 || string(b[i:i+3]) != kw {
-			return 0, nil, NewParserError(b[i:i+1], "expected %q", kw)
+			return Invalid, nil, nil, nil, NewParserError(b[i:i+1], "expected %q", kw)
 		}
 		i += 3
-		h := p.push(Node{Kind: Float, Raw: p.Range(b[:i]), Data: b[:i]})
-		return h, b[i:], nil
+		return Float, b[:i], b[:i], b[i:], nil
 	}
 
 	if !isDigit(b[i]) {
-		return 0, nil, NewParserError(b[i:i+1], "expected digit but got %#U", b[i])
+		return Invalid, nil, nil, nil, NewParserError(b[i:i+1], "expected digit but got %#U", b[i])
 	}
 
 	// radix prefixes
 	if b[i] == '0' && i+1 < len(b) && (b[i+1] == 'x' || b[i+1] == 'o' || b[i+1] == 'b') {
 		if i != 0 {
-			return 0, nil, NewParserError(b[:2], "sign is not allowed on numbers with a radix prefix")
+			return Invalid, nil, nil, nil, NewParserError(b[:2], "sign is not allowed on numbers with a radix prefix")
 		}
 		var isInRange func(byte) bool
 		switch b[1] {
@@ -857,16 +1005,15 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 		}
 		i = 2
 		if i >= len(b) || !isInRange(b[i]) {
-			return 0, nil, NewParserError(b[:2], "radix prefix must be followed by at least one digit")
+			return Invalid, nil, nil, nil, NewParserError(b[:2], "radix prefix must be followed by at least one digit")
 		}
 		i++
 		var err error
 		i, err = scanDigitsWithUnderscores(b, i, isInRange)
 		if err != nil {
-			return 0, nil, err
+			return Invalid, nil, nil, nil, err
 		}
-		h := p.push(Node{Kind: Integer, Raw: p.Range(b[:i]), Data: b[:i]})
-		return h, b[i:], nil
+		return Integer, b[:i], b[:i], b[i:], nil
 	}
 
 	// decimal integer part
@@ -876,10 +1023,10 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 	var err error
 	i, err = scanDigitsWithUnderscores(b, i, isDigit)
 	if err != nil {
-		return 0, nil, err
+		return Invalid, nil, nil, nil, err
 	}
 	if leadingZero && i > digitsStart+1 {
-		return 0, nil, NewParserError(b[digitsStart:digitsStart+2], "integers cannot have leading zeroes")
+		return Invalid, nil, nil, nil, NewParserError(b[digitsStart:digitsStart+2], "integers cannot have leading zeroes")
 	}
 
 	kind := Integer
@@ -888,12 +1035,12 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 	if i < len(b) && b[i] == '.' {
 		i++
 		if i >= len(b) || !isDigit(b[i]) {
-			return 0, nil, NewParserError(highlight1(b[i:]), "decimal point must be followed by a digit")
+			return Invalid, nil, nil, nil, NewParserError(highlight1(b[i:]), "decimal point must be followed by a digit")
 		}
 		i++
 		i, err = scanDigitsWithUnderscores(b, i, isDigit)
 		if err != nil {
-			return 0, nil, err
+			return Invalid, nil, nil, nil, err
 		}
 		kind = Float
 	}
@@ -905,12 +1052,12 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 			i++
 		}
 		if i >= len(b) || !isDigit(b[i]) {
-			return 0, nil, NewParserError(highlight1(b[i:]), "exponent must contain at least one digit")
+			return Invalid, nil, nil, nil, NewParserError(highlight1(b[i:]), "exponent must contain at least one digit")
 		}
 		i++
 		i, err = scanDigitsWithUnderscores(b, i, isDigit)
 		if err != nil {
-			return 0, nil, err
+			return Invalid, nil, nil, nil, err
 		}
 		kind = Float
 	}
@@ -920,12 +1067,11 @@ func (p *Parser) parseIntOrFloat(b []byte) (int32, []byte, error) {
 	// "expected newline" raised later (issue #413).
 	if i < len(b) {
 		if c := b[i]; (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-			return 0, nil, NewParserError(b[i:i+1], "strings must be quoted")
+			return Invalid, nil, nil, nil, NewParserError(b[i:i+1], "strings must be quoted")
 		}
 	}
 
-	h := p.push(Node{Kind: kind, Raw: p.Range(b[:i]), Data: b[:i]})
-	return h, b[i:], nil
+	return kind, b[:i], b[:i], b[i:], nil
 }
 
 // highlight1 returns a 1-byte highlight at the start of b, or b itself if it
