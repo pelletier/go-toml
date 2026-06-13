@@ -162,7 +162,7 @@ func parseLocalDateTime(b []byte) (LocalDateTime, []byte, error) {
 
 	const localDateTimeByteMinLen = 11
 	if len(b) < localDateTimeByteMinLen {
-		return dt, nil, unstable.NewParserError(b, "local datetimes are expected to have the format YYYY-MM-DDTHH:MM:SS[.NNNNNNNNN]")
+		return dt, nil, unstable.NewParserError(b, "local datetimes are expected to have the format YYYY-MM-DDTHH:MM[:SS[.NNNNNNNNN]]")
 	}
 
 	date, err := parseLocalDate(b[:10])
@@ -194,10 +194,10 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		t     LocalTime
 	)
 
-	// check if b matches to have expected format HH:MM:SS[.NNNNNN]
-	const localTimeByteLen = 8
-	if len(b) < localTimeByteLen {
-		return t, nil, unstable.NewParserError(b, "times are expected to have the format HH:MM:SS[.NNNNNN]")
+	// check if b matches to have expected format HH:MM[:SS[.NNNNNN]]
+	const localTimeByteMinLen = 5
+	if len(b) < localTimeByteMinLen {
+		return t, nil, unstable.NewParserError(b, "times are expected to have the format HH:MM[:SS[.NNNNNN]]")
 	}
 
 	var err error
@@ -221,22 +221,33 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 	if t.Minute > 59 {
 		return t, nil, unstable.NewParserError(b[3:5], "minutes cannot be greater 59")
 	}
-	if b[5] != ':' {
-		return t, nil, unstable.NewParserError(b[5:6], "expecting colon between minutes and seconds")
+
+	b = b[5:]
+
+	// Seconds are optional (TOML v1.1.0). Fractional seconds may only appear
+	// when seconds are present:
+	//   partial-time = time-hour ":" time-minute [ ":" time-second [ time-secfrac ] ]
+	secondsPresent := false
+
+	if len(b) >= 1 && b[0] == ':' {
+		if len(b) < 3 {
+			return t, nil, unstable.NewParserError(b, "incomplete seconds")
+		}
+
+		t.Second, err = parseDecimalDigits(b[1:3])
+		if err != nil {
+			return t, nil, err
+		}
+
+		if t.Second > 59 {
+			return t, nil, unstable.NewParserError(b[1:3], "seconds cannot be greater than 59")
+		}
+
+		b = b[3:]
+		secondsPresent = true
 	}
 
-	t.Second, err = parseDecimalDigits(b[6:8])
-	if err != nil {
-		return t, nil, err
-	}
-
-	if t.Second > 59 {
-		return t, nil, unstable.NewParserError(b[6:8], "seconds cannot be greater than 59")
-	}
-
-	b = b[8:]
-
-	if len(b) >= 1 && b[0] == '.' {
+	if secondsPresent && len(b) >= 1 && b[0] == '.' {
 		frac := 0
 		precision := 0
 		digits := 0

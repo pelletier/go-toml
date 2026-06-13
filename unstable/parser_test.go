@@ -332,12 +332,322 @@ func TestParser_AST(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:  "multiline inline table",
+			input: "name = {\n  first = \"Tom\",\n  last = \"Preston-Werner\"\n}",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Preston-Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with trailing comma",
+			input: `name = { first = "Tom", last = "Preston-Werner", }`,
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Preston-Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "empty inline table with newline",
+			input: "name = {\n}",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind:     InlineTable,
+						Children: nil,
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with leading comma",
+			input: "name = { first = \"Tom\"\n, last = \"Werner\" }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with leading trailing comma",
+			input: "name = { first = \"Tom\"\n, }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table comma at start is error",
+			input: "name = { , first = \"Tom\" }",
+			err:   true,
+		},
+		{
+			desc:  "inline table double comma across newline is error",
+			input: "name = { first = \"Tom\",\n, last = \"Werner\" }",
+			err:   true,
+		},
 	}
 
 	for _, e := range examples {
 		e := e
 		t.Run(e.desc, func(t *testing.T) {
 			p := Parser{}
+			p.Reset([]byte(e.input))
+			p.NextExpression()
+			err := p.Error()
+			if e.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				compareNode(t, e.ast, p.Expression())
+			}
+		})
+	}
+}
+
+//nolint:funlen
+func TestParser_AST_InlineTablesWithComments(t *testing.T) {
+	examples := []struct {
+		desc  string
+		input string
+		ast   astNode
+		err   bool
+	}{
+		{
+			desc:  "inline table with comment before first key-value",
+			input: "name = { # comment\n first = \"Tom\" }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: Comment,
+								Data: []byte(`# comment`),
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with comment after comma",
+			input: "name = { first = \"Tom\", # comment\n last = \"Werner\" }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: Comment,
+								Data: []byte(`# comment`),
+							},
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Werner`)},
+									{Kind: Key, Data: []byte(`last`)},
+								},
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with comment after key-value",
+			input: "name = { first = \"Tom\" # comment\n }",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: InlineTable,
+						Children: []astNode{
+							{
+								Kind: KeyValue,
+								Children: []astNode{
+									{Kind: String, Data: []byte(`Tom`)},
+									{Kind: Key, Data: []byte(`first`)},
+								},
+							},
+							{
+								Kind: Comment,
+								Data: []byte(`# comment`),
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`name`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "array with comment after value",
+			input: "a = [ 1 # comment\n ]",
+			ast: astNode{
+				Kind: KeyValue,
+				Children: []astNode{
+					{
+						Kind: Array,
+						Children: []astNode{
+							{
+								Kind: Integer,
+								Data: []byte(`1`),
+							},
+							{
+								Kind: Comment,
+								Data: []byte(`# comment`),
+							},
+						},
+					},
+					{
+						Kind: Key,
+						Data: []byte(`a`),
+					},
+				},
+			},
+		},
+		{
+			desc:  "inline table with invalid comment before first key-value",
+			input: "name = { # comment\r first = \"Tom\" }",
+			err:   true,
+		},
+		{
+			desc:  "inline table with invalid comment after comma",
+			input: "name = { first = \"Tom\", # comment\r last = \"Werner\" }",
+			err:   true,
+		},
+		{
+			desc:  "inline table with invalid comment after key-value",
+			input: "name = { first = \"Tom\" # comment\r }",
+			err:   true,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			p := Parser{KeepComments: true}
 			p.Reset([]byte(e.input))
 			p.NextExpression()
 			err := p.Error()

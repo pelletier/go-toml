@@ -67,6 +67,13 @@ func TestLocalTime_UnmarshalMarshalText(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestLocalTime_UnmarshalText_WithoutSeconds(t *testing.T) {
+	d := toml.LocalTime{}
+	err := d.UnmarshalText([]byte("14:15"))
+	assert.NoError(t, err)
+	assert.Equal(t, toml.LocalTime{14, 15, 0, 0, 0}, d)
+}
+
 func TestLocalTime_RoundTrip(t *testing.T) {
 	var d struct{ A toml.LocalTime }
 	err := toml.Unmarshal([]byte("a=20:12:01.500"), &d)

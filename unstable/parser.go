@@ -477,12 +477,14 @@ func (p *Parser) parseLiteralString(b []byte) ([]byte, []byte, []byte, error) {
 	return v, v[1 : len(v)-1], rest, nil
 }
 
+//nolint:funlen,cyclop,dupl
 func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	// inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
 	// inline-table-open  = %x7B ws     ; {
 	// inline-table-close = ws %x7D     ; }
 	// inline-table-sep   = ws %x2C ws  ; , Comma
 	// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
+	tableStart := b
 	parent := p.builder.Push(Node{
 		Kind: InlineTable,
 		Raw:  p.rangeOfToken(b[:1], b[1:]),
@@ -490,45 +492,77 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 
 	first := true
 
-	var child reference
+	lastChild := invalidReference
+
+	addChild := func(ref reference) {
+		if lastChild == invalidReference {
+			p.builder.AttachChild(parent, ref)
+		} else {
+			p.builder.Chain(lastChild, ref)
+		}
+		lastChild = ref
+	}
 
 	b = b[1:]
 
 	var err error
 
 	for len(b) > 0 {
-		previousB := b
-		b = p.parseWhitespace(b)
+		var cref reference
+		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return parent, nil, err
+		}
+
+		if cref != invalidReference {
+			addChild(cref)
+		}
 
 		if len(b) == 0 {
-			return parent, nil, NewParserError(previousB[:1], "inline table is incomplete")
+			return parent, nil, NewParserError(tableStart[:1], "inline table is incomplete")
 		}
 
 		if b[0] == '}' {
 			break
 		}
 
-		if !first {
-			b, err = expect(',', b)
+		if b[0] == ',' {
+			if first {
+				return parent, nil, NewParserError(b[0:1], "inline table cannot start with comma")
+			}
+			b = b[1:]
+
+			cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
 			if err != nil {
 				return parent, nil, err
 			}
-			b = p.parseWhitespace(b)
+			if cref != invalidReference {
+				addChild(cref)
+			}
+		} else if !first {
+			return parent, nil, NewParserError(b[0:1], "inline table entries must be separated by commas")
+		}
+
+		// trailing comma: if '}' follows, stop
+		if len(b) > 0 && b[0] == '}' {
+			break
 		}
 
 		var kv reference
-
 		kv, b, err = p.parseKeyval(b)
 		if err != nil {
 			return parent, nil, err
 		}
 
-		if first {
-			p.builder.AttachChild(parent, kv)
-		} else {
-			p.builder.Chain(child, kv)
+		addChild(kv)
+
+		cref, b, err = p.parseOptionalWhitespaceCommentNewline(b)
+		if err != nil {
+			return parent, nil, err
 		}
-		child = kv
+		if cref != invalidReference {
+			addChild(cref)
+		}
 
 		first = false
 	}
@@ -538,7 +572,7 @@ func (p *Parser) parseInlineTable(b []byte) (reference, []byte, error) {
 	return parent, rest, err
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop,dupl
 func (p *Parser) parseValArray(b []byte) (reference, []byte, error) {
 	// array = array-open [ array-values ] ws-comment-newline array-close
 	// array-open =  %x5B ; [
@@ -802,6 +836,13 @@ func (p *Parser) parseMultilineBasicString(b []byte) ([]byte, []byte, []byte, er
 				builder.WriteByte('\t')
 			case 'e':
 				builder.WriteByte(0x1B)
+			case 'x':
+				x, err := hexToRune(atmost(token[i+1:], 2), 2)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				builder.WriteRune(x)
+				i += 2
 			case 'u':
 				x, err := hexToRune(atmost(token[i+1:], 4), 4)
 				if err != nil {
@@ -961,6 +1002,13 @@ func (p *Parser) parseBasicString(b []byte) ([]byte, []byte, []byte, error) {
 				builder.WriteByte('\t')
 			case 'e':
 				builder.WriteByte(0x1B)
+			case 'x':
+				x, err := hexToRune(token[i+1:len(token)-1], 2)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				builder.WriteRune(x)
+				i += 2
 			case 'u':
 				x, err := hexToRune(token[i+1:len(token)-1], 4)
 				if err != nil {
