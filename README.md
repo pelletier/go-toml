@@ -2,7 +2,7 @@
 
 Go library for the [TOML](https://toml.io/en/) format.
 
-This library supports [TOML v1.0.0](https://toml.io/en/v1.0.0).
+This library supports [TOML v1.1.0](https://toml.io/en/v1.1.0).
 
 [🐞 Bug Reports](https://github.com/pelletier/go-toml/issues)
 
@@ -27,6 +27,11 @@ import "github.com/pelletier/go-toml/v2"
 
 As much as possible, this library is designed to behave similarly as the
 standard library's `encoding/json`.
+
+When encoding structs, fields tagged with `omitempty` are omitted if they are
+empty. For `time.Time`, the zero value is considered empty, so timestamps such
+as `created_at` or `updated_at` are not written unless you remove `omitempty`
+from the struct tag or use a pointer type (`*time.Time`).
 
 ### Performance
 
@@ -65,7 +70,7 @@ this use-case, go-toml provides [`LocalDate`][tld], [`LocalTime`][tlt], and
 making them convenient yet unambiguous structures for their respective TOML
 representation.
 
-[ldt]: https://toml.io/en/v1.0.0#local-date-time
+[ldt]: https://toml.io/en/v1.1.0#local-date-time
 [tld]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#LocalDate
 [tlt]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#LocalTime
 [tldt]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#LocalDateTime

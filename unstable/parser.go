@@ -627,53 +627,92 @@ func (p *Parser) parseValArray(b []byte) (int32, []byte, error) {
 }
 
 // parseInlineTable parses an inline table value. b starts at '{'.
+//
+// Per TOML v1.1.0, inline tables may span multiple lines (whitespace,
+// comments and newlines are allowed between elements) and may contain a
+// trailing comma.
 func (p *Parser) parseInlineTable(b []byte) (int32, []byte, error) {
 	tbl := p.push(Node{Kind: InlineTable, Raw: p.Range(b[:1])})
 	b = b[1:]
 
 	var lastChild int32
-	first := true
-	for {
-		b = skipWhitespace(b)
-		if len(b) == 0 {
-			return 0, nil, NewParserError(b, "inline table is incomplete")
-		}
-		if b[0] == '\n' || b[0] == '\r' {
-			return 0, nil, NewParserError(b[:1], "newlines are not allowed inside inline tables")
-		}
-		if b[0] == '}' {
-			if !first && lastChild == 0 {
-				// this should not happen: lastChild is set whenever a
-				// key-value is parsed.
-				return 0, nil, NewParserError(b[:1], "trailing comma in inline table")
-			}
-			return tbl, b[1:], nil
-		}
-		if !first {
-			if b[0] != ',' {
-				return 0, nil, NewParserError(b[:1], "expected ',' or '}' after inline table key-value")
-			}
-			b = skipWhitespace(b[1:])
-			if len(b) > 0 && b[0] == '}' {
-				return 0, nil, NewParserError(b[:1], "trailing comma in inline table")
-			}
-			if len(b) > 0 && (b[0] == '\n' || b[0] == '\r') {
-				return 0, nil, NewParserError(b[:1], "newlines are not allowed inside inline tables")
-			}
-		}
-
-		h, rest, err := p.parseKeyval(b)
-		if err != nil {
-			return 0, nil, err
-		}
+	appendChild := func(h int32) {
 		if lastChild == 0 {
 			p.at(tbl).child = h
 		} else {
 			p.at(lastChild).next = h
 		}
 		lastChild = h
-		first = false
-		b = rest
+	}
+
+	// Comments are attached as in arrays: the first comment of a "run"
+	// (consecutive comments with no key-value in between) becomes a child of
+	// the table, interleaved with key-values; subsequent comments of the run
+	// hang off the first one.
+	var runFirst, runLast int32
+
+	// afterValue is true when a key-value has been parsed and a comma (or the
+	// closing brace) is expected before the next one.
+	afterValue := false
+	for {
+		b = skipWhitespace(b)
+		if len(b) == 0 {
+			return 0, nil, NewParserError(b, "inline table is incomplete")
+		}
+
+		switch b[0] {
+		case '}':
+			return tbl, b[1:], nil
+		case '\n':
+			b = b[1:]
+			continue
+		case '\r':
+			if len(b) > 1 && b[1] == '\n' {
+				b = b[2:]
+				continue
+			}
+			return 0, nil, NewParserError(b[:1], "expected newline but got %#U", b[0])
+		case '#':
+			comment, rest, err := scanComment(b)
+			if err != nil {
+				return 0, nil, err
+			}
+			if p.KeepComments {
+				h := p.push(Node{Kind: Comment, Raw: p.Range(comment), Data: comment})
+				switch {
+				case runFirst == 0:
+					appendChild(h)
+					runFirst = h
+				case runLast == runFirst:
+					p.at(runFirst).child = h
+				default:
+					p.at(runLast).next = h
+				}
+				runLast = h
+			}
+			b = rest
+			continue
+		case ',':
+			if !afterValue {
+				return 0, nil, NewParserError(b[:1], "unexpected comma in inline table")
+			}
+			afterValue = false
+			b = b[1:]
+			continue
+		default:
+			if afterValue {
+				return 0, nil, NewParserError(b[:1], "expected ',' or '}' after inline table key-value")
+			}
+			h, rest, err := p.parseKeyval(b)
+			if err != nil {
+				return 0, nil, err
+			}
+			appendChild(h)
+			afterValue = true
+			runFirst, runLast = 0, 0
+			b = rest
+			continue
+		}
 	}
 }
 
@@ -1192,8 +1231,11 @@ func unescape(buf []byte, b []byte, i int) ([]byte, int, error) {
 	case 't':
 		return append(buf, '\t'), i + 1, nil
 	case 'e':
-		// not in TOML 1.0
-		return nil, 0, NewParserError(b[i-1:i+1], "invalid escape character %#U", c)
+		// TOML v1.1.0: \e is the escape character (U+001B).
+		return append(buf, 0x1B), i + 1, nil
+	case 'x':
+		// TOML v1.1.0: \xHH is a two-digit hexadecimal code point.
+		return unescapeUnicode(buf, b, i+1, 2)
 	case 'u':
 		return unescapeUnicode(buf, b, i+1, 4)
 	case 'U':

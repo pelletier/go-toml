@@ -423,10 +423,55 @@ type typeMismatchError struct {
 	toml      string
 	target    reflect.Type
 	highlight []byte
+	// key is the TOML key being processed when the mismatch occurred. It is
+	// populated lazily as the error propagates back up to the key-value
+	// handler (see contextualizeError).
+	key Key
 }
 
 func (e *typeMismatchError) Error() string {
 	return fmt.Sprintf("cannot decode TOML %s into %s", e.toml, e.target)
+}
+
+// contextualizeError attaches the TOML key currently being processed to errors
+// raised while decoding a key-value expression, so that DecodeError.Key()
+// reports the offending key (e.g. on type mismatch errors). The current key is
+// reconstructed from d.path; when the table target is cached, d.path holds only
+// the key-value parts, so the table key prefix is prepended. This only runs on
+// the error path and adds no cost to successful decodes.
+func (d *decoder) contextualizeError(err error, withTableKey bool) error {
+	var mm *typeMismatchError
+	if errors.As(err, &mm) {
+		if mm.key == nil {
+			mm.key = d.currentKey(withTableKey)
+		}
+		return err
+	}
+	var perr *unstable.ParserError
+	if errors.As(err, &perr) {
+		if perr.Key == nil {
+			perr.Key = d.currentKey(withTableKey)
+		}
+	}
+	return err
+}
+
+// currentKey reconstructs the full TOML key being processed from the decoder's
+// path. When withTableKey is true, d.path contains only the key-value parts
+// (the table target is cached) and the table key is prepended.
+func (d *decoder) currentKey(withTableKey bool) Key {
+	n := len(d.path)
+	if withTableKey {
+		n += len(d.tableKey)
+	}
+	key := make(Key, 0, n)
+	if withTableKey {
+		key = append(key, d.tableKey...)
+	}
+	for i := range d.path {
+		key = append(key, d.path[i].str())
+	}
+	return key
 }
 
 func (d *decoder) unmarshal(data []byte, v interface{}) error {
@@ -498,13 +543,14 @@ func (d *decoder) wrapError(data []byte, err error) error {
 		return wrapDecodeError(data, &unstable.ParserError{
 			Highlight: mm.highlight,
 			Message:   mm.Error(),
+			Key:       mm.key,
 		})
 	}
 	return err
 }
 
 func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) error {
-	first, err := d.seen.CheckExpression(expr)
+	first, err := d.seen.CheckExpression(d.p.Data(), expr)
 	if err != nil {
 		return err
 	}
@@ -1206,7 +1252,7 @@ func (d *decoder) handleKeyValueExpression(expr *unstable.Node, root reflect.Val
 
 	nv, err := d.descend(target, d.path, 0, expr, expr.Value())
 	if err != nil {
-		return err
+		return d.contextualizeError(err, useCache)
 	}
 	if !nv.IsValid() {
 		return nil

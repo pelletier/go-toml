@@ -51,16 +51,18 @@ func parseExpr(t *testing.T, doc string) *unstable.Node {
 }
 
 func TestSeenTrackerFreshReset(t *testing.T) {
-	node := parseExpr(t, "a = 1")
+	doc := "a = 1"
+	node := parseExpr(t, doc)
 	st := SeenTracker{}
-	first, err := st.CheckExpression(node)
+	first, err := st.CheckExpression([]byte(doc), node)
 	assert.NoError(t, err)
 	assert.False(t, first)
 }
 
 func TestSeenTrackerUnexpectedKind(t *testing.T) {
-	node := parseExpr(t, "# just a comment")
+	doc := "# just a comment"
+	node := parseExpr(t, doc)
 	st := SeenTracker{}
-	_, err := st.CheckExpression(node)
+	_, err := st.CheckExpression([]byte(doc), node)
 	assert.Error(t, err)
 }

@@ -80,9 +80,22 @@ type SeenTracker struct {
 	entries      []entry
 	currentTable int32
 
+	// doc is the document currently being checked. It is used to build error
+	// highlights from key node ranges (a key's decoded Data may be allocated
+	// and is therefore not a subslice of the document).
+	doc []byte
+
 	// scratch buffers for clear()
 	removedBuf []bool
 	remapBuf   []int32
+}
+
+// highlight returns the slice of the document covered by the given key part,
+// suitable for use as a ParserError highlight. Unlike the part's decoded Data,
+// this is always a subslice of the document.
+func (s *SeenTracker) highlight(part *unstable.Node) []byte {
+	r := part.Raw
+	return s.doc[r.Offset : r.Offset+r.Length]
 }
 
 // Reset brings the tracker to its initial state, with just a root table, so
@@ -162,7 +175,8 @@ func (s *SeenTracker) clear(id int32) {
 // keys that have been seen in previous calls, and validates that types are
 // consistent. It returns true if it is the first time this node's key is
 // seen. Useful to clear array tables on first use.
-func (s *SeenTracker) CheckExpression(node *unstable.Node) (bool, error) {
+func (s *SeenTracker) CheckExpression(doc []byte, node *unstable.Node) (bool, error) {
+	s.doc = doc
 	if len(s.entries) == 0 {
 		s.reset()
 	}
@@ -198,17 +212,17 @@ func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
 			switch e.kind {
 			case tableKind:
 				if e.explicit {
-					return false, unstable.NewParserError(name, "table %s already exists", name)
+					return false, unstable.NewParserError(s.highlight(part), "table %s already exists", name)
 				}
 				e.explicit = true
 				s.currentTable = i
 				return false, nil
 			case kvTableKind:
-				return false, unstable.NewParserError(name, "table %s already exists as defined by a dotted key", name)
+				return false, unstable.NewParserError(s.highlight(part), "table %s already exists as defined by a dotted key", name)
 			case arrayTableKind:
-				return false, unstable.NewParserError(name, "table %s already exists as an array of tables", name)
+				return false, unstable.NewParserError(s.highlight(part), "table %s already exists as an array of tables", name)
 			default:
-				return false, unstable.NewParserError(name, "key %s already exists as a value", name)
+				return false, unstable.NewParserError(s.highlight(part), "key %s already exists as a value", name)
 			}
 		}
 
@@ -221,7 +235,7 @@ func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
 				// Tables created by dotted keys can receive new sub-tables,
 				// but cannot be redefined (handled by the last-part case).
 			default:
-				return false, unstable.NewParserError(name, "key %s already exists as a value", name)
+				return false, unstable.NewParserError(s.highlight(part), "key %s already exists as a value", name)
 			}
 		}
 		parent = i
@@ -244,7 +258,7 @@ func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
 				return true, nil
 			}
 			if s.entries[i].kind != arrayTableKind {
-				return false, unstable.NewParserError(name, "key %s already exists", name)
+				return false, unstable.NewParserError(s.highlight(part), "key %s already exists", name)
 			}
 			// Make the descendants of this array table re-discoverable for
 			// the new element.
@@ -264,7 +278,7 @@ func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
 				// Tables created by dotted keys can receive new sub-tables,
 				// but cannot be redefined (handled by the last-part case).
 			default:
-				return false, unstable.NewParserError(name, "key %s already exists as a value", name)
+				return false, unstable.NewParserError(s.highlight(part), "key %s already exists as a value", name)
 			}
 		}
 		parent = i
@@ -279,7 +293,7 @@ func (s *SeenTracker) checkKeyValue(parent int32, node *unstable.Node) error {
 		name := part.Data
 		if it.IsLast() {
 			if i := s.find(parent, name); i >= 0 {
-				return unstable.NewParserError(name, "key %s is already defined", name)
+				return unstable.NewParserError(s.highlight(part), "key %s is already defined", name)
 			}
 			id := s.create(parent, name, valueKind, false)
 			return s.checkValue(id, node.Value())
@@ -289,7 +303,7 @@ func (s *SeenTracker) checkKeyValue(parent int32, node *unstable.Node) error {
 		if i < 0 {
 			i = s.create(parent, name, kvTableKind, false)
 		} else if s.entries[i].kind != kvTableKind {
-			return unstable.NewParserError(name, "key %s is already defined", name)
+			return unstable.NewParserError(s.highlight(part), "key %s is already defined", name)
 		}
 		parent = i
 	}

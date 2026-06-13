@@ -83,8 +83,7 @@ func (e *DecodeError) Position() (row int, column int) {
 	return e.line, e.column
 }
 
-// Key that was being processed when the error occurred. The key is present
-// only if this DecodeError is part of a StrictMissingError.
+// Key that was being processed when the error occurred.
 func (e *DecodeError) Key() Key {
 	return e.key
 }
