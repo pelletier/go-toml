@@ -1,4 +1,0 @@
-# github.com/pelletier/go-toml/v2/benchmark_test [github.com/pelletier/go-toml/v2/benchmark.test]
-benchmark/realworld_bench_test.go:537:5: d.DisallowUnknownFields undefined (type *toml.Decoder has no field or method DisallowUnknownFields)
-FAIL	github.com/pelletier/go-toml/v2/benchmark [build failed]
-FAIL

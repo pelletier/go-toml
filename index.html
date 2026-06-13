@@ -268,8 +268,8 @@ function buildMethodology() {
     ["Toolchain", DATA.toolchain + " (both platforms)"],
     ["Benchmark config", DATA.config],
     ["Harness", DATA.harness],
-    ["Linux", `holo0 · amd64 · taskset-pinned — ${c.linux.OK} ok / ${c.linux.BUILD_FAIL} skipped / ${tot('linux')} attempted`],
-    ["macOS", `local · arm64 · caffeinate — ${c.macos.OK} ok / ${c.macos.BUILD_FAIL} skipped / ${tot('macos')} attempted`],
+    ["Linux", `holo0 · amd64 · taskset-pinned — ${c.linux.OK} ok / ${tot('linux')-c.linux.OK} skipped / ${tot('linux')} attempted`],
+    ["macOS", `local · arm64 · caffeinate — ${c.macos.OK} ok / ${tot('macos')-c.macos.OK} skipped / ${tot('macos')} attempted`],
     ["Benchmarks", DATA.benchmarks.length + " cases"],
   ];
   m.innerHTML = rows.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
