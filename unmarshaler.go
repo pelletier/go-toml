@@ -199,6 +199,45 @@ func (d *decoder) newParserError(highlight []byte, format string, args ...interf
 	}
 }
 
+// wrapSeenError turns an error returned by SeenTracker.CheckExpression into a
+// ParserError carrying the position and key of the offending expression, so
+// that it is reported as a DecodeError with context (see issue #668).
+//
+// The highlight spans the expression's key. Unlike Node.Raw, key nodes always
+// carry a Raw range, so this works for tables and array tables too (whose own
+// Raw range is not set by the parser).
+func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var key Key
+	var start, end unstable.Range
+	it := node.Key()
+	for it.Next() {
+		n := it.Node()
+		key = append(key, string(n.Data))
+		if len(key) == 1 {
+			start = n.Raw
+		}
+		end = n.Raw
+	}
+
+	var highlight []byte
+	if len(key) > 0 {
+		highlight = d.p.Raw(unstable.Range{
+			Offset: start.Offset,
+			Length: end.Offset + end.Length - start.Offset,
+		})
+	}
+
+	return &unstable.ParserError{
+		Highlight: highlight,
+		Message:   strings.TrimPrefix(err.Error(), "toml: "),
+		Key:       key,
+	}
+}
+
 func (d *decoder) expr() *unstable.Node {
 	return d.p.Expression()
 }
@@ -289,7 +328,7 @@ func (d *decoder) handleRootExpression(expr *unstable.Node, v reflect.Value) err
 	if !d.skipUntilTable || expr.Kind != unstable.KeyValue {
 		first, err = d.seen.CheckExpression(expr)
 		if err != nil {
-			return err
+			return d.wrapSeenError(expr, err)
 		}
 	}
 
@@ -679,7 +718,7 @@ func (d *decoder) handleKeyValues(v reflect.Value) (reflect.Value, error) {
 
 		_, err := d.seen.CheckExpression(expr)
 		if err != nil {
-			return reflect.Value{}, err
+			return reflect.Value{}, d.wrapSeenError(expr, err)
 		}
 
 		x, err := d.handleKeyValue(expr, v)
@@ -711,7 +750,7 @@ func (d *decoder) handleKeyValuesUnmarshaler(u unstable.Unmarshaler) (reflect.Va
 
 		_, err := d.seen.CheckExpression(expr)
 		if err != nil {
-			return reflect.Value{}, err
+			return reflect.Value{}, d.wrapSeenError(expr, err)
 		}
 
 		// Use the raw bytes from the original document to preserve formatting

@@ -265,7 +265,7 @@ func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
 	} else {
 		kind := s.entries[idx].kind
 		if kind != arrayTableKind {
-			return false, fmt.Errorf("toml: key %s already exists as a %s,  but should be an array table", kind, string(k))
+			return false, fmt.Errorf("toml: key %s already exists as a %s, but should be an array table", string(k), kind)
 		}
 		s.clear(idx)
 	}
