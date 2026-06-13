@@ -1532,9 +1532,6 @@ func (d *decoder) assignInteger(v reflect.Value, value *unstable.Node) (reflect.
 		}
 		v.SetUint(uint64(i))
 		return v, nil
-	case reflect.Float32, reflect.Float64:
-		v.SetFloat(float64(i))
-		return v, nil
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(i))
 	default:

@@ -338,16 +338,8 @@ func isValueKind(v reflect.Value) bool {
 func (e *encoderState) isTableLike(v reflect.Value) bool {
 	v, ok := resolve(v)
 	if !ok {
-		// nil pointers to maps and structs are encoded as empty tables;
-		// other nils are values (or errors) handled later.
-		t := v.Type()
-		for t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-		if t.Kind() == reflect.Struct || t.Kind() == reflect.Map {
-			z := reflect.New(t).Elem()
-			return !isValueKind(z)
-		}
+		// Unresolvable values (interface-held nil pointers) are encoded as
+		// the zero value of their element type by the value path.
 		return false
 	}
 	return !isValueKind(v)
@@ -413,15 +405,8 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 			continue
 		}
 
-		tv, ok := resolve(ent.value)
-		if !ok {
-			// nil pointer to a table: encode an empty table.
-			t := ent.value.Type()
-			for t.Kind() == reflect.Ptr {
-				t = t.Elem()
-			}
-			tv = reflect.New(t).Elem()
-		}
+		// The value is resolvable: entryIsTable already resolved it.
+		tv, _ := resolve(ent.value)
 
 		e.writeTableHeader(ent.options.comment, entCommented, false, indent)
 
@@ -464,10 +449,8 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 	v, _ := resolve(ent.value)
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
-		elem, ok := resolve(v.Index(i))
-		if !ok {
-			return errors.New("toml: cannot encode a nil element in an array of tables")
-		}
+		// Elements are resolvable: isArrayOfTables already resolved them.
+		elem, _ := resolve(v.Index(i))
 
 		e.writeTableHeader(comment, commented, true, indent)
 		// The comment is only present before the first element.
@@ -642,16 +625,6 @@ func mapKeyString(k reflect.Value) (string, error) {
 		}
 		return string(b), nil
 	}
-	if !kr.CanAddr() && reflect.PtrTo(kr.Type()).Implements(textMarshalerType) {
-		tmp := reflect.New(kr.Type())
-		tmp.Elem().Set(kr)
-		b, err := tmp.Interface().(encoding.TextMarshaler).MarshalText()
-		if err != nil {
-			return "", fmt.Errorf("toml: cannot marshal map key: %w", err)
-		}
-		return string(b), nil
-	}
-
 	switch kr.Kind() {
 	case reflect.String:
 		return kr.String(), nil
