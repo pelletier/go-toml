@@ -451,6 +451,17 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 
 	d.captureIdx = -1
 	d.p.Reset(data)
+
+	// Fully generic targets (interface{} or map[string]interface{}) are
+	// decoded straight into native Go maps and slices, with no reflection on
+	// the document structure at all. This covers the common "decode arbitrary
+	// TOML into a map" case, including every standard benchmark dataset.
+	if !d.unmarshalerInterface {
+		if k := root.Kind(); k == reflect.Interface || (k == reflect.Map && root.Type() == mapStringInterfaceType) {
+			return d.unmarshalAny(root, data)
+		}
+	}
+
 	for d.p.NextExpression() {
 		err := d.handleRootExpression(d.p.Expression(), root)
 		if err != nil {
@@ -493,6 +504,132 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 	}
 
 	return d.strict.Error(data)
+}
+
+// unmarshalAny decodes the whole document into a native map[string]interface{}
+// tree, with no reflection on the document structure. It is used when the
+// target is a fully generic value (interface{} or map[string]interface{}) and
+// the unmarshaler interface is disabled. The seen-tracker still validates the
+// document (duplicate keys, type consistency), so the builder can create and
+// merge containers without revalidating. Strict mode never applies to a
+// generic target (a map has no "unknown fields"), and captures never apply (a
+// generic value implements no Unmarshaler).
+func (d *decoder) unmarshalAny(root reflect.Value, data []byte) error {
+	var m map[string]interface{}
+	if !root.IsNil() {
+		// Decode into (merge with) an existing generic map when present.
+		if em, ok := root.Interface().(map[string]interface{}); ok {
+			m = em
+		}
+	}
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+
+	cur := m
+	for d.p.NextExpression() {
+		expr := d.p.Expression()
+		first, err := d.seen.CheckExpression(expr)
+		if err != nil {
+			return d.wrapError(data, err)
+		}
+		switch expr.Kind {
+		case unstable.KeyValue:
+			if err := d.setAnyKey(cur, expr.Key(), expr.Value()); err != nil {
+				return d.wrapError(data, err)
+			}
+		case unstable.Table:
+			cur = d.anyTable(m, expr)
+		case unstable.ArrayTable:
+			cur = d.anyArrayTable(m, expr, first)
+		default:
+			return d.wrapError(data, unstable.NewParserError(expr.Data, "unsupported expression kind %s", expr.Kind))
+		}
+	}
+	if err := d.p.Error(); err != nil {
+		var perr *unstable.ParserError
+		if errors.As(err, &perr) {
+			return wrapDecodeError(data, perr)
+		}
+		return err
+	}
+
+	if root.CanSet() {
+		root.Set(reflect.ValueOf(m))
+	}
+	return nil
+}
+
+// setAnyKey assigns the value of a key-value into the native map m, following
+// the (possibly dotted) key and creating intermediate maps as needed.
+func (d *decoder) setAnyKey(m map[string]interface{}, key unstable.Iterator, value *unstable.Node) error {
+	cur := m
+	for key.Next() {
+		name := d.intern(key.Node().Data)
+		if key.IsLast() {
+			av, err := d.decodeAny(value)
+			if err != nil {
+				return err
+			}
+			cur[name] = av
+			return nil
+		}
+		cur = d.anyChildTable(cur, name)
+	}
+	return nil
+}
+
+// anyTable navigates a [table] header to the map it designates, creating
+// intermediate tables as needed.
+func (d *decoder) anyTable(m map[string]interface{}, expr *unstable.Node) map[string]interface{} {
+	cur := m
+	it := expr.Key()
+	for it.Next() {
+		cur = d.anyChildTable(cur, d.intern(it.Node().Data))
+	}
+	return cur
+}
+
+// anyArrayTable navigates a [[array table]] header, appends a fresh element to
+// the designated array, and returns it. first is true the first time this
+// header is seen, in which case any pre-existing array (from a reused target)
+// is reset.
+func (d *decoder) anyArrayTable(m map[string]interface{}, expr *unstable.Node, first bool) map[string]interface{} {
+	cur := m
+	it := expr.Key()
+	it.Next()
+	name := d.intern(it.Node().Data)
+	for it.Next() {
+		cur = d.anyChildTable(cur, name)
+		name = d.intern(it.Node().Data)
+	}
+	s, _ := cur[name].([]interface{})
+	if first {
+		s = s[:0]
+	}
+	elem := map[string]interface{}{}
+	cur[name] = append(s, elem)
+	return elem
+}
+
+// anyChildTable returns the child table at name within cur, creating it if
+// absent and descending into the current (last) element when an array table
+// occupies the slot. A non-container in the slot cannot occur for a document
+// the seen-tracker has accepted.
+func (d *decoder) anyChildTable(cur map[string]interface{}, name string) map[string]interface{} {
+	switch v := cur[name].(type) {
+	case map[string]interface{}:
+		return v
+	case []interface{}:
+		if len(v) > 0 {
+			if last, ok := v[len(v)-1].(map[string]interface{}); ok {
+				return last
+			}
+		}
+	}
+	nm := map[string]interface{}{}
+	cur[name] = nm
+	return nm
 }
 
 // wrapError gives document context to errors generated while processing an
@@ -1863,24 +2000,8 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 		it := n.Children()
 		for it.Next() {
 			kv := it.Node()
-			cur := m
-			kit := kv.Key()
-			for kit.Next() {
-				name := d.intern(kit.Node().Data)
-				if kit.IsLast() {
-					av, err := d.decodeAny(kv.Value())
-					if err != nil {
-						return nil, err
-					}
-					cur[name] = av
-					break
-				}
-				child, _ := cur[name].(map[string]interface{})
-				if child == nil {
-					child = make(map[string]interface{})
-					cur[name] = child
-				}
-				cur = child
+			if err := d.setAnyKey(m, kv.Key(), kv.Value()); err != nil {
+				return nil, err
 			}
 		}
 		return m, nil
