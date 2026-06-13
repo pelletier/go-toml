@@ -18,34 +18,18 @@ type strict struct {
 }
 
 func (s *strict) EnterTable(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
 	s.key.UpdateTable(node)
 }
 
 func (s *strict) EnterArrayTable(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
 	s.key.UpdateArrayTable(node)
 }
 
 func (s *strict) EnterKeyValue(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
 	s.key.Push(node)
 }
 
 func (s *strict) ExitKeyValue(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
 	s.key.Pop(node)
 }
 

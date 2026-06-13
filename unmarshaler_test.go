@@ -2313,6 +2313,7 @@ port = "bad"
  |        ~~~~~ cannot decode TOML string into struct field toml_test.Server.Port of type int`
 
 	assert.Equal(t, expected, x.String())
+	assert.Equal(t, toml.Key{"server", "port"}, x.Key())
 }
 
 func TestUnmarshalIntegerInvalidStructField(t *testing.T) {
