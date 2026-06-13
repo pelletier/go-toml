@@ -1188,6 +1188,74 @@ func TestEncoderOmitemptyTextMarshalerZero(t *testing.T) {
 	assert.Equal(t, "", string(b))
 }
 
+// TestEncoderOmitemptyPointerTextMarshaler covers structs whose TextMarshaler
+// implementation uses a pointer receiver: the value must be addressable for
+// the marshaler to apply, in which case omitempty falls back to
+// reflect.Value.IsZero.
+func TestEncoderOmitemptyPointerTextMarshaler(t *testing.T) {
+	type doc struct {
+		V customTextMarshaler `toml:"v,omitempty"`
+	}
+
+	d := doc{V: customTextMarshaler{value: 2}}
+	b, err := toml.Marshal(&d)
+	assert.NoError(t, err)
+	assert.Equal(t, "v = '::2'\n", string(b))
+
+	d = doc{}
+	b, err = toml.Marshal(&d)
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(b))
+}
+
+// TestEncoderOmitemptyCustomIsZero verifies that omitempty uses a custom
+// IsZero method when the struct provides one, like omitzero does.
+func TestEncoderOmitemptyCustomIsZero(t *testing.T) {
+	type doc struct {
+		Custom customZeroType `toml:",omitempty"`
+	}
+
+	// Value = 5 is non-empty for isEmptyStruct, but the custom IsZero
+	// returns true for values < 10, and takes precedence.
+	d := doc{Custom: customZeroType{Value: 5}}
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(b))
+
+	d = doc{Custom: customZeroType{Value: 15}}
+	b, err = toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "[Custom]\nValue = 15\n", string(b))
+}
+
+// TestEncoderOmitemptyCustomIsZeroPointerReceiver is the same as
+// TestEncoderOmitemptyCustomIsZero for a type implementing IsZero on its
+// pointer receiver. Marshaling the document by value exercises the
+// non-addressable code path, and by pointer the addressable one.
+func TestEncoderOmitemptyCustomIsZeroPointerReceiver(t *testing.T) {
+	type doc struct {
+		Custom customZeroPointerType `toml:",omitempty"`
+	}
+
+	d := doc{Custom: customZeroPointerType{Value: 5}}
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(b))
+
+	b, err = toml.Marshal(&d)
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(b))
+
+	d = doc{Custom: customZeroPointerType{Value: 15}}
+	b, err = toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "[Custom]\nValue = 15\n", string(b))
+
+	b, err = toml.Marshal(&d)
+	assert.NoError(t, err)
+	assert.Equal(t, "[Custom]\nValue = 15\n", string(b))
+}
+
 func TestEncoderOmitzero(t *testing.T) {
 	type doc struct {
 		String  string            `toml:",omitzero,multiline"`
