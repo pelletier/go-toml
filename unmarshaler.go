@@ -1948,12 +1948,16 @@ var (
 )
 
 // structPlan caches the mapping between TOML keys and the fields of a struct
-// type. byName holds the exact field/tag names and is consulted first so that
-// an exact match always wins; byFold is keyed by the lowercased name and
-// provides the case-insensitive fallback.
+// type. byFold, keyed by the lowercased name, resolves any key on its own when
+// no two fields fold to the same name (the overwhelmingly common case, marked
+// by hasCollision == false): TOML keys are usually lowercase and never match
+// the exact (capitalized) Go field names, so the byName probe was always a
+// wasted lookup. byName (the exact names) is only consulted, first, when
+// fields do collide under folding, to preserve the exact-match-wins tiebreak.
 type structPlan struct {
-	byName map[string]structField
-	byFold map[string]structField
+	byName       map[string]structField
+	byFold       map[string]structField
+	hasCollision bool
 }
 
 type structField struct {
@@ -1966,27 +1970,40 @@ type structField struct {
 // fallback.
 const foldBufSize = 68
 
-// lookup and lookupBytes keep the exact-match fast path tiny (a single map
-// lookup) so it stays inlinable; the case-folded fallback lives in separate
-// methods that are only called on an exact miss.
+// lookup and lookupBytes keep the hot path to a single inlinable byFold lookup.
+// byFold is indexed by both the exact field/tag names and their lowercased
+// forms, so that lookup resolves the two common cases — a lowercase key, or a
+// key matching the field's own casing — directly. byName is consulted first
+// only for types whose fields collide under case-folding, to preserve the
+// exact-match-wins tiebreak. The buffer-fold for other casings lives
+// out-of-line so it does not bloat the hot path.
 func (p *structPlan) lookup(name string) (structField, bool) {
-	if f, ok := p.byName[name]; ok {
+	if p.hasCollision {
+		if f, ok := p.byName[name]; ok {
+			return f, true
+		}
+	}
+	if f, ok := p.byFold[name]; ok {
 		return f, true
 	}
 	return p.lookupFoldStr(name)
 }
 
 func (p *structPlan) lookupBytes(name []byte) (structField, bool) {
-	if f, ok := p.byName[string(name)]; ok { // does not allocate
+	if p.hasCollision {
+		if f, ok := p.byName[string(name)]; ok { // does not allocate
+			return f, true
+		}
+	}
+	if f, ok := p.byFold[string(name)]; ok { // does not allocate
 		return f, true
 	}
 	return p.lookupFold(name)
 }
 
-// lookupFold resolves name case-insensitively. It lowercases ASCII keys into a
-// stack buffer so the common path does not allocate; only non-ASCII or
-// oversized keys fall back to strings.ToLower. The fold loop is inlined so buf
-// provably stays on the stack.
+// lookupFold resolves keys whose casing matches neither the exact nor the
+// lowercased index: it folds to lowercase (in a stack buffer for ASCII, so no
+// allocation) and retries; only non-ASCII or oversized keys hit strings.ToLower.
 func (p *structPlan) lookupFold(name []byte) (structField, bool) {
 	if len(name) <= foldBufSize {
 		var buf [foldBufSize]byte
@@ -2101,6 +2118,21 @@ func addFields(plan *structPlan, t reflect.Type, prefix []int) {
 		lower := strings.ToLower(name)
 		if _, ok := plan.byFold[lower]; !ok {
 			plan.byFold[lower] = sf
+		} else {
+			// Two distinct fields fold to the same name: case-insensitive
+			// matching is ambiguous, so lookups must consult byName first to
+			// keep the exact-match-wins tiebreak deterministic.
+			plan.hasCollision = true
+		}
+		// Index the exact (cased) name as well, so a key written with the
+		// field's own casing resolves in a single byFold lookup. Only fields
+		// whose name is not already lowercase need this extra entry. Any name
+		// that would conflict here also collides under folding (handled
+		// above), so byName-first preserves the exact tiebreak in that case.
+		if name != lower {
+			if _, ok := plan.byFold[name]; !ok {
+				plan.byFold[name] = sf
+			}
 		}
 	}
 	// Embedded structs are flattened after the regular fields, so that
