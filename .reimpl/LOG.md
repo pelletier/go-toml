@@ -277,3 +277,22 @@ https://github.com/pelletier/go-toml/pull/1067 (base v2). Description has the
 improvement summary + collapsed benchstat tables (combined/linux/macos) built
 from bench-go1.26.4-{v2,reimpl-final}.txt and bench-linux-{v2,reimpl-final}.txt.
 B/s sections stripped to fit GitHub's 65536-char body limit (inverse of sec/op).
+
+### 2026-06-12 (later): CI green on PR #1067
+First CI run failed lint (44 golangci-lint v2.8.0 findings) and report
+(coverage 88.2% vs v2's 97.4%; ci.sh fails on any decrease).
+- Lint fixes (commit 33dae86): errors.As everywhere, default: on enum
+  switches (config has default-signifies-exhaustive), nolint:gosec comments
+  matching v2 style, gofumpt, dropped always-nil results, deleted unused
+  utf8ValidNext. Config is .golangci.toml (not .yml).
+- Coverage (commit 3def07f): coverage_*_test.go files in root/unstable/
+  tracker covering error paths; deleted unused internal/characters package;
+  removed dead defensive branches (second-pass nil resolve, mapKeyString
+  !CanAddr branch, assignInteger float case shadowed by early redirect).
+  88.2% -> 98.5%.
+- PARITY BUG found by new tests & fixed: interface-held nil pointers
+  (map[string]interface{}{"a": (*S)(nil)}) must marshal as zero value
+  ("a = {X = 0}" like v2); isTableLike now returns false on unresolvable.
+- Pinned: nested inline containers under EnableUnmarshalerInterface get raw
+  "{" only (v2 does the same).
+All 12 checks green (lint, report, Fuzzing, 1.25/1.26 x 4 OS, release).
