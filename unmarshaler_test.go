@@ -715,6 +715,42 @@ foo = "bar"`,
 			},
 		},
 		{
+			desc:  "local-time fractional without seconds is invalid",
+			input: `a = 14:15.5`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "local-datetime fractional without seconds is invalid",
+			input: `a = 2010-02-03T14:15.5`,
+			gen: func() test {
+				var v map[string]interface{}
+
+				return test{
+					target: &v,
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "offset-datetime fractional without seconds is invalid",
+			input: `a = 2010-02-03T14:15.5Z`,
+			gen: func() test {
+				var v map[string]time.Time
+
+				return test{
+					target: &v,
+					err:    true,
+				}
+			},
+		},
+		{
 			desc: "issue 475 - space between dots in key",
 			input: `fruit. color = "yellow"
 					fruit . flavor = "banana"`,

@@ -224,6 +224,11 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 
 	b = b[5:]
 
+	// Seconds are optional (TOML v1.1.0). Fractional seconds may only appear
+	// when seconds are present:
+	//   partial-time = time-hour ":" time-minute [ ":" time-second [ time-secfrac ] ]
+	secondsPresent := false
+
 	if len(b) >= 1 && b[0] == ':' {
 		if len(b) < 3 {
 			return t, nil, unstable.NewParserError(b, "incomplete seconds")
@@ -239,9 +244,10 @@ func parseLocalTime(b []byte) (LocalTime, []byte, error) {
 		}
 
 		b = b[3:]
+		secondsPresent = true
 	}
 
-	if len(b) >= 1 && b[0] == '.' {
+	if secondsPresent && len(b) >= 1 && b[0] == '.' {
 		frac := 0
 		precision := 0
 		digits := 0
