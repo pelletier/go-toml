@@ -3,294 +3,355 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>go-toml v2 — benchmark history</title>
+<title>go-toml v2 · benchmark history</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  :root { --fg:#1f2328; --muted:#656d76; --line:#d0d7de; --accent:#0969da; --bg:#ffffff; --panel:#f6f8fa; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; color:var(--fg); background:var(--bg); }
-  header { padding:20px 24px; border-bottom:1px solid var(--line); }
-  h1 { margin:0 0 4px; font-size:20px; }
-  .sub { color:var(--muted); font-size:13px; line-height:1.5; }
-  .sub a { color:var(--accent); text-decoration:none; }
-  main { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
-  .controls { display:flex; flex-wrap:wrap; gap:14px 20px; align-items:flex-end; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; margin-bottom:18px; }
-  .ctl { display:flex; flex-direction:column; gap:4px; }
-  .ctl label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
-  select, button { font-size:14px; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--fg); }
-  .platforms { display:flex; gap:12px; }
-  .platforms label { font-size:13px; text-transform:none; letter-spacing:0; color:var(--fg); font-weight:400; display:flex; align-items:center; gap:5px; }
-  .chartwrap { position:relative; height:460px; border:1px solid var(--line); border-radius:8px; padding:10px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
-  .cell { border:1px solid var(--line); border-radius:8px; padding:8px 8px 4px; }
-  .cell h3 { margin:2px 6px 6px; font-size:12px; font-weight:600; color:var(--fg); }
-  .cell .mini { position:relative; height:170px; }
-  .hint { font-size:12px; color:var(--muted); margin:8px 2px 0; }
-  section.block { margin-top:34px; }
-  section.block h2 { font-size:16px; border-bottom:1px solid var(--line); padding-bottom:6px; }
-  table { border-collapse:collapse; width:100%; font-size:13px; }
-  th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
-  th { position:sticky; top:0; background:#fff; }
-  td.subj { white-space:normal; }
-  .tag { display:inline-block; background:#ddf4ff; color:#0969da; border-radius:10px; padding:0 8px; font-size:11px; font-weight:600; }
-  .tablewrap { max-height:520px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
-  code { background:var(--panel); padding:1px 5px; border-radius:4px; font-size:12px; }
-  .filterbox { margin-bottom:10px; }
-  .filterbox input { font-size:13px; padding:6px 10px; border:1px solid var(--line); border-radius:6px; width:260px; }
-  .meta dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; font-size:13px; }
-  .meta dt { color:var(--muted); }
+  :root{
+    --paper:#f4f3ee; --panel:#fbfaf6; --ink:#1b1813; --muted:#6c6557;
+    --hair:rgba(27,24,19,.12); --soft:rgba(27,24,19,.055);
+    --linux:#1f7a6d; --macos:#c2410c; --tag:#9a7209;
+    --good:#15803d; --bad:#b4341c;
+    --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:450;
+    font-feature-settings:"tnum" 1,"cv05" 1;line-height:1.45;
+    background-image:radial-gradient(var(--soft) 1px,transparent 1px);background-size:22px 22px;}
+  a{color:inherit}
+  .mono{font-family:var(--mono)}
+
+  header{position:sticky;top:0;z-index:30;background:rgba(244,243,238,.93);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--hair)}
+  .bar{max-width:1320px;margin:0 auto;padding:12px 22px;display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center}
+  .brand{display:flex;flex-direction:column;gap:1px;margin-right:auto}
+  .brand .wm{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:.02em;display:flex;align-items:baseline;gap:7px}
+  .brand .wm b{background:var(--ink);color:var(--paper);padding:1px 6px;border-radius:5px;font-weight:600}
+  .brand .tag-line{font-size:11.5px;color:var(--muted)}
+  .ctl{display:flex;flex-direction:column;gap:4px}
+  .ctl > span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .seg{display:inline-flex;border:1px solid var(--hair);border-radius:7px;overflow:hidden;background:var(--panel)}
+  .seg button{font-family:var(--mono);font-size:11.5px;border:0;background:transparent;color:var(--muted);
+    padding:5px 10px;cursor:pointer;border-left:1px solid var(--hair)}
+  .seg button:first-child{border-left:0}
+  .seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+  .seg.lx button[aria-pressed=true]{background:var(--linux)}
+  .seg.mc button[aria-pressed=true]{background:var(--macos)}
+
+  main{max-width:1320px;margin:0 auto;padding:18px 22px 10px}
+  .grouphead{display:flex;align-items:baseline;gap:10px;margin:22px 2px 10px}
+  .grouphead h2{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin:0}
+  .grouphead .rule{flex:1;height:1px;background:var(--hair)}
+  .grouphead .n{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(312px,1fr));gap:13px}
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:11px;padding:10px 11px 8px;
+    box-shadow:0 1px 0 rgba(27,24,19,.03);transition:box-shadow .16s,transform .16s,border-color .16s;cursor:pointer;
+    opacity:0;transform:translateY(6px);animation:rise .5s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .card:hover{box-shadow:0 6px 22px -10px rgba(27,24,19,.4);border-color:rgba(27,24,19,.22);transform:translateY(-2px)}
+  .card .ct{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px}
+  .card .ct h3{margin:0;font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.005em;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .ct h3 .pre{color:var(--muted)}
+  .deltas{display:flex;gap:5px;flex-shrink:0}
+  .pill{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:5px;border:1px solid var(--hair);white-space:nowrap}
+  .pill.up{color:var(--bad)} .pill.down{color:var(--good)}
+  .pill .k{opacity:.55}
+  .mini{position:relative;height:128px}
+  .axhint{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:3px}
+
+  details{max-width:1320px;margin:14px auto 0;padding:0 22px}
+  details>summary{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--muted);padding:10px 0;border-top:1px solid var(--hair);list-style:none;display:flex;align-items:center;gap:8px}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:"+";font-weight:600;color:var(--ink)}
+  details[open]>summary::before{content:"–"}
+  .panel{padding:4px 2px 18px;font-size:13px}
+  .meta-grid{display:grid;grid-template-columns:max-content 1fr;gap:5px 18px;font-size:12.5px}
+  .meta-grid dt{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.02em}
+  .note{color:var(--muted);font-size:12px;max-width:70ch;margin:12px 0 0}
+
+  .filterbox input{font-family:var(--mono);font-size:12.5px;padding:6px 10px;border:1px solid var(--hair);border-radius:7px;
+    width:280px;background:var(--panel);color:var(--ink);margin-bottom:9px}
+  .tablewrap{max-height:460px;overflow:auto;border:1px solid var(--hair);border-radius:9px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{text-align:left;padding:5px 9px;border-bottom:1px solid var(--soft);white-space:nowrap}
+  th{position:sticky;top:0;background:var(--panel);font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);font-weight:500}
+  td.subj{white-space:normal;font-size:12px}
+  td .sha{font-family:var(--mono);color:var(--linux)}
+  .rtag{font-family:var(--mono);font-size:10.5px;color:var(--tag)}
+  .xfail{color:#a4583f;font-family:var(--mono);font-size:11px}
+
+  footer{max-width:1320px;margin:8px auto 40px;padding:14px 22px;color:var(--muted);font-size:11.5px;
+    border-top:1px solid var(--hair);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:var(--mono)}
+  footer a{color:var(--linux);text-decoration:none}
+
+  /* modal */
+  #ovl{position:fixed;inset:0;z-index:50;background:rgba(27,24,19,.42);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;padding:24px}
+  #ovl.on{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--hair);border-radius:14px;width:min(960px,96vw);
+    box-shadow:0 30px 80px -30px rgba(27,24,19,.6);padding:16px 18px}
+  .modal .mh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+  .modal .mh h3{margin:0;font-family:var(--mono);font-size:14px;font-weight:600}
+  .modal .mh button{font-family:var(--mono);font-size:13px;border:1px solid var(--hair);background:var(--paper);
+    border-radius:7px;padding:4px 11px;cursor:pointer;color:var(--ink)}
+  .mbig{position:relative;height:min(64vh,460px)}
+  .mlegend{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;display:flex;gap:16px;flex-wrap:wrap}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
 </style>
 </head>
 <body>
 <header>
-  <h1>go-toml v2 — benchmark history</h1>
-  <div class="sub">
-    Performance of <a href="https://github.com/pelletier/go-toml">github.com/pelletier/go-toml/v2</a>
-    across the <code>v2</code> branch, measured with the frozen benchmark suite from
-    <a href="https://github.com/pelletier/go-toml/pull/1067">PR&nbsp;#1067</a> overlaid on every commit.
-    Lower is better. <span id="genline"></span>
+  <div class="bar">
+    <div class="brand">
+      <div class="wm"><b>go-toml</b> <span>/v2</span> · benchmark history</div>
+      <div class="tag-line" id="subline">go1.26.4 · #1067 suite · median of 5 · lower is better</div>
+    </div>
+    <div class="ctl"><span>metric</span>
+      <div class="seg" id="seg-metric">
+        <button data-v="ns" aria-pressed="true">time</button>
+        <button data-v="B">memory</button>
+        <button data-v="allocs">allocs</button>
+      </div>
+    </div>
+    <div class="ctl"><span>baseline</span>
+      <div class="seg" id="seg-base">
+        <button data-v="rel" aria-pressed="true">× vs first</button>
+        <button data-v="abs">absolute</button>
+      </div>
+    </div>
+    <div class="ctl"><span>scale</span>
+      <div class="seg" id="seg-scale">
+        <button data-v="linear" aria-pressed="true">lin</button>
+        <button data-v="logarithmic">log</button>
+      </div>
+    </div>
+    <div class="ctl"><span>platforms</span>
+      <div style="display:flex;gap:6px">
+        <div class="seg lx" id="seg-linux"><button data-v="linux" aria-pressed="true">linux</button></div>
+        <div class="seg mc" id="seg-macos"><button data-v="macos" aria-pressed="true">macOS</button></div>
+      </div>
+    </div>
   </div>
 </header>
-<main>
-  <div class="controls">
-    <div class="ctl">
-      <label for="bench">Benchmark</label>
-      <select id="bench"></select>
-    </div>
-    <div class="ctl">
-      <label for="metric">Metric</label>
-      <select id="metric">
-        <option value="ns">time (ns/op)</option>
-        <option value="B">memory (B/op)</option>
-        <option value="allocs">allocations (allocs/op)</option>
-      </select>
-    </div>
-    <div class="ctl">
-      <label>Platforms</label>
-      <div class="platforms" id="platforms"></div>
-    </div>
-    <div class="ctl">
-      <label for="view">View</label>
-      <select id="view">
-        <option value="single">Single benchmark</option>
-        <option value="grid">All benchmarks (grid)</option>
-      </select>
-    </div>
-  </div>
 
-  <div id="singleView">
-    <div class="chartwrap"><canvas id="chart"></canvas></div>
-    <div class="hint">X axis = commit order on <code>v2</code> (oldest → newest). ★ = release tag. Hover for commit details; click a point to open it on GitHub.</div>
-  </div>
-  <div id="gridView" style="display:none">
-    <div class="grid" id="grid"></div>
-  </div>
+<main id="board"></main>
 
-  <section class="block">
-    <h2>Full results</h2>
-    <p class="sub">Per-commit raw <code>go test -bench</code> output and the aggregated dataset.
-      Download <a href="data.json" download>data.json</a>.</p>
-    <div class="filterbox"><input id="filter" placeholder="filter commits (sha, subject, tag)…"></div>
+<details>
+  <summary>Full results · per-commit raw output</summary>
+  <div class="panel">
+    <div class="filterbox"><input id="filter" placeholder="filter sha / subject / tag…"></div>
     <div class="tablewrap">
-      <table id="restable">
-        <thead><tr><th>#</th><th>commit</th><th>date</th><th>subject</th><th>tag</th><th>linux</th><th>macos</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <table id="restable"><thead><tr>
+        <th>#</th><th>commit</th><th>date</th><th>subject</th><th>release</th><th>linux</th><th>macos</th>
+      </tr></thead><tbody></tbody></table>
     </div>
-  </section>
+  </div>
+</details>
 
-  <section class="block meta">
-    <h2>Methodology</h2>
-    <dl id="methodology"></dl>
-    <p class="sub" style="margin-top:10px">
-      Each commit is checked out, the frozen #1067 benchmark harness is overlaid (so only the
-      library implementation varies), and the suite is built and run with a single fixed Go
-      toolchain. Numbers are the median of the samples. macOS and Linux are different machines —
-      compare each series against itself, never across platforms. Commits before the suite's
-      required API existed (e.g. <code>Decoder.DisallowUnknownFields</code>) do not build and are
-      reported as skipped.
-    </p>
-  </section>
-</main>
+<details>
+  <summary>Methodology &amp; caveats</summary>
+  <div class="panel">
+    <dl class="meta-grid" id="methodology"></dl>
+    <p class="note">The benchmark harness is held constant (frozen #1067 suite overlaid on each commit) so only the
+      library implementation varies; each commit is built and run with one fixed Go toolchain. <b>macOS and Linux are
+      different machines — read each series against itself, not across platforms.</b> The x-axis is commit order on
+      <span class="mono">v2</span> (committer dates are non-monotonic from rebases). Commits whose API predates the suite
+      (e.g. <span class="mono">DisallowUnknownFields</span>) do not build and are omitted.</p>
+  </div>
+</details>
+
+<footer>
+  <span id="genline"></span>
+  <span><a href="data.json" download>data.json</a> · <a href="https://github.com/pelletier/go-toml">repo</a> · <a href="https://github.com/pelletier/go-toml/pull/1067">#1067</a></span>
+</footer>
+
+<div id="ovl"><div class="modal">
+  <div class="mh"><h3 id="mtitle"></h3><button id="mclose">esc ✕</button></div>
+  <div class="mbig"><canvas id="mcanvas"></canvas></div>
+  <div class="mlegend"><span><span class="dot" style="background:var(--linux)"></span>linux</span>
+    <span><span class="dot" style="background:var(--macos)"></span>macOS</span>
+    <span>★ release · click a point → commit on GitHub</span></div>
+</div></div>
 
 <script>
-const GH = "https://github.com/pelletier/go-toml/commit/";
-const COLORS = { linux: "#0969da", macos: "#cf222e" };
-const METRIC_LABEL = { ns: "ns/op", B: "B/op", allocs: "allocs/op" };
-let DATA, chart, gridCharts = [];
+const GH="https://github.com/pelletier/go-toml/commit/";
+const COL={linux:"#1f7a6d",macos:"#c2410c"};
+const MUNIT={ns:"ns/op",B:"B/op",allocs:"allocs/op"};
+const GROUPS=[
+  {key:"Unmarshal",  test:n=>n.startsWith("BenchmarkUnmarshal/")},
+  {key:"Marshal",    test:n=>n.startsWith("BenchmarkMarshal/")},
+  {key:"Datasets",   test:n=>n.startsWith("BenchmarkUnmarshalDataset")},
+  {key:"Real-world", test:n=>n.startsWith("BenchmarkRealWorld")},
+];
+let DATA, MARKERS=[], charts=[], modalChart=null;
+const ST={metric:"ns",base:"rel",scale:"linear",plat:{linux:true,macos:true}};
 
-function fmt(metric, v) {
-  if (v == null) return "—";
-  if (metric === "ns") {
-    if (v >= 1e6) return (v/1e6).toFixed(2) + " ms";
-    if (v >= 1e3) return (v/1e3).toFixed(2) + " µs";
-    return v.toFixed(0) + " ns";
+const median=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const movmed=(arr,w)=>arr.map((_,i)=>median(arr.slice(Math.max(0,i-w),Math.min(arr.length,i+w+1)))); // centered median smooth
+const niceName=n=>n.replace(/^Benchmark/,"").replace(/^UnmarshalDataset\//,"").replace(/^(Unmarshal|Marshal|RealWorld)/,"");
+function fmtAbs(m,v){
+  if(v==null)return"—";
+  if(m==="ns")return v>=1e6?(v/1e6).toFixed(2)+" ms":v>=1e3?(v/1e3).toFixed(2)+" µs":v.toFixed(0)+" ns";
+  if(m==="B")return v>=1e6?(v/1e6).toFixed(2)+" MB":v>=1e3?(v/1e3).toFixed(1)+" KB":v+" B";
+  return Number(v).toLocaleString();
+}
+function series(bench,plat){
+  const out=[];
+  for(const c of DATA.commits){const r=c.results[plat]; if(r&&r[bench]&&r[bench][ST.metric]!=null) out.push({x:c.order,y:r[bench][ST.metric],c});}
+  return out;
+}
+function transform(raw){ // apply baseline mode; relative uses a robust baseline (median of first 5)
+  if(ST.base==="abs"||!raw.length) return raw.map(p=>({x:p.x,y:p.y,c:p.c,abs:p.y}));
+  const base=median(raw.slice(0,5).map(p=>p.y))||1;
+  return raw.map(p=>({x:p.x,y:p.y/base,c:p.c,abs:p.y}));
+}
+function plats(){return DATA.platforms.filter(p=>ST.plat[p])}
+
+// faint vertical release markers + (relative mode) baseline line
+const markerPlugin={id:"mk",afterDraw(ch){
+  const{ctx,chartArea:a,scales:{x,y}}=ch; if(!a)return;
+  ctx.save();
+  if(ST.base==="rel"){const yb=y.getPixelForValue(1);if(yb>=a.top&&yb<=a.bottom){
+    ctx.strokeStyle="rgba(27,24,19,.22)";ctx.setLineDash([3,3]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(a.left,yb);ctx.lineTo(a.right,yb);ctx.stroke();ctx.setLineDash([]);}}
+  for(const mk of MARKERS){const px=x.getPixelForValue(mk.order); if(px<a.left||px>a.right)continue;
+    ctx.strokeStyle="rgba(154,114,9,.32)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(px,a.top);ctx.lineTo(px,a.bottom);ctx.stroke();
+    if(ch._big){ctx.fillStyle="rgba(154,114,9,.9)";ctx.font="10px 'IBM Plex Mono'";ctx.fillText(mk.label,px+3,a.top+11);}}
+  ctx.restore();
+}};
+Chart.register(markerPlugin);
+
+function mkChart(canvas,bench,big){
+  const ds=[];
+  for(const p of plats()){
+    const d=transform(series(bench,p)); if(!d.length)continue;
+    const sm=movmed(d.map(q=>q.y),3); // window 7, edge-preserving
+    ds.push({label:p,_raw:true,data:d,parsing:false,borderColor:COL[p]+"40",backgroundColor:COL[p],borderWidth:1,
+      tension:.1,spanGaps:true,pointHitRadius:big?6:3,order:3,
+      pointRadius:c=>c.raw&&c.raw.c.tags.length?(big?3.6:2.2):0,
+      pointStyle:c=>c.raw&&c.raw.c.tags.length?"star":"circle",pointHoverRadius:6});
+    ds.push({label:p,_raw:false,data:d.map((q,i)=>({x:q.x,y:sm[i]})),parsing:false,
+      borderColor:COL[p],borderWidth:big?2.3:1.7,tension:.32,spanGaps:true,pointRadius:0,pointHitRadius:0,order:1});
   }
-  if (metric === "B") {
-    if (v >= 1e6) return (v/1e6).toFixed(2) + " MB";
-    if (v >= 1e3) return (v/1e3).toFixed(1) + " KB";
-    return v + " B";
-  }
-  return v.toLocaleString();
+  // relative mode: stable, generous y-bounds so ±noise reads small and real step-changes stand out
+  let ymin,ymax;
+  if(ST.base==="rel"){const ys=ds.flatMap(d=>d.data.map(p=>p.y));
+    if(ys.length){ymin=Math.min(.85,Math.min(...ys)*.98);ymax=Math.max(1.2,Math.max(...ys)*1.02);}}
+  const ch=new Chart(canvas,{type:"line",data:{datasets:ds},options:{
+    animation:false,responsive:true,maintainAspectRatio:false,
+    interaction:{mode:"nearest",intersect:false,axis:"x"},
+    onClick:(e,el)=>{for(const h of el){const r=h.element.$context.raw;if(r&&r.c){window.open(GH+r.c.sha,"_blank");return;}}},
+    layout:{padding:big?6:0},
+    scales:{
+      x:{type:"linear",display:big,min:firstOrder(),max:DATA.commits.length-1,
+         ticks:{precision:0,font:{family:"IBM Plex Mono",size:10}},title:{display:big,text:"commit order →",font:{family:"IBM Plex Mono",size:10}},grid:{color:"rgba(27,24,19,.05)"}},
+      y:{type:ST.scale,display:big,min:ymin,max:ymax,
+         ticks:{font:{family:"IBM Plex Mono",size:10},callback:v=>ST.base==="rel"?(+v).toFixed(2)+"×":fmtAbs(ST.metric,v),maxTicksLimit:big?7:5},
+         grid:{color:"rgba(27,24,19,.05)"}},
+    },
+    plugins:{legend:{display:false},tooltip:{enabled:true,filter:i=>i.dataset._raw,backgroundColor:"#1b1813",titleFont:{family:"IBM Plex Sans",size:12},
+      bodyFont:{family:"IBM Plex Mono",size:11},padding:9,displayColors:true,boxWidth:8,boxHeight:8,
+      callbacks:{title:i=>i.length?i[0].raw.c.subject:"",
+        label:i=>`${i.dataset.label}: ${fmtAbs(ST.metric,i.raw.abs)}${ST.base==="rel"?"  ("+i.raw.y.toFixed(3)+"×)":""}`,
+        afterBody:i=>{const c=i[0].raw.c;return `${c.short} · ${c.date.slice(0,10)}${c.tags.length?" · "+c.tags.join(","):""}`;}}}},
+  }});
+  ch._big=big; return ch;
+}
+function firstOrder(){ // earliest order with any data, for x-min
+  let m=Infinity;for(const c of DATA.commits)if(c.results.linux||c.results.macos)m=Math.min(m,c.order);return m===Infinity?0:m;}
+
+function deltaPill(bench,p){
+  const s=series(bench,p);if(s.length<4)return"";
+  const a=median(s.slice(0,5).map(q=>q.y)),b=median(s.slice(-5).map(q=>q.y));if(!a)return"";
+  const pct=(b/a-1)*100;const cls=pct>1.5?"up":pct<-1.5?"down":"";
+  const sign=pct>0?"+":"";const lab=p==="linux"?"L":"M";
+  return `<span class="pill ${cls}"><span class="k">${lab}</span> ${sign}${pct.toFixed(0)}%</span>`;
 }
 
-function points(bench, metric, platform) {
-  const pts = [];
-  for (const c of DATA.commits) {
-    const r = c.results[platform];
-    if (r && r[bench] && r[bench][metric] != null) {
-      pts.push({ x: c.order, y: r[bench][metric], c });
+function renderBoard(){
+  charts.forEach(c=>c.destroy());charts=[];
+  const board=document.getElementById("board");board.innerHTML="";
+  let delay=0;
+  for(const g of GROUPS){
+    const names=DATA.benchmarks.filter(g.test);if(!names.length)continue;
+    const head=document.createElement("div");head.className="grouphead";
+    head.innerHTML=`<h2>${g.key}</h2><div class="rule"></div><span class="n">${names.length}</span>`;
+    board.appendChild(head);
+    const grid=document.createElement("div");grid.className="grid";board.appendChild(grid);
+    for(const bench of names){
+      const card=document.createElement("div");card.className="card";card.style.animationDelay=(delay+=18)+"ms";
+      const nm=niceName(bench);const pre=bench.replace(/^Benchmark/,"").slice(0,-(nm.length)||undefined);
+      card.innerHTML=`<div class="ct"><h3 title="${bench}">${nm||bench.replace(/^Benchmark/,"")}</h3>
+        <div class="deltas">${plats().map(p=>deltaPill(bench,p)).join("")}</div></div>
+        <div class="mini"><canvas></canvas></div>`;
+      grid.appendChild(card);
+      const ch=mkChart(card.querySelector("canvas"),bench,false);charts.push(ch);
+      card.addEventListener("click",()=>openModal(bench));
     }
   }
-  return pts;
 }
 
-function datasets(bench, metric, platforms) {
-  return platforms.map(p => {
-    const pts = points(bench, metric, p);
-    return {
-      label: p,
-      data: pts,
-      borderColor: COLORS[p],
-      backgroundColor: COLORS[p],
-      borderWidth: 1.5,
-      tension: 0.1,
-      pointRadius: ctx => ctx.raw && ctx.raw.c.tags.length ? 4.5 : 1.8,
-      pointStyle: ctx => ctx.raw && ctx.raw.c.tags.length ? "star" : "circle",
-      pointHoverRadius: 6,
-      spanGaps: true,
-    };
-  });
+function openModal(bench){
+  document.getElementById("mtitle").textContent=bench.replace(/^Benchmark/,"")+"  —  "+MUNIT[ST.metric]+(ST.base==="rel"?"  (× vs first)":"");
+  document.getElementById("ovl").classList.add("on");
+  if(modalChart)modalChart.destroy();
+  modalChart=mkChart(document.getElementById("mcanvas"),bench,true);
 }
+function closeModal(){document.getElementById("ovl").classList.remove("on");if(modalChart){modalChart.destroy();modalChart=null;}}
 
-function selectedPlatforms() {
-  return DATA.platforms.filter(p => document.getElementById("pf_" + p).checked);
+function wireSeg(id,key,after){
+  document.getElementById(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    [...e.currentTarget.querySelectorAll("button")].forEach(x=>x.setAttribute("aria-pressed",x===b));
+    ST[key]=b.dataset.v;after&&after();renderBoard();});
 }
+function wirePlat(id,p){document.getElementById(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  const on=b.getAttribute("aria-pressed")!=="true";
+  if(!on&&plats().length===1)return; // keep at least one
+  b.setAttribute("aria-pressed",on);ST.plat[p]=on;renderBoard();});}
 
-function baseOptions(metric, withLegend) {
-  return {
-    animation: false,
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: "nearest", intersect: false },
-    onClick: (e, els) => { if (els.length) { const r = els[0].element.$context.raw; if (r) window.open(GH + r.c.sha, "_blank"); } },
-    scales: {
-      x: { type: "linear", title: { display: true, text: "commit order (v2 branch)" },
-           ticks: { precision: 0 } },
-      y: { title: { display: true, text: METRIC_LABEL[metric] }, beginAtZero: false,
-           ticks: { callback: v => fmt(metric, v) } },
-    },
-    plugins: {
-      legend: { display: withLegend },
-      tooltip: {
-        callbacks: {
-          title: items => items.length ? items[0].raw.c.subject : "",
-          label: item => `${item.dataset.label}: ${fmt(metric, item.raw.y)}`,
-          afterBody: items => {
-            if (!items.length) return "";
-            const c = items[0].raw.c;
-            const t = c.tags.length ? "\ntag: " + c.tags.join(", ") : "";
-            return `${c.short}  ·  ${c.date.slice(0,10)}${t}`;
-          },
-        },
-      },
-    },
-  };
-}
-
-function renderSingle() {
-  const bench = document.getElementById("bench").value;
-  const metric = document.getElementById("metric").value;
-  const pf = selectedPlatforms();
-  if (chart) chart.destroy();
-  chart = new Chart(document.getElementById("chart"), {
-    type: "line",
-    data: { datasets: datasets(bench, metric, pf) },
-    options: baseOptions(metric, true),
-  });
-}
-
-function renderGrid() {
-  const metric = document.getElementById("metric").value;
-  const pf = selectedPlatforms();
-  const grid = document.getElementById("grid");
-  gridCharts.forEach(c => c.destroy()); gridCharts = []; grid.innerHTML = "";
-  for (const bench of DATA.benchmarks) {
-    const cell = document.createElement("div"); cell.className = "cell";
-    const h = document.createElement("h3"); h.textContent = bench; cell.appendChild(h);
-    const box = document.createElement("div"); box.className = "mini";
-    const cv = document.createElement("canvas"); box.appendChild(cv); cell.appendChild(box);
-    grid.appendChild(cell);
-    const opt = baseOptions(metric, false);
-    opt.scales.x.title.display = false; opt.scales.y.title.display = false;
-    gridCharts.push(new Chart(cv, { type: "line", data: { datasets: datasets(bench, metric, pf) }, options: opt }));
+function buildTable(){
+  const tb=document.querySelector("#restable tbody");const rows=[];
+  for(const c of DATA.commits){
+    const tag=c.tags.length?`<span class="rtag">${c.tags.join(", ")}</span>`:"";
+    const cell=p=>c.status[p]==="OK"?`<a href="raw/${p}/${c.sha}.txt">raw</a>`:(c.status[p]?`<span class="xfail">${c.status[p].toLowerCase().replace("_fail","")}</span>`:"—");
+    rows.push(`<tr data-k="${(c.short+' '+c.subject+' '+c.tags.join(' ')).toLowerCase().replace(/"/g,'')}">
+      <td>${c.order}</td><td><a class="sha" href="${GH}${c.sha}">${c.short}</a></td><td>${c.date.slice(0,10)}</td>
+      <td class="subj">${c.subject.replace(/</g,"&lt;")}</td><td>${tag}</td><td>${cell("linux")}</td><td>${cell("macos")}</td></tr>`);
   }
+  tb.innerHTML=rows.join("");
+  document.getElementById("filter").addEventListener("input",e=>{const q=e.target.value.toLowerCase();
+    tb.querySelectorAll("tr").forEach(tr=>tr.style.display=tr.dataset.k.includes(q)?"":"none");});
+}
+function buildMethodology(){
+  const c=DATA.counts,tot=p=>Object.values(c[p]).reduce((a,b)=>a+b,0);
+  document.getElementById("methodology").innerHTML=[
+    ["toolchain",DATA.toolchain+" · both platforms"],["config",DATA.config],["harness",DATA.harness],
+    ["benchmarks",DATA.benchmarks.length+" cases · "+DATA.commits.length+" commits swept"],
+    ["linux",`holo0 · amd64 · taskset — ${c.linux.OK} built / ${tot("linux")-c.linux.OK} skipped`],
+    ["macOS",`local · arm64 · caffeinate — ${c.macos.OK} built / ${tot("macos")-c.macos.OK} skipped`],
+  ].map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("");
 }
 
-function render() {
-  const grid = document.getElementById("view").value === "grid";
-  document.getElementById("singleView").style.display = grid ? "none" : "";
-  document.getElementById("gridView").style.display = grid ? "" : "none";
-  grid ? renderGrid() : renderSingle();
-}
-
-function buildTable() {
-  const tb = document.querySelector("#restable tbody");
-  const rows = [];
-  for (const c of DATA.commits) {
-    const tag = c.tags.length ? `<span class="tag">${c.tags.join(", ")}</span>` : "";
-    const cell = p => {
-      const st = c.status[p];
-      if (st === "OK") return `<a href="raw/${p}/${c.sha}.txt">raw</a>`;
-      return st ? `<span style="color:#a40e26">${st.toLowerCase()}</span>` : "—";
-    };
-    rows.push(`<tr data-k="${(c.short+' '+c.subject+' '+c.tags.join(' ')).toLowerCase()}">
-      <td>${c.order}</td>
-      <td><a href="${GH}${c.sha}"><code>${c.short}</code></a></td>
-      <td>${c.date.slice(0,10)}</td>
-      <td class="subj">${c.subject.replace(/</g,"&lt;")}</td>
-      <td>${tag}</td><td>${cell("linux")}</td><td>${cell("macos")}</td></tr>`);
-  }
-  tb.innerHTML = rows.join("");
-  document.getElementById("filter").addEventListener("input", e => {
-    const q = e.target.value.toLowerCase();
-    tb.querySelectorAll("tr").forEach(tr => {
-      tr.style.display = tr.dataset.k.includes(q) ? "" : "none";
-    });
-  });
-}
-
-function buildMethodology() {
-  const c = DATA.counts;
-  const tot = p => Object.values(c[p]).reduce((a,b)=>a+b,0);
-  const m = document.getElementById("methodology");
-  const rows = [
-    ["Toolchain", DATA.toolchain + " (both platforms)"],
-    ["Benchmark config", DATA.config],
-    ["Harness", DATA.harness],
-    ["Linux", `holo0 · amd64 · taskset-pinned — ${c.linux.OK} ok / ${tot('linux')-c.linux.OK} skipped / ${tot('linux')} attempted`],
-    ["macOS", `local · arm64 · caffeinate — ${c.macos.OK} ok / ${tot('macos')-c.macos.OK} skipped / ${tot('macos')} attempted`],
-    ["Benchmarks", DATA.benchmarks.length + " cases"],
-  ];
-  m.innerHTML = rows.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-}
-
-fetch("data.json").then(r => r.json()).then(d => {
-  DATA = d;
-  document.getElementById("genline").textContent = "Generated " + d.generated.replace("T"," ").replace("+00:00"," UTC") + ".";
-  const bsel = document.getElementById("bench");
-  d.benchmarks.forEach(b => { const o = document.createElement("option"); o.value = o.textContent = b; bsel.appendChild(o); });
-  const pdiv = document.getElementById("platforms");
-  d.platforms.forEach(p => {
-    const l = document.createElement("label");
-    l.innerHTML = `<input type="checkbox" id="pf_${p}" checked> ${p}`;
-    pdiv.appendChild(l);
-  });
-  ["bench","metric","view"].forEach(id => document.getElementById(id).addEventListener("change", render));
-  d.platforms.forEach(p => document.getElementById("pf_"+p).addEventListener("change", render));
-  buildMethodology();
-  buildTable();
-  render();
+fetch("data.json").then(r=>r.json()).then(d=>{
+  DATA=d;
+  MARKERS=d.commits.filter(c=>c.tags.some(t=>/^v2\.\d+\.0$/.test(t)))
+    .map(c=>({order:c.order,label:c.tags.find(t=>/^v2\.\d+\.0$/.test(t))}));
+  document.getElementById("genline").textContent="generated "+d.generated.replace("T"," ").replace("+00:00"," UTC");
+  document.getElementById("subline").textContent=`go1.26.4 · #1067 suite · median of ${(d.config.match(/count=(\d+)/)||[,5])[1]} · lower is better`;
+  wireSeg("seg-metric","metric");wireSeg("seg-base","base");wireSeg("seg-scale","scale");
+  wirePlat("seg-linux","linux");wirePlat("seg-macos","macos");
+  document.getElementById("mclose").addEventListener("click",closeModal);
+  document.getElementById("ovl").addEventListener("click",e=>{if(e.target.id==="ovl")closeModal();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+  buildMethodology();buildTable();renderBoard();
 });
 </script>
 </body>
