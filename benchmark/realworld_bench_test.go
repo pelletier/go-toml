@@ -1,3 +1,9 @@
+// These benchmarks exercise go-toml v2-specific API (e.g. Decoder.DisallowUnknownFields),
+// so they cannot compile against go-toml v1 or BurntSushi/toml. The cross-library
+// comparison run by `./ci.sh benchmark -a` builds with -tags cross_library_benchmark
+// to exclude this file.
+//go:build !cross_library_benchmark
+
 package benchmark_test
 
 import (
