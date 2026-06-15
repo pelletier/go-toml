@@ -551,3 +551,16 @@ func ExampleDecodeError() {
 	//  |           ~~ number must have at least one digit between underscores
 	// error occurred at row 1 column 11
 }
+
+func TestWrapDecodeErrorNil(t *testing.T) {
+	assert.True(t, wrapDecodeError([]byte("a = 1"), nil) == nil)
+}
+
+func TestSubsliceOffsetPastEndPanics(t *testing.T) {
+	data := []byte("0123456789")
+	document := data[:5]
+	highlight := data[8:10]
+	assert.Panics(t, func() {
+		_ = subsliceOffset(document, highlight)
+	})
+}
