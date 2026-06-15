@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2/internal/parserbridge"
 	"github.com/pelletier/go-toml/v2/unstable"
 )
 
@@ -62,7 +63,7 @@ func (d *decoder) fusedDocument(m map[string]interface{}, b []byte) error {
 			}
 			return unstable.NewParserError(b[:1], "expected newline but got %#U", b[0])
 		case '#':
-			_, rest, err := d.p.ScanComment(b)
+			_, rest, err := parserbridge.ScanComment(b)
 			if err != nil {
 				return err
 			}
@@ -101,7 +102,7 @@ func (d *decoder) fusedTable(b []byte, root map[string]interface{}, cur *map[str
 
 	var err error
 	var rawKey []byte
-	d.keyParts, rawKey, b, err = d.p.ScanKey(start, d.keyParts[:0])
+	d.keyParts, rawKey, b, err = parserbridge.ScanKey(&d.p, start, d.keyParts[:0])
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func (d *decoder) fusedTable(b []byte, root map[string]interface{}, cur *map[str
 func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, error) {
 	var err error
 	var rawKey []byte
-	d.keyParts, rawKey, b, err = d.p.ScanKey(b, d.keyParts[:0])
+	d.keyParts, rawKey, b, err = parserbridge.ScanKey(&d.p, b, d.keyParts[:0])
 	if err != nil {
 		return nil, err
 	}
@@ -160,10 +161,11 @@ func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, err
 	if c := b[0]; c == '[' || c == '{' {
 		// Container value: build its AST so the seen-tracker can validate it
 		// and decodeAny can presize the resulting slices and maps.
-		node, rest, err := d.p.ParseValue(b)
+		nodeAny, rest, err := parserbridge.ParseValue(&d.p, b)
 		if err != nil {
 			return nil, err
 		}
+		node := nodeAny.(*unstable.Node)
 		rest, err = d.fusedFinishLine(rest)
 		if err != nil {
 			return nil, err
@@ -185,10 +187,11 @@ func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, err
 
 	// Scalar value: scan it without building a node, then validate and convert
 	// it natively.
-	kind, _, value, rest, err := d.p.ScanScalar(b)
+	k, _, value, rest, err := parserbridge.ScanScalar(&d.p, b)
 	if err != nil {
 		return nil, err
 	}
+	kind := unstable.Kind(k)
 	rest, err = d.fusedFinishLine(rest)
 	if err != nil {
 		return nil, err
@@ -342,7 +345,7 @@ func fusedConsumeEOL(b []byte) ([]byte, error) {
 func (d *decoder) fusedFinishLine(b []byte) ([]byte, error) {
 	b = fusedSkipWS(b)
 	if len(b) > 0 && b[0] == '#' {
-		_, rest, err := d.p.ScanComment(b)
+		_, rest, err := parserbridge.ScanComment(b)
 		if err != nil {
 			return nil, err
 		}

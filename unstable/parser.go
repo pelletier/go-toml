@@ -529,20 +529,16 @@ func (p *Parser) parseVal(b []byte) (int32, []byte, error) {
 	}
 }
 
-// ScanScalar scans a single scalar TOML value (string, integer, float,
+// scanScalar scans a single scalar TOML value (string, integer, float,
 // boolean, or date/time) without building any AST node. It returns the kind of
 // the value, its raw bytes, its decoded value bytes (for strings: quotes
 // removed and escapes resolved; identical to raw for the other kinds), and the
 // rest of the input. Arrays and inline tables are not scalars and produce an
-// error: use ParseValue for those.
+// error: use parseValue for those.
 //
-// This is a lower-level companion to NextExpression for callers that decode
-// values directly and do not need an AST.
-//
-// *Unstable:* This function does not follow the compatibility guarantees of
-// semver. It can be changed or removed without a new major version being
-// issued.
-func (p *Parser) ScanScalar(b []byte) (kind Kind, raw, value, rest []byte, err error) {
+// It is exposed to the root toml package through internal/parserbridge for the
+// fused generic-decode path; it is not part of the public API.
+func (p *Parser) scanScalar(b []byte) (kind Kind, raw, value, rest []byte, err error) {
 	if len(b) == 0 {
 		return Invalid, nil, nil, nil, NewParserError(b, "expected value, not end of input")
 	}
@@ -583,7 +579,7 @@ func (p *Parser) ScanScalar(b []byte) (kind Kind, raw, value, rest []byte, err e
 	}
 }
 
-// ScanKey scans a potentially dotted key without building AST nodes,
+// scanKey scans a potentially dotted key without building AST nodes,
 // appending the decoded value of each part to dst (pass dst[:0] to reuse a
 // buffer). It consumes the whitespace following the key, so the caller can
 // directly check for the next expected character ('=', ']', ...). It returns
@@ -591,10 +587,9 @@ func (p *Parser) ScanScalar(b []byte) (kind Kind, raw, value, rest []byte, err e
 // end of the last one, excluding trailing whitespace, usable as an error
 // highlight), the rest of the input, and any error.
 //
-// *Unstable:* This function does not follow the compatibility guarantees of
-// semver. It can be changed or removed without a new major version being
-// issued.
-func (p *Parser) ScanKey(b []byte, dst [][]byte) (parts [][]byte, raw, rest []byte, err error) {
+// It is exposed to the root toml package through internal/parserbridge for the
+// fused generic-decode path; it is not part of the public API.
+func (p *Parser) scanKey(b []byte, dst [][]byte) (parts [][]byte, raw, rest []byte, err error) {
 	parts = dst
 	start := b
 	for {
@@ -617,26 +612,14 @@ func (p *Parser) ScanKey(b []byte, dst [][]byte) (parts [][]byte, raw, rest []by
 	}
 }
 
-// ScanComment scans a comment starting at the '#' character, returning the
-// comment bytes (including '#', excluding the line ending) and the rest of the
-// input.
-//
-// *Unstable:* This function does not follow the compatibility guarantees of
-// semver. It can be changed or removed without a new major version being
-// issued.
-func (p *Parser) ScanComment(b []byte) (comment, rest []byte, err error) {
-	return scanComment(b)
-}
-
-// ParseValue parses a single TOML value, which may be an array or inline table,
+// parseValue parses a single TOML value, which may be an array or inline table,
 // into the parser's arena. It returns the root node of the value and the rest
 // of the input. It resets the arena, so any node returned by a previous call to
-// ParseValue, Expression, or NextExpression is invalidated.
+// parseValue, Expression, or NextExpression is invalidated.
 //
-// *Unstable:* This function does not follow the compatibility guarantees of
-// semver. It can be changed or removed without a new major version being
-// issued.
-func (p *Parser) ParseValue(b []byte) (*Node, []byte, error) {
+// It is exposed to the root toml package through internal/parserbridge for the
+// fused generic-decode path; it is not part of the public API.
+func (p *Parser) parseValue(b []byte) (*Node, []byte, error) {
 	p.nodes = p.nodes[:0]
 	h, rest, err := p.parseVal(b)
 	if err != nil {
