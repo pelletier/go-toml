@@ -4,10 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>go-toml v2 · benchmark history</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  /* self-hosted IBM Plex — no external requests */
+  @font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2')}
+  @font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:500;font-display:swap;src:url('fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2')}
+  @font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/ibm-plex-sans-latin-600-normal.woff2') format('woff2')}
+  @font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/ibm-plex-sans-latin-700-normal.woff2') format('woff2')}
+  @font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2')}
+  @font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url('fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2')}
+  @font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/ibm-plex-mono-latin-600-normal.woff2') format('woff2')}
+</style>
+<script src="vendor/chart.umd.min.js"></script>
 <style>
   :root{
     --paper:#f4f3ee; --panel:#fbfaf6; --ink:#1b1813; --muted:#6c6557;
@@ -19,7 +26,7 @@
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:450;
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:400;
     font-feature-settings:"tnum" 1,"cv05" 1;line-height:1.45;
     background-image:radial-gradient(var(--soft) 1px,transparent 1px);background-size:22px 22px;}
   a{color:inherit}
@@ -32,7 +39,7 @@
   .brand .wm{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:.02em;display:flex;align-items:baseline;gap:7px}
   .brand .wm b{background:var(--ink);color:var(--paper);padding:1px 6px;border-radius:5px;font-weight:600}
   .brand .tag-line{font-size:11.5px;color:var(--muted)}
-  .ctl{display:flex;flex-direction:column;gap:4px}
+  .ctl{display:flex;flex-direction:column;gap:4px;flex:0 0 auto}
   .ctl > span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
   .seg{display:inline-flex;border:1px solid var(--hair);border-radius:7px;overflow:hidden;background:var(--panel)}
   .seg button{font-family:var(--mono);font-size:11.5px;border:0;background:transparent;color:var(--muted);
@@ -48,7 +55,7 @@
   .grouphead .rule{flex:1;height:1px;background:var(--hair)}
   .grouphead .n{font-size:11px;color:var(--muted);font-family:var(--mono)}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(312px,1fr));gap:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,312px),1fr));gap:13px}
   .card{background:var(--panel);border:1px solid var(--hair);border-radius:11px;padding:10px 11px 8px;
     box-shadow:0 1px 0 rgba(27,24,19,.03);transition:box-shadow .16s,transform .16s,border-color .16s;cursor:pointer;
     opacity:0;transform:translateY(6px);animation:rise .5s cubic-bezier(.2,.7,.2,1) forwards}
@@ -105,6 +112,20 @@
   .mbig{position:relative;height:min(64vh,460px)}
   .mlegend{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;display:flex;gap:16px;flex-wrap:wrap}
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+  /* phone */
+  @media (max-width:760px){
+    header{position:static}
+    .bar{padding:10px 14px;gap:9px 15px}
+    .brand{margin-right:0;flex-basis:100%}
+    main{padding:14px 13px 6px}
+    .grouphead{margin:18px 2px 9px}
+    details,footer{padding-left:13px;padding-right:13px}
+    .filterbox input{width:100%}
+    #ovl{padding:10px}
+    .modal{padding:12px 12px;border-radius:11px}
+    .mbig{height:min(58vh,400px)}
+  }
 </style>
 </head>
 <body>
@@ -113,6 +134,12 @@
     <div class="brand">
       <div class="wm"><b>go-toml</b> <span>/v2</span> · benchmark history</div>
       <div class="tag-line" id="subline">go1.26.4 · #1067 suite · median of 5 · lower is better</div>
+    </div>
+    <div class="ctl"><span>range</span>
+      <div class="seg" id="seg-window">
+        <button data-v="rel2" aria-pressed="true">last 2 releases</button>
+        <button data-v="all">all time</button>
+      </div>
     </div>
     <div class="ctl"><span>metric</span>
       <div class="seg" id="seg-metric">
@@ -164,7 +191,8 @@
       library implementation varies; each commit is built and run with one fixed Go toolchain. <b>macOS and Linux are
       different machines — read each series against itself, not across platforms.</b> The x-axis is commit order on
       <span class="mono">v2</span> (committer dates are non-monotonic from rebases). Commits whose API predates the suite
-      (e.g. <span class="mono">DisallowUnknownFields</span>) do not build and are omitted.</p>
+      (e.g. <span class="mono">DisallowUnknownFields</span>) do not build and are omitted. Charts open on the
+      window since the last two releases — use the <span class="mono">range</span> control for the full v2 history.</p>
   </div>
 </details>
 
@@ -192,7 +220,7 @@ const GROUPS=[
   {key:"Real-world", test:n=>n.startsWith("BenchmarkRealWorld")},
 ];
 let DATA, MARKERS=[], charts=[], modalChart=null;
-const ST={metric:"ns",base:"rel",scale:"linear",plat:{linux:true,macos:true}};
+const ST={metric:"ns",base:"rel",scale:"linear",window:"rel2",plat:{linux:true,macos:true}};
 
 const median=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
 const movmed=(arr,w)=>arr.map((_,i)=>median(arr.slice(Math.max(0,i-w),Math.min(arr.length,i+w+1)))); // centered median smooth
@@ -241,17 +269,23 @@ function mkChart(canvas,bench,big){
     ds.push({label:p,_raw:false,data:d.map((q,i)=>({x:q.x,y:sm[i]})),parsing:false,
       borderColor:COL[p],borderWidth:big?2.3:1.7,tension:.32,spanGaps:true,pointRadius:0,pointHitRadius:0,order:1});
   }
-  // relative mode: stable, generous y-bounds so ±noise reads small and real step-changes stand out
+  // x-window (default: since last 2 releases) + y-bounds fit to the *visible* points
+  const [wlo,whi]=windowRange(); const xmargin=Math.max(.6,(whi-wlo)*.025);
+  const visY=ds.flatMap(d=>d.data.filter(p=>p.x>=wlo&&p.x<=whi&&p.y!=null).map(p=>p.y));
   let ymin,ymax;
-  if(ST.base==="rel"){const ys=ds.flatMap(d=>d.data.map(p=>p.y));
-    if(ys.length){ymin=Math.min(.85,Math.min(...ys)*.98);ymax=Math.max(1.2,Math.max(...ys)*1.02);}}
+  if(visY.length){const lo=Math.min(...visY),hi=Math.max(...visY);
+    if(ST.base==="rel"){
+      if(ST.window==="all"){ymin=Math.min(.85,lo*.98);ymax=Math.max(1.2,hi*1.02);}
+      else{const r=Math.max(hi-lo,hi*.04);ymin=lo-r*.18;ymax=hi+r*.18;}
+    }else if(ST.window!=="all"&&ST.scale==="linear"){
+      const r=Math.max(hi-lo,hi*.04||1);ymin=Math.max(0,lo-r*.12);ymax=hi+r*.12;}}
   const ch=new Chart(canvas,{type:"line",data:{datasets:ds},options:{
     animation:false,responsive:true,maintainAspectRatio:false,
     interaction:{mode:"nearest",intersect:false,axis:"x"},
     onClick:(e,el)=>{for(const h of el){const r=h.element.$context.raw;if(r&&r.c){window.open(GH+r.c.sha,"_blank");return;}}},
-    layout:{padding:big?6:0},
+    layout:{padding:big?6:{top:5,right:6,bottom:2,left:2}},
     scales:{
-      x:{type:"linear",display:big,min:firstOrder(),max:DATA.commits.length-1,
+      x:{type:"linear",display:big,min:wlo-xmargin,max:whi+xmargin,
          ticks:{precision:0,font:{family:"IBM Plex Mono",size:10}},title:{display:big,text:"commit order →",font:{family:"IBM Plex Mono",size:10}},grid:{color:"rgba(27,24,19,.05)"}},
       y:{type:ST.scale,display:big,min:ymin,max:ymax,
          ticks:{font:{family:"IBM Plex Mono",size:10},callback:v=>ST.base==="rel"?(+v).toFixed(2)+"×":fmtAbs(ST.metric,v),maxTicksLimit:big?7:5},
@@ -267,9 +301,18 @@ function mkChart(canvas,bench,big){
 }
 function firstOrder(){ // earliest order with any data, for x-min
   let m=Infinity;for(const c of DATA.commits)if(c.results.linux||c.results.macos)m=Math.min(m,c.order);return m===Infinity?0:m;}
+function lastOrder(){ // latest order with any data, for x-max
+  let m=-Infinity;for(const c of DATA.commits)if(c.results.linux||c.results.macos)m=Math.max(m,c.order);return m<0?DATA.commits.length-1:m;}
+function windowRange(){ // [lo,hi] order range to display; default = since the 2nd-to-last v2.x.0 release
+  const lo=firstOrder(),hi=lastOrder();
+  if(ST.window==="all")return[lo,hi];
+  const rel=MARKERS.map(m=>m.order).filter(o=>o<=hi).sort((a,b)=>a-b);
+  const start=rel.length>=2?rel[rel.length-2]:(rel.length?rel[0]:lo);
+  return[Math.max(lo,Math.min(start,hi)),hi];}
 
 function deltaPill(bench,p){
-  const s=series(bench,p);if(s.length<4)return"";
+  const [wlo,whi]=windowRange();
+  const s=series(bench,p).filter(q=>q.x>=wlo&&q.x<=whi);if(s.length<4)return"";
   const a=median(s.slice(0,5).map(q=>q.y)),b=median(s.slice(-5).map(q=>q.y));if(!a)return"";
   const pct=(b/a-1)*100;const cls=pct>1.5?"up":pct<-1.5?"down":"";
   const sign=pct>0?"+":"";const lab=p==="linux"?"L":"M";
@@ -346,7 +389,7 @@ fetch("data.json").then(r=>r.json()).then(d=>{
     .map(c=>({order:c.order,label:c.tags.find(t=>/^v2\.\d+\.0$/.test(t))}));
   document.getElementById("genline").textContent="generated "+d.generated.replace("T"," ").replace("+00:00"," UTC");
   document.getElementById("subline").textContent=`go1.26.4 · #1067 suite · median of ${(d.config.match(/count=(\d+)/)||[,5])[1]} · lower is better`;
-  wireSeg("seg-metric","metric");wireSeg("seg-base","base");wireSeg("seg-scale","scale");
+  wireSeg("seg-window","window");wireSeg("seg-metric","metric");wireSeg("seg-base","base");wireSeg("seg-scale","scale");
   wirePlat("seg-linux","linux");wirePlat("seg-macos","macos");
   document.getElementById("mclose").addEventListener("click",closeModal);
   document.getElementById("ovl").addEventListener("click",e=>{if(e.target.id==="ovl")closeModal();});
