@@ -21,6 +21,11 @@ type unmarshalTextKey struct {
 	B string
 }
 
+type unmarshalBinaryKey struct {
+	A string
+	B string
+}
+
 func (k *unmarshalTextKey) UnmarshalText(text []byte) error {
 	parts := strings.Split(string(text), "-")
 	if len(parts) != 2 {
@@ -31,9 +36,25 @@ func (k *unmarshalTextKey) UnmarshalText(text []byte) error {
 	return nil
 }
 
+func (k *unmarshalBinaryKey) UnmarshalBinary(data []byte) error {
+	parts := strings.Split(string(data), "-")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid binary key: %s", data)
+	}
+	k.A = parts[0]
+	k.B = parts[1]
+	return nil
+}
+
 type unmarshalBadTextKey struct{}
 
 func (k *unmarshalBadTextKey) UnmarshalText([]byte) error {
+	return errors.New("error")
+}
+
+type unmarshalBadBinaryValue struct{}
+
+func (unmarshalBadBinaryValue) UnmarshalBinary([]byte) error {
 	return errors.New("error")
 }
 
@@ -505,6 +526,34 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			desc:  "kv bad binary value",
+			input: `A = "foo"`,
+			gen: func() test {
+				type doc struct {
+					A unmarshalBadBinaryValue
+				}
+
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "kv string into time",
+			input: `A = "foo"`,
+			gen: func() test {
+				type doc struct {
+					A time.Time
+				}
+
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
 			desc:  "kv text key",
 			input: `a-1 = "foo"`,
 			gen: func() test {
@@ -559,6 +608,42 @@ foo = "bar"`,
 			},
 		},
 		{
+			desc:  "kv binary key",
+			input: `a-1 = "foo"`,
+			gen: func() test {
+				type doc = map[unmarshalBinaryKey]string
+
+				return test{
+					target:   &doc{},
+					expected: &doc{{A: "a", B: "1"}: "foo"},
+				}
+			},
+		},
+		{
+			desc:  "kv ptr binary key",
+			input: `a-1 = "foo"`,
+			gen: func() test {
+				type doc = map[*unmarshalBinaryKey]string
+
+				return test{
+					target:   &doc{},
+					expected: &doc{{A: "a", B: "1"}: "foo"},
+					assert: func(t *testing.T, test test) {
+						t.Helper()
+						expected := make(map[unmarshalBinaryKey]string)
+						for k, v := range *(test.expected.(*doc)) {
+							expected[*k] = v
+						}
+						got := make(map[unmarshalBinaryKey]string)
+						for k, v := range *(test.target.(*doc)) {
+							got[*k] = v
+						}
+						assert.Equal(t, expected, got)
+					},
+				}
+			},
+		},
+		{
 			desc:  "kv bad text key",
 			input: `a-1 = "foo"`,
 			gen: func() test {
@@ -587,6 +672,18 @@ foo = "bar"`,
 			input: `a = "foo"`,
 			gen: func() test {
 				type doc = map[unmarshalBadBinaryValueKey]string
+
+				return test{
+					target: &doc{},
+					err:    true,
+				}
+			},
+		},
+		{
+			desc:  "kv bad ptr binary key",
+			input: `a = "foo"`,
+			gen: func() test {
+				type doc = map[*unmarshalBadBinaryValueKey]string
 
 				return test{
 					target: &doc{},
