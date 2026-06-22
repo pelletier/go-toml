@@ -868,10 +868,41 @@ func isEmptyValue(v reflect.Value) bool {
 	case reflect.Ptr, reflect.Interface:
 		return v.IsNil()
 	case reflect.Struct:
-		return v.IsZero()
+		// Structs that encode as a scalar value (time.Time, the local
+		// date/time types, or any TextMarshaler) are empty only when they
+		// equal their zero value; their fields are typically unexported, so
+		// recursing into them would be meaningless.
+		if encPropsForType(v.Type()).isValue {
+			return v.IsZero()
+		}
+		// Plain structs encode as tables and are empty when every field that
+		// would be encoded is itself empty. This matches the recursive rule
+		// used before the encoder rewrite and, in particular, treats a
+		// non-nil but empty map or slice as empty (reflect.Value.IsZero does
+		// not, which would otherwise emit an empty table header).
+		return isEmptyStruct(v)
 	default:
 		return false
 	}
+}
+
+// isEmptyStruct reports whether all of a table-valued struct's encodable
+// fields are empty per isEmptyValue. It mirrors the field selection done by
+// collectStructEntries (embedded flattening, shadowing, and "-" skips) so the
+// emptiness decision matches what would actually be encoded.
+func isEmptyStruct(v reflect.Value) bool {
+	plan := encPlanForType(v.Type())
+	for i := range plan.fields {
+		fv, ok := fieldByIndexSkipNil(v, plan.fields[i].index)
+		if !ok {
+			// A nil embedded pointer along the path contributes nothing.
+			continue
+		}
+		if !isEmptyValue(fv) {
+			return false
+		}
+	}
+	return true
 }
 
 // isZeroValue implements the omitzero rules: the type's own IsZero() when

@@ -1174,6 +1174,57 @@ func TestEncoderOmitempty(t *testing.T) {
 	assert.Equal(t, expected, string(b))
 }
 
+func TestEncoderOmitemptyNonNilEmptyCollections(t *testing.T) {
+	// Regression for #1075: a struct whose only non-zero fields are non-nil
+	// but empty maps/slices (as produced by some YAML decoders/cloners) must
+	// be treated as empty by omitempty, so no empty table header is emitted.
+	// reflect.Value.IsZero would report such a struct as non-zero.
+	type base struct {
+		Rules map[string]string `toml:"rules,omitempty"`
+	}
+	type nested struct {
+		base
+		Overrides []string `toml:"overrides,omitempty"`
+	}
+	type group struct {
+		Nested nested `toml:"nested,omitempty"`
+	}
+	type doc struct {
+		Group group  `toml:"group,omitempty"`
+		Keep  string `toml:"keep,omitempty"`
+	}
+
+	d := doc{
+		Group: group{Nested: nested{
+			base:      base{Rules: map[string]string{}},
+			Overrides: []string{},
+		}},
+		Keep: "x",
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "keep = 'x'\n", string(b))
+}
+
+func TestEncoderOmitemptyScalarStructStillEmittedWhenSet(t *testing.T) {
+	// A struct that encodes as a scalar (here, via a TextMarshaler) must keep
+	// the zero-value-based emptiness check: non-zero values are still emitted,
+	// zero values are omitted.
+	type doc struct {
+		When time.Time `toml:"when,omitempty"`
+		Keep string    `toml:"keep,omitempty"`
+	}
+
+	zero, err := toml.Marshal(doc{Keep: "x"})
+	assert.NoError(t, err)
+	assert.Equal(t, "keep = 'x'\n", string(zero))
+
+	set, err := toml.Marshal(doc{When: time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC), Keep: "x"})
+	assert.NoError(t, err)
+	assert.Equal(t, "when = 2026-06-22T00:00:00Z\nkeep = 'x'\n", string(set))
+}
+
 func TestEncoderOmitzero(t *testing.T) {
 	type doc struct {
 		String  string            `toml:",omitzero,multiline"`
