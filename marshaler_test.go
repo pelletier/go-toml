@@ -2587,6 +2587,107 @@ paths = [
 	assert.Equal(t, expectedIndented, buf2.String())
 }
 
+// TestMarshalIssue1075 reproduces the exact serialization reported in #1075.
+// It mirrors golangci-lint's "version two" config: every field tagged
+// `,multiline,omitempty`, an embedded struct, a non-nil but empty slice, and
+// the default encoder. Before the fix this produced multiline-wrapped short
+// strings (version = """\n2"""), array elements indented to the table depth,
+// and empty [linters.settings(.tagliatelle.case)] tables. The expected output
+// below is byte-for-byte golangci-lint's empty.golden.toml.
+func TestMarshalIssue1075(t *testing.T) {
+	strptr := func(s string) *string { return &s }
+
+	type tagBase struct {
+		Rules         map[string]string `toml:"rules,multiline,omitempty"`
+		UseFieldName  *bool             `toml:"use-field-name,multiline,omitempty"`
+		IgnoredFields []string          `toml:"ignored-fields,multiline,omitempty"`
+	}
+	type tagCase struct {
+		tagBase
+		Overrides []string `toml:"overrides,multiline,omitempty"`
+	}
+	type tagSettings struct {
+		Case tagCase `toml:"case,multiline,omitempty"`
+	}
+	type lintersSettings struct {
+		Tagliatelle tagSettings `toml:"tagliatelle,multiline,omitempty"`
+	}
+	type lintersExclusions struct {
+		Generated *string  `toml:"generated,multiline,omitempty"`
+		Presets   []string `toml:"presets,multiline,omitempty"`
+		Paths     []string `toml:"paths,multiline,omitempty"`
+	}
+	type linters struct {
+		Settings   lintersSettings   `toml:"settings,multiline,omitempty"`
+		Exclusions lintersExclusions `toml:"exclusions,multiline,omitempty"`
+	}
+	type formattersExclusions struct {
+		Generated *string  `toml:"generated,multiline,omitempty"`
+		Paths     []string `toml:"paths,multiline,omitempty"`
+	}
+	type formatters struct {
+		Exclusions formattersExclusions `toml:"exclusions,multiline,omitempty"`
+	}
+	type config struct {
+		Version    *string    `toml:"version,multiline,omitempty"`
+		Linters    linters    `toml:"linters,multiline,omitempty"`
+		Formatters formatters `toml:"formatters,multiline,omitempty"`
+	}
+
+	c := config{
+		Version: strptr("2"),
+		Linters: linters{
+			Settings: lintersSettings{
+				// Non-nil but empty slice: the exact trigger for the empty
+				// [linters.settings.tagliatelle.case] tables.
+				Tagliatelle: tagSettings{Case: tagCase{Overrides: []string{}}},
+			},
+			Exclusions: lintersExclusions{
+				Generated: strptr("lax"),
+				Presets:   []string{"comments", "common-false-positives", "legacy", "std-error-handling"},
+				Paths:     []string{"third_party$", "builtin$", "examples$"},
+			},
+		},
+		Formatters: formatters{
+			Exclusions: formattersExclusions{
+				Generated: strptr("lax"),
+				Paths:     []string{"third_party$", "builtin$", "examples$"},
+			},
+		},
+	}
+
+	expected := `version = '2'
+
+[linters]
+[linters.exclusions]
+generated = 'lax'
+presets = [
+  'comments',
+  'common-false-positives',
+  'legacy',
+  'std-error-handling'
+]
+paths = [
+  'third_party$',
+  'builtin$',
+  'examples$'
+]
+
+[formatters]
+[formatters.exclusions]
+generated = 'lax'
+paths = [
+  'third_party$',
+  'builtin$',
+  'examples$'
+]
+`
+
+	b, err := toml.Marshal(c)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(b))
+}
+
 func TestMarshalStringEscapes(t *testing.T) {
 	t.Run("invalid utf8 in basic string", func(t *testing.T) {
 		out, err := toml.Marshal(map[string]string{"a": "\xff"})
