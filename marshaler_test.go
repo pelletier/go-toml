@@ -441,6 +441,21 @@ hello
 `,
 		},
 		{
+			// Regression for #1075: the multiline option must not wrap a
+			// single-line value in a """...""" block.
+			desc: "multi-line option ignored without newline",
+			v: struct {
+				A string `toml:",multiline"`
+				B string `toml:",multiline"`
+			}{
+				A: "2",
+				B: "with ' quote",
+			},
+			expected: `A = '2'
+B = "with ' quote"
+`,
+		},
+		{
 			desc: "inline field",
 			v: struct {
 				A map[string]string `toml:",inline"`
@@ -2467,6 +2482,58 @@ func TestMarshalElementErrors(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, strings.Contains(buf.String(), "1"))
 	})
+}
+
+func TestMarshalMultilineArrayIndentWithoutIndentTables(t *testing.T) {
+	// Regression for #1075: when tables are not indented, a multiline array
+	// nested under tables must have its elements indented relative to its key
+	// (column zero) rather than to the table nesting depth.
+	type exclusions struct {
+		Paths []string `toml:"paths"`
+	}
+	type linters struct {
+		Exclusions exclusions `toml:"exclusions"`
+	}
+	v := struct {
+		Linters linters `toml:"linters"`
+	}{
+		Linters: linters{
+			Exclusions: exclusions{
+				Paths: []string{"third_party$", "builtin$"},
+			},
+		},
+	}
+
+	var buf strings.Builder
+	enc := toml.NewEncoder(&buf)
+	enc.SetArraysMultiline(true)
+	assert.NoError(t, enc.Encode(v))
+
+	expected := `[linters]
+[linters.exclusions]
+paths = [
+  'third_party$',
+  'builtin$'
+]
+`
+	assert.Equal(t, expected, buf.String())
+
+	// With SetIndentTables, the key and its array elements are indented
+	// consistently to the table nesting depth.
+	var buf2 strings.Builder
+	enc2 := toml.NewEncoder(&buf2)
+	enc2.SetArraysMultiline(true)
+	enc2.SetIndentTables(true)
+	assert.NoError(t, enc2.Encode(v))
+
+	expectedIndented := `[linters]
+  [linters.exclusions]
+    paths = [
+      'third_party$',
+      'builtin$'
+    ]
+`
+	assert.Equal(t, expectedIndented, buf2.String())
 }
 
 func TestMarshalStringEscapes(t *testing.T) {
