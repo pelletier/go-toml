@@ -441,6 +441,21 @@ hello
 `,
 		},
 		{
+			// Regression for #1075: the multiline option must not wrap a
+			// single-line value in a """...""" block.
+			desc: "multi-line option ignored without newline",
+			v: struct {
+				A string `toml:",multiline"`
+				B string `toml:",multiline"`
+			}{
+				A: "2",
+				B: "with ' quote",
+			},
+			expected: `A = '2'
+B = "with ' quote"
+`,
+		},
+		{
 			desc: "inline field",
 			v: struct {
 				A map[string]string `toml:",inline"`
@@ -1157,6 +1172,57 @@ func TestEncoderOmitempty(t *testing.T) {
 `
 
 	assert.Equal(t, expected, string(b))
+}
+
+func TestEncoderOmitemptyNonNilEmptyCollections(t *testing.T) {
+	// Regression for #1075: a struct whose only non-zero fields are non-nil
+	// but empty maps/slices (as produced by some YAML decoders/cloners) must
+	// be treated as empty by omitempty, so no empty table header is emitted.
+	// reflect.Value.IsZero would report such a struct as non-zero.
+	type base struct {
+		Rules map[string]string `toml:"rules,omitempty"`
+	}
+	type nested struct {
+		base
+		Overrides []string `toml:"overrides,omitempty"`
+	}
+	type group struct {
+		Nested nested `toml:"nested,omitempty"`
+	}
+	type doc struct {
+		Group group  `toml:"group,omitempty"`
+		Keep  string `toml:"keep,omitempty"`
+	}
+
+	d := doc{
+		Group: group{Nested: nested{
+			base:      base{Rules: map[string]string{}},
+			Overrides: []string{},
+		}},
+		Keep: "x",
+	}
+
+	b, err := toml.Marshal(d)
+	assert.NoError(t, err)
+	assert.Equal(t, "keep = 'x'\n", string(b))
+}
+
+func TestEncoderOmitemptyScalarStructStillEmittedWhenSet(t *testing.T) {
+	// A struct that encodes as a scalar (here, via a TextMarshaler) must keep
+	// the zero-value-based emptiness check: non-zero values are still emitted,
+	// zero values are omitted.
+	type doc struct {
+		When time.Time `toml:"when,omitempty"`
+		Keep string    `toml:"keep,omitempty"`
+	}
+
+	zero, err := toml.Marshal(doc{Keep: "x"})
+	assert.NoError(t, err)
+	assert.Equal(t, "keep = 'x'\n", string(zero))
+
+	set, err := toml.Marshal(doc{When: time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC), Keep: "x"})
+	assert.NoError(t, err)
+	assert.Equal(t, "when = 2026-06-22T00:00:00Z\nkeep = 'x'\n", string(set))
 }
 
 func TestEncoderOmitzero(t *testing.T) {
@@ -2467,6 +2533,159 @@ func TestMarshalElementErrors(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, strings.Contains(buf.String(), "1"))
 	})
+}
+
+func TestMarshalMultilineArrayIndentWithoutIndentTables(t *testing.T) {
+	// Regression for #1075: when tables are not indented, a multiline array
+	// nested under tables must have its elements indented relative to its key
+	// (column zero) rather than to the table nesting depth.
+	type exclusions struct {
+		Paths []string `toml:"paths"`
+	}
+	type linters struct {
+		Exclusions exclusions `toml:"exclusions"`
+	}
+	v := struct {
+		Linters linters `toml:"linters"`
+	}{
+		Linters: linters{
+			Exclusions: exclusions{
+				Paths: []string{"third_party$", "builtin$"},
+			},
+		},
+	}
+
+	var buf strings.Builder
+	enc := toml.NewEncoder(&buf)
+	enc.SetArraysMultiline(true)
+	assert.NoError(t, enc.Encode(v))
+
+	expected := `[linters]
+[linters.exclusions]
+paths = [
+  'third_party$',
+  'builtin$'
+]
+`
+	assert.Equal(t, expected, buf.String())
+
+	// With SetIndentTables, the key and its array elements are indented
+	// consistently to the table nesting depth.
+	var buf2 strings.Builder
+	enc2 := toml.NewEncoder(&buf2)
+	enc2.SetArraysMultiline(true)
+	enc2.SetIndentTables(true)
+	assert.NoError(t, enc2.Encode(v))
+
+	expectedIndented := `[linters]
+  [linters.exclusions]
+    paths = [
+      'third_party$',
+      'builtin$'
+    ]
+`
+	assert.Equal(t, expectedIndented, buf2.String())
+}
+
+// TestMarshalIssue1075 reproduces the exact serialization reported in #1075.
+// It mirrors golangci-lint's "version two" config: every field tagged
+// `,multiline,omitempty`, an embedded struct, a non-nil but empty slice, and
+// the default encoder. Before the fix this produced multiline-wrapped short
+// strings (version = """\n2"""), array elements indented to the table depth,
+// and empty [linters.settings(.tagliatelle.case)] tables. The expected output
+// below is byte-for-byte golangci-lint's empty.golden.toml.
+func TestMarshalIssue1075(t *testing.T) {
+	strptr := func(s string) *string { return &s }
+
+	type tagBase struct {
+		Rules         map[string]string `toml:"rules,multiline,omitempty"`
+		UseFieldName  *bool             `toml:"use-field-name,multiline,omitempty"`
+		IgnoredFields []string          `toml:"ignored-fields,multiline,omitempty"`
+	}
+	type tagCase struct {
+		tagBase
+		Overrides []string `toml:"overrides,multiline,omitempty"`
+	}
+	type tagSettings struct {
+		Case tagCase `toml:"case,multiline,omitempty"`
+	}
+	type lintersSettings struct {
+		Tagliatelle tagSettings `toml:"tagliatelle,multiline,omitempty"`
+	}
+	type lintersExclusions struct {
+		Generated *string  `toml:"generated,multiline,omitempty"`
+		Presets   []string `toml:"presets,multiline,omitempty"`
+		Paths     []string `toml:"paths,multiline,omitempty"`
+	}
+	type linters struct {
+		Settings   lintersSettings   `toml:"settings,multiline,omitempty"`
+		Exclusions lintersExclusions `toml:"exclusions,multiline,omitempty"`
+	}
+	type formattersExclusions struct {
+		Generated *string  `toml:"generated,multiline,omitempty"`
+		Paths     []string `toml:"paths,multiline,omitempty"`
+	}
+	type formatters struct {
+		Exclusions formattersExclusions `toml:"exclusions,multiline,omitempty"`
+	}
+	type config struct {
+		Version    *string    `toml:"version,multiline,omitempty"`
+		Linters    linters    `toml:"linters,multiline,omitempty"`
+		Formatters formatters `toml:"formatters,multiline,omitempty"`
+	}
+
+	c := config{
+		Version: strptr("2"),
+		Linters: linters{
+			Settings: lintersSettings{
+				// Non-nil but empty slice: the exact trigger for the empty
+				// [linters.settings.tagliatelle.case] tables.
+				Tagliatelle: tagSettings{Case: tagCase{Overrides: []string{}}},
+			},
+			Exclusions: lintersExclusions{
+				Generated: strptr("lax"),
+				Presets:   []string{"comments", "common-false-positives", "legacy", "std-error-handling"},
+				Paths:     []string{"third_party$", "builtin$", "examples$"},
+			},
+		},
+		Formatters: formatters{
+			Exclusions: formattersExclusions{
+				Generated: strptr("lax"),
+				Paths:     []string{"third_party$", "builtin$", "examples$"},
+			},
+		},
+	}
+
+	expected := `version = '2'
+
+[linters]
+[linters.exclusions]
+generated = 'lax'
+presets = [
+  'comments',
+  'common-false-positives',
+  'legacy',
+  'std-error-handling'
+]
+paths = [
+  'third_party$',
+  'builtin$',
+  'examples$'
+]
+
+[formatters]
+[formatters.exclusions]
+generated = 'lax'
+paths = [
+  'third_party$',
+  'builtin$',
+  'examples$'
+]
+`
+
+	b, err := toml.Marshal(c)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(b))
 }
 
 func TestMarshalStringEscapes(t *testing.T) {
