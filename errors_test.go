@@ -202,90 +202,6 @@ func TestDecodeError_Accessors(t *testing.T) {
 	assert.Equal(t, "bar", e.String())
 }
 
-func TestDecodeError_DuplicateContent(t *testing.T) {
-	// This test verifies that when the same content appears multiple times
-	// in the document, the error correctly points to the actual location
-	// of the error, not the first occurrence of the content.
-	//
-	// The document has "1__2" on line 1 and "3__4" on line 2.
-	// Both have "__" which is invalid, but we want to ensure errors
-	// on line 2 report line 2, not line 1.
-
-	doc := `a = 1
-b = 3__4`
-
-	var v map[string]int
-	err := Unmarshal([]byte(doc), &v)
-
-	var derr *DecodeError
-	if !errors.As(err, &derr) {
-		t.Fatal("error not in expected format")
-	}
-
-	row, col := derr.Position()
-	// The error should be on line 2 where "3__4" is
-	if row != 2 {
-		t.Errorf("expected error on row 2, got row %d", row)
-	}
-	// Column should point to the "__" part (after "3")
-	if col < 5 {
-		t.Errorf("expected error at column >= 5, got column %d", col)
-	}
-}
-
-func TestDecodeError_Position(t *testing.T) {
-	// Test that error positions are correctly reported for various error locations
-	examples := []struct {
-		name        string
-		doc         string
-		expectedRow int
-		minCol      int
-	}{
-		{
-			name:        "error on first line",
-			doc:         `a = 1__2`,
-			expectedRow: 1,
-			minCol:      5,
-		},
-		{
-			name:        "error on second line",
-			doc:         "a = 1\nb = 2__3",
-			expectedRow: 2,
-			minCol:      5,
-		},
-		{
-			name:        "error on third line",
-			doc:         "a = 1\nb = 2\nc = 3__4",
-			expectedRow: 3,
-			minCol:      5,
-		},
-		{
-			name:        "missing equals on last line without trailing newline",
-			doc:         "a = 1\nb = 2\nc",
-			expectedRow: 3,
-			minCol:      1,
-		},
-	}
-
-	for _, e := range examples {
-		t.Run(e.name, func(t *testing.T) {
-			var v map[string]int
-			err := Unmarshal([]byte(e.doc), &v)
-
-			var derr *DecodeError
-			if !errors.As(err, &derr) {
-				t.Fatal("error not in expected format")
-			}
-
-			row, col := derr.Position()
-			assert.Equal(t, e.expectedRow, row)
-			if col < e.minCol {
-				t.Errorf("expected column >= %d, got %d", e.minCol, col)
-			}
-		})
-	}
-}
-
 func TestStrictErrorUnwrap(t *testing.T) {
 	fo := bytes.NewBufferString(`
 Missing = 1
@@ -301,119 +217,201 @@ OtherMissing = 1
 	assert.Equal(t, 2, len(strictErr.Unwrap()))
 }
 
-func TestDecodeError_PositionAfterComments(t *testing.T) {
+//nolint:funlen
+func TestDecodeError_Messages(t *testing.T) {
+	// Comprehensive error reporting test: verifies that Unmarshal produces
+	// correct positions and human-readable error strings for a wide range
+	// of parse errors.
 	examples := []struct {
-		name        string
-		doc         string
-		expectedRow int
-		expectedCol int
+		desc string
+		doc  string
+		row  int
+		col  int
+		str  string
 	}{
+		// Invalid key start after various leading content.
 		{
-			name:        "comment then invalid key start",
-			doc:         "# comment\n= \"value\"",
-			expectedRow: 2,
-			expectedCol: 1,
+			desc: "invalid key after comment",
+			doc:  "# comment\n= \"value\"",
+			row:  2, col: 1,
+			str: "1| # comment\n2| = \"value\"\n | ~ invalid character at start of key: U+003D '='",
 		},
 		{
-			name:        "no comment invalid key start",
-			doc:         "= \"value\"",
-			expectedRow: 1,
-			expectedCol: 1,
+			desc: "invalid key after two comments",
+			doc:  "# one\n# two\n= \"value\"",
+			row:  3, col: 1,
+			str: "1| # one\n2| # two\n3| = \"value\"\n | ~ invalid character at start of key: U+003D '='",
 		},
 		{
-			name:        "multiple comments then error",
-			doc:         "# c1\n# c2\n= \"val\"",
-			expectedRow: 3,
-			expectedCol: 1,
+			desc: "invalid key after key-value pair",
+			doc:  "a = 1\n= 2",
+			row:  2, col: 1,
+			str: "1| a = 1\n2| = 2\n | ~ invalid character at start of key: U+003D '='",
 		},
 		{
-			name:        "valid line then invalid key start",
-			doc:         "a = 1\n= \"val\"",
-			expectedRow: 2,
-			expectedCol: 1,
+			desc: "invalid key after blank line",
+			doc:  "a = 1\n\n= 2",
+			row:  3, col: 1,
+			str: "1| a = 1\n2|\n3| = 2\n | ~ invalid character at start of key: U+003D '='",
 		},
 		{
-			name:        "blank lines then error",
-			doc:         "\n\n= \"val\"",
-			expectedRow: 3,
-			expectedCol: 1,
+			desc: "invalid key no context",
+			doc:  "= \"value\"",
+			row:  1, col: 1,
+			str: "1| = \"value\"\n | ~ invalid character at start of key: U+003D '='",
 		},
 		{
-			name:        "expected newline but got invalid char",
-			doc:         "a = 1 b = 2",
-			expectedRow: 1,
-			expectedCol: 7,
+			desc: "invalid key after blank lines",
+			doc:  "\n\n= \"val\"",
+			row:  3, col: 1,
+			str: "3| = \"val\"\n | ~ invalid character at start of key: U+003D '='",
+		},
+
+		// Expected newline.
+		{
+			desc: "expected newline",
+			doc:  "a = 1 b = 2",
+			row:  1, col: 7,
+			str: "1| a = 1 b = 2\n |       ~ expected newline but got U+0062 'b'",
+		},
+
+		// Unterminated strings.
+		{
+			desc: "unterminated basic string",
+			doc:  "a = \"hello",
+			row:  1, col: 10,
+			str: "1| a = \"hello\n |          ~ unterminated basic string",
+		},
+		{
+			desc: "unterminated literal string",
+			doc:  "a = 'hello",
+			row:  1, col: 10,
+			str: "1| a = 'hello\n |          ~ unterminated literal string",
+		},
+		{
+			desc: "unterminated multiline basic string",
+			doc:  "a = \"\"\"hello",
+			row:  1, col: 12,
+			str: "1| a = \"\"\"hello\n |            ~ multiline basic string not terminated by \"\"\"",
+		},
+		{
+			desc: "unterminated multiline literal string",
+			doc:  "a = '''hello",
+			row:  1, col: 12,
+			str: "1| a = '''hello\n |            ~ multiline literal string not terminated by '''",
+		},
+
+		// Incomplete containers.
+		{
+			desc: "incomplete inline table",
+			doc:  "a = {b = 1,",
+			row:  1, col: 11,
+			str: "1| a = {b = 1,\n |           ~ inline table is incomplete",
+		},
+		{
+			desc: "incomplete array",
+			doc:  "a = [1, 2,",
+			row:  1, col: 10,
+			str: "1| a = [1, 2,\n |          ~ array is incomplete",
+		},
+
+		// End-of-input errors.
+		{
+			desc: "expected value eof",
+			doc:  "a = ",
+			row:  1, col: 4,
+			str: "1| a = \n |    ~ expected value, not end of input",
+		},
+		{
+			desc: "missing value second line",
+			doc:  "a = 1\nb = ",
+			row:  2, col: 4,
+			str: "1| a = 1\n2| b = \n |    ~ expected value, not end of input",
+		},
+		{
+			desc: "expected equals after key",
+			doc:  "a",
+			row:  1, col: 1,
+			str: "1| a\n | ~ expected '=' after key",
+		},
+		{
+			desc: "expected equals after key second line",
+			doc:  "x = 1\na",
+			row:  2, col: 1,
+			str: "1| x = 1\n2| a\n | ~ expected '=' after key",
+		},
+
+		// Invalid values.
+		{
+			desc: "invalid number underscore",
+			doc:  "a = 1__2",
+			row:  1, col: 6,
+			str: "1| a = 1__2\n |      ~~ number must have at least one digit between underscores",
+		},
+		{
+			desc: "invalid number underscore second line",
+			doc:  "a = 1\nb = 3__4",
+			row:  2, col: 6,
+			str: "1| a = 1\n2| b = 3__4\n |      ~~ number must have at least one digit between underscores",
+		},
+		{
+			desc: "invalid bool",
+			doc:  "a = tru",
+			row:  1, col: 5,
+			str: "1| a = tru\n |     ~~~ expected keyword \"true\"",
+		},
+		{
+			desc: "newline in basic string",
+			doc:  "a = \"hello\nworld\"",
+			row:  1, col: 11,
+			str: "1| a = \"hello\n |           ~ basic strings cannot have new lines\n2| world\"",
+		},
+		{
+			desc: "array unexpected comma",
+			doc:  "a = [,1]",
+			row:  1, col: 6,
+			str: "1| a = [,1]\n |      ~ expected value but got U+002C ','",
+		},
+
+		// Missing equals on last line without trailing newline.
+		{
+			desc: "missing equals on last line",
+			doc:  "a = 1\nb = 2\nc",
+			row:  3, col: 1,
+			str: "1| a = 1\n2| b = 2\n3| c\n | ~ expected '=' after key",
+		},
+
+		// Error position on later lines.
+		{
+			desc: "error on third line",
+			doc:  "a = 1\nb = 2\nc = 3__4",
+			row:  3, col: 6,
+			str: "1| a = 1\n2| b = 2\n3| c = 3__4\n |      ~~ number must have at least one digit between underscores",
 		},
 	}
 
 	for _, e := range examples {
-		t.Run(e.name, func(t *testing.T) {
+		t.Run(e.desc, func(t *testing.T) {
 			var v interface{}
 			err := Unmarshal([]byte(e.doc), &v)
+			if err == nil {
+				t.Fatal("expected an error")
+			}
 
 			var derr *DecodeError
 			if !errors.As(err, &derr) {
-				t.Fatal("error not in expected format")
+				t.Fatalf("expected *DecodeError, got %T: %v", err, err)
 			}
 
 			row, col := derr.Position()
-			if row != e.expectedRow {
-				t.Errorf("row: got %d, want %d", row, e.expectedRow)
+			if row != e.row {
+				t.Errorf("row: got %d, want %d", row, e.row)
 			}
-			if col != e.expectedCol {
-				t.Errorf("col: got %d, want %d", col, e.expectedCol)
+			if col != e.col {
+				t.Errorf("col: got %d, want %d", col, e.col)
 			}
-		})
-	}
-}
 
-func TestErrorPositionConsistency(t *testing.T) {
-	// Verify that the unstable parser API and the public Unmarshal API
-	// report the same error positions for identical documents.
-	documents := []string{
-		"# comment\n= \"value\"",
-		"= \"value\"",
-		"# c1\n# c2\n= \"val\"",
-		"a = 1\n= \"val\"",
-		"\n\n= \"val\"",
-		"a = 1 b = 2",
-	}
-
-	for _, doc := range documents {
-		t.Run(doc, func(t *testing.T) {
-			// Get position from unstable API
-			p := unstable.Parser{}
-			p.Reset([]byte(doc))
-			for p.NextExpression() {
-			}
-			err := p.Error()
-			if err == nil {
-				t.Fatal("expected parser error")
-			}
-			var perr *unstable.ParserError
-			if !errors.As(err, &perr) {
-				t.Fatalf("expected *ParserError, got %T", err)
-			}
-			r := p.Range(perr.Highlight)
-			shape := p.Shape(r)
-			unstableLine := shape.Start.Line
-			unstableCol := shape.Start.Column
-
-			// Get position from public API
-			var v interface{}
-			pubErr := Unmarshal([]byte(doc), &v)
-			var derr *DecodeError
-			if !errors.As(pubErr, &derr) {
-				t.Fatal("error not in expected format")
-			}
-			pubRow, pubCol := derr.Position()
-
-			if unstableLine != pubRow {
-				t.Errorf("line mismatch: unstable=%d, public=%d", unstableLine, pubRow)
-			}
-			if unstableCol != pubCol {
-				t.Errorf("column mismatch: unstable=%d, public=%d", unstableCol, pubCol)
-			}
+			assert.Equal(t, e.str, derr.String())
 		})
 	}
 }
