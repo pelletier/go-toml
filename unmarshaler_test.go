@@ -4296,6 +4296,60 @@ func TestUnmarshalEmbedNonString(t *testing.T) {
 	assert.Equal(t, d.Foo, nil)
 }
 
+// Regression test for https://github.com/pelletier/go-toml/issues/1078: an
+// embedded struct whose toml tag only sets options (e.g. `,inline`) has no
+// explicit name and must be flattened, just like an untagged embedded struct
+// and just like the encoder does. Before the fix, the fields stayed at their
+// zero values.
+func TestUnmarshalEmbeddedInline(t *testing.T) {
+	type Base struct {
+		Region string
+		Name   string
+		Port   int
+	}
+	type Config struct {
+		Base `toml:",inline"`
+		PID  uint32
+	}
+
+	doc := `
+Region = "us"
+Name = "srv1"
+Port = 100
+PID = 42
+`
+	var c Config
+	err := toml.Unmarshal([]byte(doc), &c)
+	assert.NoError(t, err)
+	assert.Equal(t, Config{
+		Base: Base{Region: "us", Name: "srv1", Port: 100},
+		PID:  42,
+	}, c)
+}
+
+// An embedded struct given an explicit tag name keeps acting as a regular
+// named field: its contents come from a sub-table, not from promoted keys.
+func TestUnmarshalEmbeddedNamed(t *testing.T) {
+	type Base struct {
+		Region string
+	}
+	type Config struct {
+		Base `toml:"base"`
+		PID  uint32
+	}
+
+	var c Config
+	err := toml.Unmarshal([]byte("PID = 42\n[base]\nRegion = 'us'\n"), &c)
+	assert.NoError(t, err)
+	assert.Equal(t, Config{Base: Base{Region: "us"}, PID: 42}, c)
+
+	// Promoted keys must NOT populate a named embedded struct.
+	var c2 Config
+	err = toml.Unmarshal([]byte("Region = 'us'\nPID = 42\n"), &c2)
+	assert.NoError(t, err)
+	assert.Equal(t, Config{PID: 42}, c2)
+}
+
 func TestUnmarshal_Nil(t *testing.T) {
 	type Foo struct {
 		Foo *Foo `toml:"foo,omitempty"`
