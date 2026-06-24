@@ -15,10 +15,12 @@ type Unmarshaler interface {
 	UnmarshalTOML(data []byte) error
 }
 
-// RawMessage is a raw encoded TOML value. It implements Unmarshaler and can
-// be used to delay TOML decoding or capture raw content.
+// RawMessage is a raw encoded TOML value. It implements both Unmarshaler and
+// Marshaler and can be used to delay TOML decoding or capture raw content,
+// similar to json.RawMessage.
 //
-// Example usage:
+// Decoding (requires Decoder.EnableUnmarshalerInterface) captures the raw TOML
+// bytes for the target without decoding them:
 //
 //	type Config struct {
 //	    Plugin RawMessage `toml:"plugin"`
@@ -27,6 +29,11 @@ type Unmarshaler interface {
 //	var cfg Config
 //	toml.NewDecoder(r).EnableUnmarshalerInterface().Decode(&cfg)
 //	// cfg.Plugin now contains the raw TOML bytes for [plugin]
+//
+// Encoding (requires Encoder.EnableMarshalerInterface) splices the stored bytes
+// back into the document verbatim:
+//
+//	toml.NewEncoder(w).EnableMarshalerInterface().Encode(cfg)
 type RawMessage []byte
 
 // UnmarshalTOML implements Unmarshaler.
