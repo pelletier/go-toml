@@ -478,10 +478,13 @@ func (e *encoderState) writeTableHeader(comment string, commented bool, array bo
 
 	e.writeComment(comment, headerIndent)
 
-	e.writeIndent(headerIndent)
+	// The "commented" marker is emitted at column zero, ahead of any table
+	// indentation, so that the indentation appears inside the comment
+	// (e.g. `#   [a.b]`). This matches the historical v2.3 layout.
 	if commented {
 		e.buf = append(e.buf, "# "...)
 	}
+	e.writeIndent(headerIndent)
 	e.buf = append(e.buf, '[')
 	if array {
 		e.buf = append(e.buf, '[')
@@ -528,10 +531,14 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 
 	e.writeComment(ent.options.comment, indent)
 
-	e.writeIndent(indent)
+	// The "commented" marker is emitted at column zero, ahead of any table
+	// indentation, so that the indentation appears inside the comment
+	// (e.g. `#   key = value`). This matches the historical v2.3 layout.
+	lineStart := len(e.buf)
 	if commented {
 		e.buf = append(e.buf, "# "...)
 	}
+	e.writeIndent(indent)
 	e.buf = e.appendKey(e.buf, ent.key)
 	e.buf = append(e.buf, " = "...)
 
@@ -549,6 +556,20 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 	e.buf, err = e.appendValue(e.buf, ent.value, ent.options, valueIndent)
 	if err != nil {
 		return err
+	}
+
+	// A commented value that renders across multiple lines (a multiline string
+	// or a multiline array) must have every physical line prefixed with the
+	// comment marker, not just the first; otherwise the continuation lines are
+	// emitted as live, syntactically invalid TOML.
+	if commented {
+		if bytes.IndexByte(e.buf[lineStart:], '\n') >= 0 {
+			region := bytes.ReplaceAll(
+				append([]byte(nil), e.buf[lineStart:]...),
+				[]byte("\n"), []byte("\n# "),
+			)
+			e.buf = append(e.buf[:lineStart], region...)
+		}
 	}
 	e.buf = append(e.buf, '\n')
 	e.lastWasHeader = false
