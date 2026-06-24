@@ -483,8 +483,8 @@ func TestAuditEmbeddedOptionsOnlyTag(t *testing.T) {
 			C     int
 		}
 		assert.NoError(t, toml.Unmarshal([]byte("A = 1\nB = \"x\"\nC = 2\n"), &v))
-		assert.Equal(t, 1, v.inner.A)
-		assert.Equal(t, "x", v.inner.B)
+		assert.Equal(t, 1, v.A)
+		assert.Equal(t, "x", v.B)
 		assert.Equal(t, 2, v.C)
 	})
 
@@ -494,7 +494,7 @@ func TestAuditEmbeddedOptionsOnlyTag(t *testing.T) {
 			C     int
 		}
 		assert.NoError(t, toml.Unmarshal([]byte("C = 2\n[named]\nA = 1\nB = \"x\"\n"), &v))
-		assert.Equal(t, 1, v.inner.A)
+		assert.Equal(t, 1, v.A)
 		assert.Equal(t, 2, v.C)
 	})
 }
