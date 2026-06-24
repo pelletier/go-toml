@@ -4524,8 +4524,74 @@ func TestIssue994_OK(t *testing.T) {
 		Decode(&d)
 
 	assert.NoError(t, err)
-	// With bytes-based interface, raw TOML bytes are passed including quotes
-	assert.Equal(t, "\"bar\" from unmarshaler", d.S)
+	// The root target implements Unmarshaler, so it receives the whole
+	// document (not just the value of the first key).
+	assert.Equal(t, "foo = \"bar\"\n from unmarshaler", d.S)
+}
+
+// rootUnmarshaler994 records every call to UnmarshalTOML and the bytes it
+// received, to assert that a root target gets the entire document exactly once.
+type rootUnmarshaler994 struct {
+	calls [][]byte
+}
+
+func (d *rootUnmarshaler994) UnmarshalTOML(data []byte) error {
+	cp := append([]byte(nil), data...)
+	d.calls = append(d.calls, cp)
+	return nil
+}
+
+// TestIssue994_WholeDocument covers the part of issue #994 that the initial
+// fix (PR #996) left open: when the root target implements Unmarshaler, the
+// entire document — including top-level key-values defined before any table,
+// tables, and array tables — must be delivered to UnmarshalTOML exactly once,
+// as a valid TOML document that re-parses to the original structure.
+func TestIssue994_WholeDocument(t *testing.T) {
+	examples := map[string]string{
+		"single key":           `foo = "bar"`,
+		"multiple keys":        "a = 1\nb = 2\nc = 3\n",
+		"keys then table":      "title = \"TOML Example\"\n[owner]\nname = \"Tom\"\n",
+		"keys then arraytable": "title = \"t\"\n[[item]]\na = 1\n[[item]]\na = 2\n[item.sub]\nb = 3\n",
+		"only table":           "[owner]\nname = \"Tom\"\n",
+		"dotted keys":          "x.y = 1\nx.z = 2\n",
+		"empty document":       "",
+	}
+
+	for name, doc := range examples {
+		t.Run(name, func(t *testing.T) {
+			var root rootUnmarshaler994
+			err := toml.NewDecoder(strings.NewReader(doc)).
+				EnableUnmarshalerInterface().
+				Decode(&root)
+			assert.NoError(t, err)
+
+			// UnmarshalTOML must be called exactly once, with the whole
+			// document, never partial fragments per key-value.
+			assert.Equal(t, 1, len(root.calls))
+
+			// The bytes handed over must be a self-contained TOML document
+			// that decodes to the same structure as the original input. This
+			// is what lets a custom unmarshaler re-parse it (e.g. to preserve
+			// ordering, the issue's original motivation).
+			var fromRaw, fromOriginal map[string]interface{}
+			assert.NoError(t, toml.Unmarshal(root.calls[0], &fromRaw))
+			assert.NoError(t, toml.Unmarshal([]byte(doc), &fromOriginal))
+			assert.Equal(t, fromOriginal, fromRaw)
+		})
+	}
+}
+
+// TestIssue994_ErrorPropagation makes sure an error returned by a root
+// Unmarshaler still surfaces from Decode for documents that exercise the
+// whole-document capture path (not just a single top-level key-value).
+func TestIssue994_ErrorPropagation(t *testing.T) {
+	doc := "title = \"t\"\n[owner]\nname = \"Tom\"\n"
+	var d doc994
+	err := toml.NewDecoder(strings.NewReader(doc)).
+		EnableUnmarshalerInterface().
+		Decode(&d)
+	assert.Error(t, err)
+	assert.Equal(t, "expected-error", err.Error())
 }
 
 func TestIssue995(t *testing.T) {

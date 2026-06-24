@@ -7,6 +7,10 @@ package unstable
 // For tables (including split tables defined in multiple places), the data
 // contains the raw key-value bytes from the original document with adjusted
 // table headers to be relative to the unmarshaling target.
+//
+// When the decoding target itself implements this interface, it receives the
+// whole document — every top-level key-value as well as every table and array
+// table — assembled into a single valid TOML document and delivered once.
 type Unmarshaler interface {
 	UnmarshalTOML(data []byte) error
 }
