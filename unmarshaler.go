@@ -512,6 +512,15 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		}
 	}
 
+	// When the root target itself implements the Unmarshaler interface, the
+	// whole document decodes into it. Open a capture spanning the entire
+	// document up front: the top-level key-values then flow through the
+	// existing capture branch and any tables attach to it via resumeCapture,
+	// so UnmarshalTOML receives the assembled document exactly once.
+	if d.unmarshalerInterface && hasUnmarshaler(root) {
+		d.startRootCapture()
+	}
+
 	for d.p.NextExpression() {
 		err := d.handleRootExpression(d.p.Expression(), root)
 		if err != nil {
@@ -1151,6 +1160,18 @@ func (d *decoder) startCapture(pathLen int, expr *unstable.Node) {
 	if pathLen < len(d.tableKey) {
 		d.appendCaptureHeader(&d.captures[d.captureIdx], expr, pathLen)
 	}
+}
+
+// startRootCapture opens a capture covering the entire document, used when the
+// root target itself implements the Unmarshaler interface. It is opened before
+// reading any expression: top-level key-values are then accumulated through the
+// regular capture branch, and its empty name path matches every table in
+// resumeCapture, so the whole document is handed to UnmarshalTOML once. The
+// single index slot is -1 because the root is never reached through an array
+// table.
+func (d *decoder) startRootCapture() {
+	d.captures = append(d.captures, rawCapture{indexes: []int{-1}})
+	d.captureIdx = len(d.captures) - 1
 }
 
 // resolveCapture walks back to the target of a capture and delivers the
