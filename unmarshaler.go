@@ -1826,13 +1826,26 @@ func (d *decoder) assignDateTime(v reflect.Value, value *unstable.Node) (reflect
 	}
 
 	if v.Type() == timeType {
-		v.Set(reflect.ValueOf(t))
+		setConcrete(v, t)
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
 		return boxInto(v, reflect.ValueOf(t))
 	}
 	return reflect.Value{}, d.typeMismatchError("datetime", v.Type(), d.p.Raw(value.Raw))
+}
+
+// setConcrete assigns x to v, avoiding the heap allocation that
+// v.Set(reflect.ValueOf(x)) incurs from boxing x into an interface. The fast
+// path requires v to be addressable and of x's concrete type, which holds for
+// struct fields and slice elements; map elements are not addressable, so it
+// falls back to the reflect path for them.
+func setConcrete[T any](v reflect.Value, x T) {
+	if v.CanAddr() {
+		*(v.Addr().Interface().(*T)) = x
+		return
+	}
+	v.Set(reflect.ValueOf(x))
 }
 
 func (d *decoder) assignLocalDateTime(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
@@ -1846,10 +1859,10 @@ func (d *decoder) assignLocalDateTime(v reflect.Value, value *unstable.Node) (re
 
 	switch v.Type() {
 	case localDateTimeType:
-		v.Set(reflect.ValueOf(dt))
+		setConcrete(v, dt)
 		return v, nil
 	case timeType:
-		v.Set(reflect.ValueOf(dt.AsTime(time.Local)))
+		setConcrete(v, dt.AsTime(time.Local))
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
@@ -1866,10 +1879,10 @@ func (d *decoder) assignLocalDate(v reflect.Value, value *unstable.Node) (reflec
 
 	switch v.Type() {
 	case localDateType:
-		v.Set(reflect.ValueOf(date))
+		setConcrete(v, date)
 		return v, nil
 	case timeType:
-		v.Set(reflect.ValueOf(date.AsTime(time.Local)))
+		setConcrete(v, date.AsTime(time.Local))
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
@@ -1889,10 +1902,10 @@ func (d *decoder) assignLocalTime(v reflect.Value, value *unstable.Node) (reflec
 
 	switch v.Type() {
 	case localTimeType:
-		v.Set(reflect.ValueOf(t))
+		setConcrete(v, t)
 		return v, nil
 	case timeType:
-		v.Set(reflect.ValueOf(time.Date(0, 1, 1, t.Hour, t.Minute, t.Second, t.Nanosecond, time.Local)))
+		setConcrete(v, time.Date(0, 1, 1, t.Hour, t.Minute, t.Second, t.Nanosecond, time.Local))
 		return v, nil
 	}
 	if v.Kind() == reflect.Interface {
