@@ -10,11 +10,12 @@ import (
 )
 
 // unmarshalFused decodes a whole document into a native map[string]interface{}
-// tree with no reflection on the document structure, and without building an
-// AST for table headers and scalar key-values. Only container values (arrays
-// and inline tables) are parsed into the parser arena, so that the seen-tracker
-// can validate them and decodeAny can presize the resulting slices and maps —
-// the AST is what makes that cheap O(1) presizing possible.
+// tree with no reflection on the document structure and no AST at all: table
+// headers, keys, scalars, arrays, and inline tables are all scanned directly
+// into their native representation. Scratch stacks make the containers
+// exact-size, and the keys declared inside a container value are logged and
+// replayed through the seen-tracker once the expression has fully parsed (see
+// fusedOp), so validation and error precedence match the AST path.
 //
 // It is used when the target is a fully generic value (interface{} or
 // map[string]interface{}) and the unmarshaler interface is disabled. The
@@ -444,8 +445,8 @@ func (d *decoder) fusedInlineKeyval(b []byte) ([]byte, error) {
 
 	// The parts range must be pinned before parsing the value: the keys of a
 	// nested inline table extend d.fusedParts.
-	lo := int32(save)               //nolint:gosec // part counts are bounded by document size
-	hi := int32(len(d.fusedParts))  //nolint:gosec // part counts are bounded by document size
+	lo := int32(save)              //nolint:gosec // part counts are bounded by document size
+	hi := int32(len(d.fusedParts)) //nolint:gosec // part counts are bounded by document size
 	d.fusedOps = append(d.fusedOps, fusedOp{op: fusedOpKey, lo: lo, hi: hi})
 	v, b, err := d.fusedValue(b)
 	if err != nil {
