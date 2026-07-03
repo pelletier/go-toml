@@ -309,10 +309,10 @@ func wideParseFloat(mantissa uint64, exp int) (float64, bool) {
 		if hi == 0 {
 			return roundFloat64(lo, exp, false), true
 		}
-		sh := uint(bits.Len64(hi))
+		sh := uint(bits.Len64(hi)) //nolint:gosec // Len64 is in [1, 64]
 		top := hi<<(64-sh) | lo>>sh
 		sticky := lo<<(64-sh) != 0
-		return roundFloat64(top, exp+int(sh), sticky), true
+		return roundFloat64(top, exp+int(sh), sticky), true //nolint:gosec // sh is in [1, 64]
 	default:
 		p := -exp
 		if p >= len(uint64pow5) {
@@ -342,7 +342,7 @@ func wideParseFloat(mantissa uint64, exp int) (float64, bool) {
 // sticky is false, in (0, 1) when it is true. top must have at least 54
 // significant bits, so that the mantissa and its rounding bit are all in-word.
 func roundFloat64(top uint64, exp2 int, sticky bool) float64 {
-	s := uint(bits.Len64(top) - 53)
+	s := uint(bits.Len64(top) - 53) //nolint:gosec // top has at least 54 significant bits
 	mant := top >> s
 	rem := top & (1<<s - 1)
 	half := uint64(1) << (s - 1)
@@ -350,7 +350,7 @@ func roundFloat64(top uint64, exp2 int, sticky bool) float64 {
 		// mant can reach 1<<53, which is still exactly representable.
 		mant++
 	}
-	return math.Ldexp(float64(mant), exp2+int(s))
+	return math.Ldexp(float64(mant), exp2+int(s)) //nolint:gosec // s is in [1, 11]
 }
 
 func isDecimalDigit(c byte) bool {

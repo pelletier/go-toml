@@ -543,7 +543,7 @@ var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
 // of which can implement TextMarshaler, with a kind dispatch and one pointer
 // comparison instead of a cache lookup.
 func builtinEncProps(t reflect.Type) (typeEncProps, bool) {
-	switch t.Kind() {
+	switch t.Kind() { //nolint:exhaustive // other kinds take the cached path
 	case reflect.String:
 		if t == stringType {
 			return typeEncProps{isValue: true}, true
@@ -841,7 +841,7 @@ func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int
 	for i := range entries {
 		ent := &entries[i]
 		if mOn && ent.rawShape != shapeUnknown {
-			switch ent.rawShape {
+			switch ent.rawShape { //nolint:exhaustive // shapeUnknown is excluded by the guard
 			case shapeEmpty:
 				// No TOML representation: omit the key (the zero class keeps
 				// the second pass away from it too).
@@ -1121,15 +1121,16 @@ func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) er
 	}
 
 	var err error
-	if ent.rawShape != shapeUnknown {
+	switch {
+	case ent.rawShape != shapeUnknown:
 		// A Marshaler value is delegated, keeping this hot function lean for
 		// the default path. It shares the commented/newline handling below.
 		e.buf, err = e.appendMarshalerInlineValue(e.buf, ent)
-	} else if ent.anyValue != nil {
+	case ent.anyValue != nil:
 		e.buf, err = e.appendAnyValue(e.buf, ent.anyValue, *ent.options, valueIndent)
-	} else if ent.pf != nil && ent.pf.propsKnown {
+	case ent.pf != nil && ent.pf.propsKnown:
 		e.buf, err = e.appendValueProps(e.buf, ent.value, ent.pf.props, *ent.options, valueIndent)
-	} else {
+	default:
 		e.buf, err = e.appendValue(e.buf, ent.value, *ent.options, valueIndent)
 	}
 	if err != nil {
@@ -1763,7 +1764,7 @@ func (e *encoderState) appendValueProps(b []byte, v reflect.Value, props typeEnc
 	// Special types take precedence over their kind. All of them are structs
 	// except json.Number: dispatching on the kind first keeps the common
 	// scalars away from the interface comparisons.
-	switch v.Kind() {
+	switch v.Kind() { //nolint:exhaustive // only these kinds have special types
 	case reflect.Struct:
 		switch t {
 		case timeType:

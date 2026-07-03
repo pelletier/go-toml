@@ -135,7 +135,7 @@ func (s *SeenTracker) reset() {
 // keeps probe sequences unpredictable for untrusted documents.
 func (s *SeenTracker) hash(parent int32, name []byte) uint64 {
 	h := maphash.Bytes(s.seed, name)
-	return h ^ uint64(uint32(parent))*0x9E3779B97F4A7C15
+	return h ^ uint64(uint32(parent))*0x9E3779B97F4A7C15 //nolint:gosec // ids are non-negative; the truncation only mixes bits
 }
 
 // find returns the id of the entry with the given parent and name, or -1.
@@ -214,7 +214,7 @@ func (s *SeenTracker) spill(parent int32) {
 
 // indexFind probes the hash index for the child of a spilled parent.
 func (s *SeenTracker) indexFind(parent int32, name []byte) int32 {
-	mask := uint64(len(s.index) - 1)
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
 	for i := s.hash(parent, name) & mask; ; i = (i + 1) & mask {
 		v := s.index[i]
 		if v == 0 {
@@ -233,7 +233,7 @@ func (s *SeenTracker) indexInsert(parent int32, name []byte, id int32) {
 	if (s.inserted+1)*4 > len(s.index)*3 {
 		s.grow()
 	}
-	mask := uint64(len(s.index) - 1)
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
 	i := s.hash(parent, name) & mask
 	for s.index[i] != 0 {
 		i = (i + 1) & mask
@@ -245,7 +245,7 @@ func (s *SeenTracker) indexInsert(parent int32, name []byte, id int32) {
 // indexReplace overwrites the index slot of (parent, name) with a new id. The
 // slot must exist.
 func (s *SeenTracker) indexReplace(parent int32, name []byte, id int32) {
-	mask := uint64(len(s.index) - 1)
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
 	for i := s.hash(parent, name) & mask; ; i = (i + 1) & mask {
 		v := s.index[i]
 		if v == 0 {
@@ -267,7 +267,7 @@ func (s *SeenTracker) grow() {
 		n = 128
 	}
 	s.index = make([]int32, n)
-	mask := uint64(len(s.index) - 1)
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
 	for _, v := range old {
 		if v == 0 {
 			continue
@@ -601,7 +601,7 @@ func (s *SeenTracker) checkValue(id int32, value *unstable.Node) error {
 		it := value.Children()
 		for it.Next() {
 			elem := it.Node()
-			switch elem.Kind {
+			switch elem.Kind { //nolint:exhaustive // scalar elements declare no keys
 			case unstable.InlineTable:
 				// Each inline table is its own key scope: it needs a fresh
 				// anonymous parent so that identical keys in sibling tables

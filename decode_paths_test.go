@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/assert"
+	"github.com/pelletier/go-toml/v2/unstable"
 )
 
 // TestUnmarshalManyKeysTable exercises the seen-tracker's spill to its hash
@@ -387,4 +388,42 @@ func TestMarshalGenericTree(t *testing.T) {
 		assert.Equal(t, interface{}(int64(1)),
 			back["tbl"].(map[string]interface{})["a"])
 	})
+}
+
+// TestUnmarshalerInterfaceLoopBranches covers the expression-loop branches
+// that only the unmarshaler-interface path uses: parser error wrapping and
+// the empty-document epilogue for generic roots.
+func TestUnmarshalerInterfaceLoopBranches(t *testing.T) {
+	t.Run("syntax error", func(t *testing.T) {
+		var s struct{ A int64 }
+		d := NewDecoder(strings.NewReader("[unclosed\na = 1"))
+		d.EnableUnmarshalerInterface()
+		assert.Error(t, d.Decode(&s))
+	})
+
+	t.Run("empty document into nil map", func(t *testing.T) {
+		var m map[string]interface{}
+		d := NewDecoder(strings.NewReader(""))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&m))
+		assert.True(t, m != nil)
+	})
+
+	t.Run("empty document into interface", func(t *testing.T) {
+		var v interface{}
+		d := NewDecoder(strings.NewReader(""))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&v))
+		_, ok := v.(map[string]interface{})
+		assert.True(t, ok)
+	})
+}
+
+// TestValidateValueNodeScalar covers the guard for non-container nodes: only
+// containers declare keys, so scalars validate trivially.
+func TestValidateValueNodeScalar(t *testing.T) {
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	assert.NoError(t, d.validateValueNode(&unstable.Node{Kind: unstable.String}))
+	assert.NoError(t, d.validateValueNode(&unstable.Node{Kind: unstable.Integer}))
 }
