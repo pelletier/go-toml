@@ -15,6 +15,9 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/pelletier/go-toml/v2/internal/parserbridge"
+	"github.com/pelletier/go-toml/v2/unstable"
 )
 
 // Marshal serializes a Go value as a TOML document.
@@ -25,6 +28,7 @@ func Marshal(v interface{}) ([]byte, error) {
 
 	e := encoderStatePool.Get().(*encoderState)
 	e.Encoder = &enc
+	e.marshalerOn = enc.marshalerInterface
 	e.buf = e.buf[:0]
 	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
@@ -52,6 +56,9 @@ type Encoder struct {
 	indentSymbol       string
 	indentTables       bool
 	marshalJSONNumbers bool
+
+	// toggles the unstable.Marshaler interface
+	marshalerInterface bool
 }
 
 // NewEncoder returns a new Encoder that writes to w.
@@ -107,6 +114,35 @@ func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 // issued.
 func (enc *Encoder) SetMarshalJSONNumbers(indent bool) *Encoder {
 	enc.marshalJSONNumbers = indent
+	return enc
+}
+
+// EnableMarshalerInterface enables the unstable.Marshaler interface.
+//
+// With this feature enabled, types implementing the unstable.Marshaler
+// interface emit their own raw TOML instead of being encoded structurally. It
+// is the encoding counterpart of Decoder.EnableUnmarshalerInterface, and allows
+// types such as unstable.RawMessage to round-trip raw TOML bytes.
+//
+// The bytes returned by MarshalTOML are spliced into the document verbatim. The
+// encoder parses them to decide between the valid positions:
+//   - bytes forming a single value are emitted inline, as in `key = <raw>`;
+//   - bytes forming key-value lines are emitted as the body of a `[key]` table;
+//   - at the document root, the bytes are emitted as the whole document: the
+//     encode counterpart of the decoder delivering the whole document to a
+//     root unstable.Unmarshaler.
+//
+// An empty result is omitted from the output. Bytes that are not valid TOML
+// for their position result in an error, as do bytes forming table content in
+// a position where only a value is valid (an array element, an inline table,
+// or a table forced inline). MarshalTOML can be called more than once for the
+// same value during a single encode, so it must be deterministic.
+//
+// *Unstable:* This method does not follow the compatibility guarantees of
+// semver. It can be changed or removed without a new major version being
+// issued.
+func (enc *Encoder) EnableMarshalerInterface() *Encoder {
+	enc.marshalerInterface = true
 	return enc
 }
 
@@ -186,6 +222,7 @@ func (enc *Encoder) SetMarshalJSONNumbers(indent bool) *Encoder {
 func (enc *Encoder) Encode(v interface{}) error {
 	e := encoderStatePool.Get().(*encoderState)
 	e.Encoder = enc
+	e.marshalerOn = enc.marshalerInterface
 	e.buf = e.buf[:0]
 	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
@@ -229,6 +266,15 @@ type encoderState struct {
 	// stringKeyBuf is a reusable buffer to read string map keys without
 	// allocating one per map.
 	stringKeyBuf reflect.Value
+
+	// parser classifies the bytes returned by unstable.Marshaler values as a
+	// single value or a table body. Only used when marshalerOn is set.
+	parser unstable.Parser
+
+	// marshalerOn mirrors Encoder.marshalerInterface, copied onto the state so
+	// the per-value hot path checks a direct field instead of dereferencing the
+	// embedded *Encoder on every value.
+	marshalerOn bool
 
 	// mapIter is a reusable map iterator (one would otherwise be allocated
 	// for every table). Safe to share: a map is fully iterated (entries are
@@ -290,10 +336,30 @@ type entry struct {
 	// part of them.
 	options *valueOptions
 	class   entryClass
+	// rawShape is the unstable.Marshaler classification of the entry's value,
+	// resolved at encode time. It lives on the entry (not the shared options)
+	// and stays shapeUnknown for everything that is not a Marshaler.
+	rawShape rawShape
 	// pf points to the plan field the entry came from, carrying its
 	// statically-known facts; nil for map entries.
 	pf *encPlanField
 }
+
+// rawShape classifies the bytes produced by an unstable.Marshaler.
+type rawShape uint8
+
+const (
+	// shapeUnknown is the default: not an unstable.Marshaler, or the interface
+	// is disabled.
+	shapeUnknown rawShape = iota
+	// shapeEmpty is whitespace-only content: it has no TOML representation and
+	// is omitted from the output.
+	shapeEmpty
+	// shapeValue is a single TOML value, emitted inline as `key = <raw>`.
+	shapeValue
+	// shapeTable is one or more key-value lines, emitted as a `[key]` body.
+	shapeTable
+)
 
 // zeroValueOptions is the shared options of entries that have no tags.
 var zeroValueOptions valueOptions
@@ -315,7 +381,10 @@ func (e *encoderState) classify(ent *entry) entryClass {
 	if e.tablesInline || ent.options.inline {
 		return classKeyValue
 	}
-	if ent.pf != nil && ent.pf.classKnown {
+	// The static class is computed for the default mode: the Marshaler
+	// interface can turn a slice field into an array of tables (or a value)
+	// depending on runtime content, so it re-classifies dynamically.
+	if ent.pf != nil && ent.pf.classKnown && !e.marshalerOn {
 		return ent.pf.staticClass
 	}
 	if ent.anyValue != nil {
@@ -390,6 +459,10 @@ func (e *encoderState) encodeRoot(v interface{}) error {
 		return errors.New("toml: cannot encode a nil pointer")
 	}
 
+	if e.marshalerOn && encPropsForType(rv.Type()).marshaler != 0 {
+		return e.encodeMarshalerRoot(rv)
+	}
+
 	switch rv.Kind() {
 	case reflect.Map, reflect.Struct:
 		if isValueKind(rv) {
@@ -399,6 +472,34 @@ func (e *encoderState) encodeRoot(v interface{}) error {
 	default:
 		return fmt.Errorf("toml: cannot encode a %s as a document root", rv.Type())
 	}
+}
+
+// encodeMarshalerRoot emits the bytes of a root-level unstable.Marshaler as
+// the whole document: the encode counterpart of the decoder delivering the
+// whole document to a root Unmarshaler. The bytes must form a TOML document
+// (key-value lines and table headers); empty output produces an empty
+// document.
+func (e *encoderState) encodeMarshalerRoot(rv reflect.Value) error {
+	raw, err := e.marshalerBytes(rv)
+	if err != nil {
+		return err
+	}
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	if err := e.validateRawTableBody(rv.Type(), trimmed); err != nil {
+		// A single TOML value has no meaning at the document root; report it
+		// as such rather than as a syntax error.
+		if shape, _ := e.classifyRaw(trimmed); shape == shapeValue {
+			return fmt.Errorf("toml: cannot encode %s as a document root: MarshalTOML returned a single TOML value, not a document", rv.Type())
+		}
+		return err
+	}
+	e.buf = append(e.buf, trimmed...)
+	e.buf = append(e.buf, '\n')
+	e.lastWasHeader = false
+	return nil
 }
 
 // resolve unwraps pointers and interfaces until a concrete value is found.
@@ -426,9 +527,14 @@ func resolve(v reflect.Value) (reflect.Value, bool) {
 type typeEncProps struct {
 	// 0: not a TextMarshaler, 1: the type implements it, 2: its pointer does
 	text uint8
+	// 0: not an unstable.Marshaler, 1: the type implements it, 2: its pointer
+	// does. Only consulted when Encoder.marshalerInterface is set.
+	marshaler uint8
 	// encoded as a TOML value (as opposed to a table)
 	isValue bool
 }
+
+var marshalerType = reflect.TypeOf(new(unstable.Marshaler)).Elem()
 
 var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
 
@@ -484,6 +590,12 @@ func encPropsForType(t reflect.Type) typeEncProps {
 	case reflect.PtrTo(t).Implements(textMarshalerType):
 		p.text = 2
 	}
+	switch {
+	case t.Implements(marshalerType):
+		p.marshaler = 1
+	case reflect.PtrTo(t).Implements(marshalerType):
+		p.marshaler = 2
+	}
 	switch t {
 	case timeType, localDateType, localTimeType, localDateTimeType:
 		p.isValue = true
@@ -534,6 +646,11 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 	if v.Len() == 0 {
 		return false
 	}
+	// The Marshaler-aware classification lives in a separate method, hoisted out
+	// of this loop, so the default path keeps its exact original shape.
+	if e.marshalerOn {
+		return e.isMarshalerArrayOfTables(v)
+	}
 	for i := 0; i < v.Len(); i++ {
 		elem, ok := resolve(v.Index(i))
 		if !ok || e.propsFor(elem.Type()).isValue {
@@ -541,6 +658,157 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 		}
 	}
 	return true
+}
+
+// isMarshalerArrayOfTables is the EnableMarshalerInterface variant of
+// isArrayOfTables: a Marshaler element counts as a table only when its raw
+// content is table shaped (key-value lines); one holding a single value makes
+// the whole slice a plain array instead.
+func (e *encoderState) isMarshalerArrayOfTables(v reflect.Value) bool {
+	for i := 0; i < v.Len(); i++ {
+		elem, ok := resolve(v.Index(i))
+		if !ok {
+			return false
+		}
+		if encPropsForType(elem.Type()).marshaler != 0 {
+			raw, err := e.marshalerBytes(elem)
+			if err != nil {
+				return false
+			}
+			if shape, _ := e.classifyRaw(raw); shape != shapeTable {
+				return false
+			}
+			continue
+		}
+		if isValueKind(elem) {
+			return false
+		}
+	}
+	return true
+}
+
+// marshalerBytes returns the raw TOML produced by v's unstable.Marshaler
+// implementation. The caller guarantees v implements the interface
+// (encPropsForType(v.Type()).marshaler != 0).
+func (e *encoderState) marshalerBytes(v reflect.Value) ([]byte, error) {
+	t := v.Type()
+	var m unstable.Marshaler
+	switch {
+	case encPropsForType(t).marshaler == 1:
+		// The type itself implements Marshaler (e.g. a value receiver).
+		m = v.Interface().(unstable.Marshaler)
+	case v.CanAddr():
+		// Only the pointer implements it, and v is addressable.
+		m = v.Addr().Interface().(unstable.Marshaler)
+	default:
+		// Only the pointer implements it, but v is not addressable: take the
+		// address of a copy.
+		tmp := reflect.New(t)
+		tmp.Elem().Set(v)
+		m = tmp.Interface().(unstable.Marshaler)
+	}
+	b, err := m.MarshalTOML()
+	if err != nil {
+		return nil, fmt.Errorf("toml: error calling MarshalTOML for type %s: %w", t, err)
+	}
+	return b, nil
+}
+
+// validateRawTableBody checks that trimmed — table-shaped Marshaler output
+// about to be spliced verbatim — is syntactically valid TOML, so a Marshaler
+// cannot silently corrupt the document. It reuses e.parser, like classifyRaw.
+func (e *encoderState) validateRawTableBody(t reflect.Type, trimmed []byte) error {
+	e.parser.Reset(trimmed)
+	for e.parser.NextExpression() {
+	}
+	if err := e.parser.Error(); err != nil {
+		return fmt.Errorf("toml: error calling MarshalTOML for type %s: invalid TOML: %w", t, err)
+	}
+	return nil
+}
+
+// classifyRaw decides whether b (the output of an unstable.Marshaler) is empty,
+// a single TOML value, or a table body. It returns the trimmed bytes that
+// should be spliced into the document. It reuses e.parser, so it is not safe
+// for concurrent use (encoderState is not shared).
+func (e *encoderState) classifyRaw(b []byte) (rawShape, []byte) {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) == 0 {
+		return shapeEmpty, trimmed
+	}
+	e.parser.Reset(trimmed)
+	_, rest, err := parserbridge.ParseValue(&e.parser, trimmed)
+	if err == nil && len(bytes.TrimSpace(rest)) == 0 {
+		return shapeValue, trimmed
+	}
+	return shapeTable, trimmed
+}
+
+// resolveMarshalerEntries classifies every entry whose value implements
+// unstable.Marshaler, recording the shape on the entry so the two table passes
+// can route it without re-classifying. Any error from MarshalTOML is surfaced
+// eagerly. The marshaled bytes themselves are produced again at emit time by
+// marshalerValue; that keeps entry small on the encoder's hot path, and only
+// runs when the (opt-in) interface is enabled.
+func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
+	for i := range entries {
+		ent := &entries[i]
+		if ent.anyValue != nil {
+			// Generic entries hold their value as an interface; only named
+			// types can implement Marshaler, so materialize a value to check.
+			ent.value = reflect.ValueOf(ent.anyValue)
+			if encPropsForType(ent.value.Type()).marshaler == 0 {
+				ent.value = reflect.Value{}
+				continue
+			}
+			ent.anyValue = nil
+		}
+		v, ok := resolve(ent.value)
+		if !ok || encPropsForType(v.Type()).marshaler == 0 {
+			continue
+		}
+		raw, err := e.marshalerBytes(v)
+		if err != nil {
+			return err
+		}
+		ent.rawShape, _ = e.classifyRaw(raw)
+	}
+	return nil
+}
+
+// marshalerValue returns the trimmed bytes to splice for an entry already known
+// to be an unstable.Marshaler (ent.rawShape != shapeUnknown).
+func (e *encoderState) marshalerValue(ent *entry) ([]byte, error) {
+	v, _ := resolve(ent.value)
+	raw, err := e.marshalerBytes(v)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.TrimSpace(raw), nil
+}
+
+// appendMarshalerInline emits an unstable.Marshaler value in a value position
+// (array element or inline-table member), where only a single TOML value is
+// valid. done is false when t is not a Marshaler, so appendValue falls through
+// to its normal handling. It is split out of appendValue (type check included)
+// to keep that hot path lean.
+func (e *encoderState) appendMarshalerInline(b []byte, v reflect.Value, t reflect.Type) (out []byte, done bool, err error) {
+	if encPropsForType(t).marshaler == 0 {
+		return b, false, nil
+	}
+	raw, err := e.marshalerBytes(v)
+	if err != nil {
+		return nil, true, err
+	}
+	shape, trimmed := e.classifyRaw(raw)
+	switch shape {
+	case shapeValue:
+		return append(b, trimmed...), true, nil
+	case shapeEmpty:
+		return nil, true, fmt.Errorf("toml: cannot encode an empty %s as an inline value", t)
+	default:
+		return nil, true, fmt.Errorf("toml: cannot encode %s as an inline value: %q is not a single TOML value", t, trimmed)
+	}
 }
 
 // encodeTable writes the content of a table at the given key path.
@@ -556,10 +824,47 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 // (key-values first, then sub-tables) and returns the entry slice to the
 // pool.
 func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int) error {
+	// Marshaler routing is hoisted behind a single local flag. When the (opt-in)
+	// interface is off, mOn is false and both passes run the exact baseline
+	// code, so the default Marshal path keeps its performance.
+	mOn := e.marshalerOn
+	if mOn {
+		// Classify Marshaler entries once, up front, so the passes can route
+		// them by shape and surface MarshalTOML errors eagerly.
+		if err := e.resolveMarshalerEntries(entries); err != nil {
+			return err
+		}
+	}
+
 	// First pass: emit all key-values; tables are handled by the second
 	// pass.
 	for i := range entries {
 		ent := &entries[i]
+		if mOn && ent.rawShape != shapeUnknown {
+			switch ent.rawShape {
+			case shapeEmpty:
+				// No TOML representation: omit the key (the zero class keeps
+				// the second pass away from it too).
+				ent.class = classKeyValue
+			case shapeValue:
+				ent.class = classKeyValue
+				if err := e.encodeKeyValue(ent, commented, indent); err != nil {
+					return err
+				}
+			case shapeTable:
+				// A table body is emitted in the second pass, unless it is
+				// forced inline (SetTablesInline / inline tag), which has no
+				// valid inline form and is reported as an error by
+				// encodeKeyValue.
+				ent.class = classTable
+				if e.tablesInline || ent.options.inline {
+					if err := e.encodeKeyValue(ent, commented, indent); err != nil {
+						return err
+					}
+				}
+			}
+			continue
+		}
 		ent.class = e.classify(ent)
 		if ent.class != classKeyValue {
 			continue
@@ -573,6 +878,17 @@ func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int
 	// Second pass: emit the sub-tables, extending the shared key stack.
 	for i := range entries {
 		ent := entries[i]
+		if mOn && ent.rawShape == shapeTable {
+			// Emit the raw body verbatim under the freshly pushed header.
+			// (The forced-inline case already errored in the first pass.)
+			entCommented := commented || ent.options.commented
+			e.keyStack = append(e.keyStack, keyStackPart{s: ent.key, bare: isBareKey(ent.key)})
+			if err := e.encodeMarshalerTable(&ent, entCommented, indent); err != nil {
+				return err
+			}
+			e.keyStack = e.keyStack[:len(e.keyStack)-1]
+			continue
+		}
 		if ent.class == classKeyValue {
 			continue
 		}
@@ -614,6 +930,42 @@ func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int
 	return nil
 }
 
+// encodeMarshalerTable emits a table-shaped unstable.Marshaler entry: the
+// header for the key currently on the stack, then the raw body verbatim.
+func (e *encoderState) encodeMarshalerTable(ent *entry, commented bool, indent int) error {
+	raw, err := e.marshalerValue(ent)
+	if err != nil {
+		return err
+	}
+	// Validate the bytes actually being spliced: MarshalTOML is called again
+	// for the emit, so this both rejects invalid TOML and guards against an
+	// implementation that returned different content than during
+	// classification.
+	if err := e.validateRawTableBody(ent.value.Type(), raw); err != nil {
+		return err
+	}
+	e.writeTableHeader(ent.options.comment, commented, false, indent)
+	e.spliceRawTableBody(raw, commented)
+	return nil
+}
+
+// spliceRawTableBody appends a raw table body verbatim after its header. When
+// the table is commented, every physical line is prefixed with the comment
+// marker so the body does not leak into the document as live keys.
+func (e *encoderState) spliceRawTableBody(raw []byte, commented bool) {
+	if len(raw) == 0 {
+		return
+	}
+	if commented {
+		e.buf = append(e.buf, "# "...)
+		e.buf = append(e.buf, bytes.ReplaceAll(raw, []byte("\n"), []byte("\n# "))...)
+	} else {
+		e.buf = append(e.buf, raw...)
+	}
+	e.buf = append(e.buf, '\n')
+	e.lastWasHeader = false
+}
+
 // getEntries returns a reusable entry slice.
 func (e *encoderState) getEntries() []entry {
 	if n := len(e.entriesPool); n > 0 {
@@ -642,6 +994,22 @@ func (e *encoderState) encodeArrayTable(ent *entry, commented bool, indent int) 
 		e.writeTableHeader(comment, commented, true, indent)
 		// The comment is only present before the first element.
 		comment = ""
+
+		// A Marshaler element splices its raw table body verbatim. The shape
+		// was checked by isArrayOfTables, but MarshalTOML is called again for
+		// the emit, so the spliced bytes are validated here.
+		if e.marshalerOn && encPropsForType(elem.Type()).marshaler != 0 {
+			raw, err := e.marshalerBytes(elem)
+			if err != nil {
+				return err
+			}
+			trimmed := bytes.TrimSpace(raw)
+			if err := e.validateRawTableBody(elem.Type(), trimmed); err != nil {
+				return err
+			}
+			e.spliceRawTableBody(trimmed, commented)
+			continue
+		}
 
 		err := e.encodeTable(elem, commented, indent+1)
 		if err != nil {
@@ -753,7 +1121,11 @@ func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) er
 	}
 
 	var err error
-	if ent.anyValue != nil {
+	if ent.rawShape != shapeUnknown {
+		// A Marshaler value is delegated, keeping this hot function lean for
+		// the default path. It shares the commented/newline handling below.
+		e.buf, err = e.appendMarshalerInlineValue(e.buf, ent)
+	} else if ent.anyValue != nil {
 		e.buf, err = e.appendAnyValue(e.buf, ent.anyValue, *ent.options, valueIndent)
 	} else if ent.pf != nil && ent.pf.propsKnown {
 		e.buf, err = e.appendValueProps(e.buf, ent.value, ent.pf.props, *ent.options, valueIndent)
@@ -780,6 +1152,32 @@ func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) er
 	e.buf = append(e.buf, '\n')
 	e.lastWasHeader = false
 	return nil
+}
+
+// appendMarshalerInlineValue appends the value part of a `key = ` line for an
+// unstable.Marshaler entry, leaving the trailing newline and commented handling
+// to encodeKeyValue. Empty entries are filtered out before this point, so the
+// value is either a single value (spliced verbatim) or, when forced inline by
+// SetTablesInline or an inline tag, table content (an error).
+func (e *encoderState) appendMarshalerInlineValue(b []byte, ent *entry) ([]byte, error) {
+	errNotValue := func() error {
+		return fmt.Errorf("toml: cannot encode %s as an inline value: not a single TOML value", ent.value.Type())
+	}
+	if ent.rawShape != shapeValue {
+		return nil, errNotValue()
+	}
+	raw, err := e.marshalerValue(ent)
+	if err != nil {
+		return nil, err
+	}
+	// Classify the just-returned bytes rather than trusting the earlier pass:
+	// MarshalTOML is called again for the emit, and an implementation that
+	// returns different content must not splice non-value bytes into a
+	// `key = ` position.
+	if shape, trimmed := e.classifyRaw(raw); shape == shapeValue {
+		return append(b, trimmed...), nil
+	}
+	return nil, errNotValue()
 }
 
 // collectEntries builds the ordered list of the entries of a table,
@@ -1380,6 +1778,16 @@ func (e *encoderState) appendValueProps(b []byte, v reflect.Value, props typeEnc
 	case reflect.String:
 		if e.marshalJSONNumbers && t == jsonNumberType {
 			return appendJSONNumber(b, v.Interface().(json.Number))
+		}
+	}
+
+	// A Marshaler reached through a value position (an array element or inline
+	// table member) splices its bytes verbatim. Everything (including the type
+	// check) lives in a separate method so this hot function keeps its default
+	// layout: when the opt-in interface is off, only the bool test runs here.
+	if e.marshalerOn {
+		if b2, done, err := e.appendMarshalerInline(b, v, t); done {
+			return b2, err
 		}
 	}
 

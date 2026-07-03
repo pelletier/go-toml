@@ -5723,3 +5723,189 @@ e = 1
 	assert.NoError(t, toml.Unmarshal([]byte(doc), &m))
 	assert.Equal(t, 1, len(m["a"].([]interface{}))-1)
 }
+
+func TestIssue806_TableErrorContext(t *testing.T) {
+	// Errors raised while placing a [table] or [[array table]] into an
+	// incompatible target must be DecodeErrors carrying the position and key
+	// of the offending header, not bare strings (or errors pointing at the
+	// start of the document).
+	examples := []struct {
+		desc string
+		doc  string
+		unm  func(data []byte) error
+		msg  string
+		row  int
+		col  int
+		key  []string
+	}{
+		{
+			desc: "array table into string field",
+			doc:  "x = 1\n[[A]]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A string
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store an array table in a string",
+			row: 2, col: 3,
+			key: []string{"A"},
+		},
+		{
+			desc: "table into string field",
+			doc:  "x = 1\n[A]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A string
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store a table in a string",
+			row: 2, col: 2,
+			key: []string{"A"},
+		},
+		{
+			desc: "table into non-generic interface field",
+			doc:  "x = 1\n[A]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A interface{ Foo() }
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store a table in a interface { Foo() }",
+			row: 2, col: 2,
+			key: []string{"A"},
+		},
+		{
+			desc: "nested table through a slice of scalars",
+			doc:  "x = 1\n[A.B]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A []int
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store a table in a int",
+			row: 2, col: 2,
+			key: []string{"A", "B"},
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			err := e.unm([]byte(e.doc))
+			assert.Error(t, err)
+			assert.Equal(t, e.msg, err.Error())
+
+			var de *toml.DecodeError
+			if !errors.As(err, &de) {
+				t.Fatalf("err should have been a *toml.DecodeError, but got %s (%T)", err, err)
+			}
+			t.Log("\n" + de.String())
+			row, col := de.Position()
+			assert.Equal(t, e.row, row)
+			assert.Equal(t, e.col, col)
+			assert.Equal(t, toml.Key(e.key), de.Key())
+		})
+	}
+}
+
+type selfEmbedded struct {
+	*selfEmbedded
+	X int
+}
+
+// The mutual pair is exported: allocating an embedded pointer during decode
+// requires the embedded field to be settable, which reflect only allows for
+// exported fields.
+type MutualEmbeddedA struct {
+	*MutualEmbeddedB
+	X int
+}
+
+type MutualEmbeddedB struct {
+	*MutualEmbeddedA
+	Y int
+}
+
+func TestUnmarshalRecursiveEmbedded(t *testing.T) {
+	// A struct type that embeds itself (directly or mutually) used to send
+	// the struct-plan builder into infinite recursion, hanging Unmarshal
+	// regardless of the input. The fields of a recursive embedding are
+	// unreachable by flattening, so the cycle is simply not descended into.
+	t.Run("self", func(t *testing.T) {
+		var v selfEmbedded
+		assert.NoError(t, toml.Unmarshal([]byte(`X = 1`), &v))
+		assert.Equal(t, 1, v.X)
+		assert.Zero(t, v.selfEmbedded)
+	})
+
+	t.Run("mutual", func(t *testing.T) {
+		var v MutualEmbeddedA
+		assert.NoError(t, toml.Unmarshal([]byte("X = 1\nY = 2"), &v))
+		assert.Equal(t, 1, v.X)
+		// B's fields remain reachable through the embedding chain: the cycle
+		// only stops where B would re-embed A.
+		assert.Equal(t, 2, v.Y)
+	})
+
+	t.Run("same type twice without cycle", func(t *testing.T) {
+		// The same embedded type on two sibling branches is not a cycle and
+		// must still be flattened.
+		type leaf struct{ Z int }
+		type mid1 struct{ leaf }
+		var v struct {
+			mid1
+		}
+		assert.NoError(t, toml.Unmarshal([]byte(`Z = 3`), &v))
+		assert.Equal(t, 3, v.Z)
+	})
+}
+
+type unexportedEmbedInner struct{ Z int }
+
+type unexportedEmbedOuter struct {
+	*unexportedEmbedInner
+}
+
+func TestUnmarshalNilUnexportedEmbeddedPointer(t *testing.T) {
+	// Reaching a field promoted through a nil embedded pointer of unexported
+	// type requires setting that pointer, which reflect forbids. This must
+	// surface as an error (like encoding/json), not a panic.
+	t.Run("nil pointer errors", func(t *testing.T) {
+		var v unexportedEmbedOuter
+		err := toml.Unmarshal([]byte(`Z = 1`), &v)
+		assert.Error(t, err)
+		assert.Equal(t, "toml: cannot set embedded pointer to unexported struct: toml_test.unexportedEmbedInner", err.Error())
+	})
+
+	// A non-nil pointer needs no allocation and keeps decoding.
+	t.Run("non-nil pointer decodes", func(t *testing.T) {
+		v := unexportedEmbedOuter{unexportedEmbedInner: &unexportedEmbedInner{}}
+		assert.NoError(t, toml.Unmarshal([]byte(`Z = 1`), &v))
+		assert.Equal(t, 1, v.Z)
+	})
+
+	// Same through a table header, which walks the promoted field in
+	// walkTable rather than descend.
+	t.Run("table header errors", func(t *testing.T) {
+		var v unexportedEmbedTableOuter
+		err := toml.Unmarshal([]byte("[Sub]\nA = 1"), &v)
+		assert.Error(t, err)
+		assert.Equal(t, "toml: cannot set embedded pointer to unexported struct: toml_test.unexportedEmbedTableInner", err.Error())
+	})
+}
+
+type unexportedEmbedTableInner struct {
+	Sub struct{ A int }
+}
+
+type unexportedEmbedTableOuter struct {
+	*unexportedEmbedTableInner
+}
