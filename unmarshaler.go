@@ -1835,17 +1835,14 @@ func (d *decoder) assignDateTime(v reflect.Value, value *unstable.Node) (reflect
 	return reflect.Value{}, d.typeMismatchError("datetime", v.Type(), d.p.Raw(value.Raw))
 }
 
-// setConcrete assigns x to v, avoiding the heap allocation that
-// v.Set(reflect.ValueOf(x)) incurs from boxing x into an interface. The fast
-// path requires v to be addressable and of x's concrete type, which holds for
-// struct fields and slice elements; map elements are not addressable, so it
-// falls back to the reflect path for them.
+// setConcrete assigns x to v, which must be a settable value of x's concrete
+// type. Writing through the address avoids the heap allocation that
+// v.Set(reflect.ValueOf(x)) incurs from boxing x into an interface. Settable
+// implies addressable: the decoder assigns to struct fields, slice elements,
+// and reflect.New-allocated temporaries (map elements are decoded into such
+// temporaries), all of which are addressable.
 func setConcrete[T any](v reflect.Value, x T) {
-	if v.CanAddr() {
-		*(v.Addr().Interface().(*T)) = x
-		return
-	}
-	v.Set(reflect.ValueOf(x))
+	*(v.Addr().Interface().(*T)) = x
 }
 
 func (d *decoder) assignLocalDateTime(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
