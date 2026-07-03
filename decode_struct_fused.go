@@ -104,11 +104,10 @@ func (d *decoder) fusedStructKeyVal(b []byte, root reflect.Value) ([]byte, error
 		if err != nil {
 			return nil, err
 		}
-		leafID, err := d.seen.CheckKeyValue(d.keyParts)
-		if err != nil {
+		if _, err := d.seen.CheckKeyValue(d.keyParts); err != nil {
 			return nil, d.fusedSeenError(rawKey, d.keyParts, err)
 		}
-		if err := d.seen.CheckValueUnder(leafID, node); err != nil {
+		if err := d.validateValueNode(node); err != nil {
 			return nil, d.fusedSeenError(rawKey, d.keyParts, err)
 		}
 		if d.skipUntilTable {
@@ -184,4 +183,16 @@ func (d *decoder) fusedHandleKeyValue(root reflect.Value, rawKey []byte, value *
 		}
 	}
 	return nil
+}
+
+// validateValueNode checks the keys declared inside a container value node
+// (an inline table or array from the expression parser). The value is stored
+// under a leaf key no later expression can reach, so a second, per-value
+// tracker validates it instead of the main one, with identical rules.
+func (d *decoder) validateValueNode(value *unstable.Node) error {
+	if value.Kind != unstable.InlineTable && value.Kind != unstable.Array {
+		return nil
+	}
+	d.valSeen.Reset()
+	return d.valSeen.CheckValueUnder(0, value)
 }

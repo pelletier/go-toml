@@ -325,6 +325,12 @@ type decoder struct {
 	fusedKVKeyRange unstable.Range
 	fusedValueSpan  []byte
 
+	// valSeen validates the keys declared inside a single container value,
+	// which no later expression can reach: keeping them out of d.seen means
+	// the main tracker only ever holds reachable keys. Reset (cheaply) for
+	// every container value.
+	valSeen tracker.SeenTracker
+
 	// Small MRU memo of struct plan lookups: the key-values of a table hit
 	// the same few struct types over and over, and the global cache lookup
 	// costs an interface hash every time.

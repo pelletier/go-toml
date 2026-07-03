@@ -182,11 +182,10 @@ func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, err
 		if err != nil {
 			return nil, err
 		}
-		leafID, err := d.seen.CheckKeyValue(d.keyParts)
-		if err != nil {
+		if _, err := d.seen.CheckKeyValue(d.keyParts); err != nil {
 			return nil, d.fusedSeenError(rawKey, d.keyParts, err)
 		}
-		if err := d.replayFusedOps(leafID); err != nil {
+		if err := d.replayFusedOps(); err != nil {
 			return nil, d.fusedSeenError(rawKey, d.keyParts, err)
 		}
 		d.setFusedLeaf(cur, d.keyParts, av)
@@ -236,19 +235,22 @@ const (
 	fusedOpPop
 )
 
-// replayFusedOps validates the keys recorded by the last container value
-// against the seen-tracker, under the entry of the key-value that holds it.
-// It mirrors SeenTracker.checkValue, driven by the log instead of an AST.
-func (d *decoder) replayFusedOps(rootID int32) error {
+// replayFusedOps validates the keys recorded by the last container value.
+// The value is stored under a leaf key, which no later expression can extend
+// or redefine, so its internals never enter the main seen-tracker: a second,
+// per-value tracker validates them with the same rules and messages, and is
+// reset for every container value (which reuses its storage).
+func (d *decoder) replayFusedOps() error {
 	if len(d.fusedOps) == 0 {
 		return nil
 	}
+	d.valSeen.Reset()
 	d.idStack = d.idStack[:0]
-	top := rootID
+	top := int32(0)
 	for _, op := range d.fusedOps {
 		switch op.op {
 		case fusedOpKey:
-			id, err := d.seen.CheckKeyValueUnder(top, d.fusedParts[op.lo:op.hi])
+			id, err := d.valSeen.CheckKeyValueUnder(top, d.fusedParts[op.lo:op.hi])
 			if err != nil {
 				return err
 			}
@@ -256,7 +258,7 @@ func (d *decoder) replayFusedOps(rootID int32) error {
 			top = id
 		case fusedOpAnon:
 			d.idStack = append(d.idStack, top)
-			top = d.seen.CreateAnonymous(top)
+			top = d.valSeen.CreateAnonymous(top)
 		default: // fusedOpPop
 			top = d.idStack[len(d.idStack)-1]
 			d.idStack = d.idStack[:len(d.idStack)-1]
