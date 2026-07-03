@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"math/bits"
 	"strconv"
 	"time"
 
@@ -249,17 +250,24 @@ exponent:
 		// Trailing bytes (an underscore, a hexadecimal marker, ...).
 		return 0, false
 	}
-	if mantissa > 1<<53 {
-		return 0, false
-	}
 
-	f := float64(mantissa)
+	var f float64
 	switch {
-	case exp == 0:
-	case exp > 0 && exp <= 22:
-		f *= float64pow10[exp]
-	case exp < 0 && exp >= -22:
-		f /= float64pow10[-exp]
+	case mantissa <= 1<<53 && exp == 0:
+		f = float64(mantissa)
+	case mantissa <= 1<<53 && exp > 0 && exp <= 22:
+		f = float64(mantissa) * float64pow10[exp]
+	case mantissa <= 1<<53 && exp < 0 && exp >= -22:
+		f = float64(mantissa) / float64pow10[-exp]
+	case exp >= -27 && exp <= 27:
+		// The significand does not fit in 53 bits (or the exponent is a bit
+		// past the exact float64 powers of ten): compute the correctly
+		// rounded result with exact 128-bit integer arithmetic.
+		var ok bool
+		f, ok = wideParseFloat(mantissa, exp)
+		if !ok {
+			return 0, false
+		}
 	default:
 		return 0, false
 	}
@@ -267,6 +275,82 @@ exponent:
 		f = -f
 	}
 	return f, true
+}
+
+// uint64pow5 holds the powers of five that fit in a uint64 (5^0 .. 5^27).
+var uint64pow5 = [...]uint64{
+	1, 5, 25, 125, 625, 3125, 15625, 78125, 390625, 1953125, 9765625,
+	48828125, 244140625, 1220703125, 6103515625, 30517578125, 152587890625,
+	762939453125, 3814697265625, 19073486328125, 95367431640625,
+	476837158203125, 2384185791015625, 11920928955078125, 59604644775390625,
+	298023223876953125, 1490116119384765625, 7450580596923828125,
+}
+
+// wideParseFloat returns the float64 nearest to mantissa * 10^exp for
+// exponents within [-27, 27], the range where 5^|exp| is an exact uint64. It
+// is exact: 10^exp = 5^exp * 2^exp, the power of two is folded into the
+// binary exponent, and the power of five is applied with exact 128-bit
+// integer arithmetic (a full multiply, or a divide keeping the remainder), so
+// the round-to-nearest-even decision is taken on the true value.
+func wideParseFloat(mantissa uint64, exp int) (float64, bool) {
+	switch {
+	case mantissa == 0:
+		return 0, true
+	case exp == 0:
+		// Go guarantees correctly rounded uint64 to float64 conversions.
+		return float64(mantissa), true
+	case exp > 0:
+		if exp >= len(uint64pow5) {
+			return 0, false
+		}
+		// value = (mantissa * 5^exp) * 2^exp, with the product exact on 128
+		// bits.
+		hi, lo := bits.Mul64(mantissa, uint64pow5[exp])
+		if hi == 0 {
+			return roundFloat64(lo, exp, false), true
+		}
+		sh := uint(bits.Len64(hi))
+		top := hi<<(64-sh) | lo>>sh
+		sticky := lo<<(64-sh) != 0
+		return roundFloat64(top, exp+int(sh), sticky), true
+	default:
+		p := -exp
+		if p >= len(uint64pow5) {
+			return 0, false
+		}
+		// value = (mantissa / 5^p) * 2^exp. Shift the mantissa up so the
+		// 128/64-bit division yields a quotient with 55 to 63 significant
+		// bits, then round with the exact remainder.
+		d := uint64pow5[p]
+		t := bits.Len64(d) + 58 - bits.Len64(mantissa)
+		if t < 0 {
+			t = 0
+		}
+		var hi, lo uint64
+		if t >= 64 {
+			hi, lo = mantissa<<(t-64), 0
+		} else {
+			hi, lo = mantissa>>(64-t), mantissa<<t
+		}
+		q, r := bits.Div64(hi, lo, d)
+		return roundFloat64(q, exp-t, r != 0), true
+	}
+}
+
+// roundFloat64 returns the float64 nearest to (top + ε) * 2^exp2, where ε
+// stands for the value of extra bits strictly below top's last bit: zero when
+// sticky is false, in (0, 1) when it is true. top must have at least 54
+// significant bits, so that the mantissa and its rounding bit are all in-word.
+func roundFloat64(top uint64, exp2 int, sticky bool) float64 {
+	s := uint(bits.Len64(top) - 53)
+	mant := top >> s
+	rem := top & (1<<s - 1)
+	half := uint64(1) << (s - 1)
+	if rem > half || (rem == half && (sticky || mant&1 == 1)) {
+		// mant can reach 1<<53, which is still exactly representable.
+		mant++
+	}
+	return math.Ldexp(float64(mant), exp2+int(s))
 }
 
 func isDecimalDigit(c byte) bool {
