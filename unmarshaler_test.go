@@ -5867,3 +5867,45 @@ func TestUnmarshalRecursiveEmbedded(t *testing.T) {
 		assert.Equal(t, 3, v.Z)
 	})
 }
+
+type unexportedEmbedInner struct{ Z int }
+
+type unexportedEmbedOuter struct {
+	*unexportedEmbedInner
+}
+
+func TestUnmarshalNilUnexportedEmbeddedPointer(t *testing.T) {
+	// Reaching a field promoted through a nil embedded pointer of unexported
+	// type requires setting that pointer, which reflect forbids. This must
+	// surface as an error (like encoding/json), not a panic.
+	t.Run("nil pointer errors", func(t *testing.T) {
+		var v unexportedEmbedOuter
+		err := toml.Unmarshal([]byte(`Z = 1`), &v)
+		assert.Error(t, err)
+		assert.Equal(t, "toml: cannot set embedded pointer to unexported struct: toml_test.unexportedEmbedInner", err.Error())
+	})
+
+	// A non-nil pointer needs no allocation and keeps decoding.
+	t.Run("non-nil pointer decodes", func(t *testing.T) {
+		v := unexportedEmbedOuter{unexportedEmbedInner: &unexportedEmbedInner{}}
+		assert.NoError(t, toml.Unmarshal([]byte(`Z = 1`), &v))
+		assert.Equal(t, 1, v.Z)
+	})
+
+	// Same through a table header, which walks the promoted field in
+	// walkTable rather than descend.
+	t.Run("table header errors", func(t *testing.T) {
+		var v unexportedEmbedTableOuter
+		err := toml.Unmarshal([]byte("[Sub]\nA = 1"), &v)
+		assert.Error(t, err)
+		assert.Equal(t, "toml: cannot set embedded pointer to unexported struct: toml_test.unexportedEmbedTableInner", err.Error())
+	})
+}
+
+type unexportedEmbedTableInner struct {
+	Sub struct{ A int }
+}
+
+type unexportedEmbedTableOuter struct {
+	*unexportedEmbedTableInner
+}

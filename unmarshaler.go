@@ -946,7 +946,10 @@ walk:
 				d.skipUntilTable = true
 				return nil
 			}
-			fv := fieldByIndexAlloc(v, f.index)
+			fv, err := fieldByIndexAlloc(v, f.index)
+			if err != nil {
+				return err
+			}
 			pf = slotWriter{kind: 1, slot: fv}
 			v = fv
 			idx++
@@ -1229,7 +1232,10 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		if !found {
 			return v, nil
 		}
-		fv := fieldByIndexAlloc(v, f.index)
+		fv, err := fieldByIndexAlloc(v, f.index)
+		if err != nil {
+			return reflect.Value{}, err
+		}
 		nv, err := d.resolveCapture(fv, c, idx+1, false)
 		if err != nil {
 			return reflect.Value{}, err
@@ -1490,9 +1496,11 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 			}
 			return v, nil
 		}
-		fv := fieldByIndexAlloc(v, f.index)
+		fv, err := fieldByIndexAlloc(v, f.index)
+		if err != nil {
+			return reflect.Value{}, err
+		}
 		var nv reflect.Value
-		var err error
 		if idx+1 == len(path) {
 			// Leaf field: assign directly. descend's first action for a
 			// fully-consumed path is exactly this call, so skipping the extra
@@ -2361,16 +2369,22 @@ func addFields(plan *structPlan, t reflect.Type, prefix []int, visited map[refle
 
 // fieldByIndexAlloc returns the field of v at the given index path,
 // allocating intermediate embedded pointers as needed.
-func fieldByIndexAlloc(v reflect.Value, index []int) reflect.Value {
+func fieldByIndexAlloc(v reflect.Value, index []int) (reflect.Value, error) {
 	// Fast path for non-embedded fields, which have a single-element index:
 	// no intermediate pointer dereferencing is possible.
 	if len(index) == 1 {
-		return v.Field(index[0])
+		return v.Field(index[0]), nil
 	}
 	for i, x := range index {
 		if i > 0 {
 			for v.Kind() == reflect.Ptr {
 				if v.IsNil() {
+					if !v.CanSet() {
+						// A nil embedded pointer of unexported type cannot be
+						// allocated: reflect forbids setting it. Match
+						// encoding/json and report it instead of panicking.
+						return reflect.Value{}, fmt.Errorf("toml: cannot set embedded pointer to unexported struct: %s", v.Type().Elem())
+					}
 					v.Set(reflect.New(v.Type().Elem()))
 				}
 				v = v.Elem()
@@ -2378,5 +2392,5 @@ func fieldByIndexAlloc(v reflect.Value, index []int) reflect.Value {
 		}
 		v = v.Field(x)
 	}
-	return v
+	return v, nil
 }
