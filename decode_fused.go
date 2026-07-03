@@ -313,7 +313,7 @@ func (d *decoder) fusedArray(b []byte) (interface{}, []byte, error) {
 			copy(out, elems)
 			clear(elems)
 			d.anyStack = d.anyStack[:base]
-			return d.slab.sliceAny(out), b[1:], nil
+			return out, b[1:], nil
 		case '\n':
 			b = b[1:]
 		case '\r':
@@ -479,19 +479,13 @@ func (d *decoder) fusedSeenError(rawKey []byte, parts [][]byte, err error) error
 func (d *decoder) fusedScalar(kind unstable.Kind, value []byte) (interface{}, error) {
 	switch kind {
 	case unstable.String:
-		return d.slab.stringAny(d.slab.slabString(value)), nil
+		return string(value), nil
 	case unstable.Integer:
 		i, err := parseInteger(value)
-		if err != nil {
-			return nil, err
-		}
-		return d.slab.int64Any(i), nil
+		return i, err
 	case unstable.Float:
 		f, err := parseFloat(value)
-		if err != nil {
-			return nil, err
-		}
-		return d.slab.float64Any(f), nil
+		return f, err
 	case unstable.Bool:
 		return value[0] == 't', nil
 	case unstable.DateTime:

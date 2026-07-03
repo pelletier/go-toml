@@ -1830,10 +1830,10 @@ func (d *decoder) assignValue(v reflect.Value, expr *unstable.Node, value *unsta
 func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
 	switch v.Kind() {
 	case reflect.String:
-		v.SetString(d.slab.slabString(value.Data))
+		v.SetString(string(value.Data))
 		return v, nil
 	case reflect.Interface:
-		return boxInto(v, reflect.ValueOf(d.slab.slabString(value.Data)))
+		return boxInto(v, reflect.ValueOf(string(value.Data)))
 	default:
 	}
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
@@ -2104,19 +2104,13 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 	switch n.Kind {
 	case unstable.String:
-		return d.slab.stringAny(d.slab.slabString(n.Data)), nil
+		return string(n.Data), nil
 	case unstable.Integer:
 		i, err := parseInteger(n.Data)
-		if err != nil {
-			return nil, err
-		}
-		return d.slab.int64Any(i), nil
+		return i, err
 	case unstable.Float:
 		f, err := parseFloat(n.Data)
-		if err != nil {
-			return nil, err
-		}
-		return d.slab.float64Any(f), nil
+		return f, err
 	case unstable.Bool:
 		return n.Data[0] == 't', nil
 	case unstable.Array:
@@ -2140,7 +2134,7 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 			}
 			slice = append(slice, ev)
 		}
-		return d.slab.sliceAny(slice), nil
+		return slice, nil
 	case unstable.InlineTable:
 		// Build the map natively: navigate each (possibly dotted) key with
 		// plain Go map operations and decode each value with decodeAny. The
