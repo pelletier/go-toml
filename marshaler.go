@@ -227,6 +227,42 @@ type encoderState struct {
 	// stringKeyBuf is a reusable buffer to read string map keys without
 	// allocating one per map.
 	stringKeyBuf reflect.Value
+
+	// mapIter is a reusable map iterator (one would otherwise be allocated
+	// for every table). Safe to share: a map is fully iterated (entries are
+	// buffered) before any nested table starts its own iteration.
+	mapIter reflect.MapIter
+
+	// propsMemo is a small MRU memo of encPropsForType lookups: the values
+	// of a document hit the same few named types over and over, and the
+	// global cache lookup costs an interface hash every time.
+	propsMemo [4]struct {
+		t reflect.Type
+		p typeEncProps
+	}
+}
+
+// propsFor returns the encoding properties of t, memoizing recent lookups of
+// the types the builtin fast path of encPropsForType does not cover.
+func (e *encoderState) propsFor(t reflect.Type) typeEncProps {
+	if p, ok := builtinEncProps(t); ok {
+		return p
+	}
+	if e.propsMemo[0].t == t {
+		return e.propsMemo[0].p
+	}
+	for i := 1; i < len(e.propsMemo); i++ {
+		if e.propsMemo[i].t == t {
+			m := e.propsMemo[i]
+			copy(e.propsMemo[1:i+1], e.propsMemo[:i])
+			e.propsMemo[0] = m
+			return m.p
+		}
+	}
+	p := encPropsForType(t)
+	copy(e.propsMemo[1:], e.propsMemo[:len(e.propsMemo)-1])
+	e.propsMemo[0].t, e.propsMemo[0].p = t, p
+	return p
 }
 
 // valueOptions are the encoding options attached to one entry of a table.
@@ -326,40 +362,47 @@ type typeEncProps struct {
 
 var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
 
-func encPropsForType(t reflect.Type) typeEncProps {
-	// Generic documents (map[string]interface{} trees) are made of a handful
-	// of builtin types, none of which can implement TextMarshaler: resolve
-	// them with a kind dispatch and one pointer comparison instead of a cache
-	// lookup.
+// builtinEncProps resolves the encoding properties of the handful of builtin
+// types that make up generic documents (map[string]interface{} trees), none
+// of which can implement TextMarshaler, with a kind dispatch and one pointer
+// comparison instead of a cache lookup.
+func builtinEncProps(t reflect.Type) (typeEncProps, bool) {
 	switch t.Kind() {
 	case reflect.String:
 		if t == stringType {
-			return typeEncProps{isValue: true}
+			return typeEncProps{isValue: true}, true
 		}
 	case reflect.Bool:
 		if t == boolType {
-			return typeEncProps{isValue: true}
+			return typeEncProps{isValue: true}, true
 		}
 	case reflect.Int:
 		if t == intType {
-			return typeEncProps{isValue: true}
+			return typeEncProps{isValue: true}, true
 		}
 	case reflect.Int64:
 		if t == int64Type {
-			return typeEncProps{isValue: true}
+			return typeEncProps{isValue: true}, true
 		}
 	case reflect.Float64:
 		if t == float64Type {
-			return typeEncProps{isValue: true}
+			return typeEncProps{isValue: true}, true
 		}
 	case reflect.Slice:
 		if t == sliceInterfaceType {
-			return typeEncProps{isValue: true}
+			return typeEncProps{isValue: true}, true
 		}
 	case reflect.Map:
 		if t == mapStringInterfaceType {
-			return typeEncProps{isValue: false}
+			return typeEncProps{isValue: false}, true
 		}
+	}
+	return typeEncProps{}, false
+}
+
+func encPropsForType(t reflect.Type) typeEncProps {
+	if p, ok := builtinEncProps(t); ok {
+		return p
 	}
 	if p, ok := typeEncPropsCache.Load(t); ok {
 		return p.(typeEncProps)
@@ -405,7 +448,7 @@ func (e *encoderState) isTableLike(v reflect.Value) bool {
 		// the zero value of their element type by the value path.
 		return false
 	}
-	return !isValueKind(v)
+	return !e.propsFor(v.Type()).isValue
 }
 
 // isArrayOfTables returns true when the value is a non-empty slice or array
@@ -423,7 +466,7 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 	}
 	for i := 0; i < v.Len(); i++ {
 		elem, ok := resolve(v.Index(i))
-		if !ok || isValueKind(elem) {
+		if !ok || e.propsFor(elem.Type()).isValue {
 			return false
 		}
 	}
@@ -663,7 +706,18 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 		kbuf = reflect.New(v.Type().Key()).Elem()
 	}
 
-	iter := v.MapRange()
+	// Larger maps read their values into one slab (instead of iter.Value(),
+	// which allocates a fresh value per entry). The slab elements are
+	// addressable and stay alive with the entries that reference them. Small
+	// maps are not worth the slab allocation.
+	var slab reflect.Value
+	if v.Len() >= 8 {
+		slab = reflect.MakeSlice(reflect.SliceOf(v.Type().Elem()), v.Len(), v.Len())
+	}
+	i := 0
+
+	iter := &e.mapIter
+	iter.Reset(v)
 	for iter.Next() {
 		kbuf.SetIterKey(iter)
 		var key string
@@ -675,10 +729,18 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 			var err error
 			key, err = mapKeyString(kbuf)
 			if err != nil {
+				iter.Reset(reflect.Value{})
 				return nil, err
 			}
 		}
-		value := iter.Value()
+		var value reflect.Value
+		if slab.IsValid() && i < slab.Len() {
+			value = slab.Index(i)
+			i++
+			value.SetIterValue(iter)
+		} else {
+			value = iter.Value()
+		}
 		if value.Kind() == reflect.Interface && value.IsNil() {
 			// nil interface values are skipped
 			continue
@@ -689,6 +751,8 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 		}
 		entries = append(entries, entry{key: key, value: value})
 	}
+	// Drop the map reference: the iterator lives on in the pooled state.
+	iter.Reset(reflect.Value{})
 
 	if len(entries) > 1 {
 		// slices.SortFunc avoids boxing the slice into a sort.Interface (an
@@ -1057,7 +1121,7 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 		}
 	}
 
-	switch encPropsForType(t).text {
+	switch e.propsFor(t).text {
 	case 1:
 		if t.Kind() != reflect.String {
 			return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
