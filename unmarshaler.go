@@ -2260,11 +2260,22 @@ func buildPlan(t reflect.Type) *structPlan {
 		byName: map[string]structField{},
 		byFold: map[string]structField{},
 	}
-	addFields(plan, t, nil)
+	addFields(plan, t, nil, map[reflect.Type]bool{})
 	return plan
 }
 
-func addFields(plan *structPlan, t reflect.Type, prefix []int) {
+// addFields flattens the fields of t into the plan. visited holds the types
+// being flattened on the current branch: a struct type that embeds itself
+// (directly or through other types) is not descended into again, mirroring
+// buildEncPlan. Without this guard a recursive embedding would recurse
+// forever; the repeated fields are unreachable by flattening anyway.
+func addFields(plan *structPlan, t reflect.Type, prefix []int, visited map[reflect.Type]bool) {
+	if visited[t] {
+		return
+	}
+	visited[t] = true
+	defer delete(visited, t)
+
 	var embedded []reflect.StructField
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -2344,7 +2355,7 @@ func addFields(plan *structPlan, t reflect.Type, prefix []int) {
 		index = append(index, prefix...)
 		idx := f.Index[0]
 		index = append(index, idx)
-		addFields(plan, ft, index)
+		addFields(plan, ft, index, visited)
 	}
 }
 
