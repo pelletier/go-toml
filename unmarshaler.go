@@ -302,6 +302,10 @@ type decoder struct {
 	fusedParts [][]byte
 	fusedOps   []fusedOp
 	idStack    []int32
+
+	// slab batches the per-value allocations of generic decoding. It needs no
+	// per-document reset: leftover chunk space carries over.
+	slab slabAlloc
 }
 
 // fusedKV is a deferred key-value of an inline table being decoded natively:
@@ -2009,13 +2013,19 @@ func (d *decoder) assignArray(v reflect.Value, expr *unstable.Node, value *unsta
 func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 	switch n.Kind {
 	case unstable.String:
-		return string(n.Data), nil
+		return d.slab.stringAny(d.slab.slabString(n.Data)), nil
 	case unstable.Integer:
 		i, err := parseInteger(n.Data)
-		return i, err
+		if err != nil {
+			return nil, err
+		}
+		return d.slab.int64Any(i), nil
 	case unstable.Float:
 		f, err := parseFloat(n.Data)
-		return f, err
+		if err != nil {
+			return nil, err
+		}
+		return d.slab.float64Any(f), nil
 	case unstable.Bool:
 		return n.Data[0] == 't', nil
 	case unstable.Array:
@@ -2026,7 +2036,7 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 				count++
 			}
 		}
-		slice := make([]interface{}, 0, count)
+		slice := d.slab.anySlice(count)[:0]
 		it := n.Children()
 		for it.Next() {
 			c := it.Node()
@@ -2039,7 +2049,7 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 			}
 			slice = append(slice, ev)
 		}
-		return slice, nil
+		return d.slab.sliceAny(slice), nil
 	case unstable.InlineTable:
 		// Build the map natively: navigate each (possibly dotted) key with
 		// plain Go map operations and decode each value with decodeAny. The
