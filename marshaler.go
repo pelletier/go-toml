@@ -1150,6 +1150,10 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) {
 // fieldByIndexSkipNil returns the field at the given index path, reporting
 // false if a nil embedded pointer is found on the way.
 func fieldByIndexSkipNil(v reflect.Value, index []int) (reflect.Value, bool) {
+	if len(index) == 1 {
+		// Non-embedded fields, the common case.
+		return v.Field(index[0]), true
+	}
 	for i, x := range index {
 		if i > 0 {
 			for v.Kind() == reflect.Ptr {
