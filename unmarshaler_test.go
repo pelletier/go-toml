@@ -5815,3 +5815,55 @@ func TestIssue806_TableErrorContext(t *testing.T) {
 		})
 	}
 }
+
+type selfEmbedded struct {
+	*selfEmbedded
+	X int
+}
+
+// The mutual pair is exported: allocating an embedded pointer during decode
+// requires the embedded field to be settable, which reflect only allows for
+// exported fields.
+type MutualEmbeddedA struct {
+	*MutualEmbeddedB
+	X int
+}
+
+type MutualEmbeddedB struct {
+	*MutualEmbeddedA
+	Y int
+}
+
+func TestUnmarshalRecursiveEmbedded(t *testing.T) {
+	// A struct type that embeds itself (directly or mutually) used to send
+	// the struct-plan builder into infinite recursion, hanging Unmarshal
+	// regardless of the input. The fields of a recursive embedding are
+	// unreachable by flattening, so the cycle is simply not descended into.
+	t.Run("self", func(t *testing.T) {
+		var v selfEmbedded
+		assert.NoError(t, toml.Unmarshal([]byte(`X = 1`), &v))
+		assert.Equal(t, 1, v.X)
+		assert.Zero(t, v.selfEmbedded)
+	})
+
+	t.Run("mutual", func(t *testing.T) {
+		var v MutualEmbeddedA
+		assert.NoError(t, toml.Unmarshal([]byte("X = 1\nY = 2"), &v))
+		assert.Equal(t, 1, v.X)
+		// B's fields remain reachable through the embedding chain: the cycle
+		// only stops where B would re-embed A.
+		assert.Equal(t, 2, v.Y)
+	})
+
+	t.Run("same type twice without cycle", func(t *testing.T) {
+		// The same embedded type on two sibling branches is not a cycle and
+		// must still be flattened.
+		type leaf struct{ Z int }
+		type mid1 struct{ leaf }
+		var v struct {
+			mid1
+		}
+		assert.NoError(t, toml.Unmarshal([]byte(`Z = 3`), &v))
+		assert.Equal(t, 3, v.Z)
+	})
+}
