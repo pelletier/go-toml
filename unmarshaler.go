@@ -622,17 +622,18 @@ func (d *decoder) wrapError(data []byte, err error) error {
 	return err
 }
 
-// wrapSeenError turns an error returned by SeenTracker.CheckExpression into a
-// ParserError carrying the position and key of the offending expression, so
-// that redefinition and duplicate-key errors are reported as a DecodeError
-// with context (see issue #668).
+// keyedError turns a bare error raised while processing an expression into a
+// ParserError carrying the position and key of that expression, so that it is
+// reported as a DecodeError with context. It is used for the errors returned
+// by SeenTracker.CheckExpression (redefinitions and duplicate keys, see issue
+// #668) and for table placement errors raised by walkTable (see issue #806).
 //
 // The highlight spans the expression's key. Unlike Node.Raw, key nodes always
 // carry a Raw range, so this works for tables and array tables too (whose own
 // Raw range is not set by the parser). For a duplicate detected inside an
 // inline table, node is the enclosing key-value expression, so the error
 // points at that expression's key.
-func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
+func (d *decoder) keyedError(node *unstable.Node, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -667,7 +668,7 @@ func (d *decoder) wrapSeenError(node *unstable.Node, err error) error {
 func (d *decoder) handleRootExpression(expr *unstable.Node, root reflect.Value) error {
 	first, err := d.seen.CheckExpression(expr)
 	if err != nil {
-		return d.wrapSeenError(expr, err)
+		return d.keyedError(expr, err)
 	}
 
 	switch expr.Kind {
@@ -788,7 +789,7 @@ walk:
 			}
 			// Anything else is replaced by a fresh generic map.
 			if !mapStringInterfaceType.AssignableTo(v.Type()) {
-				return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Type())
+				return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Type()))
 			}
 			fresh := reflect.ValueOf(map[string]interface{}{})
 			d.storeSlot(&pf, fresh)
@@ -816,7 +817,7 @@ walk:
 				d.setArrayCount(key, 1)
 			}
 			if cnt > v.Len() {
-				return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot reach element %d of array of size %d", cnt-1, v.Len())
+				return d.keyedError(expr, fmt.Errorf("cannot reach element %d of array of size %d", cnt-1, v.Len()))
 			}
 			d.segIdx[idx] = cnt - 1
 			elem := v.Index(cnt - 1)
@@ -899,7 +900,7 @@ walk:
 					}
 				default:
 					if !ceIface {
-						return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", ce.Type())
+						return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", ce.Type()))
 					}
 					fresh := reflect.ValueOf(map[string]interface{}{})
 					d.storeSlot(&w, fresh)
@@ -911,7 +912,7 @@ walk:
 				switch et.Kind() {
 				case reflect.Interface:
 					if !mapStringInterfaceType.AssignableTo(et) {
-						return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", et)
+						return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", et))
 					}
 					fresh := reflect.ValueOf(map[string]interface{}{})
 					d.storeSlot(&w, fresh)
@@ -933,7 +934,7 @@ walk:
 					pf = slotWriter{kind: 1, slot: tmp}
 					v = tmp
 				default:
-					return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", et)
+					return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", et))
 				}
 			}
 			idx++
@@ -950,7 +951,7 @@ walk:
 			v = fv
 			idx++
 		default:
-			return unstable.NewParserError(d.p.Raw(expr.Raw), "cannot store a table in a %s", v.Kind())
+			return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Kind()))
 		}
 	}
 
@@ -1006,7 +1007,7 @@ walk:
 				cnt = 0
 			}
 			if cnt >= v.Len() {
-				return unstable.NewParserError(d.p.Raw(expr.Raw), "array of size %d is too small to store this array table", v.Len())
+				return d.keyedError(expr, fmt.Errorf("array of size %d is too small to store this array table", v.Len()))
 			}
 			v.Index(cnt).Set(reflect.Zero(v.Type().Elem()))
 			d.setArrayCount(akey, cnt+1)
@@ -1019,7 +1020,7 @@ walk:
 			pf = slotWriter{kind: 1, slot: elem}
 			v = elem
 		default:
-			return fmt.Errorf("toml: cannot store an array table in a %s", v.Kind())
+			return d.keyedError(expr, fmt.Errorf("cannot store an array table in a %s", v.Kind()))
 		}
 	}
 
@@ -1046,7 +1047,7 @@ walk:
 				}
 			}
 			if !mapStringInterfaceType.AssignableTo(v.Type()) {
-				return fmt.Errorf("toml: cannot store a table in a %s", v.Type())
+				return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Type()))
 			}
 			fresh := reflect.ValueOf(map[string]interface{}{})
 			d.storeSlot(&pf, fresh)
@@ -1072,7 +1073,7 @@ walk:
 			d.tableTargetValid = true
 			return nil
 		default:
-			return fmt.Errorf("toml: cannot store a table in a %s", v.Kind())
+			return d.keyedError(expr, fmt.Errorf("cannot store a table in a %s", v.Kind()))
 		}
 	}
 }
