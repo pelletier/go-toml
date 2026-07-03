@@ -173,7 +173,7 @@ func (d *Decoder) EnableUnmarshalerInterface() *Decoder {
 //	Inline Table     -> same as Table
 //	Array of Tables  -> same as Array and Table
 func (d *Decoder) Decode(v interface{}) error {
-	b, err := io.ReadAll(d.r)
+	b, err := readDocument(d.r)
 	if err != nil {
 		return fmt.Errorf("toml: %w", err)
 	}
@@ -182,6 +182,35 @@ func (d *Decoder) Decode(v interface{}) error {
 	err = dec.unmarshal(b, v)
 	putDecoder(dec)
 	return err
+}
+
+// readDocument reads the reader to its end. Readers that know their size
+// (bytes.Reader, strings.Reader, bytes.Buffer, ...) get a buffer of exactly
+// that size up front instead of io.ReadAll's growth sequence.
+func readDocument(r io.Reader) ([]byte, error) {
+	l, ok := r.(interface{ Len() int })
+	if !ok {
+		return io.ReadAll(r)
+	}
+	b := make([]byte, 0, l.Len())
+	for {
+		n, err := r.Read(b[len(b):cap(b)])
+		b = b[:len(b)+n]
+		if err != nil {
+			if err == io.EOF {
+				return b, nil
+			}
+			return b, err
+		}
+		if len(b) == cap(b) {
+			// The reader may have grown (or lied): finish with ReadAll.
+			rest, err := io.ReadAll(r)
+			if err != nil {
+				return b, err
+			}
+			return append(b, rest...), nil
+		}
+	}
 }
 
 // pathPart is one part of the key path leading to a value. Parts that come
