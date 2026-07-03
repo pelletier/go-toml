@@ -507,6 +507,203 @@ func TestRawMessageNestedSubTableHeadersLimitation(t *testing.T) {
 	assert.Equal(t, "[outer]\na = 1\n[sub]\nb = 2\n", out)
 }
 
+// TestMarshalerInterfaceInvalidContent checks that bytes which are neither a
+// value nor valid table content produce an error instead of silently splicing
+// an invalid document, mirroring json.RawMessage's validation.
+func TestMarshalerInterfaceInvalidContent(t *testing.T) {
+	type config struct {
+		X unstable.RawMessage `toml:"x"`
+	}
+	for _, raw := range []string{"!!! not toml", "[1, 2", "42 garbage", "a = ", "= 1"} {
+		t.Run(raw, func(t *testing.T) {
+			out, err := encodeRaw(t, config{X: unstable.RawMessage(raw)})
+			assert.Error(t, err)
+			assert.True(t, strings.Contains(err.Error(), "invalid TOML"), err.Error())
+			assert.Equal(t, "", out)
+		})
+	}
+
+	t.Run("array of tables element", func(t *testing.T) {
+		type config struct {
+			Item []unstable.RawMessage `toml:"item"`
+		}
+		// Both elements classify as table-shaped, but the second is invalid.
+		_, err := encodeRaw(t, config{Item: []unstable.RawMessage{
+			unstable.RawMessage("a = 1\n"),
+			unstable.RawMessage("b ="),
+		}})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "invalid TOML"), err.Error())
+	})
+}
+
+// TestMarshalerInterfaceCommentedTable checks a commented table-shaped
+// RawMessage has its body comment-prefixed line by line: it must not leak into
+// the document as live keys of the parent table.
+func TestMarshalerInterfaceCommentedTable(t *testing.T) {
+	t.Run("single table", func(t *testing.T) {
+		type config struct {
+			X unstable.RawMessage `toml:"x,commented"`
+		}
+		out, err := encodeRaw(t, config{X: unstable.RawMessage("a = 1\nb = 2\n")})
+		assert.NoError(t, err)
+		assert.Equal(t, "# [x]\n# a = 1\n# b = 2\n", out)
+
+		// The commented content must not decode into live keys.
+		var m map[string]interface{}
+		assert.NoError(t, toml.Unmarshal([]byte(out), &m))
+		assert.Equal(t, 0, len(m))
+	})
+
+	t.Run("array of tables", func(t *testing.T) {
+		type config struct {
+			Item []unstable.RawMessage `toml:"item,commented"`
+		}
+		out, err := encodeRaw(t, config{Item: []unstable.RawMessage{
+			unstable.RawMessage("a = 1\n"),
+			unstable.RawMessage("a = 2\n"),
+		}})
+		assert.NoError(t, err)
+		assert.Equal(t, "# [[item]]\n# a = 1\n\n# [[item]]\n# a = 2\n", out)
+
+		var m map[string]interface{}
+		assert.NoError(t, toml.Unmarshal([]byte(out), &m))
+		assert.Equal(t, 0, len(m))
+	})
+}
+
+// shiftyMarshaler returns a different body on each call, exercising the
+// emit-time validation that guards against non-deterministic implementations:
+// the encoder classifies on a first call and emits the bytes of a second one.
+type shiftyMarshaler struct {
+	calls  *int
+	bodies []string
+}
+
+func (s shiftyMarshaler) MarshalTOML() ([]byte, error) {
+	i := *s.calls
+	if i >= len(s.bodies) {
+		i = len(s.bodies) - 1
+	}
+	*s.calls++
+	return []byte(s.bodies[i]), nil
+}
+
+func TestMarshalerInterfaceNonDeterministic(t *testing.T) {
+	t.Run("table then value", func(t *testing.T) {
+		calls := 0
+		type config struct {
+			X shiftyMarshaler `toml:"x"`
+		}
+		// Classified as a table body, but the emit call returns a bare value,
+		// which is not valid after a [x] header.
+		_, err := encodeRaw(t, config{X: shiftyMarshaler{calls: &calls, bodies: []string{"a = 1\n", "42"}}})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "invalid TOML"), err.Error())
+	})
+
+	t.Run("value then table", func(t *testing.T) {
+		calls := 0
+		type config struct {
+			X shiftyMarshaler `toml:"x"`
+		}
+		// Classified as a value, but the emit call returns table content,
+		// which must not be spliced into a `key = ` position.
+		_, err := encodeRaw(t, config{X: shiftyMarshaler{calls: &calls, bodies: []string{"42", "a = 1\n"}}})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "inline value"), err.Error())
+	})
+}
+
+// TestMarshalerInterfaceRoot checks a Marshaler at the document root emits its
+// bytes as the whole document: the encode counterpart of the decoder
+// delivering the whole document to a root Unmarshaler.
+func TestMarshalerInterfaceRoot(t *testing.T) {
+	t.Run("document", func(t *testing.T) {
+		doc := "a = 1\n[t]\nb = 2"
+		out, err := encodeRaw(t, unstable.RawMessage(doc))
+		assert.NoError(t, err)
+		assert.Equal(t, doc+"\n", out)
+	})
+
+	t.Run("headers are absolute at the root", func(t *testing.T) {
+		// Unlike a body re-emitted under a [key] header, a root document
+		// keeps its headers at the position they name, so nested tables
+		// round-trip exactly.
+		doc := "[outer]\na = 1\n\n[outer.sub]\nb = 2"
+		out, err := encodeRaw(t, unstable.RawMessage(doc))
+		assert.NoError(t, err)
+		assert.Equal(t, doc+"\n", out)
+	})
+
+	t.Run("numeric table header", func(t *testing.T) {
+		// At the root the bytes are parsed as a document, so [1] is a table
+		// named "1", not an array value.
+		out, err := encodeRaw(t, unstable.RawMessage("[1]\na = 1"))
+		assert.NoError(t, err)
+		assert.Equal(t, "[1]\na = 1\n", out)
+	})
+
+	t.Run("pointer", func(t *testing.T) {
+		raw := unstable.RawMessage("a = 1")
+		out, err := encodeRaw(t, &raw)
+		assert.NoError(t, err)
+		assert.Equal(t, "a = 1\n", out)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		out, err := encodeRaw(t, unstable.RawMessage(" \n\t"))
+		assert.NoError(t, err)
+		assert.Equal(t, "", out)
+	})
+
+	t.Run("single value errors", func(t *testing.T) {
+		_, err := encodeRaw(t, unstable.RawMessage("42"))
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "document root"), err.Error())
+	})
+
+	t.Run("invalid content errors", func(t *testing.T) {
+		_, err := encodeRaw(t, unstable.RawMessage("!!! not toml"))
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "invalid TOML"), err.Error())
+	})
+
+	t.Run("marshal error propagates", func(t *testing.T) {
+		_, err := encodeRaw(t, errMarshaler{})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "marshal boom"), err.Error())
+	})
+
+	t.Run("disabled keeps the baseline error", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := toml.NewEncoder(&buf).Encode(unstable.RawMessage("a = 1"))
+		assert.Error(t, err)
+	})
+}
+
+// TestRawMessageRoundTripRoot captures a whole document into a root RawMessage
+// (as introduced for the decoder in #994) and re-encodes it.
+func TestRawMessageRoundTripRoot(t *testing.T) {
+	doc := "a = 1\nc = [1, 2]\n\n[t]\nb = 2\n\n[t.sub]\nd = 'x'\n"
+
+	var raw unstable.RawMessage
+	err := toml.NewDecoder(strings.NewReader(doc)).
+		EnableUnmarshalerInterface().
+		Decode(&raw)
+	assert.NoError(t, err)
+
+	reencoded, err := encodeRaw(t, raw)
+	assert.NoError(t, err)
+
+	var want, got map[string]interface{}
+	assert.NoError(t, toml.Unmarshal([]byte(doc), &want))
+	assert.NoError(t, toml.Unmarshal([]byte(reencoded), &got))
+	assert.True(t, reflect.DeepEqual(want, got),
+		"round-trip mismatch\noriginal:\n%s\nre-encoded:\n%s\nwant=%#v\ngot=%#v",
+		doc, reencoded, want, got)
+}
+
 func BenchmarkMarshalRawMessage(b *testing.B) {
 	b.Run("table", func(b *testing.B) {
 		v := rawTableConfig{

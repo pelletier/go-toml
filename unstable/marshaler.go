@@ -8,9 +8,13 @@ package unstable
 //     inline, as in `key = <raw>`.
 //   - One or more key-value lines (optionally with relative sub-table headers)
 //     is emitted as the body of a `[key]` table.
+//   - At the document root, the bytes are emitted as the whole document.
 //
-// The encoder decides between those two forms by parsing the returned bytes;
-// see Encoder.EnableMarshalerInterface in the root toml package.
+// The encoder decides between those forms by parsing the returned bytes, and
+// reports an error when they are not valid TOML for their position; see
+// Encoder.EnableMarshalerInterface in the root toml package. MarshalTOML can
+// be called more than once for the same value during a single encode, so it
+// must be deterministic.
 //
 // Marshaler is the encoding counterpart of Unmarshaler.
 type Marshaler interface {
