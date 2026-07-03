@@ -14,8 +14,17 @@ func init() {
 	parserbridge.ScanKey = func(p any, b []byte, dst [][]byte) (parts [][]byte, raw, rest []byte, err error) {
 		return p.(*Parser).scanKey(b, dst)
 	}
+	parserbridge.ScanKeyRaws = func(p any, b []byte, dst, raws [][]byte) (parts, rawsOut [][]byte, raw, rest []byte, err error) {
+		return p.(*Parser).scanKeyRaws(b, dst, raws)
+	}
 	parserbridge.ScanComment = scanComment
 	parserbridge.ParseValue = func(p any, b []byte) (node any, rest []byte, err error) {
 		return p.(*Parser).parseValue(b)
+	}
+	parserbridge.SetCursor = func(p any, rest []byte) {
+		p.(*Parser).left = rest
+	}
+	parserbridge.Cursor = func(p any) []byte {
+		return p.(*Parser).left
 	}
 }

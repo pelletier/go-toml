@@ -612,6 +612,37 @@ func (p *Parser) scanKey(b []byte, dst [][]byte) (parts [][]byte, raw, rest []by
 	}
 }
 
+// scanKeyRaws is scanKey, additionally appending the raw span of each part
+// (undecoded, quotes included — the same bytes a Key node's Raw range covers)
+// to raws.
+//
+// It is exposed to the root toml package through internal/parserbridge for the
+// fused decode paths; it is not part of the public API.
+func (p *Parser) scanKeyRaws(b []byte, dst, raws [][]byte) (parts, rawsOut [][]byte, raw, rest []byte, err error) {
+	parts = dst
+	rawsOut = raws
+	start := b
+	for {
+		praw, value, r, err := p.scanSimpleKey(b)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		parts = append(parts, value)
+		rawsOut = append(rawsOut, praw)
+
+		// r points just past the current part: the key spans from start to
+		// here, ignoring any whitespace that follows.
+		raw = start[:len(start)-len(r)]
+
+		b = skipWhitespace(r)
+		if len(b) > 0 && b[0] == '.' {
+			b = skipWhitespace(b[1:])
+			continue
+		}
+		return parts, rawsOut, raw, b, nil
+	}
+}
+
 // parseValue parses a single TOML value, which may be an array or inline table,
 // into the parser's arena. It returns the root node of the value and the rest
 // of the input. It resets the arena, so any node returned by a previous call to

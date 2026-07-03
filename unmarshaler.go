@@ -60,9 +60,12 @@ func (d *decoder) reset() {
 	d.tableFlush = d.tableFlush[:0]
 	d.tableParentSlot = slotWriter{}
 	d.keyParts = d.keyParts[:0]
+	d.keyRaws = d.keyRaws[:0]
 	d.fusedParts = d.fusedParts[:0]
 	d.fusedOps = d.fusedOps[:0]
 	d.idStack = d.idStack[:0]
+	d.fusedKVParts = nil
+	d.fusedValueSpan = nil
 	d.strict.Reset()
 }
 
@@ -183,17 +186,29 @@ func (d *Decoder) Decode(v interface{}) error {
 
 // pathPart is one part of the key path leading to a value. Parts that come
 // from the current table header only carry a name; parts that come from the
-// key of the current key-value expression also carry the AST node, and their
-// name is materialized lazily to avoid allocations.
+// key of the current key-value expression also carry the AST node — or, on
+// the fused (AST-free) path, the decoded part bytes and the range of its raw
+// span — and their name is materialized lazily to avoid allocations.
 type pathPart struct {
 	name string
 	node *unstable.Node
+	data []byte
+	rng  unstable.Range
+}
+
+// fromKey reports whether the part comes from the key of the current
+// key-value expression (as opposed to the table header prefix).
+func (p *pathPart) fromKey() bool {
+	return p.node != nil || p.data != nil
 }
 
 // bytes returns the raw bytes of the key part.
 func (p *pathPart) bytes() []byte {
 	if p.node != nil {
 		return p.node.Data
+	}
+	if p.data != nil {
+		return p.data
 	}
 	return []byte(p.name)
 }
@@ -202,6 +217,9 @@ func (p *pathPart) bytes() []byte {
 func (p *pathPart) str() string {
 	if p.node != nil {
 		return string(p.node.Data)
+	}
+	if p.data != nil {
+		return string(p.data)
 	}
 	return p.name
 }
@@ -303,6 +321,15 @@ type decoder struct {
 	fusedParts [][]byte
 	fusedOps   []fusedOp
 	idStack    []int32
+
+	// Fused struct-path state: keyRaws is the reusable buffer of raw key-part
+	// spans matching keyParts; fusedKVParts/fusedKVKeyRange describe the key
+	// of the key-value being decoded (for strict-mode reporting) and
+	// fusedValueSpan the exact raw span of its value (for error highlights).
+	keyRaws         [][]byte
+	fusedKVParts    [][]byte
+	fusedKVKeyRange unstable.Range
+	fusedValueSpan  []byte
 
 	// slab batches the per-value allocations of generic decoding. It needs no
 	// per-document reset: leftover chunk space carries over.
@@ -410,6 +437,9 @@ func (d *decoder) intern(b []byte) string {
 func (d *decoder) partString(p *pathPart) string {
 	if p.node != nil {
 		return d.intern(p.node.Data)
+	}
+	if p.data != nil {
+		return d.intern(p.data)
 	}
 	return p.name
 }
@@ -572,27 +602,36 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 		}
 	}
 
-	// When the root target itself implements the Unmarshaler interface, the
-	// whole document decodes into it. Open a capture spanning the entire
-	// document up front: the top-level key-values then flow through the
-	// existing capture branch and any tables attach to it via resumeCapture,
-	// so UnmarshalTOML receives the assembled document exactly once.
-	if d.unmarshalerInterface && hasUnmarshaler(root) {
-		d.startRootCapture()
-	}
+	if !d.unmarshalerInterface {
+		// Reflection targets without the unmarshaler interface use the fused
+		// document loop: scalar key-values decode without an AST.
+		if err := d.fusedStructDocument(root, data); err != nil {
+			return err
+		}
+	} else {
+		// When the root target itself implements the Unmarshaler interface,
+		// the whole document decodes into it. Open a capture spanning the
+		// entire document up front: the top-level key-values then flow
+		// through the existing capture branch and any tables attach to it via
+		// resumeCapture, so UnmarshalTOML receives the assembled document
+		// exactly once.
+		if hasUnmarshaler(root) {
+			d.startRootCapture()
+		}
 
-	for d.p.NextExpression() {
-		err := d.handleRootExpression(d.p.Expression(), root)
-		if err != nil {
-			return d.wrapError(data, err)
+		for d.p.NextExpression() {
+			err := d.handleRootExpression(d.p.Expression(), root)
+			if err != nil {
+				return d.wrapError(data, err)
+			}
 		}
-	}
-	if err := d.p.Error(); err != nil {
-		var perr *unstable.ParserError
-		if errors.As(err, &perr) {
-			return wrapDecodeError(data, perr)
+		if err := d.p.Error(); err != nil {
+			var perr *unstable.ParserError
+			if errors.As(err, &perr) {
+				return wrapDecodeError(data, perr)
+			}
+			return err
 		}
-		return err
 	}
 
 	d.flushTable()
@@ -1546,6 +1585,8 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		if !found {
 			if part.node != nil {
 				d.strict.MissingField(expr)
+			} else if part.data != nil {
+				d.strict.MissingFieldParts(d.fusedKVKeyRange, d.fusedKVParts)
 			}
 			return v, nil
 		}
@@ -1609,7 +1650,7 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		}
 		elemIdx := cnt - 1
 		if elemIdx >= v.Len() {
-			return reflect.Value{}, unstable.NewParserError(keyHighlight(d.p.Data(), part.node),
+			return reflect.Value{}, unstable.NewParserError(partHighlight(d.p.Data(), &part),
 				"cannot reach element %d of array of size %d", elemIdx, v.Len())
 		}
 		elem := v.Index(elemIdx)
@@ -1622,7 +1663,7 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		}
 		return v, nil
 	default:
-		return reflect.Value{}, d.typeMismatchError("table", v.Type(), keyHighlight(d.p.Data(), part.node))
+		return reflect.Value{}, d.typeMismatchError("table", v.Type(), partHighlight(d.p.Data(), &part))
 	}
 }
 
@@ -1671,12 +1712,28 @@ func keyHighlight(doc []byte, node *unstable.Node) []byte {
 	return doc[node.Raw.Offset : node.Raw.Offset+node.Raw.Length]
 }
 
+// partHighlight returns a highlight for a key path part, whether it carries
+// an AST node or raw bytes from the fused path.
+func partHighlight(doc []byte, part *pathPart) []byte {
+	if part.node == nil && part.data != nil {
+		return doc[part.rng.Offset : part.rng.Offset+part.rng.Length]
+	}
+	return keyHighlight(doc, part.node)
+}
+
 // rawValue returns the raw bytes of the value of a key-value expression.
 func (d *decoder) rawValue(expr *unstable.Node, value *unstable.Node) []byte {
 	if value.Kind != unstable.InlineTable && value.Kind != unstable.Array {
 		return d.p.Raw(value.Raw)
 	}
-	if expr == nil || expr.Kind != unstable.KeyValue {
+	if expr == nil {
+		if d.fusedValueSpan != nil {
+			// Fused path: the exact span of the current key-value's value.
+			return d.fusedValueSpan
+		}
+		return d.p.Raw(value.Raw)
+	}
+	if expr.Kind != unstable.KeyValue {
 		// Inline container nested in another container: best effort.
 		return d.p.Raw(value.Raw)
 	}
