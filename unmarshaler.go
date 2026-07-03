@@ -331,10 +331,6 @@ type decoder struct {
 	fusedKVKeyRange unstable.Range
 	fusedValueSpan  []byte
 
-	// slab batches the per-value allocations of generic decoding. It needs no
-	// per-document reset: leftover chunk space carries over.
-	slab slabAlloc
-
 	// Small MRU memo of struct plan lookups: the key-values of a table hit
 	// the same few struct types over and over, and the global cache lookup
 	// costs an interface hash every time.
@@ -2121,7 +2117,7 @@ func (d *decoder) decodeAny(n *unstable.Node) (interface{}, error) {
 				count++
 			}
 		}
-		slice := d.slab.anySlice(count)[:0]
+		slice := make([]interface{}, 0, count)
 		it := n.Children()
 		for it.Next() {
 			c := it.Node()

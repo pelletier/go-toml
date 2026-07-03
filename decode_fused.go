@@ -309,7 +309,7 @@ func (d *decoder) fusedArray(b []byte) (interface{}, []byte, error) {
 		switch b[0] {
 		case ']':
 			elems := d.anyStack[base:]
-			out := d.slab.anySlice(len(elems))
+			out := make([]interface{}, len(elems))
 			copy(out, elems)
 			clear(elems)
 			d.anyStack = d.anyStack[:base]
