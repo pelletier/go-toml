@@ -338,7 +338,7 @@ type decoder struct {
 	// Small MRU memo of struct plan lookups: the key-values of a table hit
 	// the same few struct types over and over, and the global cache lookup
 	// costs an interface hash every time.
-	planMemo [4]struct {
+	planMemo [8]struct {
 		t reflect.Type
 		p *structPlan
 	}
