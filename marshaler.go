@@ -244,6 +244,33 @@ type entry struct {
 	key     string
 	value   reflect.Value
 	options valueOptions
+	class   entryClass
+}
+
+// entryClass tells how an entry of a table is emitted. It is computed once
+// per entry: classifying requires resolving the value's type (and for arrays,
+// the type of every element), which would otherwise be repeated by each of
+// the encoding passes.
+type entryClass uint8
+
+const (
+	classKeyValue entryClass = iota
+	classTable
+	classArrayTable
+)
+
+// classify computes the entryClass of an entry.
+func (e *encoderState) classify(ent *entry) entryClass {
+	if e.tablesInline || ent.options.inline {
+		return classKeyValue
+	}
+	if e.isArrayOfTables(ent.value) {
+		return classArrayTable
+	}
+	if e.isTableLike(ent.value) {
+		return classTable
+	}
+	return classKeyValue
 }
 
 func (e *encoderState) encodeRoot(v interface{}) error {
@@ -300,6 +327,15 @@ type typeEncProps struct {
 var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
 
 func encPropsForType(t reflect.Type) typeEncProps {
+	// Generic documents (map[string]interface{} trees) are made of a handful
+	// of builtin types, none of which can implement TextMarshaler: resolve
+	// them with pointer comparisons instead of a cache lookup.
+	switch t {
+	case stringType, boolType, intType, int64Type, float64Type, sliceInterfaceType:
+		return typeEncProps{isValue: true}
+	case mapStringInterfaceType:
+		return typeEncProps{isValue: false}
+	}
 	if p, ok := typeEncPropsCache.Load(t); ok {
 		return p.(typeEncProps)
 	}
@@ -380,7 +416,8 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 	// pass.
 	for i := range entries {
 		ent := &entries[i]
-		if e.entryIsTable(ent) {
+		ent.class = e.classify(ent)
+		if ent.class != classKeyValue {
 			continue
 		}
 		err := e.encodeKeyValue(*ent, commented, indent)
@@ -392,13 +429,13 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 	// Second pass: emit the sub-tables, extending the shared key stack.
 	for i := range entries {
 		ent := entries[i]
-		if !e.entryIsTable(&ent) {
+		if ent.class == classKeyValue {
 			continue
 		}
 		entCommented := commented || ent.options.commented
 		e.keyStack = append(e.keyStack, ent.key)
 
-		if e.isArrayOfTables(ent.value) {
+		if ent.class == classArrayTable {
 			err := e.encodeArrayTable(ent, entCommented, indent)
 			if err != nil {
 				return err
@@ -407,7 +444,7 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 			continue
 		}
 
-		// The value is resolvable: entryIsTable already resolved it.
+		// The value is resolvable: classify already resolved it.
 		tv, _ := resolve(ent.value)
 
 		e.writeTableHeader(ent.options.comment, entCommented, false, indent)
@@ -421,12 +458,6 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 
 	e.putEntries(entries)
 	return nil
-}
-
-// entryIsTable reports whether the entry is emitted as a (sub-)table rather
-// than a key-value.
-func (e *encoderState) entryIsTable(ent *entry) bool {
-	return !e.tablesInline && !ent.options.inline && (e.isTableLike(ent.value) || e.isArrayOfTables(ent.value))
 }
 
 // getEntries returns a reusable entry slice.
@@ -597,7 +628,8 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	// Keys are converted to strings right away: read them into a reusable
 	// buffer to avoid one allocation per key.
 	var kbuf reflect.Value
-	if v.Type().Key() == stringType {
+	plainStringKey := v.Type().Key() == stringType
+	if plainStringKey {
 		if !e.stringKeyBuf.IsValid() {
 			e.stringKeyBuf = reflect.New(stringType).Elem()
 		}
@@ -609,9 +641,17 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	iter := v.MapRange()
 	for iter.Next() {
 		kbuf.SetIterKey(iter)
-		key, err := mapKeyString(kbuf)
-		if err != nil {
-			return nil, err
+		var key string
+		if plainStringKey {
+			// Plain strings cannot implement TextMarshaler: skip the
+			// interface checks of mapKeyString.
+			key = kbuf.String()
+		} else {
+			var err error
+			key, err = mapKeyString(kbuf)
+			if err != nil {
+				return nil, err
+			}
 		}
 		value := iter.Value()
 		if value.Kind() == reflect.Interface && value.IsNil() {
