@@ -5723,3 +5723,95 @@ e = 1
 	assert.NoError(t, toml.Unmarshal([]byte(doc), &m))
 	assert.Equal(t, 1, len(m["a"].([]interface{}))-1)
 }
+
+func TestIssue806_TableErrorContext(t *testing.T) {
+	// Errors raised while placing a [table] or [[array table]] into an
+	// incompatible target must be DecodeErrors carrying the position and key
+	// of the offending header, not bare strings (or errors pointing at the
+	// start of the document).
+	examples := []struct {
+		desc string
+		doc  string
+		unm  func(data []byte) error
+		msg  string
+		row  int
+		col  int
+		key  []string
+	}{
+		{
+			desc: "array table into string field",
+			doc:  "x = 1\n[[A]]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A string
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store an array table in a string",
+			row: 2, col: 3,
+			key: []string{"A"},
+		},
+		{
+			desc: "table into string field",
+			doc:  "x = 1\n[A]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A string
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store a table in a string",
+			row: 2, col: 2,
+			key: []string{"A"},
+		},
+		{
+			desc: "table into non-generic interface field",
+			doc:  "x = 1\n[A]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A interface{ Foo() }
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store a table in a interface { Foo() }",
+			row: 2, col: 2,
+			key: []string{"A"},
+		},
+		{
+			desc: "nested table through a slice of scalars",
+			doc:  "x = 1\n[A.B]\n",
+			unm: func(data []byte) error {
+				var s struct {
+					X int
+					A []int
+				}
+				return toml.Unmarshal(data, &s)
+			},
+			msg: "toml: cannot store a table in a int",
+			row: 2, col: 2,
+			key: []string{"A", "B"},
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			err := e.unm([]byte(e.doc))
+			assert.Error(t, err)
+			assert.Equal(t, e.msg, err.Error())
+
+			var de *toml.DecodeError
+			if !errors.As(err, &de) {
+				t.Fatalf("err should have been a *toml.DecodeError, but got %s (%T)", err, err)
+			}
+			t.Log("\n" + de.String())
+			row, col := de.Position()
+			assert.Equal(t, e.row, row)
+			assert.Equal(t, e.col, col)
+			assert.Equal(t, toml.Key(e.key), de.Key())
+		})
+	}
+}
