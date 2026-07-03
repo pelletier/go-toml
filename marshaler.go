@@ -351,6 +351,25 @@ func (e *encoderState) encodeRoot(v interface{}) error {
 		return errors.New("toml: cannot encode a nil interface")
 	}
 
+	if m, ok := v.(map[string]interface{}); ok {
+		// Generic documents skip reflection entirely: their entries are
+		// collected natively and every value encodes by type switch.
+		entries := e.getEntries()
+		for key, value := range m {
+			if value == nil {
+				// nil interface values are skipped
+				continue
+			}
+			entries = append(entries, entry{key: key, anyValue: value})
+		}
+		if len(entries) > 1 {
+			slices.SortFunc(entries, func(a, b entry) int {
+				return strings.Compare(a.key, b.key)
+			})
+		}
+		return e.encodeEntries(entries, false, 0)
+	}
+
 	rv := reflect.ValueOf(v)
 	rv, ok := resolve(rv)
 	if !ok {
@@ -516,7 +535,13 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 	if err != nil {
 		return err
 	}
+	return e.encodeEntries(entries, commented, indent)
+}
 
+// encodeEntries writes the collected entries of a table in the two passes
+// (key-values first, then sub-tables) and returns the entry slice to the
+// pool.
+func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int) error {
 	// First pass: emit all key-values; tables are handled by the second
 	// pass.
 	for i := range entries {
