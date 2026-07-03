@@ -196,12 +196,6 @@ type pathPart struct {
 	rng  unstable.Range
 }
 
-// fromKey reports whether the part comes from the key of the current
-// key-value expression (as opposed to the table header prefix).
-func (p *pathPart) fromKey() bool {
-	return p.node != nil || p.data != nil
-}
-
 // bytes returns the raw bytes of the key part.
 func (p *pathPart) bytes() []byte {
 	if p.node != nil {
