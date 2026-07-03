@@ -49,9 +49,11 @@ func (k keyKind) String() string {
 
 // spillThreshold is the number of children past which a parent's children are
 // moved from its sibling chain to the shared hash index. Chains keep small
-// tables (the common case) free of any hashing cost; the index keeps huge
-// tables O(1) per key.
-const spillThreshold = 32
+// and medium tables (the vast majority — including the ~40-key objects of
+// converted JSON documents) free of any hashing cost: their children are
+// created back to back, so walking the chain is a sequential scan. The index
+// only takes over for pathological tables, where it keeps lookups O(1).
+const spillThreshold = 64
 
 // entry represents a node that has been seen in the document. Its size has a
 // direct impact on the performance of unmarshaling documents: keep it as
