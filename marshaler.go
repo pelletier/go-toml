@@ -214,8 +214,10 @@ type encoderState struct {
 	buf []byte
 
 	// keyStack is the dotted key of the table being encoded, shared by the
-	// whole encode as a stack.
-	keyStack []string
+	// whole encode as a stack. Each part carries whether it can be emitted
+	// bare, computed once at push: nested table headers re-emit every parent
+	// part.
+	keyStack []keyStackPart
 
 	// entriesPool recycles entry slices across tables of the same encode.
 	entriesPool [][]entry
@@ -283,12 +285,18 @@ type entry struct {
 	key      string
 	value    reflect.Value
 	anyValue interface{}
-	options  valueOptions
-	class    entryClass
+	// options points into the encoder plan (or at zeroValueOptions for map
+	// entries): entries are copied around, and the options are the widest
+	// part of them.
+	options *valueOptions
+	class   entryClass
 	// pf points to the plan field the entry came from, carrying its
 	// statically-known facts; nil for map entries.
 	pf *encPlanField
 }
+
+// zeroValueOptions is the shared options of entries that have no tags.
+var zeroValueOptions valueOptions
 
 // entryClass tells how an entry of a table is emitted. It is computed once
 // per entry: classifying requires resolving the value's type (and for arrays,
@@ -366,7 +374,7 @@ func (e *encoderState) encodeRoot(v interface{}) error {
 				// nil interface values are skipped
 				continue
 			}
-			entries = append(entries, entry{key: key, anyValue: value})
+			entries = append(entries, entry{key: key, anyValue: value, options: &zeroValueOptions})
 		}
 		if len(entries) > 1 {
 			slices.SortFunc(entries, func(a, b entry) int {
@@ -556,7 +564,7 @@ func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int
 		if ent.class != classKeyValue {
 			continue
 		}
-		err := e.encodeKeyValue(*ent, commented, indent)
+		err := e.encodeKeyValue(ent, commented, indent)
 		if err != nil {
 			return err
 		}
@@ -575,10 +583,14 @@ func (e *encoderState) encodeEntries(entries []entry, commented bool, indent int
 			ent.anyValue = nil
 		}
 		entCommented := commented || ent.options.commented
-		e.keyStack = append(e.keyStack, ent.key)
+		bare := ent.pf != nil && ent.pf.bareKey
+		if !bare {
+			bare = isBareKey(ent.key)
+		}
+		e.keyStack = append(e.keyStack, keyStackPart{s: ent.key, bare: bare})
 
 		if ent.class == classArrayTable {
-			err := e.encodeArrayTable(ent, entCommented, indent)
+			err := e.encodeArrayTable(&ent, entCommented, indent)
 			if err != nil {
 				return err
 			}
@@ -620,7 +632,7 @@ func (e *encoderState) putEntries(s []entry) {
 }
 
 // encodeArrayTable writes all the elements of an array of tables.
-func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeArrayTable(ent *entry, commented bool, indent int) error {
 	v, _ := resolve(ent.value)
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
@@ -637,6 +649,13 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 		}
 	}
 	return nil
+}
+
+// keyStackPart is one part of the current table key, with its quoting need
+// precomputed.
+type keyStackPart struct {
+	s    string
+	bare bool
 }
 
 // writeTableHeader emits a [table] or [[array table]] header line, preceded
@@ -666,7 +685,11 @@ func (e *encoderState) writeTableHeader(comment string, commented bool, array bo
 		if i > 0 {
 			e.buf = append(e.buf, '.')
 		}
-		e.buf = e.appendKey(e.buf, part)
+		if part.bare {
+			e.buf = append(e.buf, part.s...)
+		} else {
+			e.buf = e.appendString(e.buf, part.s)
+		}
 	}
 	e.buf = append(e.buf, ']')
 	if array {
@@ -699,7 +722,7 @@ func (e *encoderState) writeComment(comment string, indent int) {
 }
 
 // encodeKeyValue writes one `key = value` line of a table.
-func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) error {
 	commented = commented || ent.options.commented
 
 	e.writeComment(ent.options.comment, indent)
@@ -731,9 +754,11 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 
 	var err error
 	if ent.anyValue != nil {
-		e.buf, err = e.appendAnyValue(e.buf, ent.anyValue, ent.options, valueIndent)
+		e.buf, err = e.appendAnyValue(e.buf, ent.anyValue, *ent.options, valueIndent)
+	} else if ent.pf != nil && ent.pf.propsKnown {
+		e.buf, err = e.appendValueProps(e.buf, ent.value, ent.pf.props, *ent.options, valueIndent)
 	} else {
-		e.buf, err = e.appendValue(e.buf, ent.value, ent.options, valueIndent)
+		e.buf, err = e.appendValue(e.buf, ent.value, *ent.options, valueIndent)
 	}
 	if err != nil {
 		return err
@@ -782,7 +807,7 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 				// nil interface values are skipped
 				continue
 			}
-			entries = append(entries, entry{key: key, anyValue: value})
+			entries = append(entries, entry{key: key, anyValue: value, options: &zeroValueOptions})
 		}
 		if len(entries) > 1 {
 			slices.SortFunc(entries, func(a, b entry) int {
@@ -848,7 +873,7 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 			// nil pointers in maps are encoded as their zero value
 			value = reflect.New(value.Type().Elem()).Elem()
 		}
-		entries = append(entries, entry{key: key, value: value})
+		entries = append(entries, entry{key: key, value: value, options: &zeroValueOptions})
 	}
 	// Drop the map reference: the iterator lives on in the pooled state.
 	iter.Reset(reflect.Value{})
@@ -1118,7 +1143,7 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) {
 			continue
 		}
 
-		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options, pf: f})
+		*entries = append(*entries, entry{key: f.name, value: fv, options: &f.options, pf: f})
 	}
 }
 
@@ -1325,6 +1350,12 @@ func (e *encoderState) appendAnyArray(b []byte, v []interface{}, opts valueOptio
 
 // appendValue emits a TOML value.
 func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
+	return e.appendValueProps(b, v, e.propsFor(v.Type()), opts, indent)
+}
+
+// appendValueProps is appendValue for callers that already know the type
+// properties (encoder plans precompute them per field).
+func (e *encoderState) appendValueProps(b []byte, v reflect.Value, props typeEncProps, opts valueOptions, indent int) ([]byte, error) {
 	t := v.Type()
 
 	// Special types take precedence over their kind. All of them are structs
@@ -1348,7 +1379,7 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 		}
 	}
 
-	switch e.propsFor(t).text {
+	switch props.text {
 	case 1:
 		if t.Kind() != reflect.String {
 			return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
@@ -1510,7 +1541,7 @@ func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) 
 		b = append(b, " = "...)
 		// multiline strings are not allowed inside inline tables: they
 		// would break the single-line requirement.
-		opts := ent.options
+		opts := *ent.options
 		opts.multiline = false
 		if ent.anyValue != nil {
 			b, err = e.appendAnyValue(b, ent.anyValue, opts, indent)
