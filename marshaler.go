@@ -236,7 +236,7 @@ type encoderState struct {
 	// propsMemo is a small MRU memo of encPropsForType lookups: the values
 	// of a document hit the same few named types over and over, and the
 	// global cache lookup costs an interface hash every time.
-	propsMemo [4]struct {
+	propsMemo [16]struct {
 		t reflect.Type
 		p typeEncProps
 	}
@@ -285,6 +285,9 @@ type entry struct {
 	anyValue interface{}
 	options  valueOptions
 	class    entryClass
+	// pf points to the plan field the entry came from, carrying its
+	// statically-known facts; nil for map entries.
+	pf *encPlanField
 }
 
 // entryClass tells how an entry of a table is emitted. It is computed once
@@ -303,6 +306,9 @@ const (
 func (e *encoderState) classify(ent *entry) entryClass {
 	if e.tablesInline || ent.options.inline {
 		return classKeyValue
+	}
+	if ent.pf != nil && ent.pf.classKnown {
+		return ent.pf.staticClass
 	}
 	if ent.anyValue != nil {
 		switch v := ent.anyValue.(type) {
@@ -706,7 +712,11 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 		e.buf = append(e.buf, "# "...)
 	}
 	e.writeIndent(indent)
-	e.buf = e.appendKey(e.buf, ent.key)
+	if ent.pf != nil && ent.pf.bareKey {
+		e.buf = append(e.buf, ent.key...)
+	} else {
+		e.buf = e.appendKey(e.buf, ent.key)
+	}
 	e.buf = append(e.buf, " = "...)
 
 	// When tables are not indented, the key is emitted at column zero
@@ -896,6 +906,50 @@ type encPlanField struct {
 	index   []int
 	depth   int
 	options valueOptions
+
+	// Statically-known facts about the field, so that encoding does not
+	// re-derive them per value: whether the name needs quoting, and — when
+	// the field type fully determines them — the entry class and the
+	// encoding properties.
+	bareKey     bool
+	staticClass entryClass
+	classKnown  bool
+	props       typeEncProps
+	propsKnown  bool
+}
+
+// staticFieldFacts computes the compile-time part of encPlanField from the
+// field type. The class (key-value vs table vs array of tables) is knowable
+// unless it depends on the value: interfaces and pointers resolve
+// dynamically, and slices of table-like elements switch on emptiness.
+func staticFieldFacts(f *encPlanField, t reflect.Type) {
+	if t.Kind() == reflect.Ptr || t.Kind() == reflect.Interface {
+		return
+	}
+	f.props = encPropsForType(t)
+	f.propsKnown = true
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		et := t.Elem()
+		for et.Kind() == reflect.Ptr {
+			et = et.Elem()
+		}
+		if et.Kind() == reflect.Interface {
+			return
+		}
+		if encPropsForType(et).isValue {
+			// Elements are values: never an array of tables.
+			f.staticClass = classKeyValue
+			f.classKnown = true
+		}
+	default:
+		if f.props.isValue {
+			f.staticClass = classKeyValue
+		} else {
+			f.staticClass = classTable
+		}
+		f.classKnown = true
+	}
 }
 
 // encPlan caches the per-type information needed to encode a struct:
@@ -990,12 +1044,15 @@ func buildEncPlan(plan *encPlan, t reflect.Type, prefix []int, depth int, visite
 			continue
 		}
 
-		plan.fields = append(plan.fields, encPlanField{
+		pf := encPlanField{
 			name:    name,
 			index:   index,
 			depth:   depth,
 			options: opts,
-		})
+			bareKey: isBareKey(name),
+		}
+		staticFieldFacts(&pf, f.Type)
+		plan.fields = append(plan.fields, pf)
 	}
 }
 
@@ -1061,7 +1118,7 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) {
 			continue
 		}
 
-		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options})
+		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options, pf: f})
 	}
 }
 
