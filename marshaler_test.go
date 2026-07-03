@@ -917,11 +917,14 @@ var allFlags = flagsSetters{
 	{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
 	{"tables-inline", (*toml.Encoder).SetTablesInline},
 	{"indent-tables", (*toml.Encoder).SetIndentTables},
+	{"omit-empty-super-tables", (*toml.Encoder).SetOmitEmptySuperTables},
 }
 
 func setFlags(enc *toml.Encoder, flags int) {
+	// testWithFlags builds the bitmask by shifting at each recursion level, so
+	// the first setter owns the most significant bit.
 	for i := 0; i < len(allFlags); i++ {
-		enabled := flags&1 > 0
+		enabled := flags&(1<<(len(allFlags)-1-i)) > 0
 		allFlags[i].f(enc, enabled)
 	}
 }
@@ -1041,6 +1044,157 @@ func TestMarshalIndentTables(t *testing.T) {
 			err := enc.Encode(e.v)
 			assert.NoError(t, err)
 			assert.Equal(t, e.expected, buf.String())
+		})
+	}
+}
+
+func TestMarshalOmitEmptySuperTables(t *testing.T) {
+	type D struct{ S string }
+	type C struct{ D D }
+	type B struct{ C C }
+
+	examples := []struct {
+		desc     string
+		v        interface{}
+		indent   bool
+		expected string
+	}{
+		{
+			desc: "chain of super-tables",
+			v:    struct{ B B }{B{C{D{S: "foo"}}}},
+			expected: `[B.C.D]
+S = 'foo'
+`,
+		},
+		{
+			desc: "super-table with its own key-value keeps its header",
+			v: struct {
+				B struct {
+					X int
+					C C
+				}
+			}{B: struct {
+				X int
+				C C
+			}{X: 1, C: C{D: D{S: "foo"}}}},
+			expected: `[B]
+X = 1
+
+[B.C.D]
+S = 'foo'
+`,
+		},
+		{
+			desc: "empty table keeps its header",
+			v:    struct{ B struct{} }{},
+			expected: `[B]
+`,
+		},
+		{
+			desc: "empty table under a super-table",
+			v:    struct{ B struct{ C struct{} } }{},
+			expected: `[B.C]
+`,
+		},
+		{
+			desc: "array of tables under super-tables",
+			v: struct{ B struct{ C []D } }{B: struct{ C []D }{
+				C: []D{{S: "x"}, {S: "y"}},
+			}},
+			expected: `[[B.C]]
+S = 'x'
+
+[[B.C]]
+S = 'y'
+`,
+		},
+		{
+			desc: "super-table with a comment keeps its header",
+			v: struct {
+				B struct{ C C } `comment:"hello"`
+			}{B: struct{ C C }{C: C{D: D{S: "foo"}}}},
+			expected: `# hello
+[B]
+[B.C.D]
+S = 'foo'
+`,
+		},
+		{
+			desc: "commented super-tables are still omitted",
+			v: struct {
+				B struct{ C C } `toml:",commented"`
+			}{B: struct{ C C }{C: C{D: D{S: "foo"}}}},
+			expected: `# [B.C.D]
+# S = 'foo'
+`,
+		},
+		{
+			desc: "two sibling sub-tables",
+			v: struct{ B struct{ C, D D } }{B: struct{ C, D D }{
+				C: D{S: "one"},
+				D: D{S: "two"},
+			}},
+			expected: `[B.C]
+S = 'one'
+
+[B.D]
+S = 'two'
+`,
+		},
+		{
+			desc: "maps",
+			v: map[string]map[string]map[string]string{
+				"x": {"y": {"z": "w"}},
+			},
+			expected: `[x.y]
+z = 'w'
+`,
+		},
+		{
+			desc: "table emptied by omitempty",
+			v: struct {
+				B struct {
+					X string `toml:",omitempty"`
+					C C
+				}
+			}{B: struct {
+				X string `toml:",omitempty"`
+				C C
+			}{C: C{D: D{S: "foo"}}}},
+			expected: `[B.C.D]
+S = 'foo'
+`,
+		},
+		{
+			desc:   "omitted tables do not indent their children",
+			v:      struct{ B B }{B{C{D{S: "foo"}}}},
+			indent: true,
+			expected: `[B.C.D]
+  S = 'foo'
+`,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			var buf strings.Builder
+			enc := toml.NewEncoder(&buf)
+			enc.SetOmitEmptySuperTables(true)
+			enc.SetIndentTables(e.indent)
+			err := enc.Encode(e.v)
+			assert.NoError(t, err)
+			assert.Equal(t, e.expected, buf.String())
+
+			// The omitted headers must not change the meaning of the
+			// document: both outputs decode to the same map.
+			def, err := toml.Marshal(e.v)
+			assert.NoError(t, err)
+			defaultMap := map[string]interface{}{}
+			assert.NoError(t, toml.Unmarshal(def, &defaultMap))
+			omitMap := map[string]interface{}{}
+			assert.NoError(t, toml.Unmarshal([]byte(buf.String()), &omitMap))
+			assert.Equal(t, defaultMap, omitMap)
 		})
 	}
 }
@@ -2125,6 +2279,41 @@ func ExampleMarshal() {
 	// Version = 2
 	// Name = 'go-toml'
 	// Tags = ['go', 'toml']
+}
+
+func ExampleEncoder_SetOmitEmptySuperTables() {
+	type Credentials struct {
+		User     string
+		Password string
+	}
+	type Database struct {
+		Credentials Credentials
+	}
+	type Config struct {
+		Database Database
+	}
+
+	cfg := Config{
+		Database: Database{
+			Credentials: Credentials{
+				User:     "root",
+				Password: "hunter2",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetOmitEmptySuperTables(true)
+	if err := enc.Encode(cfg); err != nil {
+		panic(err)
+	}
+	fmt.Println(buf.String())
+
+	// Output:
+	// [Database.Credentials]
+	// User = 'root'
+	// Password = 'hunter2'
 }
 
 // Example that uses the 'commented' field tag option to generate an example
