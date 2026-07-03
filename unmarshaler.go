@@ -46,17 +46,15 @@ func (d *decoder) reset() {
 	d.captureIdx = -1
 	d.segIdx = d.segIdx[:0]
 	// Reuse the array-table counter slots across documents instead of
-	// deleting them: a zeroed slot is indistinguishable from an absent one,
-	// and keeping it alive means setArrayCount does not have to allocate a new
-	// *int every time the same path reappears. A safety valve bounds the table
-	// for adversarial inputs that introduce unboundedly many distinct paths.
+	// deleting them: bumping the generation makes every slot read as zero,
+	// and keeping slots alive means setArrayCount does not have to allocate
+	// a new one every time the same path reappears. A safety valve bounds
+	// the table for adversarial inputs that introduce unboundedly many
+	// distinct paths.
 	if len(d.arrayCounts) > 1<<14 {
 		d.arrayCounts = nil
-	} else {
-		for _, p := range d.arrayCounts {
-			*p = 0
-		}
 	}
+	d.acGen++
 	d.tableTarget = reflect.Value{}
 	d.tableTargetValid = false
 	d.tableFlush = d.tableFlush[:0]
@@ -259,8 +257,11 @@ type decoder struct {
 	// arrayCounts tracks the number of elements appended to fixed-size
 	// arrays used as array tables, keyed by the NUL-joined key parts.
 	// Values are pointer slots so that updating an existing path does not
-	// allocate a new key string.
-	arrayCounts map[string]*int
+	// allocate a new key string. Slots stamped with an older generation
+	// than acGen read as zero, which resets all counts in O(1) between
+	// documents.
+	arrayCounts map[string]*acSlot
+	acGen       uint64
 
 	// Cached target of the current table, so that key-values do not need to
 	// walk the document structure from the root for every expression.
@@ -307,20 +308,31 @@ type decoder struct {
 	// per-document reset: leftover chunk space carries over.
 	slab slabAlloc
 
-	// One-entry memo of the last struct plan lookup: the key-values of a
-	// table hit the same struct type over and over, and the global cache
-	// lookup costs an interface hash every time.
-	lastPlanType reflect.Type
-	lastPlan     *structPlan
+	// Small MRU memo of struct plan lookups: the key-values of a table hit
+	// the same few struct types over and over, and the global cache lookup
+	// costs an interface hash every time.
+	planMemo [4]struct {
+		t reflect.Type
+		p *structPlan
+	}
 }
 
-// planFor returns the struct plan of t, memoizing the last lookup.
+// planFor returns the struct plan of t, memoizing recent lookups.
 func (d *decoder) planFor(t reflect.Type) *structPlan {
-	if t == d.lastPlanType {
-		return d.lastPlan
+	if d.planMemo[0].t == t {
+		return d.planMemo[0].p
+	}
+	for i := 1; i < len(d.planMemo); i++ {
+		if d.planMemo[i].t == t {
+			e := d.planMemo[i]
+			copy(d.planMemo[1:i+1], d.planMemo[:i])
+			d.planMemo[0] = e
+			return e.p
+		}
 	}
 	p := planForType(t)
-	d.lastPlanType, d.lastPlan = t, p
+	copy(d.planMemo[1:], d.planMemo[:len(d.planMemo)-1])
+	d.planMemo[0].t, d.planMemo[0].p = t, p
 	return p
 }
 
@@ -432,22 +444,28 @@ func (d *decoder) arrayCount(key []byte) int {
 	if d.arrayCounts == nil {
 		return 0
 	}
-	if p := d.arrayCounts[string(key)]; p != nil { // does not allocate
-		return *p
+	if p := d.arrayCounts[string(key)]; p != nil && p.gen == d.acGen { // does not allocate
+		return p.n
 	}
 	return 0
 }
 
 func (d *decoder) setArrayCount(key []byte, n int) {
 	if d.arrayCounts == nil {
-		d.arrayCounts = map[string]*int{}
+		d.arrayCounts = map[string]*acSlot{}
 	}
 	if p := d.arrayCounts[string(key)]; p != nil { // does not allocate
-		*p = n
+		p.gen = d.acGen
+		p.n = n
 		return
 	}
-	v := n
-	d.arrayCounts[string(key)] = &v
+	d.arrayCounts[string(key)] = &acSlot{gen: d.acGen, n: n}
+}
+
+// acSlot is an array-table element count, valid for one decode generation.
+type acSlot struct {
+	gen uint64
+	n   int
 }
 
 // resetChildArrayCounts forgets the counts of all the array tables under
@@ -462,7 +480,7 @@ func (d *decoder) resetChildArrayCounts(key []byte) {
 		if len(k) > len(key) && k[len(key)] == 0 && k[:len(key)] == string(key) {
 			// Zero instead of delete: the next element of the parent table
 			// will reuse the slot without allocating a new key.
-			*p = 0
+			p.n = 0
 		}
 	}
 }
