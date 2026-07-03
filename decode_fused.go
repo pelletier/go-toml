@@ -159,13 +159,16 @@ func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, err
 	}
 
 	if c := b[0]; c == '[' || c == '{' {
-		// Container value: build its AST so the seen-tracker can validate it
-		// and decodeAny can presize the resulting slices and maps.
-		nodeAny, rest, err := parserbridge.ParseValue(&d.p, b)
+		// Container value: build the native value directly, recording the keys
+		// declared inside it. They are validated only after the whole line has
+		// parsed and the outer key has been checked, so that error precedence
+		// is identical to the AST path.
+		d.fusedParts = d.fusedParts[:0]
+		d.fusedOps = d.fusedOps[:0]
+		av, rest, err := d.fusedContainerValue(b)
 		if err != nil {
 			return nil, err
 		}
-		node := nodeAny.(*unstable.Node)
 		rest, err = d.fusedFinishLine(rest)
 		if err != nil {
 			return nil, err
@@ -174,12 +177,8 @@ func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, err
 		if err != nil {
 			return nil, d.fusedSeenError(rawKey, d.keyParts, err)
 		}
-		if err := d.seen.CheckValueUnder(leafID, node); err != nil {
+		if err := d.replayFusedOps(leafID); err != nil {
 			return nil, d.fusedSeenError(rawKey, d.keyParts, err)
-		}
-		av, err := d.decodeAny(node)
-		if err != nil {
-			return nil, err
 		}
 		d.setFusedLeaf(cur, d.keyParts, av)
 		return rest, nil
@@ -205,6 +204,243 @@ func (d *decoder) fusedKeyVal(b []byte, cur map[string]interface{}) ([]byte, err
 	}
 	d.setFusedLeaf(cur, d.keyParts, av)
 	return rest, nil
+}
+
+// fusedOp is one step of the deferred key validation of a container value.
+// The keys declared inside an array or inline table cannot be checked while
+// the value parses (a syntax error later on the line must win, as must a
+// duplicate of the outer key), so parsing logs the declarations and
+// replayFusedOps runs them through the seen-tracker afterwards.
+type fusedOp struct {
+	lo, hi int32 // fusedOpKey: the parts d.fusedParts[lo:hi] of the key
+	op     uint8
+}
+
+const (
+	// fusedOpKey declares a (possibly dotted) key of an inline table; the
+	// scopes of the value it introduces follow until the matching fusedOpPop.
+	fusedOpKey = iota
+	// fusedOpAnon enters an inline table stored in an array, which is its own
+	// anonymous key scope, until the matching fusedOpPop.
+	fusedOpAnon
+	// fusedOpPop leaves the scope entered by fusedOpKey or fusedOpAnon.
+	fusedOpPop
+)
+
+// replayFusedOps validates the keys recorded by the last container value
+// against the seen-tracker, under the entry of the key-value that holds it.
+// It mirrors SeenTracker.checkValue, driven by the log instead of an AST.
+func (d *decoder) replayFusedOps(rootID int32) error {
+	if len(d.fusedOps) == 0 {
+		return nil
+	}
+	d.idStack = d.idStack[:0]
+	top := rootID
+	for _, op := range d.fusedOps {
+		switch op.op {
+		case fusedOpKey:
+			id, err := d.seen.CheckKeyValueUnder(top, d.fusedParts[op.lo:op.hi])
+			if err != nil {
+				return err
+			}
+			d.idStack = append(d.idStack, top)
+			top = id
+		case fusedOpAnon:
+			d.idStack = append(d.idStack, top)
+			top = d.seen.CreateAnonymous(top)
+		default: // fusedOpPop
+			top = d.idStack[len(d.idStack)-1]
+			d.idStack = d.idStack[:len(d.idStack)-1]
+		}
+	}
+	return nil
+}
+
+// fusedContainerValue parses an array or inline table (b starts at '[' or
+// '{') directly into its native generic representation, without building an
+// AST. The keys declared inside are appended to the d.fusedOps log for later
+// validation.
+func (d *decoder) fusedContainerValue(b []byte) (interface{}, []byte, error) {
+	if b[0] == '[' {
+		return d.fusedArray(b)
+	}
+	return d.fusedInlineTable(b)
+}
+
+// fusedValue parses any TOML value nested in a container. b is not empty.
+func (d *decoder) fusedValue(b []byte) (interface{}, []byte, error) {
+	switch b[0] {
+	case '[', '{':
+		return d.fusedContainerValue(b)
+	default:
+		k, _, value, rest, err := parserbridge.ScanScalar(&d.p, b)
+		if err != nil {
+			return nil, nil, err
+		}
+		av, err := d.fusedScalar(unstable.Kind(k), value)
+		if err != nil {
+			return nil, nil, err
+		}
+		return av, rest, nil
+	}
+}
+
+// fusedArray parses an array value natively. b starts at '['. It mirrors the
+// grammar (and error messages) of Parser.parseValArray. Elements accumulate
+// on d.anyStack and are copied out to an exact-size slice on ']'.
+func (d *decoder) fusedArray(b []byte) (interface{}, []byte, error) {
+	b = b[1:]
+	base := len(d.anyStack)
+	afterValue := false
+	for {
+		b = fusedSkipWS(b)
+		if len(b) == 0 {
+			return nil, nil, unstable.NewParserError(b, "array is incomplete")
+		}
+		switch b[0] {
+		case ']':
+			elems := d.anyStack[base:]
+			out := make([]interface{}, len(elems))
+			copy(out, elems)
+			clear(elems)
+			d.anyStack = d.anyStack[:base]
+			return out, b[1:], nil
+		case '\n':
+			b = b[1:]
+		case '\r':
+			if len(b) > 1 && b[1] == '\n' {
+				b = b[2:]
+				continue
+			}
+			return nil, nil, unstable.NewParserError(b[:1], "expected newline but got %#U", b[0])
+		case '#':
+			_, rest, err := parserbridge.ScanComment(b)
+			if err != nil {
+				return nil, nil, err
+			}
+			b = rest
+		case ',':
+			if !afterValue {
+				return nil, nil, unstable.NewParserError(b[:1], "expected value but got %#U", b[0])
+			}
+			afterValue = false
+			b = b[1:]
+		default:
+			if afterValue {
+				return nil, nil, unstable.NewParserError(b[:1], "expected ',' or ']' after array value")
+			}
+			var (
+				v   interface{}
+				err error
+			)
+			if b[0] == '{' {
+				// An inline table in an array is its own key scope.
+				d.fusedOps = append(d.fusedOps, fusedOp{op: fusedOpAnon})
+				v, b, err = d.fusedInlineTable(b)
+				if err == nil {
+					d.fusedOps = append(d.fusedOps, fusedOp{op: fusedOpPop})
+				}
+			} else {
+				v, b, err = d.fusedValue(b)
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			d.anyStack = append(d.anyStack, v)
+			afterValue = true
+		}
+	}
+}
+
+// fusedInlineTable parses an inline table value natively. b starts at '{'.
+// It mirrors the grammar (and error messages) of Parser.parseInlineTable.
+// Key declarations are logged for deferred validation: conflicting keys may
+// temporarily build garbage into the result, but the replay rejects the
+// document before the value is used.
+func (d *decoder) fusedInlineTable(b []byte) (interface{}, []byte, error) {
+	b = b[1:]
+	m := map[string]interface{}{}
+	afterValue := false
+	for {
+		b = fusedSkipWS(b)
+		if len(b) == 0 {
+			return nil, nil, unstable.NewParserError(b, "inline table is incomplete")
+		}
+		switch b[0] {
+		case '}':
+			return m, b[1:], nil
+		case '\n':
+			b = b[1:]
+		case '\r':
+			if len(b) > 1 && b[1] == '\n' {
+				b = b[2:]
+				continue
+			}
+			return nil, nil, unstable.NewParserError(b[:1], "expected newline but got %#U", b[0])
+		case '#':
+			_, rest, err := parserbridge.ScanComment(b)
+			if err != nil {
+				return nil, nil, err
+			}
+			b = rest
+		case ',':
+			if !afterValue {
+				return nil, nil, unstable.NewParserError(b[:1], "unexpected comma in inline table")
+			}
+			afterValue = false
+			b = b[1:]
+		default:
+			if afterValue {
+				return nil, nil, unstable.NewParserError(b[:1], "expected ',' or '}' after inline table key-value")
+			}
+			var err error
+			b, err = d.fusedInlineKeyval(b, m)
+			if err != nil {
+				return nil, nil, err
+			}
+			afterValue = true
+		}
+	}
+}
+
+// fusedInlineKeyval parses one `key = value` pair of an inline table into m.
+// b starts at the first character of the key.
+func (d *decoder) fusedInlineKeyval(b []byte, m map[string]interface{}) ([]byte, error) {
+	save := len(d.fusedParts)
+	var err error
+	d.fusedParts, _, b, err = parserbridge.ScanKey(&d.p, b, d.fusedParts)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 || b[0] != '=' {
+		return nil, unstable.NewParserError(fusedHL1(b), "expected '=' after key")
+	}
+	b = fusedSkipWS(b[1:])
+	if len(b) == 0 {
+		return nil, unstable.NewParserError(b, "expected value, not end of input")
+	}
+
+	// The parts range must be pinned before parsing the value: the keys of a
+	// nested inline table extend d.fusedParts.
+	lo, hi := save, len(d.fusedParts)
+	d.fusedOps = append(d.fusedOps, fusedOp{
+		op: fusedOpKey,
+		lo: int32(lo), //nolint:gosec // part counts are bounded by document size
+		hi: int32(hi), //nolint:gosec // part counts are bounded by document size
+	})
+	v, b, err := d.fusedValue(b)
+	if err != nil {
+		return nil, err
+	}
+	d.fusedOps = append(d.fusedOps, fusedOp{op: fusedOpPop})
+
+	parts := d.fusedParts[lo:hi]
+	cur := m
+	for i := 0; i < len(parts)-1; i++ {
+		cur = d.anyChildTable(cur, d.intern(parts[i]))
+	}
+	cur[d.intern(parts[len(parts)-1])] = v
+	return b, nil
 }
 
 // fusedSeenError turns a bare error returned by a SeenTracker parts-method
