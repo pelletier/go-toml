@@ -317,3 +317,74 @@ func TestUnmarshalCommentAndDottedStrictEdges(t *testing.T) {
 	var missing *StrictMissingError
 	assert.True(t, errors.As(err, &missing))
 }
+
+// TestMarshalGenericTree covers the reflection-free encoding of generic
+// map[string]interface{} documents: every native scalar type, nested arrays
+// and tables, multiline arrays, and fallback to the reflection encoder for
+// non-generic values held in interfaces.
+func TestMarshalGenericTree(t *testing.T) {
+	doc := map[string]interface{}{
+		"str":      "hello",
+		"lit":      "with \"quotes\" and\ttab",
+		"bool_t":   true,
+		"bool_f":   false,
+		"int64":    int64(42),
+		"int":      7,
+		"float":    1.5,
+		"time":     time.Date(2021, 3, 30, 11, 21, 0, 0, time.UTC),
+		"date":     LocalDate{2021, 3, 30},
+		"ltime":    LocalTime{11, 21, 0, 0, 0},
+		"ldt":      LocalDateTime{LocalDate{2021, 3, 30}, LocalTime{11, 21, 0, 0, 0}},
+		"arr":      []interface{}{int64(1), "two", 3.0},
+		"nested":   []interface{}{[]interface{}{int64(1)}, []interface{}{int64(2)}},
+		"typed":    uint16(9),
+		"tbl":      map[string]interface{}{"a": int64(1), "sub": map[string]interface{}{"b": "c"}},
+		"arrtbl":   []interface{}{map[string]interface{}{"x": int64(1)}, map[string]interface{}{"x": int64(2)}},
+		"mixedarr": []interface{}{map[string]interface{}{"x": int64(1)}, int64(2)},
+	}
+
+	out, err := Marshal(doc)
+	assert.NoError(t, err)
+
+	back := map[string]interface{}{}
+	assert.NoError(t, Unmarshal(out, &back))
+	assert.Equal(t, interface{}("hello"), back["str"])
+	assert.Equal(t, interface{}(int64(42)), back["int64"])
+	assert.Equal(t, interface{}(int64(7)), back["int"])
+	assert.Equal(t, interface{}(int64(9)), back["typed"])
+	assert.Equal(t, interface{}(1.5), back["float"])
+	assert.Equal(t, 3, len(back["arr"].([]interface{})))
+	assert.Equal(t, 2, len(back["arrtbl"].([]interface{})))
+	assert.Equal(t, 2, len(back["mixedarr"].([]interface{})))
+	assert.Equal(t, interface{}("c"),
+		back["tbl"].(map[string]interface{})["sub"].(map[string]interface{})["b"])
+
+	t.Run("multiline arrays and inline tables", func(t *testing.T) {
+		var buf strings.Builder
+		enc := NewEncoder(&buf)
+		enc.SetArraysMultiline(true)
+		enc.SetTablesInline(true)
+		assert.NoError(t, enc.Encode(doc))
+		back := map[string]interface{}{}
+		assert.NoError(t, Unmarshal([]byte(buf.String()), &back))
+		assert.Equal(t, 3, len(back["arr"].([]interface{})))
+	})
+
+	t.Run("nil in inline table errors", func(t *testing.T) {
+		_, err := Marshal(map[string]interface{}{
+			"a": []interface{}{nil},
+		})
+		assert.Error(t, err)
+	})
+
+	t.Run("indented tables", func(t *testing.T) {
+		var buf strings.Builder
+		enc := NewEncoder(&buf)
+		enc.SetIndentTables(true)
+		assert.NoError(t, enc.Encode(doc))
+		back := map[string]interface{}{}
+		assert.NoError(t, Unmarshal([]byte(buf.String()), &back))
+		assert.Equal(t, interface{}(int64(1)),
+			back["tbl"].(map[string]interface{})["a"])
+	})
+}
