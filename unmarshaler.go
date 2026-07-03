@@ -306,6 +306,22 @@ type decoder struct {
 	// slab batches the per-value allocations of generic decoding. It needs no
 	// per-document reset: leftover chunk space carries over.
 	slab slabAlloc
+
+	// One-entry memo of the last struct plan lookup: the key-values of a
+	// table hit the same struct type over and over, and the global cache
+	// lookup costs an interface hash every time.
+	lastPlanType reflect.Type
+	lastPlan     *structPlan
+}
+
+// planFor returns the struct plan of t, memoizing the last lookup.
+func (d *decoder) planFor(t reflect.Type) *structPlan {
+	if t == d.lastPlanType {
+		return d.lastPlan
+	}
+	p := planForType(t)
+	d.lastPlanType, d.lastPlan = t, p
+	return p
 }
 
 // fusedKV is a deferred key-value of an inline table being decoded natively:
@@ -964,7 +980,7 @@ walk:
 			}
 			idx++
 		case reflect.Struct:
-			plan := planForType(v.Type())
+			plan := d.planFor(v.Type())
 			f, found := plan.lookup(name)
 			if !found {
 				d.strict.MissingTable(expr)
@@ -1249,7 +1265,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 
 	switch v.Kind() {
 	case reflect.Struct:
-		plan := planForType(v.Type())
+		plan := d.planFor(v.Type())
 		f, found := plan.lookup(name)
 		if !found {
 			return v, nil
@@ -1507,7 +1523,7 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		}
 		return v, nil
 	case reflect.Struct:
-		plan := planForType(v.Type())
+		plan := d.planFor(v.Type())
 		f, found := plan.lookupBytes(part.bytes())
 		if !found {
 			if part.node != nil {
@@ -1739,10 +1755,10 @@ func (d *decoder) assignValue(v reflect.Value, expr *unstable.Node, value *unsta
 func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
 	switch v.Kind() {
 	case reflect.String:
-		v.SetString(string(value.Data))
+		v.SetString(d.slab.slabString(value.Data))
 		return v, nil
 	case reflect.Interface:
-		return boxInto(v, reflect.ValueOf(string(value.Data)))
+		return boxInto(v, reflect.ValueOf(d.slab.slabString(value.Data)))
 	default:
 	}
 	if v.CanAddr() && v.Addr().Type().Implements(textUnmarshalerType) {
