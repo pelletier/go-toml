@@ -508,7 +508,7 @@ type errAfterReader struct{ n int }
 
 func (e *errAfterReader) Read(p []byte) (int, error) {
 	if e.n == 0 {
-		return 0, fmt.Errorf("boom")
+		return 0, errors.New("boom")
 	}
 	p[0] = 'a'
 	e.n--
@@ -578,4 +578,190 @@ func TestRawValueWithSpan(t *testing.T) {
 	// A non-key-value expression context takes the best-effort span.
 	arrExpr := &unstable.Node{Kind: unstable.Array}
 	assert.Equal(t, "[1]", string(d.rawValue(arrExpr, node)))
+}
+
+// TestUnmarshalerInterfaceNodePaths drives the node-driven expression loop
+// (only used with the unmarshaler interface) through its error and
+// line-ending branches, raw captures stored under maps, and pre-existing
+// interface values replaced by tables.
+func TestUnmarshalerInterfaceNodePaths(t *testing.T) {
+	bad := []string{
+		"\rx = 1",             // bare CR at expression level
+		"[a]\n[a]",            // duplicate table
+		"[[a]]\n[a]",          // table after array table
+		"a.b = 1\n[a.b]",      // table over dotted key
+		"a = 1\n[a]",          // table over value
+		"[a]\n[[a]]",          // array table over table
+		"a = {x = 1,\rb = 2}", // bare CR in inline table
+	}
+	for _, doc := range bad {
+		var s struct{ A int64 }
+		d := NewDecoder(strings.NewReader(doc))
+		d.EnableUnmarshalerInterface()
+		assert.Error(t, d.Decode(&s), "expected error for %q", doc)
+	}
+
+	t.Run("crlf in inline table", func(t *testing.T) {
+		m := map[string]interface{}{}
+		d := NewDecoder(strings.NewReader("a = {x = 1,\r\ny = 2}"))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&m))
+		assert.Equal(t, 2, len(m["a"].(map[string]interface{})))
+	})
+
+	t.Run("raw capture under map", func(t *testing.T) {
+		var s struct {
+			M map[string]unstable.RawMessage `toml:"m"`
+		}
+		d := NewDecoder(strings.NewReader("[m.x]\na = 1\n[m.y]\nb = 2"))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&s))
+		assert.True(t, strings.Contains(string(s.M["x"]), "a = 1"), "got %q", s.M["x"])
+	})
+
+	t.Run("table replaces scalar interface via node walk", func(t *testing.T) {
+		var s struct{ T interface{} }
+		s.T = "old"
+		d := NewDecoder(strings.NewReader("[t]\nk = 1"))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&s))
+		m, ok := s.T.(map[string]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, interface{}(int64(1)), m["k"])
+	})
+}
+
+// TestMarshalLargeTypedMap covers the value-slab path of map entry
+// collection (maps with at least eight entries).
+func TestMarshalLargeTypedMap(t *testing.T) {
+	m := map[string]int64{}
+	for i := 0; i < 12; i++ {
+		m[fmt.Sprintf("key%02d", i)] = int64(i)
+	}
+	out, err := Marshal(m)
+	assert.NoError(t, err)
+	back := map[string]int64{}
+	assert.NoError(t, Unmarshal(out, &back))
+	assert.Equal(t, m, back)
+}
+
+// TestParseIntegerOverflows covers the radix-specific overflow guards
+// directly (the scanner accepts the tokens; conversion rejects them).
+func TestParseIntegerOverflows(t *testing.T) {
+	for _, s := range []string{
+		"0xFFFFFFFFFFFFFFFF",
+		"0o1777777777777777777777",
+		"0b" + strings.Repeat("1", 64),
+	} {
+		_, err := parseInteger([]byte(s))
+		assert.Error(t, err, "expected overflow for %q", s)
+	}
+}
+
+// tmText has a pointer-receiver TextMarshaler; tmRawVal/tmRawPtr implement
+// unstable.Marshaler with value and pointer receivers.
+type tmText struct{ s string }
+
+func (t *tmText) MarshalText() ([]byte, error) { return []byte(t.s), nil }
+
+type tmRawVal struct{}
+
+func (tmRawVal) MarshalTOML() ([]byte, error) { return []byte("1"), nil }
+
+type tmRawPtr struct{}
+
+func (*tmRawPtr) MarshalTOML() ([]byte, error) { return []byte("2"), nil }
+
+// TestEncPropsReceiverVariants covers the pointer-receiver classification
+// branches of the encoder's type properties.
+func TestEncPropsReceiverVariants(t *testing.T) {
+	out, err := Marshal(map[string]tmText{"a": {s: "x"}})
+	assert.NoError(t, err)
+	assert.True(t, strings.Contains(string(out), "'x'"), "got %q", out)
+
+	var buf strings.Builder
+	enc := NewEncoder(&buf)
+	enc.EnableMarshalerInterface()
+	assert.NoError(t, enc.Encode(map[string]interface{}{
+		"v": tmRawVal{},
+		"p": &tmRawPtr{},
+	}))
+	back := map[string]interface{}{}
+	assert.NoError(t, Unmarshal([]byte(buf.String()), &back))
+	assert.Equal(t, interface{}(int64(1)), back["v"])
+	assert.Equal(t, interface{}(int64(2)), back["p"])
+}
+
+// TestMoreLineEndingAndHeaderEdges sweeps remaining line-ending and header
+// branches on both document loops.
+func TestMoreLineEndingAndHeaderEdges(t *testing.T) {
+	t.Run("crlf blank line, interface loop", func(t *testing.T) {
+		m := map[string]interface{}{}
+		d := NewDecoder(strings.NewReader("\r\na = 1\r\n"))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&m))
+		assert.Equal(t, interface{}(int64(1)), m["a"])
+	})
+
+	t.Run("invalid comment, fused generic loop", func(t *testing.T) {
+		m := map[string]interface{}{}
+		assert.Error(t, Unmarshal([]byte("# \x01\nx = 1"), &m))
+	})
+
+	t.Run("array table over scalar interface", func(t *testing.T) {
+		var s struct{ T interface{} }
+		s.T = "old"
+		assert.NoError(t, Unmarshal([]byte("[[t]]\nk = 1\n[[t]]\nk = 2"), &s))
+		arr, ok := s.T.([]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, 2, len(arr))
+	})
+}
+
+// TestFastParseFloatRejects covers the scanner-shape early-outs that the
+// parser normally filters before the fast path sees them.
+func TestFastParseFloatRejects(t *testing.T) {
+	for _, s := range []string{"1..2", "-e1", "1e+"} {
+		_, ok := fastParseFloat([]byte(s))
+		assert.False(t, ok, "expected reject for %q", s)
+	}
+}
+
+type tmRawErr struct{}
+
+func (tmRawErr) MarshalTOML() ([]byte, error) { return nil, errors.New("nope") }
+
+// TestMarshalerInterfaceMoreEdges covers the root single-value error, a
+// failing MarshalTOML inside an array classification, and the fused scalar
+// kind guard.
+func TestMarshalerInterfaceMoreEdges(t *testing.T) {
+	var buf strings.Builder
+	enc := NewEncoder(&buf)
+	enc.EnableMarshalerInterface()
+	err := enc.Encode(unstable.RawMessage("42"))
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "document root"), "got %v", err)
+
+	var buf2 strings.Builder
+	enc2 := NewEncoder(&buf2)
+	enc2.EnableMarshalerInterface()
+	assert.Error(t, enc2.Encode(map[string]interface{}{
+		"arr": []interface{}{tmRawErr{}, tmRawErr{}},
+	}))
+
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	_, err = d.fusedScalar(unstable.Comment, []byte("#"))
+	assert.Error(t, err)
+}
+
+// TestTableThroughScalarInterface covers replacing a scalar held in an
+// interface when it is an intermediate step of a deeper table header.
+func TestTableThroughScalarInterface(t *testing.T) {
+	var s struct{ T interface{} }
+	s.T = "old scalar"
+	assert.NoError(t, Unmarshal([]byte("[t.sub]\nk = 1"), &s))
+	m := s.T.(map[string]interface{})
+	sub := m["sub"].(map[string]interface{})
+	assert.Equal(t, interface{}(int64(1)), sub["k"])
 }
