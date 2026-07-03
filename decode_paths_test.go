@@ -3,6 +3,7 @@ package toml
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -426,4 +427,155 @@ func TestValidateValueNodeScalar(t *testing.T) {
 	defer putDecoder(d)
 	assert.NoError(t, d.validateValueNode(&unstable.Node{Kind: unstable.String}))
 	assert.NoError(t, d.validateValueNode(&unstable.Node{Kind: unstable.Integer}))
+}
+
+// lyingLenReader reports a smaller Len than it will deliver, exercising the
+// finish-with-ReadAll branch of readDocument.
+type lyingLenReader struct {
+	r io.Reader
+}
+
+func (l *lyingLenReader) Read(p []byte) (int, error) { return l.r.Read(p) }
+func (l *lyingLenReader) Len() int                   { return 2 }
+
+// TestReadDocumentGrowingReader covers readers whose Len underestimates the
+// actual content.
+func TestReadDocumentGrowingReader(t *testing.T) {
+	var m map[string]interface{}
+	d := NewDecoder(&lyingLenReader{r: strings.NewReader("key = 'longer than two bytes'")})
+	assert.NoError(t, d.Decode(&m))
+	assert.Equal(t, interface{}("longer than two bytes"), m["key"])
+}
+
+// TestMarshalerInterfaceGenericMap covers unstable.Marshaler values held in
+// generic maps: the resolver materializes the interface value to classify it.
+func TestMarshalerInterfaceGenericMap(t *testing.T) {
+	doc := map[string]interface{}{
+		"raw":   unstable.RawMessage("1"),
+		"table": unstable.RawMessage("a = 1"),
+		"plain": "hello",
+		"num":   int64(3),
+	}
+	var buf strings.Builder
+	enc := NewEncoder(&buf)
+	enc.EnableMarshalerInterface()
+	assert.NoError(t, enc.Encode(doc))
+
+	back := map[string]interface{}{}
+	assert.NoError(t, Unmarshal([]byte(buf.String()), &back))
+	assert.Equal(t, interface{}(int64(1)), back["raw"])
+	assert.Equal(t, interface{}("hello"), back["plain"])
+	assert.Equal(t, interface{}(int64(1)), back["table"].(map[string]interface{})["a"])
+}
+
+// TestUnmarshalerInterfaceDottedGeneric covers setAnyKey's dotted-key walk
+// and error propagation on the AST generic path.
+func TestUnmarshalerInterfaceDottedGeneric(t *testing.T) {
+	m := map[string]interface{}{}
+	d := NewDecoder(strings.NewReader("a.b.c = 1\na.b.d = 'x'"))
+	d.EnableUnmarshalerInterface()
+	assert.NoError(t, d.Decode(&m))
+	ab := m["a"].(map[string]interface{})["b"].(map[string]interface{})
+	assert.Equal(t, interface{}(int64(1)), ab["c"])
+
+	m2 := map[string]interface{}{}
+	d2 := NewDecoder(strings.NewReader("a.b = 2021-13-45"))
+	d2.EnableUnmarshalerInterface()
+	assert.Error(t, d2.Decode(&m2))
+}
+
+// TestArrayTableRefreshUnderSpilledParent covers refreshing an array table
+// whose parent's children have spilled to the tracker's hash index, and the
+// sibling-chain swap when they have not.
+func TestArrayTableRefreshUnderSpilledParent(t *testing.T) {
+	var sb strings.Builder
+	for i := 0; i < 70; i++ {
+		fmt.Fprintf(&sb, "key%d = %d\n", i, i)
+	}
+	sb.WriteString("[[t]]\nx = 1\n[[t]]\nx = 2\n")
+	m := map[string]interface{}{}
+	assert.NoError(t, Unmarshal([]byte(sb.String()), &m))
+	assert.Equal(t, 2, len(m["t"].([]interface{})))
+
+	// Unspilled parent, refresh target not at the chain head.
+	doc := "a = 1\n[[t]]\nx = 1\nb = 2\n[[t]]\nx = 2\n"
+	m2 := map[string]interface{}{}
+	assert.NoError(t, Unmarshal([]byte(doc), &m2))
+	assert.Equal(t, 2, len(m2["t"].([]interface{})))
+}
+
+type errAfterReader struct{ n int }
+
+func (e *errAfterReader) Read(p []byte) (int, error) {
+	if e.n == 0 {
+		return 0, fmt.Errorf("boom")
+	}
+	p[0] = 'a'
+	e.n--
+	return 1, nil
+}
+func (e *errAfterReader) Len() int { return 8 }
+
+// TestReadDocumentReadError covers the error branch of the sized read.
+func TestReadDocumentReadError(t *testing.T) {
+	var m map[string]interface{}
+	d := NewDecoder(&errAfterReader{n: 1})
+	assert.Error(t, d.Decode(&m))
+}
+
+// TestSetAnyKeyValueError covers error propagation through the AST generic
+// inline-table walk (an impossible date inside a nested inline table).
+func TestSetAnyKeyValueError(t *testing.T) {
+	var s struct{ V interface{} }
+	d := NewDecoder(strings.NewReader("v = { nested = { d = 2021-13-45 } }"))
+	d.EnableUnmarshalerInterface()
+	assert.Error(t, d.Decode(&s))
+}
+
+// TestRawValueWithoutSpan covers the fallback of rawValue when neither an
+// expression node nor a fused value span is available.
+func TestRawValueWithoutSpan(t *testing.T) {
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	doc := []byte("x = [1]")
+	d.p.Reset(doc)
+	d.fusedValueSpan = nil
+	node := &unstable.Node{Kind: unstable.Array, Raw: d.p.Range(doc[4:7])}
+	assert.Equal(t, "[1]", string(d.rawValue(nil, node)))
+}
+
+// TestSetAnyKeyBranches covers setAnyKey (the generic decode of inline
+// tables reached through struct-held maps): dotted keys and error
+// propagation.
+func TestSetAnyKeyBranches(t *testing.T) {
+	type target struct {
+		M map[string]interface{} `toml:"m"`
+	}
+
+	var s target
+	assert.NoError(t, Unmarshal([]byte("[m]\nv = { a.b = 1, c = 2 }"), &s))
+	v := s.M["v"].(map[string]interface{})
+	assert.Equal(t, interface{}(int64(1)),
+		v["a"].(map[string]interface{})["b"])
+	assert.Equal(t, interface{}(int64(2)), v["c"])
+
+	var s2 target
+	assert.Error(t, Unmarshal([]byte("[m]\nv = { d = 2021-13-45 }"), &s2))
+}
+
+// TestRawValueWithSpan covers the fused-path branch of rawValue, which
+// returns the exact span of the current key-value's container.
+func TestRawValueWithSpan(t *testing.T) {
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	doc := []byte("x = [1]")
+	d.p.Reset(doc)
+	d.fusedValueSpan = doc[4:7]
+	node := &unstable.Node{Kind: unstable.Array, Raw: d.p.Range(doc[4:7])}
+	assert.Equal(t, "[1]", string(d.rawValue(nil, node)))
+	d.fusedValueSpan = nil
+
+	// A non-key-value expression context takes the best-effort span.
+	arrExpr := &unstable.Node{Kind: unstable.Array}
+	assert.Equal(t, "[1]", string(d.rawValue(arrExpr, node)))
 }
