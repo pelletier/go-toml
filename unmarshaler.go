@@ -62,11 +62,6 @@ func (d *decoder) reset() {
 	d.tableFlush = d.tableFlush[:0]
 	d.tableParentSlot = slotWriter{}
 	d.keyParts = d.keyParts[:0]
-	// anyStack is empty between expressions; clear the backing array anyway so
-	// that a pooled decoder does not retain references to user data after an
-	// error unwound a partially-built array.
-	clear(d.anyStack[:cap(d.anyStack)])
-	d.anyStack = d.anyStack[:0]
 	d.fusedParts = d.fusedParts[:0]
 	d.fusedOps = d.fusedOps[:0]
 	d.idStack = d.idStack[:0]
@@ -297,15 +292,23 @@ type decoder struct {
 	keyParts [][]byte
 
 	// Scratch buffers of the fused generic decode path for container values:
-	// anyStack accumulates array elements before the exact-size copy-out;
-	// fusedParts and fusedOps record the keys seen inside a container value so
-	// they can be validated by the seen-tracker after the whole expression has
-	// parsed (preserving error precedence); idStack is the scope stack used
-	// during that replay.
+	// anyStack accumulates array elements (and kvStack inline-table pairs)
+	// before the exact-size copy-out; fusedParts and fusedOps record the keys
+	// seen inside a container value so they can be validated by the
+	// seen-tracker after the whole expression has parsed (preserving error
+	// precedence); idStack is the scope stack used during that replay.
 	anyStack   []interface{}
+	kvStack    []fusedKV
 	fusedParts [][]byte
 	fusedOps   []fusedOp
 	idStack    []int32
+}
+
+// fusedKV is a deferred key-value of an inline table being decoded natively:
+// the parts d.fusedParts[lo:hi] of its key, and its decoded value.
+type fusedKV struct {
+	v      interface{}
+	lo, hi int32
 }
 
 // slotWriter remembers how to store a value at some location of the target

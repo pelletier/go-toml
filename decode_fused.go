@@ -35,6 +35,14 @@ func (d *decoder) unmarshalFused(root reflect.Value, data []byte) error {
 	}
 
 	if err := d.fusedDocument(m, data); err != nil {
+		// An error may have unwound partially-built containers: drop the
+		// references still held by the scratch stacks so the pooled decoder
+		// does not retain user data. (On success both stacks are empty and
+		// already zeroed by their copy-outs.)
+		clear(d.anyStack[:cap(d.anyStack)])
+		d.anyStack = d.anyStack[:0]
+		clear(d.kvStack[:cap(d.kvStack)])
+		d.kvStack = d.kvStack[:0]
 		return d.wrapFusedError(data, err)
 	}
 
@@ -354,12 +362,13 @@ func (d *decoder) fusedArray(b []byte) (interface{}, []byte, error) {
 
 // fusedInlineTable parses an inline table value natively. b starts at '{'.
 // It mirrors the grammar (and error messages) of Parser.parseInlineTable.
-// Key declarations are logged for deferred validation: conflicting keys may
-// temporarily build garbage into the result, but the replay rejects the
-// document before the value is used.
+// Key-values accumulate on d.kvStack so that the map is created with its
+// exact size on '}'. Key declarations are logged for deferred validation:
+// conflicting keys may temporarily build garbage into the result, but the
+// replay rejects the document before the value is used.
 func (d *decoder) fusedInlineTable(b []byte) (interface{}, []byte, error) {
 	b = b[1:]
-	m := map[string]interface{}{}
+	base := len(d.kvStack)
 	afterValue := false
 	for {
 		b = fusedSkipWS(b)
@@ -368,6 +377,19 @@ func (d *decoder) fusedInlineTable(b []byte) (interface{}, []byte, error) {
 		}
 		switch b[0] {
 		case '}':
+			pairs := d.kvStack[base:]
+			m := make(map[string]interface{}, len(pairs))
+			for i := range pairs {
+				kv := &pairs[i]
+				parts := d.fusedParts[kv.lo:kv.hi]
+				cur := m
+				for j := 0; j < len(parts)-1; j++ {
+					cur = d.anyChildTable(cur, d.intern(parts[j]))
+				}
+				cur[d.intern(parts[len(parts)-1])] = kv.v
+			}
+			clear(pairs)
+			d.kvStack = d.kvStack[:base]
 			return m, b[1:], nil
 		case '\n':
 			b = b[1:]
@@ -394,7 +416,7 @@ func (d *decoder) fusedInlineTable(b []byte) (interface{}, []byte, error) {
 				return nil, nil, unstable.NewParserError(b[:1], "expected ',' or '}' after inline table key-value")
 			}
 			var err error
-			b, err = d.fusedInlineKeyval(b, m)
+			b, err = d.fusedInlineKeyval(b)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -403,9 +425,9 @@ func (d *decoder) fusedInlineTable(b []byte) (interface{}, []byte, error) {
 	}
 }
 
-// fusedInlineKeyval parses one `key = value` pair of an inline table into m.
-// b starts at the first character of the key.
-func (d *decoder) fusedInlineKeyval(b []byte, m map[string]interface{}) ([]byte, error) {
+// fusedInlineKeyval parses one `key = value` pair of an inline table onto
+// d.kvStack. b starts at the first character of the key.
+func (d *decoder) fusedInlineKeyval(b []byte) ([]byte, error) {
 	save := len(d.fusedParts)
 	var err error
 	d.fusedParts, _, b, err = parserbridge.ScanKey(&d.p, b, d.fusedParts)
@@ -422,24 +444,16 @@ func (d *decoder) fusedInlineKeyval(b []byte, m map[string]interface{}) ([]byte,
 
 	// The parts range must be pinned before parsing the value: the keys of a
 	// nested inline table extend d.fusedParts.
-	lo, hi := save, len(d.fusedParts)
-	d.fusedOps = append(d.fusedOps, fusedOp{
-		op: fusedOpKey,
-		lo: int32(lo), //nolint:gosec // part counts are bounded by document size
-		hi: int32(hi), //nolint:gosec // part counts are bounded by document size
-	})
+	lo := int32(save)               //nolint:gosec // part counts are bounded by document size
+	hi := int32(len(d.fusedParts))  //nolint:gosec // part counts are bounded by document size
+	d.fusedOps = append(d.fusedOps, fusedOp{op: fusedOpKey, lo: lo, hi: hi})
 	v, b, err := d.fusedValue(b)
 	if err != nil {
 		return nil, err
 	}
 	d.fusedOps = append(d.fusedOps, fusedOp{op: fusedOpPop})
 
-	parts := d.fusedParts[lo:hi]
-	cur := m
-	for i := 0; i < len(parts)-1; i++ {
-		cur = d.anyChildTable(cur, d.intern(parts[i]))
-	}
-	cur[d.intern(parts[len(parts)-1])] = v
+	d.kvStack = append(d.kvStack, fusedKV{v: v, lo: lo, hi: hi})
 	return b, nil
 }
 
