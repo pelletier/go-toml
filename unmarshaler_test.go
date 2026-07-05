@@ -2588,6 +2588,53 @@ func TestUnmarshalErrors(t *testing.T) {
 	assert.Equal(t, "toml: cannot decode TOML integer into struct field toml_test.mystruct.Bar of type string", err.Error())
 }
 
+// TestUnmarshalDeeplyNestedValues checks that deeply nested arrays and inline
+// tables are rejected with an ordinary error through the stable API, rather
+// than overflowing the goroutine stack (an unrecoverable fatal error that no
+// recover() can intercept and that would terminate the whole process).
+func TestUnmarshalDeeplyNestedValues(t *testing.T) {
+	// Far beyond the parser's nesting limit, so this must error, not crash.
+	const depth = 100000
+
+	examples := []struct {
+		desc  string
+		input string
+	}{
+		{
+			desc:  "arrays",
+			input: "a=" + strings.Repeat("[", depth) + strings.Repeat("]", depth),
+		},
+		{
+			desc:  "inline tables",
+			input: "a=" + strings.Repeat("{k=", depth) + "1" + strings.Repeat("}", depth),
+		},
+	}
+
+	for _, e := range examples {
+		t.Run("Unmarshal/"+e.desc, func(t *testing.T) {
+			var v interface{}
+			err := toml.Unmarshal([]byte(e.input), &v)
+			assert.Error(t, err)
+		})
+
+		t.Run("Decode/"+e.desc, func(t *testing.T) {
+			var v interface{}
+			err := toml.NewDecoder(strings.NewReader(e.input)).Decode(&v)
+			assert.Error(t, err)
+		})
+	}
+
+	// A modestly nested document must still decode without error: the guard
+	// only rejects pathologically deep input.
+	t.Run("valid nesting still decodes", func(t *testing.T) {
+		const n = 100
+		var v interface{}
+		input := "a=" + strings.Repeat("[", n) + strings.Repeat("]", n)
+		err := toml.Unmarshal([]byte(input), &v)
+		assert.NoError(t, err)
+	})
+}
+
 func TestUnmarshalStringInvalidStructField(t *testing.T) {
 	type Server struct {
 		Path string
