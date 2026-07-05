@@ -233,6 +233,14 @@ API subject to change.
 Parser is the unstable API that allows iterative parsing of a TOML document at
 the AST level. See https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable.
 
+### Document editing
+
+The `unstable/edit` package modifies TOML documents in place while preserving
+comments, whitespace, and ordering. Parse a document with `edit.Parse`, then
+`Get`, `Set`, and `Delete` values by key path: only the bytes expressing an
+edit are rewritten, everything else is kept byte-for-byte. See
+https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable/edit.
+
 ## Benchmarks
 
 Execution time speedup compared to other Go TOML libraries:
