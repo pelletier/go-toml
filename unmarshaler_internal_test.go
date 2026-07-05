@@ -7,6 +7,29 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/assert"
 )
 
+func TestArrayCountsFreshDecoder(t *testing.T) {
+	// Whether a decode starts with a nil arrayCounts map depends on decoder
+	// pooling: a reused decoder keeps the map allocated across documents.
+	// Exercise the nil-map paths on a guaranteed-fresh decoder so their
+	// coverage does not depend on sync.Pool behavior.
+	d := &decoder{}
+	key := []byte("a")
+	assert.Equal(t, 0, d.arrayCount(key))
+	d.resetChildArrayCounts(key)
+	d.setArrayCount(key, 1)
+	assert.Equal(t, 1, d.arrayCount(key))
+	d.setArrayCount(key, 2)
+	assert.Equal(t, 2, d.arrayCount(key))
+	assert.Equal(t, 0, d.arrayCount([]byte("b")))
+	// Child paths are joined with a NUL separator; resetting the parent
+	// zeroes the child count but leaves the parent untouched.
+	child := []byte("a\x00b")
+	d.setArrayCount(child, 3)
+	d.resetChildArrayCounts(key)
+	assert.Equal(t, 0, d.arrayCount(child))
+	assert.Equal(t, 2, d.arrayCount(key))
+}
+
 type unexpCaptureInner struct{ C int }
 
 type unexpCaptureOuter struct {
