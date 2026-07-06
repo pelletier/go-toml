@@ -35,6 +35,9 @@ go-toml is a TOML library for Go. The goal is to provide an easy-to-use and effi
 
 - New features or feature extensions must include documentation
 - Documentation lives in [README.md](./README.md) and throughout source code
+- The "Unstable API" section of the README must list every feature exported by
+  the `unstable` package. When adding, promoting, or removing an unstable
+  feature, update that list in the same change
 
 ### Code Style
 
