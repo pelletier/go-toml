@@ -202,10 +202,7 @@ func (d *Document) exprSpan(e *unstable.Node) (int, int, error) {
 	// Table and ArrayTable nodes carry no Raw range: recover the header span
 	// from the key parts. Only whitespace can separate them from the
 	// brackets.
-	first, last, err := firstLastKey(e)
-	if err != nil {
-		return 0, 0, err
-	}
+	first, last := firstLastKey(e)
 	brackets := 1
 	if e.Kind == unstable.ArrayTable {
 		brackets = 2
@@ -239,10 +236,7 @@ func (d *Document) exprSpan(e *unstable.Node) (int, int, error) {
 // is recovered from the last key part instead: the value starts after the
 // '=' separator and ends where the key-value does.
 func (d *Document) valueSpan(e *unstable.Node) (span, error) {
-	_, last, err := firstLastKey(e)
-	if err != nil {
-		return span{}, err
-	}
+	_, last := firstLastKey(e)
 	i := int(last.Raw.Offset + last.Raw.Length)
 	for i < len(d.data) && (d.data[i] == ' ' || d.data[i] == '\t') {
 		i++
@@ -257,7 +251,10 @@ func (d *Document) valueSpan(e *unstable.Node) (span, error) {
 	return span{i, int(e.Raw.Offset + e.Raw.Length)}, nil
 }
 
-func firstLastKey(e *unstable.Node) (*unstable.Node, *unstable.Node, error) {
+// firstLastKey returns the first and last parts of the key of e. Key-value
+// and header expressions produced by the parser always have at least one key
+// part.
+func firstLastKey(e *unstable.Node) (*unstable.Node, *unstable.Node) {
 	var first, last *unstable.Node
 	it := e.Key()
 	for it.Next() {
@@ -266,10 +263,7 @@ func firstLastKey(e *unstable.Node) (*unstable.Node, *unstable.Node, error) {
 		}
 		last = it.Node()
 	}
-	if first == nil {
-		return nil, nil, fmt.Errorf("toml/edit: internal error: %s expression without key", e.Kind)
-	}
-	return first, last, nil
+	return first, last
 }
 
 func keyParts(e *unstable.Node) []string {

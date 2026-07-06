@@ -337,10 +337,15 @@ func TestSetErrors(t *testing.T) {
 		{"append element with nil value", "[[x]]\nk = 1\n", []string{"x", "1", "k"}, nil},
 		{"insert into inline table with nil value", "p = {a = 1}\n", []string{"p", "b"}, nil},
 		{"append to array with nil value", "a = [1]\n", []string{"a", "1"}, nil},
+		{"replace array element with nil", "a = [1]\n", []string{"a", "0"}, nil},
 		{"through scalar in inline table", "a = {b = 1}\n", []string{"a", "b", "c"}, 2},
 		{"non-index into array", "a = [1, 2]\n", []string{"a", "x"}, 1},
 		{"array index out of range", "a = [1, 2]\n", []string{"a", "5"}, 1},
 		{"onto implicit table in inline", "a = {b.c = 1}\n", []string{"a", "b"}, 1},
+		{"replace inline value with nil", "p = {x = 1}\n", []string{"p", "x"}, nil},
+		{"extend dotted table with nil", "a.b = 1\n", []string{"a", "c"}, nil},
+		{"element sub-table with nil", "[[s]]\nx = 1\n", []string{"s", "0", "o", "k"}, nil},
+		{"new section with nil", "", []string{"a", "b"}, nil},
 		{"onto table", "[t]\nx = 1\n", []string{"t"}, 5},
 		{"onto dotted table", "a.b = 1\n", []string{"a"}, 5},
 		{"nil value", "", []string{"a"}, nil},
@@ -426,6 +431,12 @@ func TestDelete(t *testing.T) {
 			doc:  "[a.b]\nx = 1\n",
 			key:  []string{"a", "b"},
 			want: "",
+		},
+		{
+			name: "crlf table at end absorbs separator",
+			doc:  "a = 1\r\n\r\n[t]\r\nx = 1\r\n",
+			key:  []string{"t"},
+			want: "a = 1\r\n",
 		},
 	}
 	for _, test := range tests {

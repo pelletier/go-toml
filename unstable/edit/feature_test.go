@@ -573,6 +573,17 @@ func TestCommentCRLF(t *testing.T) {
 	if got, _ := d.Comment([]string{"a"}); got != "hi\nthere" {
 		t.Errorf("Comment = %q", got)
 	}
+
+	d = mustParse(t, "a = 1 # old\r\n")
+	if got, _ := d.TrailingComment([]string{"a"}); got != "old" {
+		t.Errorf("TrailingComment = %q", got)
+	}
+	if err := d.SetTrailingComment([]string{"a"}, "new"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := d.String(), "a = 1 # new\r\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
 }
 
 func TestRawMessage(t *testing.T) {
