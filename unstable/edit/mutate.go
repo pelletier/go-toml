@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
+	"github.com/pelletier/go-toml/v2/unstable"
 )
 
 // splice is a pending replacement of a byte range of the document. An empty
@@ -20,16 +21,19 @@ type splice struct {
 // Set sets the value at the given key path, creating the tables leading to
 // it as needed.
 //
-// If the path designates an existing key-value, only the bytes of its value
-// are replaced: comments and layout around it are preserved. Otherwise a new
-// `key = value` line is added at the end of the section of the closest
-// existing parent table, under new [table] headers or dotted keys as
-// appropriate. The value is rendered like toml.Marshal would, in inline
-// (single-line) form.
+// If the path designates an existing value, only the bytes of that value are
+// replaced: comments and layout around it are preserved. Paths descend into
+// arrays and inline tables; elements of arrays (of tables or not) are
+// addressed by a decimal index, and the index equal to the current length
+// appends a new element. Otherwise a new `key = value` line is added at the
+// end of the section of the closest existing parent table, under a new
+// [table] header or dotted keys as appropriate. Values are rendered like
+// toml.Marshal would, in inline (single-line) form; pass an
+// unstable.RawMessage to use an exact TOML representation instead.
 //
-// Setting a path that designates or crosses an existing table, array of
-// tables, or non-table value is an error: Set never silently discards parts
-// of the document. Delete first to replace a whole table.
+// Setting a path that designates an existing table or array of tables is an
+// error: Set never silently discards parts of the document. Delete first to
+// replace a whole table.
 func (d *Document) Set(key []string, value interface{}) error {
 	if len(key) == 0 {
 		return errors.New("toml/edit: key must have at least one element")
@@ -37,7 +41,7 @@ func (d *Document) Set(key []string, value interface{}) error {
 
 	t := d.root
 	i := 0
-	for ; i < len(key); i++ {
+	for i < len(key) {
 		it := t.items[key[i]]
 		if it == nil {
 			break
@@ -45,21 +49,39 @@ func (d *Document) Set(key []string, value interface{}) error {
 		last := i == len(key)-1
 		switch {
 		case it.leaf != nil:
-			if !last {
-				return fmt.Errorf("toml/edit: cannot set %q: %q is not a table", pathString(key), pathString(key[:i+1]))
+			if last {
+				raw, err := d.renderValue(value)
+				if err != nil {
+					return err
+				}
+				return d.apply(splice{it.leaf.value, raw})
 			}
-			raw, err := d.renderValue(value)
-			if err != nil {
-				return err
-			}
-			return d.apply(splice{it.leaf.value, raw})
+			return d.setInline(it.leaf, key, i+1, value)
 		case it.arr != nil:
-			return fmt.Errorf("toml/edit: cannot set %q: %q is an array of tables", pathString(key), pathString(key[:i+1]))
+			if last {
+				return fmt.Errorf("toml/edit: cannot set %q: it is an array of tables; address its elements by index or delete it first", pathString(key))
+			}
+			idx, ok := parseIndex(key[i+1])
+			if !ok {
+				return fmt.Errorf("toml/edit: cannot set %q: %q is an array of tables and %q is not an index", pathString(key), pathString(key[:i+1]), key[i+1])
+			}
+			if idx > len(it.arr) {
+				return fmt.Errorf("toml/edit: cannot set %q: index %d out of range: %q has %d elements", pathString(key), idx, pathString(key[:i+1]), len(it.arr))
+			}
+			if idx == len(it.arr) {
+				return d.appendElement(it.arr, key, i+2, value)
+			}
+			if i+1 == len(key)-1 {
+				return fmt.Errorf("toml/edit: cannot set %q: it is a table; delete it first or set its keys individually", pathString(key))
+			}
+			t = it.arr[idx]
+			i += 2
 		default:
 			if last {
 				return fmt.Errorf("toml/edit: cannot set %q: it is a table; delete it first or set its keys individually", pathString(key))
 			}
 			t = it.tbl
+			i++
 		}
 	}
 
@@ -69,25 +91,39 @@ func (d *Document) Set(key []string, value interface{}) error {
 		return fmt.Errorf("toml/edit: internal error: no keys left to create for %q", pathString(key))
 	}
 
-	if t.dotted {
-		// t was defined by a dotted key in the section of t.host: extend it
-		// the same way, relative to the host table.
-		rel := make([]string, 0, len(t.path)-len(t.host.path)+len(suffix))
-		rel = append(rel, t.path[len(t.host.path):]...)
+	// Tables defined by dotted keys, and tables inside array-of-tables
+	// elements that have no section of their own, are extended with dotted
+	// key-values in their nearest section.
+	if t.dotted || (t.viaArray && !t.explicit) {
+		sec := nearestSection(t)
+		rel := make([]string, 0, len(t.path)-len(sec.path)+len(suffix))
+		rel = append(rel, t.path[len(sec.path):]...)
 		rel = append(rel, suffix...)
 		line, err := d.renderDottedKV(rel, value)
 		if err != nil {
 			return err
 		}
-		return d.apply(d.insertion(t.host.insertAt, line, false))
+		return d.apply(d.insertion(sec.insertAt, line, false))
 	}
 
-	if (t.explicit || t.root) && len(suffix) == 1 {
-		line, err := d.renderKV(suffix[0], value)
-		if err != nil {
-			return err
+	if t.explicit || t.root {
+		if len(suffix) == 1 {
+			line, err := d.renderDottedKV(suffix, value)
+			if err != nil {
+				return err
+			}
+			return d.apply(d.insertion(t.insertAt, line, false))
 		}
-		return d.apply(d.insertion(t.insertAt, line, false))
+		if t.viaArray {
+			// A [header] below an array element would attach to the last
+			// element of the array, not necessarily this one: dotted keys
+			// stay unambiguous.
+			line, err := d.renderDottedKV(suffix, value)
+			if err != nil {
+				return err
+			}
+			return d.apply(d.insertion(t.insertAt, line, false))
+		}
 	}
 
 	// The remaining tables need a section of their own, placed right after
@@ -102,7 +138,7 @@ func (d *Document) Set(key []string, value interface{}) error {
 	if err != nil {
 		return err
 	}
-	kv, err := d.renderKV(suffix[len(suffix)-1], value)
+	kv, err := d.renderDottedKV(suffix[len(suffix)-1:], value)
 	if err != nil {
 		return err
 	}
@@ -111,33 +147,104 @@ func (d *Document) Set(key []string, value interface{}) error {
 	return d.apply(d.insertion(subtreeEnd(t), text, true))
 }
 
-// Delete removes the key-value, table, or array of tables at the given key
-// path, along with the comments attached to it. It returns true if something
-// was deleted. Deleting a table removes all its content, including sections
+// appendElement appends a new [[element]] to an existing array of tables,
+// initialized with the key-value described by key[restFrom:] and value.
+func (d *Document) appendElement(arr []*table, key []string, restFrom int, value interface{}) error {
+	rest := key[restFrom:]
+	if len(rest) == 0 {
+		return fmt.Errorf("toml/edit: cannot set %q: a new array element is a table; set its keys individually", pathString(key))
+	}
+	headerKey, err := d.renderKeyPath(arr[0].path)
+	if err != nil {
+		return err
+	}
+	kv, err := d.renderDottedKV(rest, value)
+	if err != nil {
+		return err
+	}
+	text := append([]byte("[["+headerKey+"]]"), d.eol()...)
+	text = append(text, kv...)
+	return d.apply(d.insertion(arraySubtreeEnd(arr), text, true))
+}
+
+// Delete removes the value, key-value, table, or array of tables at the
+// given key path, along with the comments attached to it. It returns true if
+// something was deleted. Elements of arrays are addressed by a decimal
+// index. Deleting a table removes all its content, including sections
 // defined elsewhere in the document.
 func (d *Document) Delete(key []string) bool {
+	// Document-level targets are removed in one batch. A target inside an
+	// inline value may be expressed by several key-values of a dotted group:
+	// those are removed one at a time, re-resolving the path in between.
+	deleted := false
+	for {
+		splices, again, found := d.resolveDelete(key)
+		if !found || d.apply(splices...) != nil {
+			return deleted
+		}
+		deleted = true
+		if !again {
+			return true
+		}
+	}
+}
+
+// resolveDelete computes the splices removing the target of key. again
+// reports that the deletion may be partial (one key-value of a dotted group)
+// and that the caller should resolve the path again after applying.
+func (d *Document) resolveDelete(key []string) ([]splice, bool, bool) {
 	if len(key) == 0 {
-		return false
+		return nil, false, false
 	}
 	t := d.root
-	for _, name := range key[:len(key)-1] {
-		it := t.items[name]
-		if it == nil || it.tbl == nil {
-			return false
+	i := 0
+	for i < len(key) {
+		it := t.items[key[i]]
+		if it == nil {
+			return nil, false, false
 		}
-		t = it.tbl
+		last := i == len(key)-1
+		switch {
+		case it.leaf != nil:
+			if last {
+				return d.deletionSplices([]span{it.leaf.line}), false, true
+			}
+			s, again, ok := d.deleteInline(it.leaf, key, i+1)
+			if !ok {
+				return nil, false, false
+			}
+			return []splice{s}, again, true
+		case it.arr != nil:
+			if last {
+				return d.deletionSplices(collectSpans(it, nil)), false, true
+			}
+			idx, ok := parseIndex(key[i+1])
+			if !ok || idx >= len(it.arr) {
+				return nil, false, false
+			}
+			if i+1 == len(key)-1 {
+				return d.deletionSplices(collectTableSpans(it.arr[idx], nil)), false, true
+			}
+			t = it.arr[idx]
+			i += 2
+		default:
+			if last {
+				return d.deletionSplices(collectSpans(it, nil)), false, true
+			}
+			t = it.tbl
+			i++
+		}
 	}
-	it := t.items[key[len(key)-1]]
-	if it == nil {
-		return false
-	}
+	return nil, false, false
+}
 
-	spans := mergeSpans(collectSpans(it, nil))
+func (d *Document) deletionSplices(spans []span) []splice {
+	spans = mergeSpans(spans)
 	splices := make([]splice, len(spans))
 	for i, s := range spans {
 		splices[i] = splice{span: d.absorbTrailingBlanks(s)}
 	}
-	return d.apply(splices...) == nil
+	return splices
 }
 
 // collectSpans accumulates the byte ranges expressing an item: key-value
@@ -291,18 +398,16 @@ func renderKVLine(name string, value interface{}) ([]byte, error) {
 	return line, nil
 }
 
-// renderKV renders a `key = value` line ending with the document's line
-// ending.
-func (d *Document) renderKV(name string, value interface{}) ([]byte, error) {
-	line, err := renderKVLine(name, value)
-	if err != nil {
-		return nil, err
-	}
-	return d.withEOL(line), nil
-}
-
-// renderValue renders the bare TOML representation of a value.
+// renderValue renders the bare TOML representation of a value. An
+// unstable.RawMessage is used as-is.
 func (d *Document) renderValue(value interface{}) ([]byte, error) {
+	if raw, ok := value.(unstable.RawMessage); ok {
+		raw = bytes.TrimSpace(raw)
+		if len(raw) == 0 {
+			return nil, errors.New("toml/edit: raw value is empty")
+		}
+		return bytes.Clone(raw), nil
+	}
 	line, err := renderKVLine("v", value)
 	if err != nil {
 		return nil, err
@@ -314,9 +419,9 @@ func (d *Document) renderValue(value interface{}) ([]byte, error) {
 	return line[len(prefix) : len(line)-1], nil
 }
 
-// renderDottedKV renders a `dotted.key = value` line ending with the
-// document's line ending.
-func (d *Document) renderDottedKV(parts []string, value interface{}) ([]byte, error) {
+// renderInlineKV renders a `dotted.key = value` fragment without a line
+// ending, as used inside inline tables.
+func (d *Document) renderInlineKV(parts []string, value interface{}) ([]byte, error) {
 	kp, err := d.renderKeyPath(parts)
 	if err != nil {
 		return nil, err
@@ -325,11 +430,21 @@ func (d *Document) renderDottedKV(parts []string, value interface{}) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	line := make([]byte, 0, len(kp)+len(v)+5)
-	line = append(line, kp...)
-	line = append(line, " = "...)
-	line = append(line, v...)
-	return append(line, d.eol()...), nil
+	b := make([]byte, 0, len(kp)+len(v)+3)
+	b = append(b, kp...)
+	b = append(b, " = "...)
+	b = append(b, v...)
+	return b, nil
+}
+
+// renderDottedKV renders a `dotted.key = value` line ending with the
+// document's line ending.
+func (d *Document) renderDottedKV(parts []string, value interface{}) ([]byte, error) {
+	b, err := d.renderInlineKV(parts, value)
+	if err != nil {
+		return nil, err
+	}
+	return append(b, d.eol()...), nil
 }
 
 // renderKeyPath renders a dotted key path, quoting the parts that need it
@@ -348,15 +463,6 @@ func (d *Document) renderKeyPath(parts []string) (string, error) {
 		rendered[i] = string(line[:len(line)-len(suffix)])
 	}
 	return strings.Join(rendered, "."), nil
-}
-
-func (d *Document) withEOL(line []byte) []byte {
-	// line ends with '\n'; rewrite it as CRLF if the document uses CRLF.
-	eol := d.eol()
-	if len(eol) == 2 {
-		line = append(line[:len(line)-1], eol...)
-	}
-	return line
 }
 
 func pathString(key []string) string {

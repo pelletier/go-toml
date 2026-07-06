@@ -43,6 +43,65 @@ host = 'localhost'
 	// port = 5432
 }
 
+func ExampleDocument_Set_arraysAndInline() {
+	doc := `[[servers]]
+ip = '10.0.0.1'
+ports = [8080]
+
+[[servers]]
+ip = '10.0.0.2'
+ports = [8080]
+`
+	d, err := edit.Parse([]byte(doc))
+	if err != nil {
+		panic(err)
+	}
+
+	// Array elements (of tables or not) are addressed by decimal indexes.
+	if err := d.Set([]string{"servers", "1", "ip"}, "10.0.0.3"); err != nil {
+		panic(err)
+	}
+	// An index equal to the length appends: a port to the first server...
+	if err := d.Set([]string{"servers", "0", "ports", "1"}, 8081); err != nil {
+		panic(err)
+	}
+	// ...or a whole new [[servers]] element.
+	if err := d.Set([]string{"servers", "2", "ip"}, "10.0.0.4"); err != nil {
+		panic(err)
+	}
+
+	fmt.Print(d.String())
+	// Output:
+	// [[servers]]
+	// ip = '10.0.0.1'
+	// ports = [8080, 8081]
+	//
+	// [[servers]]
+	// ip = '10.0.0.3'
+	// ports = [8080]
+	//
+	// [[servers]]
+	// ip = '10.0.0.4'
+}
+
+func ExampleDocument_SetComment() {
+	d, err := edit.Parse([]byte("[server]\nport = 8080\n"))
+	if err != nil {
+		panic(err)
+	}
+	if err := d.SetComment([]string{"server"}, "Connection settings."); err != nil {
+		panic(err)
+	}
+	if err := d.SetTrailingComment([]string{"server", "port"}, "default"); err != nil {
+		panic(err)
+	}
+	fmt.Print(d.String())
+	// Output:
+	// # Connection settings.
+	// [server]
+	// port = 8080 # default
+}
+
 func ExampleDocument_Set() {
 	d, err := edit.Parse(nil)
 	if err != nil {

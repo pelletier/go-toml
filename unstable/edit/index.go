@@ -21,22 +21,32 @@ type leaf struct {
 	line span
 	// value covers exactly the bytes of the value.
 	value span
+	// exprLine is the start of the line the key-value itself is on; the
+	// bytes between line.start and exprLine are the attached comments.
+	exprLine int
 }
 
 // table is a table of the document: the root, a [table] section, an element
 // of an [[array table]], or a table implied by a header or a dotted key.
 type table struct {
-	path []string
-	root bool
+	path   []string
+	parent *table
+	root   bool
 	// explicit tables have their own section in the document: a [header] (or
 	// [[header]] for array-table elements) followed by key-values.
 	explicit bool
-	section  span // for explicit tables: header start (incl. attached comments) to end of section
-	insertAt int  // for explicit tables and the root: where to insert a new key-value line
-	// dotted tables are defined by a dotted key inside the section of host;
-	// they have no section of their own and are extended with dotted keys.
+	// viaArray is set on array-table elements and everything below them:
+	// their absolute path is only meaningful relative to the last element of
+	// each array, so new sub-tables cannot be created with [headers].
+	viaArray   bool
+	section    span // for explicit tables: header start (incl. attached comments) to end of section
+	headerLine int  // for explicit tables: start of the [header] line itself
+	exprEnd    int  // for explicit tables: past the closing bracket of the header
+	insertAt   int  // for explicit tables and the root: where to insert a new key-value line
+	// dotted tables are defined by a dotted key inside the section of their
+	// nearest section ancestor; they have no header and are extended with
+	// dotted keys.
 	dotted bool
-	host   *table
 	items  map[string]*item
 }
 
@@ -47,8 +57,14 @@ type item struct {
 	arr  []*table // array of tables: one table per [[element]]
 }
 
-func newTable(path []string) *table {
-	return &table{path: path, items: map[string]*item{}}
+func newTable(parent *table, name string) *table {
+	t := &table{items: map[string]*item{}}
+	if parent != nil {
+		t.path = childPath(parent, name)
+		t.parent = parent
+		t.viaArray = parent.viaArray
+	}
+	return t
 }
 
 func childPath(t *table, name string) []string {
@@ -58,11 +74,20 @@ func childPath(t *table, name string) []string {
 	return p
 }
 
+// nearestSection returns the closest ancestor-or-self of t that has its own
+// section to insert key-values into: an explicit table or the root.
+func nearestSection(t *table) *table {
+	for !t.explicit && !t.root {
+		t = t.parent
+	}
+	return t
+}
+
 // reindex rebuilds the span index from d.data, which must be a valid TOML
 // document. Errors are only possible on invalid input and indicate a bug in
 // the caller.
 func (d *Document) reindex() error {
-	root := newTable(nil)
+	root := newTable(nil, "")
 	root.root = true
 	root.section = span{0, len(d.data)}
 	root.insertAt = -1
@@ -108,7 +133,7 @@ func (d *Document) reindex() error {
 			if err != nil {
 				return err
 			}
-			lf := &leaf{line: span{attach, le}, value: value}
+			lf := &leaf{line: span{attach, le}, value: value, exprLine: ls}
 			if err := addKeyValue(current, keyParts(e), lf); err != nil {
 				return err
 			}
@@ -121,6 +146,8 @@ func (d *Document) reindex() error {
 			}
 			t.explicit = true
 			t.section = span{attach, len(d.data)}
+			t.headerLine = ls
+			t.exprEnd = exprEnd
 			t.insertAt = le
 			if firstHeaderAttach < 0 {
 				firstHeaderAttach = attach
@@ -133,6 +160,8 @@ func (d *Document) reindex() error {
 				return err
 			}
 			elem.section = span{attach, len(d.data)}
+			elem.headerLine = ls
+			elem.exprEnd = exprEnd
 			elem.insertAt = le
 			if firstHeaderAttach < 0 {
 				firstHeaderAttach = attach
@@ -204,10 +233,11 @@ func (d *Document) exprSpan(e *unstable.Node) (int, int, error) {
 	return start, end, nil
 }
 
-// valueSpan returns the byte range of the value of a KeyValue expression.
+// valueSpan returns the byte range of the value of a KeyValue node, which
+// may be a top-level expression or a key-value inside an inline table.
 // Composite values (arrays, inline tables) carry no usable Raw range, so it
 // is recovered from the last key part instead: the value starts after the
-// '=' separator and ends where the expression does.
+// '=' separator and ends where the key-value does.
 func (d *Document) valueSpan(e *unstable.Node) (span, error) {
 	_, last, err := firstLastKey(e)
 	if err != nil {
@@ -260,7 +290,7 @@ func resolveHeader(root *table, parts []string) (*table, error) {
 		it := t.items[name]
 		switch {
 		case it == nil:
-			nt := newTable(childPath(t, name))
+			nt := newTable(t, name)
 			t.items[name] = &item{tbl: nt}
 			t = nt
 		case it.tbl != nil:
@@ -282,7 +312,7 @@ func appendArrayElement(root *table, parts []string) (*table, error) {
 		it := t.items[name]
 		switch {
 		case it == nil:
-			nt := newTable(childPath(t, name))
+			nt := newTable(t, name)
 			t.items[name] = &item{tbl: nt}
 			t = nt
 		case it.tbl != nil:
@@ -294,8 +324,9 @@ func appendArrayElement(root *table, parts []string) (*table, error) {
 		}
 	}
 	name := parts[len(parts)-1]
-	elem := newTable(childPath(t, name))
+	elem := newTable(t, name)
 	elem.explicit = true
+	elem.viaArray = true
 	it := t.items[name]
 	switch {
 	case it == nil:
@@ -316,9 +347,8 @@ func addKeyValue(sec *table, parts []string, lf *leaf) error {
 		it := t.items[name]
 		switch {
 		case it == nil:
-			nt := newTable(childPath(t, name))
+			nt := newTable(t, name)
 			nt.dotted = true
-			nt.host = sec
 			t.items[name] = &item{tbl: nt}
 			t = nt
 		case it.tbl != nil:
@@ -341,21 +371,27 @@ func addKeyValue(sec *table, parts []string, lf *leaf) error {
 func subtreeEnd(t *table) int {
 	end := t.section.end
 	for _, it := range t.items {
-		e := 0
+		var e int
 		switch {
 		case it.leaf != nil:
 			e = it.leaf.line.end
 		case it.tbl != nil:
 			e = subtreeEnd(it.tbl)
 		default:
-			for _, elem := range it.arr {
-				if se := subtreeEnd(elem); se > e {
-					e = se
-				}
-			}
+			e = arraySubtreeEnd(it.arr)
 		}
 		if e > end {
 			end = e
+		}
+	}
+	return end
+}
+
+func arraySubtreeEnd(arr []*table) int {
+	end := 0
+	for _, elem := range arr {
+		if se := subtreeEnd(elem); se > end {
+			end = se
 		}
 	}
 	return end
@@ -374,4 +410,20 @@ func (d *Document) lineEnd(off int) int {
 		return len(d.data)
 	}
 	return off + i + 1
+}
+
+// parseIndex interprets a key path element as an array index: a non-empty
+// string of decimal digits.
+func parseIndex(s string) (int, bool) {
+	if s == "" || len(s) > 18 {
+		return 0, false
+	}
+	n := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return 0, false
+		}
+		n = n*10 + int(s[i]-'0')
+	}
+	return n, true
 }

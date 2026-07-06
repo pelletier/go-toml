@@ -3,31 +3,54 @@
 //
 // A Document is created from TOML source with Parse. Bytes returns the
 // current source, byte-for-byte identical to the input except for the parts
-// modified through Set and Delete: an edit rewrites only the bytes that
-// express it, leaving the comments, whitespace, and ordering of everything
-// else untouched.
+// modified through Set, Delete, SetComment, and SetTrailingComment: an edit
+// rewrites only the bytes that express it, leaving the comments, whitespace,
+// and ordering of everything else untouched.
 //
-// Keys are addressed by their path, one element per key part:
+// # Key paths
+//
+// Values are addressed by their key path, one element per key part:
 // []string{"servers", "alpha", "ip"} addresses ip in [servers.alpha]. Path
 // elements are plain strings, never quoted or dotted: quoting is applied as
 // needed when writing.
 //
-// Set and Delete address the structures that make up the document: tables
-// and key-values, whether defined by [table] headers or dotted keys. Arrays
-// and inline tables are atomic values: Set can replace one wholesale, but
-// Set and Delete paths cannot reach inside them. Elements of arrays of
-// tables ([[table]]) are not addressable either; Delete removes such an
-// array as a whole. Get operates on decoded values instead, so it can
-// descend into inline tables.
+// Paths descend through tables (whether defined by [table] headers, dotted
+// keys, or inline), through arrays of tables, and through arrays. When a
+// path element steps into an array, it is interpreted as a 0-based decimal
+// index; everywhere else it is a key, so keys that look like numbers are
+// unambiguous. For Set, an index equal to the array's length appends a new
+// element, including a new [[table]] section for arrays of tables.
+//
+// # Values
 //
 // Values passed to Set are rendered with the same encoder as toml.Marshal,
-// in inline (single-line) form. New tables created by Set get their own
-// [header] section, appended after the section of their closest existing
-// parent, unless that parent was defined with dotted keys, in which case
-// dotted keys are used for the new values as well.
+// in inline (single-line) form. To control the exact TOML representation
+// (formatting, multi-line strings, ...), pass an unstable.RawMessage: its
+// bytes are used verbatim as the value. New tables created by Set get their
+// own [header] section, appended after the section of their closest existing
+// parent; dotted keys are used instead when the parent was defined with
+// dotted keys or lives inside an array-of-tables element (where a new header
+// would attach to the wrong element).
+//
+// Setting a path that designates an existing table or array of tables is an
+// error: Set never silently discards parts of the document. Delete it first
+// to replace it wholesale.
+//
+// # Comments
+//
+// Comments travel with the expression they annotate: the contiguous
+// full-line comments directly above a key-value or table header, and the
+// comment trailing it on the same line, move and are deleted with it. They
+// can be read and written with Comment, SetComment, TrailingComment, and
+// SetTrailingComment.
+//
+// # Guarantees
 //
 // Every mutation is validated: if an edit would produce an invalid TOML
-// document, the document is left unchanged and an error is returned.
+// document, the document is left unchanged and an error is returned. A few
+// exotic combinations (for example extending, from outside, a table defined
+// implicitly inside an array-of-tables element) are rejected that way when
+// TOML offers no valid syntax for them.
 //
 // Like the rest of the unstable API, this package does not follow the
 // backward compatibility guarantees of go-toml. It also favors correctness
@@ -88,9 +111,9 @@ func (d *Document) Unmarshal(v interface{}) error {
 // Get returns the decoded value at the given key path, and whether it
 // exists. Values are decoded like toml.Unmarshal into an interface{}: tables
 // (inline or not) become map[string]interface{}, arrays and arrays of tables
-// become []interface{}, and scalars follow the usual decoding rules. An
-// empty path returns the whole document. Unlike Set and Delete, Get descends
-// into inline tables.
+// become []interface{}, and scalars follow the usual decoding rules. Array
+// elements are addressed by a decimal index. An empty path returns the whole
+// document.
 func (d *Document) Get(key []string) (interface{}, bool) {
 	var v interface{}
 	if err := toml.Unmarshal(d.data, &v); err != nil {
@@ -98,12 +121,20 @@ func (d *Document) Get(key []string) (interface{}, bool) {
 		return nil, false
 	}
 	for _, k := range key {
-		m, ok := v.(map[string]interface{})
-		if !ok {
-			return nil, false
-		}
-		v, ok = m[k]
-		if !ok {
+		switch c := v.(type) {
+		case map[string]interface{}:
+			var ok bool
+			v, ok = c[k]
+			if !ok {
+				return nil, false
+			}
+		case []interface{}:
+			idx, ok := parseIndex(k)
+			if !ok || idx >= len(c) {
+				return nil, false
+			}
+			v = c[idx]
+		default:
 			return nil, false
 		}
 	}

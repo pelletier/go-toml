@@ -237,7 +237,9 @@ the AST level. See https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable.
 
 The `unstable/edit` package modifies TOML documents in place while preserving
 comments, whitespace, and ordering. Parse a document with `edit.Parse`, then
-`Get`, `Set`, and `Delete` values by key path: only the bytes expressing an
+`Get`, `Set`, and `Delete` values by key path — including array elements by
+index and keys inside inline tables — and read or write the comments attached
+to any key or table with `Comment`/`SetComment`. Only the bytes expressing an
 edit are rewritten, everything else is kept byte-for-byte. See
 https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable/edit.
 

@@ -3,6 +3,7 @@ package edit
 import (
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -328,9 +329,18 @@ func TestSetErrors(t *testing.T) {
 	}{
 		{"empty key", "a = 1\n", nil, 1},
 		{"through value", "a = 1\n", []string{"a", "b"}, 1},
-		{"through inline table", "a = {b = 1}\n", []string{"a", "b"}, 2},
-		{"through array of tables", "[[x]]\nk = 1\n", []string{"x", "k"}, 2},
+		{"non-index into array of tables", "[[x]]\nk = 1\n", []string{"x", "k"}, 2},
 		{"onto array of tables", "[[x]]\nk = 1\n", []string{"x"}, 1},
+		{"onto array-of-tables element", "[[x]]\nk = 1\n", []string{"x", "0"}, 1},
+		{"array-of-tables index out of range", "[[x]]\nk = 1\n", []string{"x", "2", "k"}, 1},
+		{"append element without keys", "[[x]]\nk = 1\n", []string{"x", "1"}, 1},
+		{"append element with nil value", "[[x]]\nk = 1\n", []string{"x", "1", "k"}, nil},
+		{"insert into inline table with nil value", "p = {a = 1}\n", []string{"p", "b"}, nil},
+		{"append to array with nil value", "a = [1]\n", []string{"a", "1"}, nil},
+		{"through scalar in inline table", "a = {b = 1}\n", []string{"a", "b", "c"}, 2},
+		{"non-index into array", "a = [1, 2]\n", []string{"a", "x"}, 1},
+		{"array index out of range", "a = [1, 2]\n", []string{"a", "5"}, 1},
+		{"onto implicit table in inline", "a = {b.c = 1}\n", []string{"a", "b"}, 1},
 		{"onto table", "[t]\nx = 1\n", []string{"t"}, 5},
 		{"onto dotted table", "a.b = 1\n", []string{"a"}, 5},
 		{"nil value", "", []string{"a"}, nil},
@@ -444,8 +454,11 @@ func TestDeleteFalse(t *testing.T) {
 		{"missing", "a = 1\n", []string{"b"}},
 		{"missing nested", "[t]\n", []string{"t", "x"}},
 		{"through value", "a = 1\n", []string{"a", "b"}},
-		{"inside inline table", "a = {b = 1}\n", []string{"a", "b"}},
-		{"inside array of tables", "[[x]]\nk = 1\n", []string{"x", "k"}},
+		{"missing in inline table", "a = {b = 1}\n", []string{"a", "c"}},
+		{"non-index into array of tables", "[[x]]\nk = 1\n", []string{"x", "k"}},
+		{"element index out of range", "[[x]]\nk = 1\n", []string{"x", "1"}},
+		{"array index out of range", "a = [1]\n", []string{"a", "1"}},
+		{"non-index into array", "a = [1]\n", []string{"a", "x"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -492,6 +505,11 @@ func collectPaths(t *table, prefix []string, leaves, tables *[][]string) {
 			collectPaths(it.tbl, p, leaves, tables)
 		case it.arr != nil:
 			*tables = append(*tables, p)
+			for idx, elem := range it.arr {
+				ep := append(append([]string{}, p...), strconv.Itoa(idx))
+				*tables = append(*tables, ep)
+				collectPaths(elem, ep, leaves, tables)
+			}
 		}
 	}
 }
@@ -520,7 +538,9 @@ func TestEveryPathEditable(t *testing.T) {
 				t.Errorf("doc %q: Delete(%q) = false", doc, path)
 				continue
 			}
-			if d.Has(path) {
+			// Deleting an array element shifts the following ones, so an
+			// index-ended path may legitimately still exist.
+			if _, isIdx := parseIndex(path[len(path)-1]); !isIdx && d.Has(path) {
 				t.Errorf("doc %q: Has(%q) after Delete", doc, path)
 			}
 		}
