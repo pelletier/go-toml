@@ -233,6 +233,29 @@ API subject to change.
 Parser is the unstable API that allows iterative parsing of a TOML document at
 the AST level. See https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable.
 
+### Marshaler and Unmarshaler interfaces
+
+[`unstable.Marshaler`][unstable-marshaler] and
+[`unstable.Unmarshaler`][unstable-unmarshaler] let types produce and consume
+their own raw TOML representation, similar to the equivalent `encoding/json`
+interfaces. They are opt-in: enable them with
+[`Encoder.EnableMarshalerInterface`][enable-marshaler] and
+[`Decoder.EnableUnmarshalerInterface`][enable-unmarshaler].
+
+[unstable-marshaler]: https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable#Marshaler
+[unstable-unmarshaler]: https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable#Unmarshaler
+[enable-marshaler]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#Encoder.EnableMarshalerInterface
+[enable-unmarshaler]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#Decoder.EnableUnmarshalerInterface
+
+### RawMessage
+
+[`unstable.RawMessage`][unstable-rawmessage] is a raw encoded TOML value
+implementing both interfaces above. Like `json.RawMessage`, it can delay the
+decoding of part of a document or splice pre-encoded TOML verbatim into the
+output.
+
+[unstable-rawmessage]: https://pkg.go.dev/github.com/pelletier/go-toml/v2/unstable#RawMessage
+
 ### Document editing
 
 The `unstable/edit` package modifies TOML documents in place while preserving

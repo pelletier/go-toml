@@ -51,11 +51,12 @@ type Encoder struct {
 	w io.Writer
 
 	// global settings
-	tablesInline       bool
-	arraysMultiline    bool
-	indentSymbol       string
-	indentTables       bool
-	marshalJSONNumbers bool
+	tablesInline         bool
+	arraysMultiline      bool
+	indentSymbol         string
+	indentTables         bool
+	marshalJSONNumbers   bool
+	omitEmptySuperTables bool
 
 	// toggles the unstable.Marshaler interface
 	marshalerInterface bool
@@ -117,6 +118,29 @@ func (enc *Encoder) SetMarshalJSONNumbers(indent bool) *Encoder {
 	return enc
 }
 
+// SetOmitEmptySuperTables removes the header of tables that do not directly
+// contain any key-value. Emitting a sub-table implicitly defines all its
+// parent tables, so such "super-table" headers are not needed for the
+// document to be valid TOML. For example, instead of:
+//
+//	[a]
+//	[a.b]
+//	[a.b.c]
+//	key = 'value'
+//
+// the encoder emits:
+//
+//	[a.b.c]
+//	key = 'value'
+//
+// Tables with no content at all keep their header: it is their only
+// definition in the document. Tables annotated with a comment tag also keep
+// their header, so the comment has a line to attach to.
+func (enc *Encoder) SetOmitEmptySuperTables(omit bool) *Encoder {
+	enc.omitEmptySuperTables = omit
+	return enc
+}
+
 // EnableMarshalerInterface enables the unstable.Marshaler interface.
 //
 // With this feature enabled, types implementing the unstable.Marshaler
@@ -162,7 +186,8 @@ func (enc *Encoder) EnableMarshalerInterface() *Encoder {
 //
 // Keys in key-values always have one part.
 //
-// Intermediate tables are always printed.
+// Intermediate tables are always printed, unless SetOmitEmptySuperTables is
+// enabled.
 //
 // By default, strings are encoded as literal string, unless they contain
 // either a newline character or a single quote. In that case they are emitted
@@ -578,6 +603,11 @@ func (e *encoderState) classifyRaw(b []byte) (rawShape, []byte) {
 func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 	for i := range entries {
 		ent := &entries[i]
+		if ent.options.rawShape != shapeUnknown {
+			// Already classified: SetOmitEmptySuperTables resolves the
+			// entries early to route them by shape.
+			continue
+		}
 		v, ok := resolve(ent.value)
 		if !ok || encPropsForType(v.Type()).marshaler == 0 {
 			continue
@@ -632,7 +662,12 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 	if err != nil {
 		return err
 	}
+	return e.encodeTableEntries(entries, commented, indent)
+}
 
+// encodeTableEntries writes the given table entries at the given key path,
+// and returns them to the pool.
+func (e *encoderState) encodeTableEntries(entries []entry, commented bool, indent int) error {
 	// Marshaler routing is hoisted behind a single local flag. When the (opt-in)
 	// interface is off, mOn is false and both passes run the exact baseline
 	// code, so the default Marshal path keeps its performance.
@@ -722,9 +757,36 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 		// The value is resolvable: entryIsTable already resolved it.
 		tv, _ := resolve(ent.value)
 
-		e.writeTableHeader(ent.options.comment, entCommented, false, indent)
+		subEntries, err := e.collectEntries(tv)
+		if err != nil {
+			return err
+		}
 
-		err := e.encodeTable(tv, entCommented, indent+1)
+		subIndent := indent + 1
+		if e.omitEmptySuperTables && ent.options.comment == "" {
+			if mOn {
+				// The check below routes entries by their Marshaler shape,
+				// so classification cannot wait for encodeTableEntries.
+				// resolveMarshalerEntries skips already-classified entries,
+				// making the second call there a no-op.
+				if err := e.resolveMarshalerEntries(subEntries); err != nil {
+					return err
+				}
+			}
+			if e.onlySubTables(subEntries) {
+				// The table has no key-value of its own and at least one
+				// sub-table: emitting the sub-tables implicitly defines it,
+				// so its header can be omitted. Its children take its place
+				// in the indentation hierarchy.
+				subIndent = indent
+			} else {
+				e.writeTableHeader(ent.options.comment, entCommented, false, indent)
+			}
+		} else {
+			e.writeTableHeader(ent.options.comment, entCommented, false, indent)
+		}
+
+		err = e.encodeTableEntries(subEntries, entCommented, subIndent)
 		if err != nil {
 			return err
 		}
@@ -733,6 +795,31 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 
 	e.putEntries(entries)
 	return nil
+}
+
+// onlySubTables reports whether the entries contain at least one sub-table
+// and nothing else. A table made only of sub-tables is a "super-table": every
+// one of its entries emits a header that implicitly defines it, so its own
+// header carries no information.
+func (e *encoderState) onlySubTables(entries []entry) bool {
+	if len(entries) == 0 {
+		return false
+	}
+	for i := range entries {
+		ent := &entries[i]
+		if ent.options.rawShape != shapeUnknown {
+			// Classified unstable.Marshaler entry: only a table-shaped one
+			// that is not forced inline is guaranteed to emit a header.
+			if ent.options.rawShape != shapeTable || e.tablesInline || ent.options.inline {
+				return false
+			}
+			continue
+		}
+		if !e.entryIsTable(ent) {
+			return false
+		}
+	}
+	return true
 }
 
 // encodeMarshalerTable emits a table-shaped unstable.Marshaler entry: the
