@@ -308,6 +308,11 @@ type encoderState struct {
 		t reflect.Type
 		p typeEncProps
 	}
+
+	// mapIter is a reusable map iterator (one would otherwise be allocated
+	// for every table). Safe to share: a map is fully iterated (entries are
+	// buffered) before any nested table starts its own iteration.
+	mapIter reflect.MapIter
 }
 
 // propsFor returns the encoding properties of t, memoizing recent lookups of
@@ -1221,7 +1226,8 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	// Keys are converted to strings right away: read them into a reusable
 	// buffer to avoid one allocation per key.
 	var kbuf reflect.Value
-	if v.Type().Key() == stringType {
+	plainStringKey := v.Type().Key() == stringType
+	if plainStringKey {
 		if !e.stringKeyBuf.IsValid() {
 			e.stringKeyBuf = reflect.New(stringType).Elem()
 		}
@@ -1230,14 +1236,41 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 		kbuf = reflect.New(v.Type().Key()).Elem()
 	}
 
-	iter := v.MapRange()
+	// Larger maps read their values into one slab (instead of iter.Value(),
+	// which allocates a fresh value per entry). The slab elements are
+	// addressable and stay alive with the entries that reference them. Small
+	// maps are not worth the slab allocation.
+	var slab reflect.Value
+	if v.Len() >= 8 {
+		slab = reflect.MakeSlice(reflect.SliceOf(v.Type().Elem()), v.Len(), v.Len())
+	}
+	i := 0
+
+	iter := &e.mapIter
+	iter.Reset(v)
 	for iter.Next() {
 		kbuf.SetIterKey(iter)
-		key, err := mapKeyString(kbuf)
-		if err != nil {
-			return nil, err
+		var key string
+		if plainStringKey {
+			// Plain strings cannot implement TextMarshaler: skip the
+			// interface checks of mapKeyString.
+			key = kbuf.String()
+		} else {
+			var err error
+			key, err = mapKeyString(kbuf)
+			if err != nil {
+				iter.Reset(reflect.Value{})
+				return nil, err
+			}
 		}
-		value := iter.Value()
+		var value reflect.Value
+		if slab.IsValid() && i < slab.Len() {
+			value = slab.Index(i)
+			i++
+			value.SetIterValue(iter)
+		} else {
+			value = iter.Value()
+		}
 		if value.Kind() == reflect.Interface && value.IsNil() {
 			// nil interface values are skipped
 			continue
@@ -1248,6 +1281,8 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 		}
 		entries = append(entries, entry{key: key, value: value, options: &zeroValueOptions})
 	}
+	// Drop the map reference: the iterator lives on in the pooled state.
+	iter.Reset(reflect.Value{})
 
 	if len(entries) > 1 {
 		// slices.SortFunc avoids boxing the slice into a sort.Interface (an

@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -39,4 +40,18 @@ func TestEncPropsReceiverVariants(t *testing.T) {
 	assert.NoError(t, Unmarshal([]byte(buf.String()), &back))
 	assert.Equal(t, interface{}(int64(1)), back["v"])
 	assert.Equal(t, interface{}(int64(2)), back["p"])
+}
+
+// TestMarshalLargeTypedMap covers the value-slab path of map entry
+// collection (maps with at least eight entries).
+func TestMarshalLargeTypedMap(t *testing.T) {
+	m := map[string]int64{}
+	for i := 0; i < 12; i++ {
+		m[fmt.Sprintf("key%02d", i)] = int64(i)
+	}
+	out, err := Marshal(m)
+	assert.NoError(t, err)
+	back := map[string]int64{}
+	assert.NoError(t, Unmarshal(out, &back))
+	assert.Equal(t, m, back)
 }
