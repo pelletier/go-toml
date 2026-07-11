@@ -425,10 +425,25 @@ func (s *SeenTracker) CheckArrayTable(parts [][]byte) (bool, error) {
 }
 
 // CheckKeyValue validates the (possibly dotted) key of a key-value under the
-// current table, WITHOUT validating its value. It returns the id of the leaf
-// entry, so the caller can validate a container value with CheckValueUnder.
+// current table, WITHOUT validating its value: the keys declared inside a
+// container value are validated separately (see CheckKeyValueUnder and the
+// decoder's per-value replay). It returns the id of the leaf entry.
 func (s *SeenTracker) CheckKeyValue(parts [][]byte) (int32, error) {
-	parent := s.currentTable
+	return s.CheckKeyValueUnder(s.currentTable, parts)
+}
+
+// CreateAnonymous creates an anonymous entry under parent and returns its id.
+// It gives each inline table stored in an array its own key scope, so that
+// identical keys in sibling tables do not collide.
+func (s *SeenTracker) CreateAnonymous(parent int32) int32 {
+	return s.create(parent, nil, anonymousKind, false)
+}
+
+// CheckKeyValueUnder validates the (possibly dotted) key of a key-value under
+// the given parent entry, WITHOUT validating its value. It mirrors
+// checkKeyValue but is driven directly from the key parts, for callers that
+// decode without building an AST.
+func (s *SeenTracker) CheckKeyValueUnder(parent int32, parts [][]byte) (int32, error) {
 	for k := 0; k < len(parts); k++ {
 		name := parts[k]
 		if k == len(parts)-1 {
@@ -447,14 +462,6 @@ func (s *SeenTracker) CheckKeyValue(parts [][]byte) (int32, error) {
 		parent = i
 	}
 	panic("unreachable: key-value expression without key")
-}
-
-// CheckValueUnder validates the content of a value stored under the given
-// entry (typically the leaf returned by CheckKeyValue): inline tables cannot
-// contain duplicate keys, including in the inline tables and arrays they
-// contain.
-func (s *SeenTracker) CheckValueUnder(parent int32, value *unstable.Node) error {
-	return s.checkValue(parent, value)
 }
 
 func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
