@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -353,4 +354,262 @@ func TestUnmarshalTypedContainerEdges(t *testing.T) {
 		var s target
 		assert.Error(t, Unmarshal([]byte(doc), &s), "expected error for %q", doc)
 	}
+}
+
+// TestUnmarshalFusedStructErrors covers the scanning error branches of the
+// fused document loop for reflection targets, and the strict-mode reporting
+// on both the fused path and the AST path (unmarshaler interface enabled).
+func TestUnmarshalFusedStructErrors(t *testing.T) {
+	type target struct {
+		A int64 `toml:"a"`
+	}
+
+	bad := []string{
+		"a = 1\rb = 2",   // bare CR between expressions
+		"# comment\rx",   // bare CR terminating a comment
+		"[tbl\na = 1",    // header syntax error through the delegated parser
+		"a = 1 trailing", // garbage after a scalar value
+		"a.b = 1",        // dotted key descending into an integer field
+	}
+	for _, doc := range bad {
+		var s target
+		assert.Error(t, Unmarshal([]byte(doc), &s), "expected error for %q", doc)
+	}
+
+	t.Run("strict unknown field fused", func(t *testing.T) {
+		var s target
+		d := NewDecoder(strings.NewReader("a = 1\nunknown = 2\nun.known = 3\n"))
+		d.DisallowUnknownFields()
+		err := d.Decode(&s)
+		assert.Error(t, err)
+		var missing *StrictMissingError
+		assert.True(t, errors.As(err, &missing))
+		assert.Equal(t, 2, len(missing.Errors))
+	})
+
+	t.Run("strict unknown field with unmarshaler interface", func(t *testing.T) {
+		var s target
+		d := NewDecoder(strings.NewReader("a = 1\nunknown = 2\n"))
+		d.DisallowUnknownFields()
+		d.EnableUnmarshalerInterface()
+		err := d.Decode(&s)
+		assert.Error(t, err)
+		var missing *StrictMissingError
+		assert.True(t, errors.As(err, &missing))
+		assert.Equal(t, 1, len(missing.Errors))
+	})
+
+	t.Run("fixed array overflow via dotted key", func(t *testing.T) {
+		var s struct {
+			Elem [1]struct{ V int64 }
+		}
+		err := Unmarshal([]byte("[[elem]]\nv = 1\n[[elem]]\nv = 2\n"), &s)
+		assert.Error(t, err)
+	})
+}
+
+// TestUnmarshalMoreErrorBranches sweeps assorted error and edge branches of
+// the fused paths and integer parsing.
+func TestUnmarshalMoreErrorBranches(t *testing.T) {
+	type target struct {
+		A []int64                     `toml:"a"`
+		M map[string]int64            `toml:"m"`
+		N map[string]map[string]int64 `toml:"n"`
+	}
+
+	bad := []string{
+		"\rx = 1",            // CR at start of expression (struct loop)
+		"a = [1,",            // container syntax error (struct target)
+		"a = [1] x",          // garbage after container
+		"b = 1\nb = [1]",     // duplicate key with container value
+		"m = {x = 1, x = 2}", // duplicate inside container (struct target)
+	}
+	for _, doc := range bad {
+		var s target
+		assert.Error(t, Unmarshal([]byte(doc), &s), "expected error for %q", doc)
+	}
+
+	overflow := []string{
+		"i = 0xFFFFFFFFFFFFFFFF",           // hex overflow
+		"i = 0o7777777777777777777777",     // octal overflow
+		"i = 0b" + strings.Repeat("1", 65), // binary overflow
+	}
+	for _, doc := range overflow {
+		m := map[string]interface{}{}
+		assert.Error(t, Unmarshal([]byte(doc), &m), "expected error for %q", doc)
+	}
+
+	good := []string{
+		"\r\na = [1]\r\n",            // CRLF blank line handling in the struct loop
+		"[m]\r\nk = 1",               // CRLF after header
+		"[n.x]\nk = 1\n[n.y]\nk = 2", // dotted headers into nested maps
+	}
+	for _, doc := range good {
+		var s target
+		assert.NoError(t, Unmarshal([]byte(doc), &s), "expected success for %q", doc)
+	}
+
+	t.Run("unmarshaler interface without strict ignores unknowns", func(t *testing.T) {
+		var s struct{ A int64 }
+		d := NewDecoder(strings.NewReader("a = 1\nunknown = 2"))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&s))
+		assert.Equal(t, int64(1), s.A)
+	})
+
+	t.Run("nil map field filled through cached table", func(t *testing.T) {
+		var s struct {
+			M map[string]int64 `toml:"m"`
+		}
+		assert.NoError(t, Unmarshal([]byte("[m]\nk = 1\nl = 2"), &s))
+		assert.Equal(t, int64(2), s.M["l"])
+	})
+}
+
+// TestUnmarshalReplacePreexistingValues covers replacing pre-existing values
+// held in interface fields and AST-path assignment errors.
+func TestUnmarshalReplacePreexistingValues(t *testing.T) {
+	t.Run("table replaces scalar in interface field", func(t *testing.T) {
+		var s struct{ T interface{} }
+		s.T = "old scalar"
+		assert.NoError(t, Unmarshal([]byte("[t]\nk = 1"), &s))
+		m, ok := s.T.(map[string]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, interface{}(int64(1)), m["k"])
+	})
+
+	t.Run("type mismatch through unmarshaler interface path", func(t *testing.T) {
+		var s struct{ A int64 }
+		d := NewDecoder(strings.NewReader(`a = "not an int"`))
+		d.EnableUnmarshalerInterface()
+		assert.Error(t, d.Decode(&s))
+	})
+
+	t.Run("duplicate key through unmarshaler interface path", func(t *testing.T) {
+		var s struct{ A int64 }
+		d := NewDecoder(strings.NewReader("a = 1\na = 2"))
+		d.EnableUnmarshalerInterface()
+		assert.Error(t, d.Decode(&s))
+	})
+}
+
+// TestUnmarshalCommentAndDottedStrictEdges covers comment scanning errors in
+// the fused loops and dotted-key strict reporting through the AST path.
+func TestUnmarshalCommentAndDottedStrictEdges(t *testing.T) {
+	for _, doc := range []string{"# c\rx = 1", "a = {#\x01\nx = 1}"} {
+		m := map[string]interface{}{}
+		assert.Error(t, Unmarshal([]byte(doc), &m), "expected error for %q", doc)
+	}
+
+	var s struct{ A int64 }
+	d := NewDecoder(strings.NewReader("un.known.key = 1"))
+	d.DisallowUnknownFields()
+	d.EnableUnmarshalerInterface()
+	err := d.Decode(&s)
+	var missing *StrictMissingError
+	assert.True(t, errors.As(err, &missing))
+}
+
+// TestUnmarshalerInterfaceLoopBranches covers the expression-loop branches
+// that only the unmarshaler-interface path uses: parser error wrapping and
+// the empty-document epilogue for generic roots.
+func TestUnmarshalerInterfaceLoopBranches(t *testing.T) {
+	t.Run("syntax error", func(t *testing.T) {
+		var s struct{ A int64 }
+		d := NewDecoder(strings.NewReader("[unclosed\na = 1"))
+		d.EnableUnmarshalerInterface()
+		assert.Error(t, d.Decode(&s))
+	})
+
+	t.Run("empty document into nil map", func(t *testing.T) {
+		var m map[string]interface{}
+		d := NewDecoder(strings.NewReader(""))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&m))
+		assert.True(t, m != nil)
+	})
+
+	t.Run("empty document into interface", func(t *testing.T) {
+		var v interface{}
+		d := NewDecoder(strings.NewReader(""))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&v))
+		_, ok := v.(map[string]interface{})
+		assert.True(t, ok)
+	})
+}
+
+// TestValidateValueNodeScalar covers the guard for non-container nodes: only
+// containers declare keys, so scalars validate trivially.
+func TestValidateValueNodeScalar(t *testing.T) {
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	assert.NoError(t, d.validateValueNode(&unstable.Node{Kind: unstable.String}))
+	assert.NoError(t, d.validateValueNode(&unstable.Node{Kind: unstable.Integer}))
+}
+
+// TestRawValueWithoutSpan covers the fallback of rawValue when neither an
+// expression node nor a fused value span is available.
+func TestRawValueWithoutSpan(t *testing.T) {
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	doc := []byte("x = [1]")
+	d.p.Reset(doc)
+	d.fusedValueSpan = nil
+	node := &unstable.Node{Kind: unstable.Array, Raw: d.p.Range(doc[4:7])}
+	assert.Equal(t, "[1]", string(d.rawValue(nil, node)))
+}
+
+// TestRawValueWithSpan covers the fused-path branch of rawValue, which
+// returns the exact span of the current key-value's container.
+func TestRawValueWithSpan(t *testing.T) {
+	d := getDecoder(false, false)
+	defer putDecoder(d)
+	doc := []byte("x = [1]")
+	d.p.Reset(doc)
+	d.fusedValueSpan = doc[4:7]
+	node := &unstable.Node{Kind: unstable.Array, Raw: d.p.Range(doc[4:7])}
+	assert.Equal(t, "[1]", string(d.rawValue(nil, node)))
+	d.fusedValueSpan = nil
+
+	// A non-key-value expression context takes the best-effort span.
+	arrExpr := &unstable.Node{Kind: unstable.Array}
+	assert.Equal(t, "[1]", string(d.rawValue(arrExpr, node)))
+}
+
+// TestMoreLineEndingAndHeaderEdges sweeps remaining line-ending and header
+// branches on both document loops.
+func TestMoreLineEndingAndHeaderEdges(t *testing.T) {
+	t.Run("crlf blank line, interface loop", func(t *testing.T) {
+		m := map[string]interface{}{}
+		d := NewDecoder(strings.NewReader("\r\na = 1\r\n"))
+		d.EnableUnmarshalerInterface()
+		assert.NoError(t, d.Decode(&m))
+		assert.Equal(t, interface{}(int64(1)), m["a"])
+	})
+
+	t.Run("invalid comment, fused generic loop", func(t *testing.T) {
+		m := map[string]interface{}{}
+		assert.Error(t, Unmarshal([]byte("# \x01\nx = 1"), &m))
+	})
+
+	t.Run("array table over scalar interface", func(t *testing.T) {
+		var s struct{ T interface{} }
+		s.T = "old"
+		assert.NoError(t, Unmarshal([]byte("[[t]]\nk = 1\n[[t]]\nk = 2"), &s))
+		arr, ok := s.T.([]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, 2, len(arr))
+	})
+}
+
+// TestTableThroughScalarInterface covers replacing a scalar held in an
+// interface when it is an intermediate step of a deeper table header.
+func TestTableThroughScalarInterface(t *testing.T) {
+	var s struct{ T interface{} }
+	s.T = "old scalar"
+	assert.NoError(t, Unmarshal([]byte("[t.sub]\nk = 1"), &s))
+	m := s.T.(map[string]interface{})
+	sub := m["sub"].(map[string]interface{})
+	assert.Equal(t, interface{}(int64(1)), sub["k"])
 }

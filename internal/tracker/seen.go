@@ -439,6 +439,15 @@ func (s *SeenTracker) CreateAnonymous(parent int32) int32 {
 	return s.create(parent, nil, anonymousKind, false)
 }
 
+// CheckValueUnder validates the content of a value node stored under the
+// given entry: inline tables cannot contain duplicate keys, including in the
+// inline tables and arrays they contain. The fused struct path uses it to
+// validate container values (which it still parses into the arena) against a
+// per-value tracker.
+func (s *SeenTracker) CheckValueUnder(parent int32, value *unstable.Node) error {
+	return s.checkValue(parent, value)
+}
+
 // CheckKeyValueUnder validates the (possibly dotted) key of a key-value under
 // the given parent entry, WITHOUT validating its value. It mirrors
 // checkKeyValue but is driven directly from the key parts, for callers that

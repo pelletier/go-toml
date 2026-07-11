@@ -39,6 +39,17 @@ func (t *KeyTracker) Pop(node *unstable.Node) {
 	}
 }
 
+// PushParts pushes already-decoded key parts on the stack, for callers that
+// track keys without an AST.
+func (t *KeyTracker) PushParts(parts [][]byte) {
+	t.k = append(t.k, parts...)
+}
+
+// PopN pops n parts from the stack.
+func (t *KeyTracker) PopN(n int) {
+	t.k = t.k[:len(t.k)-n]
+}
+
 // Key returns the current key.
 func (t *KeyTracker) Key() []string {
 	k := make([]string, len(t.k))
