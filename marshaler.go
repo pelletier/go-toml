@@ -351,10 +351,14 @@ type valueOptions struct {
 // zeroValueOptions is the shared options of entries that have no tags.
 var zeroValueOptions valueOptions
 
-// entry is a deferred key-value of a table being encoded.
+// entry is a deferred key-value of a table being encoded. Entries collected
+// from a generic map[string]interface{} carry the value as anyValue (with a
+// zero reflect.Value): the whole generic tree then encodes through concrete
+// type switches, without reflection.
 type entry struct {
-	key   string
-	value reflect.Value
+	key      string
+	value    reflect.Value
+	anyValue interface{}
 	// options points into the encoder plan (or at zeroValueOptions for map
 	// entries): entries are copied around, and the options are the widest
 	// part of them.
@@ -412,6 +416,39 @@ func (e *encoderState) classify(ent *entry) entryClass {
 	if ent.pf != nil && ent.pf.classKnown && !e.marshalerOn {
 		return ent.pf.staticClass
 	}
+	if ent.anyValue != nil {
+		switch v := ent.anyValue.(type) {
+		case map[string]interface{}:
+			return classTable
+		case []interface{}:
+			if len(v) == 0 {
+				return classKeyValue
+			}
+			for _, elem := range v {
+				if _, ok := elem.(map[string]interface{}); !ok {
+					// Mixed or exotic elements: decide like the reflection
+					// path would (resolving pointers and interfaces).
+					if e.isArrayOfTables(reflect.ValueOf(ent.anyValue)) {
+						return classArrayTable
+					}
+					return classKeyValue
+				}
+			}
+			return classArrayTable
+		case time.Time, LocalDate, LocalTime, LocalDateTime:
+			return classKeyValue
+		default:
+			// Not a generic container: classify through reflection.
+			v2 := reflect.ValueOf(ent.anyValue)
+			if e.isArrayOfTables(v2) {
+				return classArrayTable
+			}
+			if e.isTableLike(v2) {
+				return classTable
+			}
+			return classKeyValue
+		}
+	}
 	if e.isArrayOfTables(ent.value) {
 		return classArrayTable
 	}
@@ -434,6 +471,25 @@ func (e *encoderState) classOf(ent *entry) entryClass {
 func (e *encoderState) encodeRoot(v interface{}) error {
 	if v == nil {
 		return errors.New("toml: cannot encode a nil interface")
+	}
+
+	if m, ok := v.(map[string]interface{}); ok {
+		// Generic documents skip reflection entirely: their entries are
+		// collected natively and every value encodes by type switch.
+		entries := e.getEntries()
+		for key, value := range m {
+			if value == nil {
+				// nil interface values are skipped
+				continue
+			}
+			entries = append(entries, entry{key: key, anyValue: value, options: &zeroValueOptions})
+		}
+		if len(entries) > 1 {
+			slices.SortFunc(entries, func(a, b entry) int {
+				return strings.Compare(a.key, b.key)
+			})
+		}
+		return e.encodeTableEntries(entries, false, 0)
 	}
 
 	rv := reflect.ValueOf(v)
@@ -741,6 +797,16 @@ func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 			// entries early to route them by shape.
 			continue
 		}
+		if ent.anyValue != nil {
+			// Generic entries hold their value as an interface; only named
+			// types can implement Marshaler, so materialize a value to check.
+			ent.value = reflect.ValueOf(ent.anyValue)
+			if encPropsForType(ent.value.Type()).marshaler == 0 {
+				ent.value = reflect.Value{}
+				continue
+			}
+			ent.anyValue = nil
+		}
 		v, ok := resolve(ent.value)
 		if !ok || encPropsForType(v.Type()).marshaler == 0 {
 			continue
@@ -869,6 +935,12 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 		}
 		if ent.class == classKeyValue {
 			continue
+		}
+		if ent.anyValue != nil {
+			// Tables recurse through the reflection walk; their own entries
+			// are collected natively again at the next level.
+			ent.value = reflect.ValueOf(ent.anyValue)
+			ent.anyValue = nil
 		}
 		entCommented := commented || ent.options.commented
 		bare := ent.pf != nil && ent.pf.bareKey
@@ -1151,6 +1223,8 @@ func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) er
 		// the default path (rawShape stays shapeUnknown when the interface is
 		// off). It shares the commented/newline handling below.
 		e.buf, err = e.appendMarshalerInlineValue(e.buf, ent)
+	case ent.anyValue != nil:
+		e.buf, err = e.appendAnyValue(e.buf, ent.anyValue, *ent.options, valueIndent)
 	case ent.pf != nil && ent.pf.propsKnown:
 		// The plan already knows the field type's properties.
 		e.buf, err = e.appendValueProps(e.buf, ent.value, ent.pf.props, *ent.options, valueIndent)
@@ -1222,6 +1296,23 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 
 func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	entries := e.getEntries()
+
+	// Generic maps iterate natively: no per-entry reflect values at all.
+	if v.Type() == mapStringInterfaceType {
+		for key, value := range v.Interface().(map[string]interface{}) {
+			if value == nil {
+				// nil interface values are skipped
+				continue
+			}
+			entries = append(entries, entry{key: key, anyValue: value, options: &zeroValueOptions})
+		}
+		if len(entries) > 1 {
+			slices.SortFunc(entries, func(a, b entry) int {
+				return strings.Compare(a.key, b.key)
+			})
+		}
+		return entries, nil
+	}
 
 	// Keys are converted to strings right away: read them into a reusable
 	// buffer to avoid one allocation per key.
@@ -1677,6 +1768,87 @@ func isUnquotedKeyByte(c byte) bool {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
 }
 
+// appendAnyValue emits a TOML value held in an interface, dispatching on the
+// concrete types a generic document is made of without going through
+// reflection. Anything else falls back to the reflection encoder.
+func (e *encoderState) appendAnyValue(b []byte, v interface{}, opts valueOptions, indent int) ([]byte, error) {
+	if v == nil {
+		return nil, errors.New("toml: cannot encode a nil interface")
+	}
+	switch tv := v.(type) {
+	case string:
+		if opts.multiline && strings.IndexByte(tv, '\n') >= 0 {
+			return e.appendMultilineString(b, tv), nil
+		}
+		return e.appendString(b, tv), nil
+	case bool:
+		if tv {
+			return append(b, "true"...), nil
+		}
+		return append(b, "false"...), nil
+	case int64:
+		return strconv.AppendInt(b, tv, 10), nil
+	case int:
+		return strconv.AppendInt(b, int64(tv), 10), nil
+	case float64:
+		return appendFloat(b, tv, 64), nil
+	case time.Time:
+		return tv.AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
+	case LocalDate:
+		return append(b, tv.String()...), nil
+	case LocalTime:
+		return append(b, tv.String()...), nil
+	case LocalDateTime:
+		return append(b, tv.String()...), nil
+	case []interface{}:
+		return e.appendAnyArray(b, tv, opts, indent)
+	case map[string]interface{}:
+		return e.appendInlineTable(b, reflect.ValueOf(tv), indent)
+	default:
+		return e.appendValue(b, reflect.ValueOf(v), opts, indent)
+	}
+}
+
+// appendAnyArray is appendArray for a native []interface{}, with the exact
+// same layout decisions.
+func (e *encoderState) appendAnyArray(b []byte, v []interface{}, opts valueOptions, indent int) ([]byte, error) {
+	multiline := opts.multiline || e.arraysMultiline
+
+	b = append(b, '[')
+	if multiline && len(v) > 0 {
+		for i, elem := range v {
+			if i > 0 {
+				b = append(b, ',')
+			}
+			b = append(b, '\n')
+			for j := 0; j <= indent; j++ {
+				b = append(b, e.indentSymbol...)
+			}
+			var err error
+			b, err = e.appendAnyValue(b, elem, valueOptions{}, indent+1)
+			if err != nil {
+				return nil, err
+			}
+		}
+		b = append(b, '\n')
+		for j := 0; j < indent; j++ {
+			b = append(b, e.indentSymbol...)
+		}
+	} else {
+		for i, elem := range v {
+			if i > 0 {
+				b = append(b, ", "...)
+			}
+			var err error
+			b, err = e.appendAnyValue(b, elem, valueOptions{}, indent)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return append(b, ']'), nil
+}
+
 // appendValue emits a TOML value.
 func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
 	return e.appendValueProps(b, v, e.propsFor(v.Type()), opts, indent)
@@ -1882,7 +2054,11 @@ func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) 
 		// would break the single-line requirement.
 		opts := *ent.options
 		opts.multiline = false
-		b, err = e.appendValue(b, ent.value, opts, indent)
+		if ent.anyValue != nil {
+			b, err = e.appendAnyValue(b, ent.anyValue, opts, indent)
+		} else {
+			b, err = e.appendValue(b, ent.value, opts, indent)
+		}
 		if err != nil {
 			return nil, err
 		}
