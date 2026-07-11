@@ -756,6 +756,47 @@ func benchmarkEncodeRaw(b *testing.B, v interface{}) {
 	}
 }
 
+// TestMarshalerInterfaceOmitEmptySuperTables checks that the shape of
+// Marshaler entries is taken into account when deciding whether a table only
+// contains sub-tables and can lose its header.
+func TestMarshalerInterfaceOmitEmptySuperTables(t *testing.T) {
+	t.Run("table-shaped raw counts as a sub-table", func(t *testing.T) {
+		var v struct {
+			B struct {
+				C unstable.RawMessage `toml:"c"`
+			}
+		}
+		v.B.C = unstable.RawMessage("a = 1\nb = 2")
+
+		var buf bytes.Buffer
+		err := toml.NewEncoder(&buf).
+			EnableMarshalerInterface().
+			SetOmitEmptySuperTables(true).
+			Encode(v)
+		assert.NoError(t, err)
+		assert.Equal(t, "[B.c]\na = 1\nb = 2\n", buf.String())
+	})
+
+	t.Run("value-shaped raw keeps the super-table header", func(t *testing.T) {
+		var v struct {
+			B struct {
+				N unstable.RawMessage `toml:"n"`
+				C struct{ S string }
+			}
+		}
+		v.B.N = unstable.RawMessage("42")
+		v.B.C.S = "foo"
+
+		var buf bytes.Buffer
+		err := toml.NewEncoder(&buf).
+			EnableMarshalerInterface().
+			SetOmitEmptySuperTables(true).
+			Encode(v)
+		assert.NoError(t, err)
+		assert.Equal(t, "[B]\nn = 42\n\n[B.C]\nS = 'foo'\n", buf.String())
+	})
+}
+
 func ExampleEncoder_EnableMarshalerInterface() {
 	// A RawMessage captured (or hand-built) as raw TOML is spliced back into
 	// the document verbatim.
