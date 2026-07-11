@@ -934,6 +934,32 @@ func scanDateTime(b []byte) (Kind, []byte, []byte, []byte, error) {
 	return kind, tok, tok, b[i:], nil
 }
 
+// scanDecimalDigits is scanDigitsWithUnderscores specialized for decimal
+// digits, the overwhelmingly common case: it avoids the indirect isInRange
+// call on every byte.
+func scanDecimalDigits(b []byte, i int) (int, error) {
+	for i < len(b) {
+		c := b[i]
+		if c >= '0' && c <= '9' {
+			i++
+			continue
+		}
+		if c == '_' {
+			if i+1 >= len(b) || !isDigit(b[i+1]) {
+				end := i + 2
+				if end > len(b) {
+					end = len(b)
+				}
+				return 0, NewParserError(b[i:end], "number must have at least one digit between underscores")
+			}
+			i += 2
+			continue
+		}
+		break
+	}
+	return i, nil
+}
+
 // scanDigitsWithUnderscores scans a run of digits potentially separated by
 // underscores. b starts right after the first digit of the run. isInRange
 // selects the kind of digits. Returns the index after the run.
@@ -1032,7 +1058,7 @@ func scanIntOrFloat(b []byte) (Kind, []byte, []byte, []byte, error) {
 	digitsStart := i
 	i++
 	var err error
-	i, err = scanDigitsWithUnderscores(b, i, isDigit)
+	i, err = scanDecimalDigits(b, i)
 	if err != nil {
 		return Invalid, nil, nil, nil, err
 	}
@@ -1049,7 +1075,7 @@ func scanIntOrFloat(b []byte) (Kind, []byte, []byte, []byte, error) {
 			return Invalid, nil, nil, nil, NewParserError(highlight1(b[i:]), "decimal point must be followed by a digit")
 		}
 		i++
-		i, err = scanDigitsWithUnderscores(b, i, isDigit)
+		i, err = scanDecimalDigits(b, i)
 		if err != nil {
 			return Invalid, nil, nil, nil, err
 		}
@@ -1066,7 +1092,7 @@ func scanIntOrFloat(b []byte) (Kind, []byte, []byte, []byte, error) {
 			return Invalid, nil, nil, nil, NewParserError(highlight1(b[i:]), "exponent must contain at least one digit")
 		}
 		i++
-		i, err = scanDigitsWithUnderscores(b, i, isDigit)
+		i, err = scanDecimalDigits(b, i)
 		if err != nil {
 			return Invalid, nil, nil, nil, err
 		}
