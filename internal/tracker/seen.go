@@ -3,6 +3,7 @@ package tracker
 import (
 	"bytes"
 	"fmt"
+	"hash/maphash"
 
 	"github.com/pelletier/go-toml/v2/unstable"
 )
@@ -46,14 +47,32 @@ func (k keyKind) String() string {
 	panic("missing keyKind string mapping")
 }
 
+// spillThreshold is the number of children past which a parent's children are
+// moved from its sibling chain to the shared hash index. Chains keep small
+// and medium tables (the vast majority — including the ~40-key objects of
+// converted JSON documents) free of any hashing cost: their children are
+// created back to back, so walking the chain is a sequential scan. The index
+// only takes over for pathological tables, where it keeps lookups O(1).
+const spillThreshold = 64
+
 // entry represents a node that has been seen in the document. Its size has a
 // direct impact on the performance of unmarshaling documents: keep it as
 // small as possible.
 type entry struct {
-	parent   int32
-	kind     keyKind
-	explicit bool
-	name     []byte
+	name       []byte
+	parent     int32
+	firstChild int32  // head of the child chain, -1 when empty
+	next       int32  // next sibling in the parent's chain, -1 at the tail
+	childCount uint16 // saturating count of named children
+	kind       keyKind
+	explicit   bool
+}
+
+// spilled reports whether the children of an entry live in the hash index
+// instead of its sibling chain. Spilling happens exactly when the child count
+// crosses spillThreshold, so the count doubles as the flag.
+func (e *entry) spilled() bool {
+	return e.childCount > spillThreshold
 }
 
 // SeenTracker tracks which keys have been seen with which TOML type to flag
@@ -63,27 +82,32 @@ type entry struct {
 // an identifier, which is provided by a counter. Entries are stored in the
 // array entries. As new nodes are discovered (referenced for the first time
 // in the TOML document), entries are created and appended to the array. An
-// entry points to its parent using its id.
+// entry points to its parent using its id. The array is append-only: ids are
+// stable for the duration of a document.
 //
-// To find whether a given key (sequence of []byte) has already been visited,
-// the entries are linearly searched, looking for one with the right name and
-// parent id.
+// The named children of an entry are linked in a sibling chain, so looking a
+// key up costs at most the number of keys in its table. Parents whose child
+// count crosses spillThreshold have their children moved ("spilled") to a
+// shared open-addressing hash index keyed by (parent, name), which keeps
+// pathological tables with thousands of keys O(1) per lookup.
 //
-// Given that all keys appear in the document after their parent, it is
-// guaranteed that all descendants of a node are stored after the node, this
-// speeds up the search process.
-//
-// When encountering [[array tables]], the descendants of that node are removed
-// to allow that branch of the tree to be "rediscovered". To maintain the
-// invariant above, the deletion process needs to keep the order of entries.
-// This results in more copies in that case.
+// When encountering [[array tables]], the keys seen in the previous element
+// must not shadow the keys of the new element. Instead of deleting the
+// previous element's entries, the array table entry is replaced by a fresh
+// entry (with a fresh id): the previous descendants still exist but hang off
+// the old id, which no future lookup uses.
 type SeenTracker struct {
 	entries      []entry
 	currentTable int32
 
-	// scratch buffers for clear()
-	removedBuf []bool
-	remapBuf   []int32
+	// index is the open-addressing hash table of entry ids (stored as id+1,
+	// 0 meaning empty) for the children of spilled parents, keyed by
+	// hash(parent, name). Its size is always a power of two. inserted counts
+	// used slots for load-factor purposes.
+	index    []int32
+	inserted int
+	seed     maphash.Seed
+	seeded   bool
 }
 
 // Reset brings the tracker to its initial state, with just a root table, so
@@ -95,68 +119,198 @@ func (s *SeenTracker) Reset() {
 // reset brings the tracker to its initial state, with just a root table.
 func (s *SeenTracker) reset() {
 	s.entries = append(s.entries[:0], entry{
-		parent: -1,
-		kind:   tableKind,
+		parent:     -1,
+		firstChild: -1,
+		next:       -1,
+		kind:       tableKind,
 	})
 	s.currentTable = 0
+	if s.inserted > 0 {
+		clear(s.index)
+		s.inserted = 0
+	}
+}
+
+// hash computes the index hash of a (parent, name) pair. The seeded name hash
+// keeps probe sequences unpredictable for untrusted documents.
+func (s *SeenTracker) hash(parent int32, name []byte) uint64 {
+	h := maphash.Bytes(s.seed, name)
+	return h ^ uint64(uint32(parent))*0x9E3779B97F4A7C15 //nolint:gosec // ids are non-negative; the truncation only mixes bits
 }
 
 // find returns the id of the entry with the given parent and name, or -1.
-// Anonymous entries are never returned.
+// Anonymous entries are never returned (they are not linked nor indexed).
 func (s *SeenTracker) find(parent int32, name []byte) int32 {
-	// Children always appear after their parent.
-	for i := int(parent) + 1; i < len(s.entries); i++ {
-		e := &s.entries[i]
-		if e.parent == parent && e.kind != anonymousKind && bytes.Equal(e.name, name) {
-			return int32(i) //nolint:gosec // entry counts are bounded by document size
+	if len(s.entries) == 0 {
+		s.reset()
+	}
+	p := &s.entries[parent]
+	if p.spilled() {
+		return s.indexFind(parent, name)
+	}
+	for id := p.firstChild; id >= 0; id = s.entries[id].next {
+		if bytes.Equal(s.entries[id].name, name) {
+			return id
 		}
 	}
 	return -1
 }
 
-// create appends a new entry and returns its id.
+// create appends a new entry and returns its id. Anonymous entries cannot be
+// found; every other entry must not already exist under the same parent.
 func (s *SeenTracker) create(parent int32, name []byte, kind keyKind, explicit bool) int32 {
 	id := int32(len(s.entries)) //nolint:gosec // entry counts are bounded by document size
 	s.entries = append(s.entries, entry{
-		parent:   parent,
-		kind:     kind,
-		explicit: explicit,
-		name:     name,
+		parent:     parent,
+		firstChild: -1,
+		next:       -1,
+		name:       name,
+		kind:       kind,
+		explicit:   explicit,
 	})
+	if kind != anonymousKind {
+		s.link(parent, name, id)
+	}
 	return id
 }
 
-// clear removes all the descendants of the entry with the given id, keeping
-// the order of the remaining entries.
-func (s *SeenTracker) clear(id int32) {
-	// Compute which entries are removed. Given that children always appear
-	// after their parent, a single forward pass is enough.
-	if cap(s.removedBuf) < len(s.entries) {
-		s.removedBuf = make([]bool, len(s.entries))
-		s.remapBuf = make([]int32, len(s.entries))
+// link attaches a new named child to its parent: to the sibling chain for
+// regular parents, or to the hash index for spilled ones. Children are
+// prepended to the chain, so no tail pointer is needed.
+func (s *SeenTracker) link(parent int32, name []byte, id int32) {
+	p := &s.entries[parent]
+	if p.childCount < 0xFFFF {
+		p.childCount++
 	}
-	removed := s.removedBuf[:len(s.entries)]
-	remap := s.remapBuf[:len(s.entries)]
-	for i := range removed {
-		removed[i] = false
+	if p.spilled() {
+		if p.childCount == spillThreshold+1 {
+			// The parent just crossed the threshold: move its chain to the
+			// hash index. The chain links are left dangling; they are never
+			// read again.
+			s.spill(parent)
+		}
+		s.indexInsert(parent, name, id)
+		return
 	}
+	s.entries[id].next = p.firstChild
+	p.firstChild = id
+}
 
-	n := int32(0)
-	for i := 0; i < len(s.entries); i++ {
-		parent := s.entries[i].parent
-		if parent >= 0 && (parent == id && s.entries[i].kind != invalidKind || removed[parent]) {
-			removed[i] = true
+// spill moves the children of a parent from its sibling chain to the hash
+// index.
+func (s *SeenTracker) spill(parent int32) {
+	if !s.seeded {
+		s.seed = maphash.MakeSeed()
+		s.seeded = true
+	}
+	if s.index == nil {
+		s.index = make([]int32, 128)
+	}
+	p := &s.entries[parent]
+	for id := p.firstChild; id >= 0; id = s.entries[id].next {
+		s.indexInsert(parent, s.entries[id].name, id)
+	}
+}
+
+// indexFind probes the hash index for the child of a spilled parent.
+func (s *SeenTracker) indexFind(parent int32, name []byte) int32 {
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
+	for i := s.hash(parent, name) & mask; ; i = (i + 1) & mask {
+		v := s.index[i]
+		if v == 0 {
+			return -1
+		}
+		e := &s.entries[v-1]
+		if e.parent == parent && bytes.Equal(e.name, name) {
+			return v - 1
+		}
+	}
+}
+
+// indexInsert adds an id to the index under (parent, name), growing the table
+// when its load factor reaches 3/4.
+func (s *SeenTracker) indexInsert(parent int32, name []byte, id int32) {
+	if (s.inserted+1)*4 > len(s.index)*3 {
+		s.grow()
+	}
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
+	i := s.hash(parent, name) & mask
+	for s.index[i] != 0 {
+		i = (i + 1) & mask
+	}
+	s.index[i] = id + 1
+	s.inserted++
+}
+
+// indexReplace overwrites the index slot of (parent, name) with a new id. The
+// slot must exist.
+func (s *SeenTracker) indexReplace(parent int32, name []byte, id int32) {
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
+	for i := s.hash(parent, name) & mask; ; i = (i + 1) & mask {
+		v := s.index[i]
+		if v == 0 {
+			panic("toml: internal error: indexReplace on missing entry")
+		}
+		e := &s.entries[v-1]
+		if e.parent == parent && bytes.Equal(e.name, name) {
+			s.index[i] = id + 1
+			return
+		}
+	}
+}
+
+// grow doubles the index and rehashes every used slot.
+func (s *SeenTracker) grow() {
+	old := s.index
+	n := len(old) * 2
+	if n == 0 {
+		n = 128
+	}
+	s.index = make([]int32, n)
+	mask := uint64(len(s.index) - 1) //nolint:gosec // the index is never empty here, so len-1 >= 0
+	for _, v := range old {
+		if v == 0 {
 			continue
 		}
-		remap[i] = n
-		if int32(i) != n { //nolint:gosec // entry counts are bounded by document size
-			e := s.entries[i]
-			e.parent = remap[e.parent]
-			s.entries[n] = e
+		e := &s.entries[v-1]
+		i := s.hash(e.parent, e.name) & mask
+		for s.index[i] != 0 {
+			i = (i + 1) & mask
 		}
-		n++
+		s.index[i] = v
 	}
-	s.entries = s.entries[:n]
+}
+
+// refreshArrayTable replaces the array table entry id with a fresh entry (and
+// id), so that the descendants recorded by the previous element no longer
+// shadow the keys of the new element. Returns the new id.
+func (s *SeenTracker) refreshArrayTable(id int32) int32 {
+	old := s.entries[id]
+	nid := int32(len(s.entries)) //nolint:gosec // entry counts are bounded by document size
+	s.entries = append(s.entries, entry{
+		parent:     old.parent,
+		firstChild: -1,
+		next:       old.next,
+		name:       old.name,
+		kind:       arrayTableKind,
+		explicit:   true,
+	})
+	p := &s.entries[old.parent]
+	if p.spilled() {
+		s.indexReplace(old.parent, old.name, nid)
+		return nid
+	}
+	// Swap the id for nid in the parent's chain.
+	if p.firstChild == id {
+		p.firstChild = nid
+	} else {
+		prev := p.firstChild
+		for s.entries[prev].next != id {
+			prev = s.entries[prev].next
+		}
+		s.entries[prev].next = nid
+	}
+	return nid
 }
 
 // CheckExpression takes a top-level node and checks that it does not contain
@@ -249,8 +403,7 @@ func (s *SeenTracker) CheckArrayTable(parts [][]byte) (bool, error) {
 			}
 			// Make the descendants of this array table re-discoverable for
 			// the new element.
-			s.clear(i)
-			s.currentTable = i
+			s.currentTable = s.refreshArrayTable(i)
 			return false, nil
 		}
 
@@ -272,10 +425,34 @@ func (s *SeenTracker) CheckArrayTable(parts [][]byte) (bool, error) {
 }
 
 // CheckKeyValue validates the (possibly dotted) key of a key-value under the
-// current table, WITHOUT validating its value. It returns the id of the leaf
-// entry, so the caller can validate a container value with CheckValueUnder.
+// current table, WITHOUT validating its value: the keys declared inside a
+// container value are validated separately (see CheckKeyValueUnder and the
+// decoder's per-value replay). It returns the id of the leaf entry.
 func (s *SeenTracker) CheckKeyValue(parts [][]byte) (int32, error) {
-	parent := s.currentTable
+	return s.CheckKeyValueUnder(s.currentTable, parts)
+}
+
+// CreateAnonymous creates an anonymous entry under parent and returns its id.
+// It gives each inline table stored in an array its own key scope, so that
+// identical keys in sibling tables do not collide.
+func (s *SeenTracker) CreateAnonymous(parent int32) int32 {
+	return s.create(parent, nil, anonymousKind, false)
+}
+
+// CheckValueUnder validates the content of a value node stored under the
+// given entry: inline tables cannot contain duplicate keys, including in the
+// inline tables and arrays they contain. The fused struct path uses it to
+// validate container values (which it still parses into the arena) against a
+// per-value tracker.
+func (s *SeenTracker) CheckValueUnder(parent int32, value *unstable.Node) error {
+	return s.checkValue(parent, value)
+}
+
+// CheckKeyValueUnder validates the (possibly dotted) key of a key-value under
+// the given parent entry, WITHOUT validating its value. It mirrors
+// checkKeyValue but is driven directly from the key parts, for callers that
+// decode without building an AST.
+func (s *SeenTracker) CheckKeyValueUnder(parent int32, parts [][]byte) (int32, error) {
 	for k := 0; k < len(parts); k++ {
 		name := parts[k]
 		if k == len(parts)-1 {
@@ -294,14 +471,6 @@ func (s *SeenTracker) CheckKeyValue(parts [][]byte) (int32, error) {
 		parent = i
 	}
 	panic("unreachable: key-value expression without key")
-}
-
-// CheckValueUnder validates the content of a value stored under the given
-// entry (typically the leaf returned by CheckKeyValue): inline tables cannot
-// contain duplicate keys, including in the inline tables and arrays they
-// contain.
-func (s *SeenTracker) CheckValueUnder(parent int32, value *unstable.Node) error {
-	return s.checkValue(parent, value)
 }
 
 func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
@@ -374,10 +543,7 @@ func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
 			}
 			// Make the descendants of this array table re-discoverable for
 			// the new element.
-			s.clear(i)
-			// Note: clear cannot move i because i comes before all its
-			// descendants.
-			s.currentTable = i
+			s.currentTable = s.refreshArrayTable(i)
 			return false, nil
 		}
 
@@ -437,9 +603,19 @@ func (s *SeenTracker) checkValue(id int32, value *unstable.Node) error {
 		it := value.Children()
 		for it.Next() {
 			elem := it.Node()
-			if elem.Kind == unstable.InlineTable || elem.Kind == unstable.Array {
+			switch elem.Kind { //nolint:exhaustive // scalar elements declare no keys
+			case unstable.InlineTable:
+				// Each inline table is its own key scope: it needs a fresh
+				// anonymous parent so that identical keys in sibling tables
+				// do not collide.
 				elemID := s.create(id, nil, anonymousKind, false)
 				if err := s.checkValue(elemID, elem); err != nil {
+					return err
+				}
+			case unstable.Array:
+				// Arrays declare no keys themselves: pass through without
+				// creating an entry.
+				if err := s.checkValue(id, elem); err != nil {
 					return err
 				}
 			}

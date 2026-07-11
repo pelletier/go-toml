@@ -25,7 +25,7 @@ type decodeError struct {
 // Reset clears the state of the tracker so it can be reused for another
 // document.
 func (s *strict) Reset() {
-	s.key = tracker.KeyTracker{}
+	s.key.Reset()
 	s.missing = s.missing[:0]
 }
 
@@ -64,6 +64,21 @@ func (s *strict) MissingField(node *unstable.Node) {
 		message:   "unknown field",
 	})
 	s.key.Pop(node)
+}
+
+// MissingFieldParts is MissingField for callers that decode without an AST:
+// rng is the location of the whole (dotted) key and parts its decoded parts.
+func (s *strict) MissingFieldParts(rng unstable.Range, parts [][]byte) {
+	if !s.Enabled {
+		return
+	}
+	s.key.PushParts(parts)
+	s.missing = append(s.missing, decodeError{
+		highlight: rng,
+		key:       s.key.Key(),
+		message:   "unknown field",
+	})
+	s.key.PopN(len(parts))
 }
 
 // Error returns the cumulated StrictMissingError for the document, or nil.
