@@ -298,6 +298,37 @@ type encoderState struct {
 	// the per-value hot path checks a direct field instead of dereferencing the
 	// embedded *Encoder on every value.
 	marshalerOn bool
+
+	// propsMemo is a small MRU memo of encPropsForType lookups: the values
+	// of a document hit the same few named types over and over, and the
+	// global cache lookup costs an interface hash every time.
+	propsMemo [16]struct {
+		t reflect.Type
+		p typeEncProps
+	}
+}
+
+// propsFor returns the encoding properties of t, memoizing recent lookups of
+// the types the builtin fast path of encPropsForType does not cover.
+func (e *encoderState) propsFor(t reflect.Type) typeEncProps {
+	if p, ok := builtinEncProps(t); ok {
+		return p
+	}
+	if e.propsMemo[0].t == t {
+		return e.propsMemo[0].p
+	}
+	for i := 1; i < len(e.propsMemo); i++ {
+		if e.propsMemo[i].t == t {
+			m := e.propsMemo[i]
+			copy(e.propsMemo[1:i+1], e.propsMemo[:i])
+			e.propsMemo[0] = m
+			return m.p
+		}
+	}
+	p := encPropsForType(t)
+	copy(e.propsMemo[1:], e.propsMemo[:len(e.propsMemo)-1])
+	e.propsMemo[0].t, e.propsMemo[0].p = t, p
+	return p
 }
 
 // valueOptions are the encoding options attached to one entry of a table.
@@ -469,7 +500,48 @@ var marshalerType = reflect.TypeOf(new(unstable.Marshaler)).Elem()
 
 var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
 
+// builtinEncProps resolves the encoding properties of the handful of builtin
+// types that make up generic documents (map[string]interface{} trees), none
+// of which can implement TextMarshaler, with a kind dispatch and one pointer
+// comparison instead of a cache lookup.
+func builtinEncProps(t reflect.Type) (typeEncProps, bool) {
+	switch t.Kind() { //nolint:exhaustive // other kinds take the cached path
+	case reflect.String:
+		if t == stringType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Bool:
+		if t == boolType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Int:
+		if t == intType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Int64:
+		if t == int64Type {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Float64:
+		if t == float64Type {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Slice:
+		if t == sliceInterfaceType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Map:
+		if t == mapStringInterfaceType {
+			return typeEncProps{isValue: false}, true
+		}
+	}
+	return typeEncProps{}, false
+}
+
 func encPropsForType(t reflect.Type) typeEncProps {
+	if p, ok := builtinEncProps(t); ok {
+		return p
+	}
 	if p, ok := typeEncPropsCache.Load(t); ok {
 		return p.(typeEncProps)
 	}
@@ -520,7 +592,7 @@ func (e *encoderState) isTableLike(v reflect.Value) bool {
 		// the zero value of their element type by the value path.
 		return false
 	}
-	return !isValueKind(v)
+	return !e.propsFor(v.Type()).isValue
 }
 
 // isArrayOfTables returns true when the value is a non-empty slice or array
@@ -543,7 +615,7 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 	}
 	for i := 0; i < v.Len(); i++ {
 		elem, ok := resolve(v.Index(i))
-		if !ok || isValueKind(elem) {
+		if !ok || e.propsFor(elem.Type()).isValue {
 			return false
 		}
 	}
@@ -1482,20 +1554,31 @@ func isUnquotedKeyByte(c byte) bool {
 
 // appendValue emits a TOML value.
 func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
+	return e.appendValueProps(b, v, e.propsFor(v.Type()), opts, indent)
+}
+
+// appendValueProps is appendValue for callers that already know the type
+// properties.
+func (e *encoderState) appendValueProps(b []byte, v reflect.Value, props typeEncProps, opts valueOptions, indent int) ([]byte, error) {
 	t := v.Type()
 
-	// Special types take precedence over their kind.
-	switch t {
-	case timeType:
-		return v.Interface().(time.Time).AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
-	case localDateType:
-		return append(b, v.Interface().(LocalDate).String()...), nil
-	case localTimeType:
-		return append(b, v.Interface().(LocalTime).String()...), nil
-	case localDateTimeType:
-		return append(b, v.Interface().(LocalDateTime).String()...), nil
-	case jsonNumberType:
-		if e.marshalJSONNumbers {
+	// Special types take precedence over their kind. All of them are structs
+	// except json.Number: dispatching on the kind first keeps the common
+	// scalars away from the interface comparisons.
+	switch v.Kind() { //nolint:exhaustive // only these kinds have special types
+	case reflect.Struct:
+		switch t {
+		case timeType:
+			return v.Interface().(time.Time).AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
+		case localDateType:
+			return append(b, v.Interface().(LocalDate).String()...), nil
+		case localTimeType:
+			return append(b, v.Interface().(LocalTime).String()...), nil
+		case localDateTimeType:
+			return append(b, v.Interface().(LocalDateTime).String()...), nil
+		}
+	case reflect.String:
+		if e.marshalJSONNumbers && t == jsonNumberType {
 			return appendJSONNumber(b, v.Interface().(json.Number))
 		}
 	}
@@ -1510,7 +1593,7 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 		}
 	}
 
-	switch encPropsForType(t).text {
+	switch props.text {
 	case 1:
 		if t.Kind() != reflect.String {
 			return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
