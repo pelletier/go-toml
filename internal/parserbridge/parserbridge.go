@@ -30,8 +30,18 @@ var (
 	// needs no parser state.
 	ScanComment func(b []byte) (comment, rest []byte, err error)
 
+	// ScanKeyRaws is ScanKey, additionally collecting the raw span of each
+	// part (undecoded, quotes included) into raws.
+	ScanKeyRaws func(p any, b []byte, dst, raws [][]byte) (parts, rawsOut [][]byte, raw, rest []byte, err error)
+
 	// ParseValue parses a single value (including arrays and inline tables) into
 	// the parser arena, returning the root *unstable.Node and the rest of the
 	// input.
 	ParseValue func(p any, b []byte) (node any, rest []byte, err error)
+
+	// SetCursor repositions the parser's expression cursor, so that a caller
+	// scanning the document itself can delegate the next expression to
+	// Parser.NextExpression. Cursor reads it back.
+	SetCursor func(p any, rest []byte)
+	Cursor    func(p any) []byte
 )
