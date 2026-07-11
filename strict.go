@@ -25,7 +25,7 @@ type decodeError struct {
 // Reset clears the state of the tracker so it can be reused for another
 // document.
 func (s *strict) Reset() {
-	s.key = tracker.KeyTracker{}
+	s.key.Reset()
 	s.missing = s.missing[:0]
 }
 

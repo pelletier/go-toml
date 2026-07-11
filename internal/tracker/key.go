@@ -3,21 +3,23 @@ package tracker
 import "github.com/pelletier/go-toml/v2/unstable"
 
 // KeyTracker is a tracker that keeps track of the current Key as the AST is
-// walked.
+// walked. It holds the raw bytes of each part (valid for the lifetime of the
+// document being parsed) and only materializes strings when Key is called,
+// so tracking is allocation-free for documents that produce no error.
 type KeyTracker struct {
-	k []string
+	k [][]byte
 }
 
 // UpdateTable sets the state of the tracker with the AST table node.
 func (t *KeyTracker) UpdateTable(node *unstable.Node) {
-	t.reset()
+	t.Reset()
 	t.Push(node)
 }
 
 // UpdateArrayTable sets the state of the tracker with the AST array table
 // node.
 func (t *KeyTracker) UpdateArrayTable(node *unstable.Node) {
-	t.reset()
+	t.Reset()
 	t.Push(node)
 }
 
@@ -25,7 +27,7 @@ func (t *KeyTracker) UpdateArrayTable(node *unstable.Node) {
 func (t *KeyTracker) Push(node *unstable.Node) {
 	it := node.Key()
 	for it.Next() {
-		t.k = append(t.k, string(it.Node().Data))
+		t.k = append(t.k, it.Node().Data)
 	}
 }
 
@@ -40,10 +42,13 @@ func (t *KeyTracker) Pop(node *unstable.Node) {
 // Key returns the current key.
 func (t *KeyTracker) Key() []string {
 	k := make([]string, len(t.k))
-	copy(k, t.k)
+	for i, b := range t.k {
+		k[i] = string(b)
+	}
 	return k
 }
 
-func (t *KeyTracker) reset() {
+// Reset empties the tracker, keeping the allocated stack for reuse.
+func (t *KeyTracker) Reset() {
 	t.k = t.k[:0]
 }
