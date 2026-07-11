@@ -62,6 +62,11 @@ func (d *decoder) reset() {
 	d.tableFlush = d.tableFlush[:0]
 	d.tableParentSlot = slotWriter{}
 	d.keyParts = d.keyParts[:0]
+	d.fusedParts = d.fusedParts[:0]
+	d.fusedOps = d.fusedOps[:0]
+	d.idStack = d.idStack[:0]
+	// A decode aborted by an error may leave the count non-zero.
+	d.fusedNesting = 0
 	d.strict.Reset()
 }
 
@@ -287,6 +292,35 @@ type decoder struct {
 	// keyParts is the reusable buffer holding the decoded parts of the key of
 	// the current expression in the fused generic decode path.
 	keyParts [][]byte
+
+	// Scratch buffers of the fused generic decode path for container values:
+	// anyStack accumulates array elements (and kvStack inline-table pairs)
+	// before the exact-size copy-out; fusedParts and fusedOps record the keys
+	// seen inside a container value so they can be validated by the
+	// seen-tracker after the whole expression has parsed (preserving error
+	// precedence); idStack is the scope stack used during that replay.
+	anyStack   []interface{}
+	kvStack    []fusedKV
+	fusedParts [][]byte
+	fusedOps   []fusedOp
+	idStack    []int32
+
+	// fusedNesting is the current depth of nested containers being decoded
+	// natively, bounded by maxFusedNesting (see fusedContainerValue).
+	fusedNesting int
+
+	// valSeen validates the keys declared inside a single container value,
+	// which no later expression can reach: keeping them out of d.seen means
+	// the main tracker only ever holds reachable keys. Reset (cheaply) for
+	// every container value.
+	valSeen tracker.SeenTracker
+}
+
+// fusedKV is a deferred key-value of an inline table being decoded natively:
+// the parts d.fusedParts[lo:hi] of its key, and its decoded value.
+type fusedKV struct {
+	v      interface{}
+	lo, hi int32
 }
 
 // slotWriter remembers how to store a value at some location of the target
