@@ -236,6 +236,43 @@ func TestMarshalerInterfaceErrorPropagation(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, strings.Contains(err.Error(), "marshal boom"), err.Error())
 	})
+
+	t.Run("nested table position", func(t *testing.T) {
+		type inner struct {
+			X errMarshaler `toml:"x"`
+		}
+		type config struct {
+			A inner `toml:"a"`
+		}
+		_, err := encodeRaw(t, config{})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "marshal boom"), err.Error())
+	})
+
+	t.Run("nested table position with omitted super-tables", func(t *testing.T) {
+		type inner struct {
+			X errMarshaler `toml:"x"`
+		}
+		type config struct {
+			A inner `toml:"a"`
+		}
+		var buf bytes.Buffer
+		err := toml.NewEncoder(&buf).
+			EnableMarshalerInterface().
+			SetOmitEmptySuperTables(true).
+			Encode(config{})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "marshal boom"), err.Error())
+	})
+
+	t.Run("bad map key under a table", func(t *testing.T) {
+		type config struct {
+			A map[bool]int `toml:"a"`
+		}
+		_, err := encodeRaw(t, config{A: map[bool]int{true: 1}})
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "map with key type"), err.Error())
+	})
 }
 
 // TestMarshalerInterfaceArrayOfTablesPointerReceiver exercises a slice of a
@@ -250,6 +287,70 @@ func TestMarshalerInterfaceArrayOfTablesPointerReceiver(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 	assert.Equal(t, "[[item]]\na = 1\n\n[[item]]\na = 2\n", out)
+}
+
+// TestMarshalerInterfacePlainArrayOfTables marshals an array of plain
+// (non-Marshaler) tables with the interface enabled: the elements go through
+// the regular structural encoding.
+func TestMarshalerInterfacePlainArrayOfTables(t *testing.T) {
+	type item struct {
+		V int64 `toml:"v"`
+	}
+	type config struct {
+		Item []item `toml:"item"`
+	}
+	out, err := encodeRaw(t, config{Item: []item{{V: 1}, {V: 2}}})
+	assert.NoError(t, err)
+	assert.Equal(t, "[[item]]\nv = 1\n\n[[item]]\nv = 2\n", out)
+}
+
+// TestMarshalerInterfacePlainArrayOfTablesError propagates an encoding error
+// out of a plain (non-Marshaler) element of an array of tables while the
+// interface is enabled.
+func TestMarshalerInterfacePlainArrayOfTablesError(t *testing.T) {
+	type item struct {
+		C chan int `toml:"c"`
+	}
+	type config struct {
+		Item []item `toml:"item"`
+	}
+	_, err := encodeRaw(t, config{Item: []item{{C: make(chan int)}}})
+	assert.Error(t, err)
+}
+
+// budgetMarshaler succeeds for a fixed number of calls, then errors. Unlike
+// flakyMarshaler (which fails on its second call), the budget can be set to
+// survive every classification pass and fail only on the final emit call.
+type budgetMarshaler struct {
+	calls  *int
+	body   string
+	budget int
+}
+
+func (m budgetMarshaler) MarshalTOML() ([]byte, error) {
+	*m.calls++
+	if *m.calls > m.budget {
+		return nil, errors.New("budget boom")
+	}
+	return []byte(m.body), nil
+}
+
+// TestMarshalerInterfaceArrayOfTablesEmitError exercises the emit-time
+// MarshalTOML error inside an array of tables: classification succeeds, the
+// call producing the spliced bytes fails.
+func TestMarshalerInterfaceArrayOfTablesEmitError(t *testing.T) {
+	calls := 0
+	type config struct {
+		Item []budgetMarshaler `toml:"item"`
+	}
+	// The encoder classifies the slice as an array of tables before emitting:
+	// the budget covers the classification calls so the failure lands on the
+	// emit call inside the array-table writer.
+	_, err := encodeRaw(t, config{Item: []budgetMarshaler{
+		{calls: &calls, body: "a = 1\n", budget: 3},
+	}})
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "budget boom"), err.Error())
 }
 
 // TestMarshalerInterfaceCommentedMultilineValue checks a commented multiline
@@ -612,6 +713,18 @@ func TestMarshalerInterfaceNonDeterministic(t *testing.T) {
 		_, err := encodeRaw(t, config{X: shiftyMarshaler{calls: &calls, bodies: []string{"42", "a = 1\n"}}})
 		assert.Error(t, err)
 		assert.True(t, strings.Contains(err.Error(), "inline value"), err.Error())
+	})
+
+	t.Run("table then empty", func(t *testing.T) {
+		calls := 0
+		type config struct {
+			X shiftyMarshaler `toml:"x"`
+		}
+		// Classified as a table body, but the emit call returns nothing:
+		// empty content is valid TOML, so the header stands alone.
+		out, err := encodeRaw(t, config{X: shiftyMarshaler{calls: &calls, bodies: []string{"a = 1\n", ""}}})
+		assert.NoError(t, err)
+		assert.Equal(t, "[x]\n", out)
 	})
 }
 
