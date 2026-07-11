@@ -276,8 +276,10 @@ type encoderState struct {
 	buf []byte
 
 	// keyStack is the dotted key of the table being encoded, shared by the
-	// whole encode as a stack.
-	keyStack []string
+	// whole encode as a stack. Each part carries whether it can be emitted
+	// bare, computed once at push: nested table headers re-emit every parent
+	// part.
+	keyStack []keyStackPart
 
 	// entriesPool recycles entry slices across tables of the same encode.
 	entriesPool [][]entry
@@ -338,21 +340,29 @@ type valueOptions struct {
 	omitempty bool
 	omitzero  bool
 	commented bool
-	// rawShape is the unstable.Marshaler classification of the entry's value,
-	// resolved at encode time (not from tags). It lives here, in the byte of
-	// padding the booleans already leave, so that entry does not grow and the
-	// encoder's default (interface-disabled) path keeps its exact layout and
-	// performance. It stays shapeUnknown for everything that is not a Marshaler.
-	rawShape rawShape
-	comment  string
+	comment   string
 }
+
+// zeroValueOptions is the shared options of entries that have no tags.
+var zeroValueOptions valueOptions
 
 // entry is a deferred key-value of a table being encoded.
 type entry struct {
-	key     string
-	value   reflect.Value
-	options valueOptions
+	key   string
+	value reflect.Value
+	// options points into the encoder plan (or at zeroValueOptions for map
+	// entries): entries are copied around, and the options are the widest
+	// part of them.
+	options *valueOptions
 	class   entryClass
+	// rawShape is the unstable.Marshaler classification of the entry's value,
+	// resolved at encode time (not from tags). It lives on the entry — not on
+	// the shared, read-only options — and stays shapeUnknown for everything
+	// that is not a Marshaler.
+	rawShape rawShape
+	// pf points to the plan field the entry came from, carrying its
+	// statically-known facts; nil for map entries.
+	pf *encPlanField
 }
 
 // rawShape classifies the bytes produced by an unstable.Marshaler.
@@ -390,6 +400,12 @@ const (
 func (e *encoderState) classify(ent *entry) entryClass {
 	if e.tablesInline || ent.options.inline {
 		return classKeyValue
+	}
+	// The static class is computed for the default mode: the Marshaler
+	// interface can turn a slice field into an array of tables (or a value)
+	// depending on runtime content, so it re-classifies dynamically.
+	if ent.pf != nil && ent.pf.classKnown && !e.marshalerOn {
+		return ent.pf.staticClass
 	}
 	if e.isArrayOfTables(ent.value) {
 		return classArrayTable
@@ -715,7 +731,7 @@ func (e *encoderState) classifyRaw(b []byte) (rawShape, []byte) {
 func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 	for i := range entries {
 		ent := &entries[i]
-		if ent.options.rawShape != shapeUnknown {
+		if ent.rawShape != shapeUnknown {
 			// Already classified: SetOmitEmptySuperTables resolves the
 			// entries early to route them by shape.
 			continue
@@ -728,13 +744,13 @@ func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 		if err != nil {
 			return err
 		}
-		ent.options.rawShape, _ = e.classifyRaw(raw)
+		ent.rawShape, _ = e.classifyRaw(raw)
 	}
 	return nil
 }
 
 // marshalerValue returns the trimmed bytes to splice for an entry already known
-// to be an unstable.Marshaler (ent.options.rawShape != shapeUnknown).
+// to be an unstable.Marshaler (ent.rawShape != shapeUnknown).
 func (e *encoderState) marshalerValue(ent *entry) ([]byte, error) {
 	v, _ := resolve(ent.value)
 	raw, err := e.marshalerBytes(v)
@@ -796,15 +812,15 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 	// pass.
 	for i := range entries {
 		ent := &entries[i]
-		if mOn && ent.options.rawShape != shapeUnknown {
-			switch ent.options.rawShape { //nolint:exhaustive // shapeUnknown is excluded by the guard
+		if mOn && ent.rawShape != shapeUnknown {
+			switch ent.rawShape { //nolint:exhaustive // shapeUnknown is excluded by the guard
 			case shapeEmpty:
 				// No TOML representation: omit the key (the key-value class
 				// keeps the second pass away from it too).
 				ent.class = classKeyValue
 			case shapeValue:
 				ent.class = classKeyValue
-				if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
+				if err := e.encodeKeyValue(ent, commented, indent); err != nil {
 					return err
 				}
 			case shapeTable:
@@ -814,7 +830,7 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 				// encodeKeyValue.
 				ent.class = classTable
 				if e.tablesInline || ent.options.inline {
-					if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
+					if err := e.encodeKeyValue(ent, commented, indent); err != nil {
 						return err
 					}
 				}
@@ -824,7 +840,7 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 		if e.classOf(ent) != classKeyValue {
 			continue
 		}
-		if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
+		if err := e.encodeKeyValue(ent, commented, indent); err != nil {
 			return err
 		}
 	}
@@ -834,12 +850,12 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 	// class routes it without resolving any type again.
 	for i := range entries {
 		ent := entries[i]
-		if mOn && ent.options.rawShape == shapeTable {
+		if mOn && ent.rawShape == shapeTable {
 			// Emit the raw body verbatim under the freshly pushed header.
 			// (The forced-inline case already errored in the first pass;
 			// value- and empty-shaped entries carry the key-value class.)
 			entCommented := commented || ent.options.commented
-			e.keyStack = append(e.keyStack, ent.key)
+			e.keyStack = append(e.keyStack, keyStackPart{s: ent.key, bare: isBareKey(ent.key)})
 			if err := e.encodeMarshalerTable(&ent, entCommented, indent); err != nil {
 				return err
 			}
@@ -850,10 +866,14 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 			continue
 		}
 		entCommented := commented || ent.options.commented
-		e.keyStack = append(e.keyStack, ent.key)
+		bare := ent.pf != nil && ent.pf.bareKey
+		if !bare {
+			bare = isBareKey(ent.key)
+		}
+		e.keyStack = append(e.keyStack, keyStackPart{s: ent.key, bare: bare})
 
 		if ent.class == classArrayTable {
-			err := e.encodeArrayTable(ent, entCommented, indent)
+			err := e.encodeArrayTable(&ent, entCommented, indent)
 			if err != nil {
 				return err
 			}
@@ -914,10 +934,10 @@ func (e *encoderState) onlySubTables(entries []entry) bool {
 	}
 	for i := range entries {
 		ent := &entries[i]
-		if ent.options.rawShape != shapeUnknown {
+		if ent.rawShape != shapeUnknown {
 			// Classified unstable.Marshaler entry: only a table-shaped one
 			// that is not forced inline is guaranteed to emit a header.
-			if ent.options.rawShape != shapeTable || e.tablesInline || ent.options.inline {
+			if ent.rawShape != shapeTable || e.tablesInline || ent.options.inline {
 				return false
 			}
 			continue
@@ -983,7 +1003,7 @@ func (e *encoderState) putEntries(s []entry) {
 }
 
 // encodeArrayTable writes all the elements of an array of tables.
-func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeArrayTable(ent *entry, commented bool, indent int) error {
 	v, _ := resolve(ent.value)
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
@@ -1018,6 +1038,13 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 	return nil
 }
 
+// keyStackPart is one part of the current table key, with its quoting need
+// precomputed.
+type keyStackPart struct {
+	s    string
+	bare bool
+}
+
 // writeTableHeader emits a [table] or [[array table]] header line, preceded
 // by an empty line and comments as needed.
 func (e *encoderState) writeTableHeader(comment string, commented bool, array bool, indent int) {
@@ -1045,7 +1072,11 @@ func (e *encoderState) writeTableHeader(comment string, commented bool, array bo
 		if i > 0 {
 			e.buf = append(e.buf, '.')
 		}
-		e.buf = e.appendKey(e.buf, part)
+		if part.bare {
+			e.buf = append(e.buf, part.s...)
+		} else {
+			e.buf = e.appendString(e.buf, part.s)
+		}
 	}
 	e.buf = append(e.buf, ']')
 	if array {
@@ -1078,7 +1109,7 @@ func (e *encoderState) writeComment(comment string, indent int) {
 }
 
 // encodeKeyValue writes one `key = value` line of a table.
-func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) error {
 	commented = commented || ent.options.commented
 
 	e.writeComment(ent.options.comment, indent)
@@ -1091,7 +1122,11 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 		e.buf = append(e.buf, "# "...)
 	}
 	e.writeIndent(indent)
-	e.buf = e.appendKey(e.buf, ent.key)
+	if ent.pf != nil && ent.pf.bareKey {
+		e.buf = append(e.buf, ent.key...)
+	} else {
+		e.buf = e.appendKey(e.buf, ent.key)
+	}
 	e.buf = append(e.buf, " = "...)
 
 	// When tables are not indented, the key is emitted at column zero
@@ -1104,14 +1139,18 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 		valueIndent = 0
 	}
 
-	// A Marshaler value is delegated, keeping this hot function lean for the
-	// default path (rawShape stays shapeUnknown when the interface is off). It
-	// shares the commented/newline handling below.
 	var err error
-	if ent.options.rawShape != shapeUnknown {
-		e.buf, err = e.appendMarshalerInlineValue(e.buf, &ent)
-	} else {
-		e.buf, err = e.appendValue(e.buf, ent.value, ent.options, valueIndent)
+	switch {
+	case ent.rawShape != shapeUnknown:
+		// A Marshaler value is delegated, keeping this hot function lean for
+		// the default path (rawShape stays shapeUnknown when the interface is
+		// off). It shares the commented/newline handling below.
+		e.buf, err = e.appendMarshalerInlineValue(e.buf, ent)
+	case ent.pf != nil && ent.pf.propsKnown:
+		// The plan already knows the field type's properties.
+		e.buf, err = e.appendValueProps(e.buf, ent.value, ent.pf.props, *ent.options, valueIndent)
+	default:
+		e.buf, err = e.appendValue(e.buf, ent.value, *ent.options, valueIndent)
 	}
 	if err != nil {
 		return err
@@ -1144,7 +1183,7 @@ func (e *encoderState) appendMarshalerInlineValue(b []byte, ent *entry) ([]byte,
 	errNotValue := func() error {
 		return fmt.Errorf("toml: cannot encode %s as an inline value: not a single TOML value", ent.value.Type())
 	}
-	if ent.options.rawShape != shapeValue {
+	if ent.rawShape != shapeValue {
 		return nil, errNotValue()
 	}
 	raw, err := e.marshalerValue(ent)
@@ -1207,7 +1246,7 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 			// nil pointers in maps are encoded as their zero value
 			value = reflect.New(value.Type().Elem()).Elem()
 		}
-		entries = append(entries, entry{key: key, value: value})
+		entries = append(entries, entry{key: key, value: value, options: &zeroValueOptions})
 	}
 
 	if len(entries) > 1 {
@@ -1263,6 +1302,50 @@ type encPlanField struct {
 	index   []int
 	depth   int
 	options valueOptions
+
+	// Statically-known facts about the field, so that encoding does not
+	// re-derive them per value: whether the name needs quoting, and — when
+	// the field type fully determines them — the entry class and the
+	// encoding properties.
+	bareKey     bool
+	staticClass entryClass
+	classKnown  bool
+	props       typeEncProps
+	propsKnown  bool
+}
+
+// staticFieldFacts computes the compile-time part of encPlanField from the
+// field type. The class (key-value vs table vs array of tables) is knowable
+// unless it depends on the value: interfaces and pointers resolve
+// dynamically, and slices of table-like elements switch on emptiness.
+func staticFieldFacts(f *encPlanField, t reflect.Type) {
+	if t.Kind() == reflect.Ptr || t.Kind() == reflect.Interface {
+		return
+	}
+	f.props = encPropsForType(t)
+	f.propsKnown = true
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		et := t.Elem()
+		for et.Kind() == reflect.Ptr {
+			et = et.Elem()
+		}
+		if et.Kind() == reflect.Interface {
+			return
+		}
+		if encPropsForType(et).isValue {
+			// Elements are values: never an array of tables.
+			f.staticClass = classKeyValue
+			f.classKnown = true
+		}
+	default:
+		if f.props.isValue {
+			f.staticClass = classKeyValue
+		} else {
+			f.staticClass = classTable
+		}
+		f.classKnown = true
+	}
 }
 
 // encPlan caches the per-type information needed to encode a struct:
@@ -1357,12 +1440,15 @@ func buildEncPlan(plan *encPlan, t reflect.Type, prefix []int, depth int, visite
 			continue
 		}
 
-		plan.fields = append(plan.fields, encPlanField{
+		pf := encPlanField{
 			name:    name,
 			index:   index,
 			depth:   depth,
 			options: opts,
-		})
+			bareKey: isBareKey(name),
+		}
+		staticFieldFacts(&pf, f.Type)
+		plan.fields = append(plan.fields, pf)
 	}
 }
 
@@ -1428,13 +1514,17 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) {
 			continue
 		}
 
-		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options})
+		*entries = append(*entries, entry{key: f.name, value: fv, options: &f.options, pf: f})
 	}
 }
 
 // fieldByIndexSkipNil returns the field at the given index path, reporting
 // false if a nil embedded pointer is found on the way.
 func fieldByIndexSkipNil(v reflect.Value, index []int) (reflect.Value, bool) {
+	if len(index) == 1 {
+		// Non-embedded fields, the common case.
+		return v.Field(index[0]), true
+	}
 	for i, x := range index {
 		if i > 0 {
 			for v.Kind() == reflect.Ptr {
@@ -1755,7 +1845,7 @@ func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) 
 		b = append(b, " = "...)
 		// multiline strings are not allowed inside inline tables: they
 		// would break the single-line requirement.
-		opts := ent.options
+		opts := *ent.options
 		opts.multiline = false
 		b, err = e.appendValue(b, ent.value, opts, indent)
 		if err != nil {
