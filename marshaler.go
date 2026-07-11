@@ -276,8 +276,10 @@ type encoderState struct {
 	buf []byte
 
 	// keyStack is the dotted key of the table being encoded, shared by the
-	// whole encode as a stack.
-	keyStack []string
+	// whole encode as a stack. Each part carries whether it can be emitted
+	// bare, computed once at push: nested table headers re-emit every parent
+	// part.
+	keyStack []keyStackPart
 
 	// entriesPool recycles entry slices across tables of the same encode.
 	entriesPool [][]entry
@@ -298,6 +300,42 @@ type encoderState struct {
 	// the per-value hot path checks a direct field instead of dereferencing the
 	// embedded *Encoder on every value.
 	marshalerOn bool
+
+	// propsMemo is a small MRU memo of encPropsForType lookups: the values
+	// of a document hit the same few named types over and over, and the
+	// global cache lookup costs an interface hash every time.
+	propsMemo [16]struct {
+		t reflect.Type
+		p typeEncProps
+	}
+
+	// mapIter is a reusable map iterator (one would otherwise be allocated
+	// for every table). Safe to share: a map is fully iterated (entries are
+	// buffered) before any nested table starts its own iteration.
+	mapIter reflect.MapIter
+}
+
+// propsFor returns the encoding properties of t, memoizing recent lookups of
+// the types the builtin fast path of encPropsForType does not cover.
+func (e *encoderState) propsFor(t reflect.Type) typeEncProps {
+	if p, ok := builtinEncProps(t); ok {
+		return p
+	}
+	if e.propsMemo[0].t == t {
+		return e.propsMemo[0].p
+	}
+	for i := 1; i < len(e.propsMemo); i++ {
+		if e.propsMemo[i].t == t {
+			m := e.propsMemo[i]
+			copy(e.propsMemo[1:i+1], e.propsMemo[:i])
+			e.propsMemo[0] = m
+			return m.p
+		}
+	}
+	p := encPropsForType(t)
+	copy(e.propsMemo[1:], e.propsMemo[:len(e.propsMemo)-1])
+	e.propsMemo[0].t, e.propsMemo[0].p = t, p
+	return p
 }
 
 // valueOptions are the encoding options attached to one entry of a table.
@@ -307,20 +345,33 @@ type valueOptions struct {
 	omitempty bool
 	omitzero  bool
 	commented bool
-	// rawShape is the unstable.Marshaler classification of the entry's value,
-	// resolved at encode time (not from tags). It lives here, in the byte of
-	// padding the booleans already leave, so that entry does not grow and the
-	// encoder's default (interface-disabled) path keeps its exact layout and
-	// performance. It stays shapeUnknown for everything that is not a Marshaler.
-	rawShape rawShape
-	comment  string
+	comment   string
 }
 
-// entry is a deferred key-value of a table being encoded.
+// zeroValueOptions is the shared options of entries that have no tags.
+var zeroValueOptions valueOptions
+
+// entry is a deferred key-value of a table being encoded. Entries collected
+// from a generic map[string]interface{} carry the value as anyValue (with a
+// zero reflect.Value): the whole generic tree then encodes through concrete
+// type switches, without reflection.
 type entry struct {
-	key     string
-	value   reflect.Value
-	options valueOptions
+	key      string
+	value    reflect.Value
+	anyValue interface{}
+	// options points into the encoder plan (or at zeroValueOptions for map
+	// entries): entries are copied around, and the options are the widest
+	// part of them.
+	options *valueOptions
+	class   entryClass
+	// rawShape is the unstable.Marshaler classification of the entry's value,
+	// resolved at encode time (not from tags). It lives on the entry — not on
+	// the shared, read-only options — and stays shapeUnknown for everything
+	// that is not a Marshaler.
+	rawShape rawShape
+	// pf points to the plan field the entry came from, carrying its
+	// statically-known facts; nil for map entries.
+	pf *encPlanField
 }
 
 // rawShape classifies the bytes produced by an unstable.Marshaler.
@@ -339,9 +390,106 @@ const (
 	shapeTable
 )
 
+// entryClass tells how an entry of a table is emitted: as a `key = value`
+// line, a [table], or an [[array of tables]]. It is computed at most once per
+// entry and cached: classifying requires resolving the value's type (and for
+// arrays, the type of every element), which was previously repeated by each
+// of the encoding passes — up to three times per entry.
+type entryClass uint8
+
+const (
+	// classUnknown means the entry has not been classified yet.
+	classUnknown entryClass = iota
+	classKeyValue
+	classTable
+	classArrayTable
+)
+
+// classify computes the entryClass of an entry.
+func (e *encoderState) classify(ent *entry) entryClass {
+	if e.tablesInline || ent.options.inline {
+		return classKeyValue
+	}
+	// The static class is computed for the default mode: the Marshaler
+	// interface can turn a slice field into an array of tables (or a value)
+	// depending on runtime content, so it re-classifies dynamically.
+	if ent.pf != nil && ent.pf.classKnown && !e.marshalerOn {
+		return ent.pf.staticClass
+	}
+	if ent.anyValue != nil {
+		switch v := ent.anyValue.(type) {
+		case map[string]interface{}:
+			return classTable
+		case []interface{}:
+			if len(v) == 0 {
+				return classKeyValue
+			}
+			for _, elem := range v {
+				if _, ok := elem.(map[string]interface{}); !ok {
+					// Mixed or exotic elements: decide like the reflection
+					// path would (resolving pointers and interfaces).
+					if e.isArrayOfTables(reflect.ValueOf(ent.anyValue)) {
+						return classArrayTable
+					}
+					return classKeyValue
+				}
+			}
+			return classArrayTable
+		case time.Time, LocalDate, LocalTime, LocalDateTime:
+			return classKeyValue
+		default:
+			// Not a generic container: classify through reflection.
+			v2 := reflect.ValueOf(ent.anyValue)
+			if e.isArrayOfTables(v2) {
+				return classArrayTable
+			}
+			if e.isTableLike(v2) {
+				return classTable
+			}
+			return classKeyValue
+		}
+	}
+	if e.isArrayOfTables(ent.value) {
+		return classArrayTable
+	}
+	if e.isTableLike(ent.value) {
+		return classTable
+	}
+	return classKeyValue
+}
+
+// classOf returns the entry's class, computing and caching it on first use.
+// Marshaler-shaped entries are classified by their rawShape routing instead
+// and never reach classify.
+func (e *encoderState) classOf(ent *entry) entryClass {
+	if ent.class == classUnknown {
+		ent.class = e.classify(ent)
+	}
+	return ent.class
+}
+
 func (e *encoderState) encodeRoot(v interface{}) error {
 	if v == nil {
 		return errors.New("toml: cannot encode a nil interface")
+	}
+
+	if m, ok := v.(map[string]interface{}); ok {
+		// Generic documents skip reflection entirely: their entries are
+		// collected natively and every value encodes by type switch.
+		entries := e.getEntries()
+		for key, value := range m {
+			if value == nil {
+				// nil interface values are skipped
+				continue
+			}
+			entries = append(entries, entry{key: key, anyValue: value, options: &zeroValueOptions})
+		}
+		if len(entries) > 1 {
+			slices.SortFunc(entries, func(a, b entry) int {
+				return strings.Compare(a.key, b.key)
+			})
+		}
+		return e.encodeTableEntries(entries, false, 0)
 	}
 
 	rv := reflect.ValueOf(v)
@@ -429,7 +577,48 @@ var marshalerType = reflect.TypeOf(new(unstable.Marshaler)).Elem()
 
 var typeEncPropsCache sync.Map // reflect.Type -> typeEncProps
 
+// builtinEncProps resolves the encoding properties of the handful of builtin
+// types that make up generic documents (map[string]interface{} trees), none
+// of which can implement TextMarshaler, with a kind dispatch and one pointer
+// comparison instead of a cache lookup.
+func builtinEncProps(t reflect.Type) (typeEncProps, bool) {
+	switch t.Kind() { //nolint:exhaustive // other kinds take the cached path
+	case reflect.String:
+		if t == stringType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Bool:
+		if t == boolType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Int:
+		if t == intType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Int64:
+		if t == int64Type {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Float64:
+		if t == float64Type {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Slice:
+		if t == sliceInterfaceType {
+			return typeEncProps{isValue: true}, true
+		}
+	case reflect.Map:
+		if t == mapStringInterfaceType {
+			return typeEncProps{isValue: false}, true
+		}
+	}
+	return typeEncProps{}, false
+}
+
 func encPropsForType(t reflect.Type) typeEncProps {
+	if p, ok := builtinEncProps(t); ok {
+		return p
+	}
 	if p, ok := typeEncPropsCache.Load(t); ok {
 		return p.(typeEncProps)
 	}
@@ -480,7 +669,7 @@ func (e *encoderState) isTableLike(v reflect.Value) bool {
 		// the zero value of their element type by the value path.
 		return false
 	}
-	return !isValueKind(v)
+	return !e.propsFor(v.Type()).isValue
 }
 
 // isArrayOfTables returns true when the value is a non-empty slice or array
@@ -503,7 +692,7 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 	}
 	for i := 0; i < v.Len(); i++ {
 		elem, ok := resolve(v.Index(i))
-		if !ok || isValueKind(elem) {
+		if !ok || e.propsFor(elem.Type()).isValue {
 			return false
 		}
 	}
@@ -603,10 +792,20 @@ func (e *encoderState) classifyRaw(b []byte) (rawShape, []byte) {
 func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 	for i := range entries {
 		ent := &entries[i]
-		if ent.options.rawShape != shapeUnknown {
+		if ent.rawShape != shapeUnknown {
 			// Already classified: SetOmitEmptySuperTables resolves the
 			// entries early to route them by shape.
 			continue
+		}
+		if ent.anyValue != nil {
+			// Generic entries hold their value as an interface; only named
+			// types can implement Marshaler, so materialize a value to check.
+			ent.value = reflect.ValueOf(ent.anyValue)
+			if encPropsForType(ent.value.Type()).marshaler == 0 {
+				ent.value = reflect.Value{}
+				continue
+			}
+			ent.anyValue = nil
 		}
 		v, ok := resolve(ent.value)
 		if !ok || encPropsForType(v.Type()).marshaler == 0 {
@@ -616,13 +815,13 @@ func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 		if err != nil {
 			return err
 		}
-		ent.options.rawShape, _ = e.classifyRaw(raw)
+		ent.rawShape, _ = e.classifyRaw(raw)
 	}
 	return nil
 }
 
 // marshalerValue returns the trimmed bytes to splice for an entry already known
-// to be an unstable.Marshaler (ent.options.rawShape != shapeUnknown).
+// to be an unstable.Marshaler (ent.rawShape != shapeUnknown).
 func (e *encoderState) marshalerValue(ent *entry) ([]byte, error) {
 	v, _ := resolve(ent.value)
 	raw, err := e.marshalerBytes(v)
@@ -684,69 +883,74 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 	// pass.
 	for i := range entries {
 		ent := &entries[i]
-		if mOn {
-			switch ent.options.rawShape {
-			case shapeUnknown:
-				// Not a Marshaler: handled by the baseline logic below.
+		if mOn && ent.rawShape != shapeUnknown {
+			switch ent.rawShape { //nolint:exhaustive // shapeUnknown is excluded by the guard
 			case shapeEmpty:
-				// No TOML representation: omit the key.
-				continue
+				// No TOML representation: omit the key (the key-value class
+				// keeps the second pass away from it too).
+				ent.class = classKeyValue
 			case shapeValue:
-				if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
+				ent.class = classKeyValue
+				if err := e.encodeKeyValue(ent, commented, indent); err != nil {
 					return err
 				}
-				continue
 			case shapeTable:
 				// A table body is emitted in the second pass, unless it is
 				// forced inline (SetTablesInline / inline tag), which has no
 				// valid inline form and is reported as an error by
 				// encodeKeyValue.
+				ent.class = classTable
 				if e.tablesInline || ent.options.inline {
-					if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
+					if err := e.encodeKeyValue(ent, commented, indent); err != nil {
 						return err
 					}
 				}
-				continue
 			}
-		}
-		if e.entryIsTable(ent) {
 			continue
 		}
-		if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
+		if e.classOf(ent) != classKeyValue {
+			continue
+		}
+		if err := e.encodeKeyValue(ent, commented, indent); err != nil {
 			return err
 		}
 	}
 
 	// Second pass: emit the sub-tables, extending the shared key stack.
+	// Every entry was classified by the first pass (or earlier), so the
+	// class routes it without resolving any type again.
 	for i := range entries {
 		ent := entries[i]
-		if mOn {
-			switch ent.options.rawShape {
-			case shapeUnknown:
-				// Not a Marshaler: handled by the baseline logic below.
-			case shapeValue, shapeEmpty:
-				// Not a table: already handled (or omitted) in the first pass.
-				continue
-			case shapeTable:
-				// Emit the raw body verbatim under the freshly pushed header.
-				// (The forced-inline case already errored in the first pass.)
-				entCommented := commented || ent.options.commented
-				e.keyStack = append(e.keyStack, ent.key)
-				if err := e.encodeMarshalerTable(&ent, entCommented, indent); err != nil {
-					return err
-				}
-				e.keyStack = e.keyStack[:len(e.keyStack)-1]
-				continue
+		if mOn && ent.rawShape == shapeTable {
+			// Emit the raw body verbatim under the freshly pushed header.
+			// (The forced-inline case already errored in the first pass;
+			// value- and empty-shaped entries carry the key-value class.)
+			entCommented := commented || ent.options.commented
+			e.keyStack = append(e.keyStack, keyStackPart{s: ent.key, bare: isBareKey(ent.key)})
+			if err := e.encodeMarshalerTable(&ent, entCommented, indent); err != nil {
+				return err
 			}
-		}
-		if !e.entryIsTable(&ent) {
+			e.keyStack = e.keyStack[:len(e.keyStack)-1]
 			continue
 		}
+		if ent.class == classKeyValue {
+			continue
+		}
+		if ent.anyValue != nil {
+			// Tables recurse through the reflection walk; their own entries
+			// are collected natively again at the next level.
+			ent.value = reflect.ValueOf(ent.anyValue)
+			ent.anyValue = nil
+		}
 		entCommented := commented || ent.options.commented
-		e.keyStack = append(e.keyStack, ent.key)
+		bare := ent.pf != nil && ent.pf.bareKey
+		if !bare {
+			bare = isBareKey(ent.key)
+		}
+		e.keyStack = append(e.keyStack, keyStackPart{s: ent.key, bare: bare})
 
-		if e.isArrayOfTables(ent.value) {
-			err := e.encodeArrayTable(ent, entCommented, indent)
+		if ent.class == classArrayTable {
+			err := e.encodeArrayTable(&ent, entCommented, indent)
 			if err != nil {
 				return err
 			}
@@ -754,7 +958,7 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 			continue
 		}
 
-		// The value is resolvable: entryIsTable already resolved it.
+		// The value is resolvable: classify already resolved it.
 		tv, _ := resolve(ent.value)
 
 		subEntries, err := e.collectEntries(tv)
@@ -807,15 +1011,15 @@ func (e *encoderState) onlySubTables(entries []entry) bool {
 	}
 	for i := range entries {
 		ent := &entries[i]
-		if ent.options.rawShape != shapeUnknown {
+		if ent.rawShape != shapeUnknown {
 			// Classified unstable.Marshaler entry: only a table-shaped one
 			// that is not forced inline is guaranteed to emit a header.
-			if ent.options.rawShape != shapeTable || e.tablesInline || ent.options.inline {
+			if ent.rawShape != shapeTable || e.tablesInline || ent.options.inline {
 				return false
 			}
 			continue
 		}
-		if !e.entryIsTable(ent) {
+		if e.classOf(ent) == classKeyValue {
 			return false
 		}
 	}
@@ -858,13 +1062,6 @@ func (e *encoderState) spliceRawTableBody(raw []byte, commented bool) {
 	e.lastWasHeader = false
 }
 
-// entryIsTable reports whether the entry is emitted as a (sub-)table rather
-// than a key-value. Marshaler entries are routed by encodeTable before this is
-// reached, so it carries no marshaler-specific cost.
-func (e *encoderState) entryIsTable(ent *entry) bool {
-	return !e.tablesInline && !ent.options.inline && (e.isTableLike(ent.value) || e.isArrayOfTables(ent.value))
-}
-
 // getEntries returns a reusable entry slice.
 func (e *encoderState) getEntries() []entry {
 	if n := len(e.entriesPool); n > 0 {
@@ -883,7 +1080,7 @@ func (e *encoderState) putEntries(s []entry) {
 }
 
 // encodeArrayTable writes all the elements of an array of tables.
-func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeArrayTable(ent *entry, commented bool, indent int) error {
 	v, _ := resolve(ent.value)
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
@@ -918,6 +1115,13 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 	return nil
 }
 
+// keyStackPart is one part of the current table key, with its quoting need
+// precomputed.
+type keyStackPart struct {
+	s    string
+	bare bool
+}
+
 // writeTableHeader emits a [table] or [[array table]] header line, preceded
 // by an empty line and comments as needed.
 func (e *encoderState) writeTableHeader(comment string, commented bool, array bool, indent int) {
@@ -945,7 +1149,11 @@ func (e *encoderState) writeTableHeader(comment string, commented bool, array bo
 		if i > 0 {
 			e.buf = append(e.buf, '.')
 		}
-		e.buf = e.appendKey(e.buf, part)
+		if part.bare {
+			e.buf = append(e.buf, part.s...)
+		} else {
+			e.buf = e.appendString(e.buf, part.s)
+		}
 	}
 	e.buf = append(e.buf, ']')
 	if array {
@@ -978,7 +1186,7 @@ func (e *encoderState) writeComment(comment string, indent int) {
 }
 
 // encodeKeyValue writes one `key = value` line of a table.
-func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) error {
+func (e *encoderState) encodeKeyValue(ent *entry, commented bool, indent int) error {
 	commented = commented || ent.options.commented
 
 	e.writeComment(ent.options.comment, indent)
@@ -991,7 +1199,11 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 		e.buf = append(e.buf, "# "...)
 	}
 	e.writeIndent(indent)
-	e.buf = e.appendKey(e.buf, ent.key)
+	if ent.pf != nil && ent.pf.bareKey {
+		e.buf = append(e.buf, ent.key...)
+	} else {
+		e.buf = e.appendKey(e.buf, ent.key)
+	}
 	e.buf = append(e.buf, " = "...)
 
 	// When tables are not indented, the key is emitted at column zero
@@ -1004,14 +1216,20 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 		valueIndent = 0
 	}
 
-	// A Marshaler value is delegated, keeping this hot function lean for the
-	// default path (rawShape stays shapeUnknown when the interface is off). It
-	// shares the commented/newline handling below.
 	var err error
-	if ent.options.rawShape != shapeUnknown {
-		e.buf, err = e.appendMarshalerInlineValue(e.buf, &ent)
-	} else {
-		e.buf, err = e.appendValue(e.buf, ent.value, ent.options, valueIndent)
+	switch {
+	case ent.rawShape != shapeUnknown:
+		// A Marshaler value is delegated, keeping this hot function lean for
+		// the default path (rawShape stays shapeUnknown when the interface is
+		// off). It shares the commented/newline handling below.
+		e.buf, err = e.appendMarshalerInlineValue(e.buf, ent)
+	case ent.anyValue != nil:
+		e.buf, err = e.appendAnyValue(e.buf, ent.anyValue, *ent.options, valueIndent)
+	case ent.pf != nil && ent.pf.propsKnown:
+		// The plan already knows the field type's properties.
+		e.buf, err = e.appendValueProps(e.buf, ent.value, ent.pf.props, *ent.options, valueIndent)
+	default:
+		e.buf, err = e.appendValue(e.buf, ent.value, *ent.options, valueIndent)
 	}
 	if err != nil {
 		return err
@@ -1044,7 +1262,7 @@ func (e *encoderState) appendMarshalerInlineValue(b []byte, ent *entry) ([]byte,
 	errNotValue := func() error {
 		return fmt.Errorf("toml: cannot encode %s as an inline value: not a single TOML value", ent.value.Type())
 	}
-	if ent.options.rawShape != shapeValue {
+	if ent.rawShape != shapeValue {
 		return nil, errNotValue()
 	}
 	raw, err := e.marshalerValue(ent)
@@ -1079,10 +1297,28 @@ func (e *encoderState) collectEntries(v reflect.Value) ([]entry, error) {
 func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 	entries := e.getEntries()
 
+	// Generic maps iterate natively: no per-entry reflect values at all.
+	if v.Type() == mapStringInterfaceType {
+		for key, value := range v.Interface().(map[string]interface{}) {
+			if value == nil {
+				// nil interface values are skipped
+				continue
+			}
+			entries = append(entries, entry{key: key, anyValue: value, options: &zeroValueOptions})
+		}
+		if len(entries) > 1 {
+			slices.SortFunc(entries, func(a, b entry) int {
+				return strings.Compare(a.key, b.key)
+			})
+		}
+		return entries, nil
+	}
+
 	// Keys are converted to strings right away: read them into a reusable
 	// buffer to avoid one allocation per key.
 	var kbuf reflect.Value
-	if v.Type().Key() == stringType {
+	plainStringKey := v.Type().Key() == stringType
+	if plainStringKey {
 		if !e.stringKeyBuf.IsValid() {
 			e.stringKeyBuf = reflect.New(stringType).Elem()
 		}
@@ -1091,14 +1327,41 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 		kbuf = reflect.New(v.Type().Key()).Elem()
 	}
 
-	iter := v.MapRange()
+	// Larger maps read their values into one slab (instead of iter.Value(),
+	// which allocates a fresh value per entry). The slab elements are
+	// addressable and stay alive with the entries that reference them. Small
+	// maps are not worth the slab allocation.
+	var slab reflect.Value
+	if v.Len() >= 8 {
+		slab = reflect.MakeSlice(reflect.SliceOf(v.Type().Elem()), v.Len(), v.Len())
+	}
+	i := 0
+
+	iter := &e.mapIter
+	iter.Reset(v)
 	for iter.Next() {
 		kbuf.SetIterKey(iter)
-		key, err := mapKeyString(kbuf)
-		if err != nil {
-			return nil, err
+		var key string
+		if plainStringKey {
+			// Plain strings cannot implement TextMarshaler: skip the
+			// interface checks of mapKeyString.
+			key = kbuf.String()
+		} else {
+			var err error
+			key, err = mapKeyString(kbuf)
+			if err != nil {
+				iter.Reset(reflect.Value{})
+				return nil, err
+			}
 		}
-		value := iter.Value()
+		var value reflect.Value
+		if slab.IsValid() && i < slab.Len() {
+			value = slab.Index(i)
+			i++
+			value.SetIterValue(iter)
+		} else {
+			value = iter.Value()
+		}
 		if value.Kind() == reflect.Interface && value.IsNil() {
 			// nil interface values are skipped
 			continue
@@ -1107,8 +1370,10 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 			// nil pointers in maps are encoded as their zero value
 			value = reflect.New(value.Type().Elem()).Elem()
 		}
-		entries = append(entries, entry{key: key, value: value})
+		entries = append(entries, entry{key: key, value: value, options: &zeroValueOptions})
 	}
+	// Drop the map reference: the iterator lives on in the pooled state.
+	iter.Reset(reflect.Value{})
 
 	if len(entries) > 1 {
 		// slices.SortFunc avoids boxing the slice into a sort.Interface (an
@@ -1163,6 +1428,50 @@ type encPlanField struct {
 	index   []int
 	depth   int
 	options valueOptions
+
+	// Statically-known facts about the field, so that encoding does not
+	// re-derive them per value: whether the name needs quoting, and — when
+	// the field type fully determines them — the entry class and the
+	// encoding properties.
+	bareKey     bool
+	staticClass entryClass
+	classKnown  bool
+	props       typeEncProps
+	propsKnown  bool
+}
+
+// staticFieldFacts computes the compile-time part of encPlanField from the
+// field type. The class (key-value vs table vs array of tables) is knowable
+// unless it depends on the value: interfaces and pointers resolve
+// dynamically, and slices of table-like elements switch on emptiness.
+func staticFieldFacts(f *encPlanField, t reflect.Type) {
+	if t.Kind() == reflect.Ptr || t.Kind() == reflect.Interface {
+		return
+	}
+	f.props = encPropsForType(t)
+	f.propsKnown = true
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		et := t.Elem()
+		for et.Kind() == reflect.Ptr {
+			et = et.Elem()
+		}
+		if et.Kind() == reflect.Interface {
+			return
+		}
+		if encPropsForType(et).isValue {
+			// Elements are values: never an array of tables.
+			f.staticClass = classKeyValue
+			f.classKnown = true
+		}
+	default:
+		if f.props.isValue {
+			f.staticClass = classKeyValue
+		} else {
+			f.staticClass = classTable
+		}
+		f.classKnown = true
+	}
 }
 
 // encPlan caches the per-type information needed to encode a struct:
@@ -1257,12 +1566,15 @@ func buildEncPlan(plan *encPlan, t reflect.Type, prefix []int, depth int, visite
 			continue
 		}
 
-		plan.fields = append(plan.fields, encPlanField{
+		pf := encPlanField{
 			name:    name,
 			index:   index,
 			depth:   depth,
 			options: opts,
-		})
+			bareKey: isBareKey(name),
+		}
+		staticFieldFacts(&pf, f.Type)
+		plan.fields = append(plan.fields, pf)
 	}
 }
 
@@ -1328,13 +1640,17 @@ func (e *encoderState) collectStructEntries(entries *[]entry, v reflect.Value) {
 			continue
 		}
 
-		*entries = append(*entries, entry{key: f.name, value: fv, options: f.options})
+		*entries = append(*entries, entry{key: f.name, value: fv, options: &f.options, pf: f})
 	}
 }
 
 // fieldByIndexSkipNil returns the field at the given index path, reporting
 // false if a nil embedded pointer is found on the way.
 func fieldByIndexSkipNil(v reflect.Value, index []int) (reflect.Value, bool) {
+	if len(index) == 1 {
+		// Non-embedded fields, the common case.
+		return v.Field(index[0]), true
+	}
 	for i, x := range index {
 		if i > 0 {
 			for v.Kind() == reflect.Ptr {
@@ -1452,22 +1768,114 @@ func isUnquotedKeyByte(c byte) bool {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
 }
 
+// appendAnyValue emits a TOML value held in an interface, dispatching on the
+// concrete types a generic document is made of without going through
+// reflection. Anything else falls back to the reflection encoder.
+func (e *encoderState) appendAnyValue(b []byte, v interface{}, opts valueOptions, indent int) ([]byte, error) {
+	if v == nil {
+		return nil, errors.New("toml: cannot encode a nil interface")
+	}
+	switch tv := v.(type) {
+	case string:
+		if opts.multiline && strings.IndexByte(tv, '\n') >= 0 {
+			return e.appendMultilineString(b, tv), nil
+		}
+		return e.appendString(b, tv), nil
+	case bool:
+		if tv {
+			return append(b, "true"...), nil
+		}
+		return append(b, "false"...), nil
+	case int64:
+		return strconv.AppendInt(b, tv, 10), nil
+	case int:
+		return strconv.AppendInt(b, int64(tv), 10), nil
+	case float64:
+		return appendFloat(b, tv, 64), nil
+	case time.Time:
+		return tv.AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
+	case LocalDate:
+		return append(b, tv.String()...), nil
+	case LocalTime:
+		return append(b, tv.String()...), nil
+	case LocalDateTime:
+		return append(b, tv.String()...), nil
+	case []interface{}:
+		return e.appendAnyArray(b, tv, opts, indent)
+	case map[string]interface{}:
+		return e.appendInlineTable(b, reflect.ValueOf(tv), indent)
+	default:
+		return e.appendValue(b, reflect.ValueOf(v), opts, indent)
+	}
+}
+
+// appendAnyArray is appendArray for a native []interface{}, with the exact
+// same layout decisions.
+func (e *encoderState) appendAnyArray(b []byte, v []interface{}, opts valueOptions, indent int) ([]byte, error) {
+	multiline := opts.multiline || e.arraysMultiline
+
+	b = append(b, '[')
+	if multiline && len(v) > 0 {
+		for i, elem := range v {
+			if i > 0 {
+				b = append(b, ',')
+			}
+			b = append(b, '\n')
+			for j := 0; j <= indent; j++ {
+				b = append(b, e.indentSymbol...)
+			}
+			var err error
+			b, err = e.appendAnyValue(b, elem, valueOptions{}, indent+1)
+			if err != nil {
+				return nil, err
+			}
+		}
+		b = append(b, '\n')
+		for j := 0; j < indent; j++ {
+			b = append(b, e.indentSymbol...)
+		}
+	} else {
+		for i, elem := range v {
+			if i > 0 {
+				b = append(b, ", "...)
+			}
+			var err error
+			b, err = e.appendAnyValue(b, elem, valueOptions{}, indent)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return append(b, ']'), nil
+}
+
 // appendValue emits a TOML value.
 func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
+	return e.appendValueProps(b, v, e.propsFor(v.Type()), opts, indent)
+}
+
+// appendValueProps is appendValue for callers that already know the type
+// properties.
+func (e *encoderState) appendValueProps(b []byte, v reflect.Value, props typeEncProps, opts valueOptions, indent int) ([]byte, error) {
 	t := v.Type()
 
-	// Special types take precedence over their kind.
-	switch t {
-	case timeType:
-		return v.Interface().(time.Time).AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
-	case localDateType:
-		return append(b, v.Interface().(LocalDate).String()...), nil
-	case localTimeType:
-		return append(b, v.Interface().(LocalTime).String()...), nil
-	case localDateTimeType:
-		return append(b, v.Interface().(LocalDateTime).String()...), nil
-	case jsonNumberType:
-		if e.marshalJSONNumbers {
+	// Special types take precedence over their kind. All of them are structs
+	// except json.Number: dispatching on the kind first keeps the common
+	// scalars away from the interface comparisons.
+	switch v.Kind() { //nolint:exhaustive // only these kinds have special types
+	case reflect.Struct:
+		switch t {
+		case timeType:
+			return v.Interface().(time.Time).AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
+		case localDateType:
+			return append(b, v.Interface().(LocalDate).String()...), nil
+		case localTimeType:
+			return append(b, v.Interface().(LocalTime).String()...), nil
+		case localDateTimeType:
+			return append(b, v.Interface().(LocalDateTime).String()...), nil
+		}
+	case reflect.String:
+		if e.marshalJSONNumbers && t == jsonNumberType {
 			return appendJSONNumber(b, v.Interface().(json.Number))
 		}
 	}
@@ -1482,7 +1890,7 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 		}
 	}
 
-	switch encPropsForType(t).text {
+	switch props.text {
 	case 1:
 		if t.Kind() != reflect.String {
 			return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
@@ -1644,9 +2052,13 @@ func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) 
 		b = append(b, " = "...)
 		// multiline strings are not allowed inside inline tables: they
 		// would break the single-line requirement.
-		opts := ent.options
+		opts := *ent.options
 		opts.multiline = false
-		b, err = e.appendValue(b, ent.value, opts, indent)
+		if ent.anyValue != nil {
+			b, err = e.appendAnyValue(b, ent.anyValue, opts, indent)
+		} else {
+			b, err = e.appendValue(b, ent.value, opts, indent)
+		}
 		if err != nil {
 			return nil, err
 		}
