@@ -21,4 +21,8 @@ var (
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}(nil))
 	sliceInterfaceType     = reflect.TypeOf([]interface{}(nil))
 	stringType             = reflect.TypeOf("")
+	boolType               = reflect.TypeOf(false)
+	intType                = reflect.TypeOf(int(0))
+	int64Type              = reflect.TypeOf(int64(0))
+	float64Type            = reflect.TypeOf(float64(0))
 )
