@@ -1452,6 +1452,66 @@ func isUnquotedKeyByte(c byte) bool {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
 }
 
+// The temporal formatters below (String and time.Format) write their fields
+// blindly, so an out-of-range component would produce a document the parser
+// rejects, or, for a nanosecond >= 1e9 or a zone offset that is not a whole
+// number of minutes, one that silently decodes to a different value. Validate
+// against the ranges the decoder enforces and error instead of emitting
+// invalid or lossy TOML.
+
+func validateLocalDate(d LocalDate) error {
+	if d.Year < 0 || d.Year > 9999 {
+		return fmt.Errorf("toml: cannot encode local date with year %d out of range [0,9999]", d.Year)
+	}
+	if d.Month < 1 || d.Month > 12 {
+		return fmt.Errorf("toml: cannot encode local date with month %d out of range [1,12]", d.Month)
+	}
+	if maxDay := daysIn(d.Month, d.Year); d.Day < 1 || d.Day > maxDay {
+		return fmt.Errorf("toml: cannot encode local date %04d-%02d-%02d with day out of range [1,%d]", d.Year, d.Month, d.Day, maxDay)
+	}
+	return nil
+}
+
+func validateLocalTime(t LocalTime) error {
+	if t.Hour < 0 || t.Hour > 23 {
+		return fmt.Errorf("toml: cannot encode local time with hour %d out of range [0,23]", t.Hour)
+	}
+	if t.Minute < 0 || t.Minute > 59 {
+		return fmt.Errorf("toml: cannot encode local time with minute %d out of range [0,59]", t.Minute)
+	}
+	if t.Second < 0 || t.Second > 59 {
+		return fmt.Errorf("toml: cannot encode local time with second %d out of range [0,59]", t.Second)
+	}
+	if t.Nanosecond < 0 || t.Nanosecond > 999999999 {
+		return fmt.Errorf("toml: cannot encode local time with nanosecond %d out of range [0,999999999]", t.Nanosecond)
+	}
+	if t.Precision > 9 {
+		return fmt.Errorf("toml: cannot encode local time with precision %d out of range [0,9]", t.Precision)
+	}
+	return nil
+}
+
+func validateLocalDateTime(dt LocalDateTime) error {
+	if err := validateLocalDate(dt.LocalDate); err != nil {
+		return err
+	}
+	return validateLocalTime(dt.LocalTime)
+}
+
+func validateTime(t time.Time) error {
+	if y := t.Year(); y < 0 || y > 9999 {
+		return fmt.Errorf("toml: cannot encode time.Time with year %d out of range [0,9999]", y)
+	}
+	_, offset := t.Zone()
+	if offset <= -24*3600 || offset >= 24*3600 {
+		return fmt.Errorf("toml: cannot encode time.Time with zone offset %ds out of range [-24h,+24h]", offset)
+	}
+	if offset%60 != 0 {
+		return fmt.Errorf("toml: cannot encode time.Time with zone offset %ds not aligned to a whole minute", offset)
+	}
+	return nil
+}
+
 // appendValue emits a TOML value.
 func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
 	t := v.Type()
@@ -1459,13 +1519,29 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 	// Special types take precedence over their kind.
 	switch t {
 	case timeType:
-		return v.Interface().(time.Time).AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
+		tv := v.Interface().(time.Time)
+		if err := validateTime(tv); err != nil {
+			return nil, err
+		}
+		return tv.AppendFormat(b, "2006-01-02T15:04:05.999999999Z07:00"), nil
 	case localDateType:
-		return append(b, v.Interface().(LocalDate).String()...), nil
+		d := v.Interface().(LocalDate)
+		if err := validateLocalDate(d); err != nil {
+			return nil, err
+		}
+		return append(b, d.String()...), nil
 	case localTimeType:
-		return append(b, v.Interface().(LocalTime).String()...), nil
+		lt := v.Interface().(LocalTime)
+		if err := validateLocalTime(lt); err != nil {
+			return nil, err
+		}
+		return append(b, lt.String()...), nil
 	case localDateTimeType:
-		return append(b, v.Interface().(LocalDateTime).String()...), nil
+		dt := v.Interface().(LocalDateTime)
+		if err := validateLocalDateTime(dt); err != nil {
+			return nil, err
+		}
+		return append(b, dt.String()...), nil
 	case jsonNumberType:
 		if e.marshalJSONNumbers {
 			return appendJSONNumber(b, v.Interface().(json.Number))
