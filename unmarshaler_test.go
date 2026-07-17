@@ -5956,3 +5956,179 @@ type unexportedEmbedTableInner struct {
 type unexportedEmbedTableOuter struct {
 	*unexportedEmbedTableInner
 }
+
+// Issue #1109: encoding.TextUnmarshaler must be invoked for named types even
+// when their underlying kind matches the TOML value's native Go kind (e.g. a
+// TOML string into `type Secret string`). Since v2.4.0 the kind-based fast
+// paths assigned the raw value directly and silently skipped UnmarshalText.
+
+type textScalarStr1109 string
+
+func (s *textScalarStr1109) UnmarshalText(data []byte) error {
+	*s = textScalarStr1109("text:" + string(data))
+	return nil
+}
+
+type textScalarInt1109 int
+
+func (i *textScalarInt1109) UnmarshalText(data []byte) error {
+	v, err := strconv.Atoi(string(data))
+	if err != nil {
+		return err
+	}
+	*i = textScalarInt1109(v + 1000)
+	return nil
+}
+
+type textScalarUint1109 uint8
+
+func (u *textScalarUint1109) UnmarshalText(data []byte) error {
+	v, err := strconv.Atoi(string(data))
+	if err != nil {
+		return err
+	}
+	*u = textScalarUint1109(v + 1)
+	return nil
+}
+
+type textScalarFloat1109 float64
+
+func (f *textScalarFloat1109) UnmarshalText(data []byte) error {
+	v, err := strconv.ParseFloat(string(data), 64)
+	if err != nil {
+		return err
+	}
+	*f = textScalarFloat1109(v * 10)
+	return nil
+}
+
+// textScalarBool1109 inverts the parsed value so that tests can tell
+// UnmarshalText ran instead of the native bool assignment.
+type textScalarBool1109 bool
+
+func (b *textScalarBool1109) UnmarshalText(data []byte) error {
+	*b = textScalarBool1109(string(data) == "false")
+	return nil
+}
+
+type textScalarErr1109 string
+
+func (s *textScalarErr1109) UnmarshalText([]byte) error {
+	return errors.New("boom")
+}
+
+func TestIssue1109_TextUnmarshalerNamedScalarKinds(t *testing.T) {
+	t.Run("string", func(t *testing.T) {
+		var x struct{ V textScalarStr1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = "raw"`), &x))
+		assert.Equal(t, textScalarStr1109("text:raw"), x.V)
+	})
+
+	t.Run("integer", func(t *testing.T) {
+		var x struct{ V textScalarInt1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = 42`), &x))
+		assert.Equal(t, textScalarInt1109(1042), x.V)
+	})
+
+	t.Run("integer into uint kind", func(t *testing.T) {
+		var x struct{ V textScalarUint1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = 3`), &x))
+		assert.Equal(t, textScalarUint1109(4), x.V)
+	})
+
+	t.Run("float", func(t *testing.T) {
+		var x struct{ V textScalarFloat1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = 1.5`), &x))
+		assert.Equal(t, textScalarFloat1109(15), x.V)
+	})
+
+	t.Run("integer into float kind", func(t *testing.T) {
+		var x struct{ V textScalarFloat1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = 2`), &x))
+		assert.Equal(t, textScalarFloat1109(20), x.V)
+	})
+
+	t.Run("bool", func(t *testing.T) {
+		var x struct{ V textScalarBool1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = true`), &x))
+		assert.Equal(t, textScalarBool1109(false), x.V)
+	})
+
+	t.Run("pointer to named type", func(t *testing.T) {
+		var x struct{ V *textScalarStr1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = "raw"`), &x))
+		assert.Equal(t, textScalarStr1109("text:raw"), *x.V)
+	})
+
+	t.Run("map value", func(t *testing.T) {
+		var x map[string]textScalarStr1109
+		assert.NoError(t, toml.Unmarshal([]byte(`V = "raw"`), &x))
+		assert.Equal(t, textScalarStr1109("text:raw"), x["V"])
+	})
+
+	t.Run("slice element", func(t *testing.T) {
+		var x struct{ V []textScalarStr1109 }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = ["a", "b"]`), &x))
+		assert.Equal(t, []textScalarStr1109{"text:a", "text:b"}, x.V)
+	})
+
+	t.Run("UnmarshalText error is reported", func(t *testing.T) {
+		var x struct{ V textScalarErr1109 }
+		err := toml.Unmarshal([]byte(`V = "raw"`), &x)
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "boom"), "error %q should mention the UnmarshalText failure", err)
+	})
+
+	// Named scalar types without TextUnmarshaler must keep decoding
+	// natively.
+	t.Run("named types without TextUnmarshaler decode natively", func(t *testing.T) {
+		type S string
+		type I int
+		type F float64
+		type B bool
+		var x struct {
+			S S
+			I I
+			F F
+			B B
+		}
+		doc := "S = \"s\"\nI = 1\nF = 1.5\nB = true"
+		assert.NoError(t, toml.Unmarshal([]byte(doc), &x))
+		assert.Equal(t, S("s"), x.S)
+		assert.Equal(t, I(1), x.I)
+		assert.Equal(t, F(1.5), x.F)
+		assert.Equal(t, B(true), x.B)
+	})
+}
+
+// Issue #1109: same regression for date and time TOML values: in v2.3.x any
+// addressable target implementing encoding.TextUnmarshaler (other than
+// time.Time) received the raw text of the value.
+func TestIssue1109_TextUnmarshalerDateTimeKinds(t *testing.T) {
+	examples := []struct {
+		name string
+		doc  string
+		want textScalarStr1109
+	}{
+		{"datetime", `V = 2021-03-30T21:12:00Z`, "text:2021-03-30T21:12:00Z"},
+		{"local datetime", `V = 2021-03-30T21:12:00`, "text:2021-03-30T21:12:00"},
+		{"local date", `V = 2021-03-30`, "text:2021-03-30"},
+		{"local time", `V = 21:12:00`, "text:21:12:00"},
+	}
+
+	for _, e := range examples {
+		t.Run(e.name, func(t *testing.T) {
+			var x struct{ V textScalarStr1109 }
+			assert.NoError(t, toml.Unmarshal([]byte(e.doc), &x))
+			assert.Equal(t, e.want, x.V)
+		})
+	}
+
+	// time.Time keeps its native datetime decoding: its UnmarshalText only
+	// accepts RFC 3339, which would break local date/time values.
+	t.Run("time.Time still decodes natively", func(t *testing.T) {
+		var x struct{ V time.Time }
+		assert.NoError(t, toml.Unmarshal([]byte(`V = 2021-03-30`), &x))
+		assert.Equal(t, time.Date(2021, 3, 30, 0, 0, 0, 0, time.Local), x.V)
+	})
+}
