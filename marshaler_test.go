@@ -2110,6 +2110,117 @@ func TestMarshalUint64Overflow(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestMarshalRejectsInvalidTemporal(t *testing.T) {
+	// The parser enforces component ranges (and since TOML 1.1, seconds <= 59),
+	// so the encoder must not emit a temporal value it would then refuse to
+	// read back. On an unvalidated encoder each case below produced a document
+	// that fails to reparse; Marshal must return an error instead.
+	examples := []struct {
+		desc     string
+		v        interface{}
+		contains string
+	}{
+		{"local time hour 24", toml.LocalTime{Hour: 24}, "hour 24"},
+		{"local time hour negative", toml.LocalTime{Hour: -1}, "hour -1"},
+		{"local time minute 60", toml.LocalTime{Minute: 60}, "minute 60"},
+		{"local time second 60", toml.LocalTime{Second: 60}, "second 60"},
+		{"local time second 99", toml.LocalTime{Second: 99}, "second 99"},
+		{"local time nanosecond negative", toml.LocalTime{Nanosecond: -1}, "nanosecond -1"},
+		{"local time precision above 9", toml.LocalTime{Precision: 10}, "precision 10"},
+		{"local date zero value", toml.LocalDate{}, "month 0"},
+		{"local date month 13", toml.LocalDate{Year: 2024, Month: 13, Day: 5}, "month 13"},
+		{"local date day 0", toml.LocalDate{Year: 2024, Month: 2, Day: 0}, "day out of range"},
+		{"local date day 32", toml.LocalDate{Year: 2024, Month: 1, Day: 32}, "day out of range"},
+		{"local date february 30", toml.LocalDate{Year: 2023, Month: 2, Day: 30}, "day out of range"},
+		{"local date year negative", toml.LocalDate{Year: -1, Month: 1, Day: 1}, "year -1"},
+		{"local date year 10000", toml.LocalDate{Year: 10000, Month: 1, Day: 1}, "year 10000"},
+		{
+			"local date-time invalid date",
+			toml.LocalDateTime{LocalDate: toml.LocalDate{Year: 2024, Month: 13, Day: 40}, LocalTime: toml.LocalTime{Hour: 25}},
+			"month 13",
+		},
+		{
+			"local date-time invalid time",
+			toml.LocalDateTime{LocalDate: toml.LocalDate{Year: 2024, Month: 1, Day: 1}, LocalTime: toml.LocalTime{Hour: 25}},
+			"hour 25",
+		},
+		{"time.Time year 10000", time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC), "year 10000"},
+		{"time.Time year negative", time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC), "year -1"},
+		{"time.Time offset above 24h", time.Date(2024, 1, 1, 0, 0, 0, 0, time.FixedZone("", 100*3600)), "out of range [-24h,+24h]"},
+		{"time.Time offset exactly 24h", time.Date(2024, 1, 1, 0, 0, 0, 0, time.FixedZone("", 24*3600)), "out of range [-24h,+24h]"},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			b, err := toml.Marshal(map[string]interface{}{"v": e.v})
+			assert.Error(t, err, "expected Marshal to reject %s, got %q", e.desc, string(b))
+			assert.True(t, strings.Contains(err.Error(), e.contains), "error %q should mention %q", err, e.contains)
+		})
+	}
+}
+
+func TestMarshalRejectsLossyTemporal(t *testing.T) {
+	// These reparse successfully but to a *different* value, so an unvalidated
+	// encoder corrupts data silently. Marshal must error rather than emit them.
+	examples := []struct {
+		desc     string
+		v        interface{}
+		wasLike  string // what the unvalidated encoder used to emit
+		contains string
+	}{
+		// Nanosecond >= 1e9 formats as ".100000000": 1s silently becomes 0.1s.
+		{"nanosecond 1e9 overflows into fraction", toml.LocalTime{Nanosecond: 1000000000}, "00:00:00.100000000", "nanosecond 1000000000"},
+		// RFC 3339 offsets are HH:MM, so +01:01:01 loses its trailing second.
+		{"zone offset drops seconds", time.Date(2024, 1, 1, 0, 0, 0, 0, time.FixedZone("", 3661)), "+01:01", "not aligned to a whole minute"},
+		// A purely sub-minute offset collapses to +00:00, i.e. looks like UTC.
+		{"sub-minute zone offset collapses to utc", time.Date(2024, 1, 1, 0, 0, 0, 0, time.FixedZone("", 30)), "+00:00", "not aligned to a whole minute"},
+	}
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			_, err := toml.Marshal(map[string]interface{}{"v": e.v})
+			assert.Error(t, err, "expected Marshal to reject %s (previously emitted %q)", e.desc, e.wasLike)
+			assert.True(t, strings.Contains(err.Error(), e.contains), "error %q should mention %q", err, e.contains)
+		})
+	}
+}
+
+func TestMarshalValidTemporalRoundTrip(t *testing.T) {
+	// Valid boundary values must still marshal and survive a
+	// Marshal -> Unmarshal -> Marshal round trip byte-for-byte.
+	examples := []struct {
+		desc string
+		v    interface{}
+	}{
+		{"leap day", toml.LocalDate{Year: 2024, Month: 2, Day: 29}},
+		{"year 0", toml.LocalDate{Year: 0, Month: 1, Day: 1}},
+		{"year 9999", toml.LocalDate{Year: 9999, Month: 12, Day: 31}},
+		{"max local time", toml.LocalTime{Hour: 23, Minute: 59, Second: 59, Nanosecond: 999999999, Precision: 9}},
+		{
+			"local date-time boundary",
+			toml.LocalDateTime{
+				LocalDate: toml.LocalDate{Year: 2024, Month: 2, Day: 29},
+				LocalTime: toml.LocalTime{Hour: 23, Minute: 59, Second: 59, Nanosecond: 999999999, Precision: 9},
+			},
+		},
+		{"utc", time.Date(2024, 6, 15, 12, 30, 0, 0, time.UTC)},
+		{"minute-aligned offset", time.Date(2024, 1, 1, 0, 0, 0, 0, time.FixedZone("", 3660))},
+		{"max offset 23:59", time.Date(2024, 1, 1, 0, 0, 0, 0, time.FixedZone("", 23*3600+59*60))},
+	}
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			first, err := toml.Marshal(map[string]interface{}{"v": e.v})
+			assert.NoError(t, err)
+
+			var back map[string]interface{}
+			assert.NoError(t, toml.Unmarshal(first, &back))
+
+			second, err := toml.Marshal(back)
+			assert.NoError(t, err)
+			assert.Equal(t, string(first), string(second))
+		})
+	}
+}
+
 func TestIndentWithInlineTable(t *testing.T) {
 	x := map[string][]map[string]string{
 		"one": {
