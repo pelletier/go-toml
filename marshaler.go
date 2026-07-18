@@ -1560,9 +1560,7 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 
 	switch encPropsForType(t).text {
 	case 1:
-		if t.Kind() != reflect.String {
-			return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
-		}
+		return e.appendTextMarshaler(b, v.Interface().(encoding.TextMarshaler))
 	case 2:
 		if v.CanAddr() {
 			return e.appendTextMarshaler(b, v.Addr().Interface().(encoding.TextMarshaler))
@@ -1788,7 +1786,7 @@ func appendBasicString(b []byte, s string) []byte {
 			r, size := utf8.DecodeRuneInString(s[i:])
 			if r == utf8.RuneError && size == 1 {
 				// Replace invalid bytes by the replacement character.
-				b = append(b, fmt.Sprintf("\\u%04X", c)...)
+				b = append(b, `\uFFFD`...)
 				i++
 				continue
 			}
@@ -1844,7 +1842,8 @@ func appendMultilineString(b []byte, s string) []byte {
 		default:
 			r, size := utf8.DecodeRuneInString(s[i:])
 			if r == utf8.RuneError && size == 1 {
-				b = append(b, fmt.Sprintf("\\u%04X", c)...)
+				// Replace invalid bytes by the replacement character.
+				b = append(b, `\uFFFD`...)
 				i++
 				continue
 			}
