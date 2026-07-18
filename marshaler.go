@@ -1743,19 +1743,79 @@ func (e *encoderState) appendString(b []byte, s string) []byte {
 // canBeLiteral returns true when the string can be represented as a TOML
 // literal string: no control characters, no single quote, no newline.
 func canBeLiteral(s string) bool {
-	for i := 0; i < len(s); i++ {
+	// Fast path: printable ASCII without a single quote needs no UTF-8
+	// validation, and is proven eight bytes at a time.
+	i := 0
+	for i+8 <= len(s) {
+		x := uint64(s[i]) | uint64(s[i+1])<<8 | uint64(s[i+2])<<16 |
+			uint64(s[i+3])<<24 | uint64(s[i+4])<<32 | uint64(s[i+5])<<40 |
+			uint64(s[i+6])<<48 | uint64(s[i+7])<<56
+		if (x&encMSB)|encHasByteBelow(x, 0x20)|encHasByteEqual(x, '\'')|encHasByteEqual(x, 0x7f) != 0 {
+			goto slow
+		}
+		i += 8
+	}
+	for ; i < len(s); i++ {
 		c := s[i]
+		if c == '\'' || c >= 0x7f || c < 0x20 {
+			goto slow
+		}
+	}
+	return true
+
+slow:
+	for j := i; j < len(s); j++ {
+		c := s[j]
 		if c == '\'' || c == 0x7f || c < 0x20 {
 			return false
 		}
 	}
-	return utf8.ValidString(s)
+	return utf8.ValidString(s[i:])
+}
+
+const encMSB = 0x8080808080808080
+
+// encHasByteBelow returns a non-zero value when any byte of x is strictly
+// below n, for n <= 0x80. Bytes with their high bit set do not trigger.
+func encHasByteBelow(x, n uint64) uint64 {
+	return (x - n*0x0101010101010101) &^ x & encMSB
+}
+
+// encHasByteEqual returns a non-zero value when any byte of x equals c, for
+// c < 0x80.
+func encHasByteEqual(x, c uint64) uint64 {
+	return encHasByteBelow(x^(c*0x0101010101010101), 1)
 }
 
 // appendBasicString encodes a string as a TOML basic (double-quoted) string.
 func appendBasicString(b []byte, s string) []byte {
 	b = append(b, '"')
+	start := 0
 	for i := 0; i < len(s); {
+		// Skip over a run of bytes that are emitted verbatim (printable
+		// ASCII except '"' and '\'), eight bytes at a time, and append it in
+		// one copy.
+		for i+8 <= len(s) {
+			x := uint64(s[i]) | uint64(s[i+1])<<8 | uint64(s[i+2])<<16 |
+				uint64(s[i+3])<<24 | uint64(s[i+4])<<32 | uint64(s[i+5])<<40 |
+				uint64(s[i+6])<<48 | uint64(s[i+7])<<56
+			if (x&encMSB)|encHasByteBelow(x, 0x20)|encHasByteEqual(x, '"')|encHasByteEqual(x, '\\')|encHasByteEqual(x, 0x7f) != 0 {
+				break
+			}
+			i += 8
+		}
+		for i < len(s) {
+			if c := s[i]; c >= 0x20 && c < 0x7f && c != '"' && c != '\\' {
+				i++
+				continue
+			}
+			break
+		}
+		b = append(b, s[start:i]...)
+		if i >= len(s) {
+			break
+		}
+
 		c := s[i]
 		switch {
 		case c == '"':
@@ -1788,11 +1848,12 @@ func appendBasicString(b []byte, s string) []byte {
 				// Replace invalid bytes by the replacement character.
 				b = append(b, `\uFFFD`...)
 				i++
-				continue
+			} else {
+				b = append(b, s[i:i+size]...)
+				i += size
 			}
-			b = append(b, s[i:i+size]...)
-			i += size
 		}
+		start = i
 	}
 	return append(b, '"')
 }
