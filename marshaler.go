@@ -321,6 +321,7 @@ type entry struct {
 	key     string
 	value   reflect.Value
 	options valueOptions
+	class   entryClass
 }
 
 // rawShape classifies the bytes produced by an unstable.Marshaler.
@@ -338,6 +339,45 @@ const (
 	// shapeTable is one or more key-value lines, emitted as a `[key]` body.
 	shapeTable
 )
+
+// entryClass tells how an entry of a table is emitted: as a `key = value`
+// line, a [table], or an [[array of tables]]. It is computed at most once per
+// entry and cached: classifying requires resolving the value's type (and for
+// arrays, the type of every element), which was previously repeated by each
+// of the encoding passes — up to three times per entry.
+type entryClass uint8
+
+const (
+	// classUnknown means the entry has not been classified yet.
+	classUnknown entryClass = iota
+	classKeyValue
+	classTable
+	classArrayTable
+)
+
+// classify computes the entryClass of an entry.
+func (e *encoderState) classify(ent *entry) entryClass {
+	if e.tablesInline || ent.options.inline {
+		return classKeyValue
+	}
+	if e.isArrayOfTables(ent.value) {
+		return classArrayTable
+	}
+	if e.isTableLike(ent.value) {
+		return classTable
+	}
+	return classKeyValue
+}
+
+// classOf returns the entry's class, computing and caching it on first use.
+// Marshaler-shaped entries are classified by their rawShape routing instead
+// and never reach classify.
+func (e *encoderState) classOf(ent *entry) entryClass {
+	if ent.class == classUnknown {
+		ent.class = e.classify(ent)
+	}
+	return ent.class
+}
 
 func (e *encoderState) encodeRoot(v interface{}) error {
 	if v == nil {
@@ -684,32 +724,32 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 	// pass.
 	for i := range entries {
 		ent := &entries[i]
-		if mOn {
-			switch ent.options.rawShape {
-			case shapeUnknown:
-				// Not a Marshaler: handled by the baseline logic below.
+		if mOn && ent.options.rawShape != shapeUnknown {
+			switch ent.options.rawShape { //nolint:exhaustive // shapeUnknown is excluded by the guard
 			case shapeEmpty:
-				// No TOML representation: omit the key.
-				continue
+				// No TOML representation: omit the key (the key-value class
+				// keeps the second pass away from it too).
+				ent.class = classKeyValue
 			case shapeValue:
+				ent.class = classKeyValue
 				if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
 					return err
 				}
-				continue
 			case shapeTable:
 				// A table body is emitted in the second pass, unless it is
 				// forced inline (SetTablesInline / inline tag), which has no
 				// valid inline form and is reported as an error by
 				// encodeKeyValue.
+				ent.class = classTable
 				if e.tablesInline || ent.options.inline {
 					if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
 						return err
 					}
 				}
-				continue
 			}
+			continue
 		}
-		if e.entryIsTable(ent) {
+		if e.classOf(ent) != classKeyValue {
 			continue
 		}
 		if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
@@ -718,34 +758,29 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 	}
 
 	// Second pass: emit the sub-tables, extending the shared key stack.
+	// Every entry was classified by the first pass (or earlier), so the
+	// class routes it without resolving any type again.
 	for i := range entries {
 		ent := entries[i]
-		if mOn {
-			switch ent.options.rawShape {
-			case shapeUnknown:
-				// Not a Marshaler: handled by the baseline logic below.
-			case shapeValue, shapeEmpty:
-				// Not a table: already handled (or omitted) in the first pass.
-				continue
-			case shapeTable:
-				// Emit the raw body verbatim under the freshly pushed header.
-				// (The forced-inline case already errored in the first pass.)
-				entCommented := commented || ent.options.commented
-				e.keyStack = append(e.keyStack, ent.key)
-				if err := e.encodeMarshalerTable(&ent, entCommented, indent); err != nil {
-					return err
-				}
-				e.keyStack = e.keyStack[:len(e.keyStack)-1]
-				continue
+		if mOn && ent.options.rawShape == shapeTable {
+			// Emit the raw body verbatim under the freshly pushed header.
+			// (The forced-inline case already errored in the first pass;
+			// value- and empty-shaped entries carry the key-value class.)
+			entCommented := commented || ent.options.commented
+			e.keyStack = append(e.keyStack, ent.key)
+			if err := e.encodeMarshalerTable(&ent, entCommented, indent); err != nil {
+				return err
 			}
+			e.keyStack = e.keyStack[:len(e.keyStack)-1]
+			continue
 		}
-		if !e.entryIsTable(&ent) {
+		if ent.class == classKeyValue {
 			continue
 		}
 		entCommented := commented || ent.options.commented
 		e.keyStack = append(e.keyStack, ent.key)
 
-		if e.isArrayOfTables(ent.value) {
+		if ent.class == classArrayTable {
 			err := e.encodeArrayTable(ent, entCommented, indent)
 			if err != nil {
 				return err
@@ -754,7 +789,7 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 			continue
 		}
 
-		// The value is resolvable: entryIsTable already resolved it.
+		// The value is resolvable: classify already resolved it.
 		tv, _ := resolve(ent.value)
 
 		subEntries, err := e.collectEntries(tv)
@@ -815,7 +850,7 @@ func (e *encoderState) onlySubTables(entries []entry) bool {
 			}
 			continue
 		}
-		if !e.entryIsTable(ent) {
+		if e.classOf(ent) == classKeyValue {
 			return false
 		}
 	}
@@ -856,13 +891,6 @@ func (e *encoderState) spliceRawTableBody(raw []byte, commented bool) {
 	}
 	e.buf = append(e.buf, '\n')
 	e.lastWasHeader = false
-}
-
-// entryIsTable reports whether the entry is emitted as a (sub-)table rather
-// than a key-value. Marshaler entries are routed by encodeTable before this is
-// reached, so it carries no marshaler-specific cost.
-func (e *encoderState) entryIsTable(ent *entry) bool {
-	return !e.tablesInline && !ent.options.inline && (e.isTableLike(ent.value) || e.isArrayOfTables(ent.value))
 }
 
 // getEntries returns a reusable entry slice.
