@@ -1722,8 +1722,13 @@ func (d *decoder) assignValue(v reflect.Value, expr *unstable.Node, value *unsta
 func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
 	switch v.Kind() {
 	case reflect.String:
-		v.SetString(string(value.Data))
-		return v, nil
+		// Only the predeclared string type skips the TextUnmarshaler check
+		// below: named string types may implement it, and it takes
+		// precedence over direct assignment.
+		if v.Type() == stringType {
+			v.SetString(string(value.Data))
+			return v, nil
+		}
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(string(value.Data)))
 	default:
@@ -1735,6 +1740,11 @@ func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.V
 		}
 		return v, nil
 	}
+	if v.Kind() == reflect.String {
+		// Named string type that does not implement TextUnmarshaler.
+		v.SetString(string(value.Data))
+		return v, nil
+	}
 	return reflect.Value{}, d.typeMismatchError("string", v.Type(), d.p.Raw(value.Raw))
 }
 
@@ -1743,6 +1753,15 @@ func (d *decoder) assignInteger(v reflect.Value, value *unstable.Node) (reflect.
 	// represent (approximately) numbers beyond the int64 range.
 	if k := v.Kind(); k == reflect.Float32 || k == reflect.Float64 {
 		return d.assignFloat(v, value)
+	}
+
+	// TextUnmarshaler takes precedence over native assignment, and must be
+	// tried before parsing: the raw text may carry a number that does not
+	// fit an int64.
+	if mayImplementTextUnmarshaler(v.Type()) {
+		if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+			return v, err
+		}
 	}
 
 	i, err := parseInteger(value.Data)
@@ -1770,9 +1789,6 @@ func (d *decoder) assignInteger(v reflect.Value, value *unstable.Node) (reflect.
 		return boxInto(v, reflect.ValueOf(i))
 	default:
 	}
-	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
-		return v, err
-	}
 	return reflect.Value{}, d.typeMismatchError("integer", v.Type(), d.p.Raw(value.Raw))
 }
 
@@ -1785,7 +1801,46 @@ func tryTextUnmarshaler(v reflect.Value, text []byte) (bool, error) {
 	return false, nil
 }
 
+// predeclaredScalarType maps a scalar reflect.Kind to its predeclared Go
+// type (int64, string, bool, ...). It is sized to cover every reflect.Kind;
+// non-scalar kinds map to nil.
+var predeclaredScalarType = [reflect.UnsafePointer + 1]reflect.Type{
+	reflect.Bool:    reflect.TypeOf(false),
+	reflect.Int:     reflect.TypeOf(int(0)),
+	reflect.Int8:    reflect.TypeOf(int8(0)),
+	reflect.Int16:   reflect.TypeOf(int16(0)),
+	reflect.Int32:   reflect.TypeOf(int32(0)),
+	reflect.Int64:   reflect.TypeOf(int64(0)),
+	reflect.Uint:    reflect.TypeOf(uint(0)),
+	reflect.Uint8:   reflect.TypeOf(uint8(0)),
+	reflect.Uint16:  reflect.TypeOf(uint16(0)),
+	reflect.Uint32:  reflect.TypeOf(uint32(0)),
+	reflect.Uint64:  reflect.TypeOf(uint64(0)),
+	reflect.Uintptr: reflect.TypeOf(uintptr(0)),
+	reflect.Float32: reflect.TypeOf(float32(0)),
+	reflect.Float64: reflect.TypeOf(float64(0)),
+	reflect.String:  stringType,
+}
+
+// mayImplementTextUnmarshaler filters out types that cannot possibly
+// implement encoding.TextUnmarshaler before the more expensive interface
+// check: predeclared scalar types cannot have methods. Named scalar types
+// (e.g. `type Secret string`) can, and must be probed for the interface
+// before their kind is used for native assignment (issue #1109).
+func mayImplementTextUnmarshaler(t reflect.Type) bool {
+	return predeclaredScalarType[t.Kind()] != t
+}
+
 func (d *decoder) assignFloat(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
+	// TextUnmarshaler takes precedence over native assignment. Note that
+	// integer values targeting a named float type also land here, through
+	// the redirect in assignInteger.
+	if mayImplementTextUnmarshaler(v.Type()) {
+		if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+			return v, err
+		}
+	}
+
 	f, err := parseFloat(value.Data)
 	if err != nil {
 		return reflect.Value{}, err
@@ -1805,13 +1860,17 @@ func (d *decoder) assignFloat(v reflect.Value, value *unstable.Node) (reflect.Va
 		return boxInto(v, reflect.ValueOf(f))
 	default:
 	}
-	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
-		return v, err
-	}
 	return reflect.Value{}, d.typeMismatchError("float", v.Type(), d.p.Raw(value.Raw))
 }
 
 func (d *decoder) assignBool(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
+	// TextUnmarshaler takes precedence over native assignment.
+	if mayImplementTextUnmarshaler(v.Type()) {
+		if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+			return v, err
+		}
+	}
+
 	b := value.Data[0] == 't'
 
 	switch v.Kind() {
@@ -1821,9 +1880,6 @@ func (d *decoder) assignBool(v reflect.Value, value *unstable.Node) (reflect.Val
 	case reflect.Interface:
 		return boxInto(v, reflect.ValueOf(b))
 	default:
-	}
-	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
-		return v, err
 	}
 	return reflect.Value{}, d.typeMismatchError("boolean", v.Type(), d.p.Raw(value.Raw))
 }
@@ -1840,6 +1896,9 @@ func (d *decoder) assignDateTime(v reflect.Value, value *unstable.Node) (reflect
 	}
 	if v.Kind() == reflect.Interface {
 		return boxInto(v, reflect.ValueOf(t))
+	}
+	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+		return v, err
 	}
 	return reflect.Value{}, d.typeMismatchError("datetime", v.Type(), d.p.Raw(value.Raw))
 }
@@ -1874,6 +1933,9 @@ func (d *decoder) assignLocalDateTime(v reflect.Value, value *unstable.Node) (re
 	if v.Kind() == reflect.Interface {
 		return boxInto(v, reflect.ValueOf(dt))
 	}
+	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+		return v, err
+	}
 	return reflect.Value{}, d.typeMismatchError("local datetime", v.Type(), d.p.Raw(value.Raw))
 }
 
@@ -1893,6 +1955,9 @@ func (d *decoder) assignLocalDate(v reflect.Value, value *unstable.Node) (reflec
 	}
 	if v.Kind() == reflect.Interface {
 		return boxInto(v, reflect.ValueOf(date))
+	}
+	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+		return v, err
 	}
 	return reflect.Value{}, d.typeMismatchError("local date", v.Type(), d.p.Raw(value.Raw))
 }
@@ -1916,6 +1981,9 @@ func (d *decoder) assignLocalTime(v reflect.Value, value *unstable.Node) (reflec
 	}
 	if v.Kind() == reflect.Interface {
 		return boxInto(v, reflect.ValueOf(t))
+	}
+	if ok, err := tryTextUnmarshaler(v, value.Data); ok {
+		return v, err
 	}
 	return reflect.Value{}, d.typeMismatchError("local time", v.Type(), d.p.Raw(value.Raw))
 }
