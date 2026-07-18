@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pelletier/go-toml/v2/internal/assert"
@@ -2992,7 +2993,8 @@ func TestMarshalStringEscapes(t *testing.T) {
 	t.Run("invalid utf8 in basic string", func(t *testing.T) {
 		out, err := toml.Marshal(map[string]string{"a": "\xff"})
 		assert.NoError(t, err)
-		assert.True(t, strings.Contains(string(out), "\\u00FF"))
+		assert.True(t, strings.Contains(string(out), "\\uFFFD"))
+		assert.True(t, !strings.Contains(string(out), "\\u00FF"))
 	})
 	t.Run("multiline escapes", func(t *testing.T) {
 		v := struct {
@@ -3007,7 +3009,7 @@ func TestMarshalStringEscapes(t *testing.T) {
 		assert.True(t, strings.Contains(s, "\\f"))
 		assert.True(t, strings.Contains(s, "\\r"))
 		assert.True(t, strings.Contains(s, "\\u0001"))
-		assert.True(t, strings.Contains(s, "\\u00FF"))
+		assert.True(t, strings.Contains(s, "\\uFFFD"))
 	})
 	t.Run("multiline short quote runs kept", func(t *testing.T) {
 		v := struct {
@@ -3089,4 +3091,168 @@ func TestMarshalInlineTableKeyError(t *testing.T) {
 	enc.SetTablesInline(true)
 	err := enc.Encode(map[string]map[failKey]int{"a": {{}: 1}})
 	assert.Error(t, err)
+}
+
+// namedStringText is a named string type with a value-receiver TextMarshaler and
+// a pointer-receiver TextUnmarshaler, matching the custom scalar types from
+// issue #1109.
+type namedStringText string
+
+func (s namedStringText) MarshalText() ([]byte, error) { return []byte("enc:" + string(s)), nil }
+func (s *namedStringText) UnmarshalText(b []byte) error {
+	*s = namedStringText("dec:" + string(b))
+	return nil
+}
+
+func TestMarshalTextMarshalerStringKind(t *testing.T) {
+	// A named string type whose value receiver implements TextMarshaler must have
+	// MarshalText applied in every value position, like any other TextMarshaler.
+	examples := []struct {
+		desc string
+		v    interface{}
+		want string
+	}{
+		{"struct field", struct{ S namedStringText }{"raw"}, "S = 'enc:raw'\n"},
+		{"map value", map[string]namedStringText{"k": "raw"}, "k = 'enc:raw'\n"},
+		{"slice element", map[string][]namedStringText{"a": {"p", "q"}}, "a = ['enc:p', 'enc:q']\n"},
+		{"inline table member", struct {
+			T struct{ S namedStringText } `toml:",inline"`
+		}{}, "T = {S = 'enc:'}\n"},
+	}
+
+	for _, e := range examples {
+		t.Run(e.desc, func(t *testing.T) {
+			b, err := toml.Marshal(e.v)
+			assert.NoError(t, err)
+			assert.Equal(t, e.want, string(b))
+		})
+	}
+}
+
+func TestMarshalTextMarshalerStringKindRoundTrip(t *testing.T) {
+	// Encode applies MarshalText and decode applies UnmarshalText (#1113), so the
+	// two must be symmetric for a named string type. Before the fix Marshal
+	// emitted the raw string, silently breaking the round-trip.
+	type doc struct{ S namedStringText }
+
+	b, err := toml.Marshal(doc{S: "raw"})
+	assert.NoError(t, err)
+	assert.Equal(t, "S = 'enc:raw'\n", string(b))
+
+	var back doc
+	err = toml.Unmarshal(b, &back)
+	assert.NoError(t, err)
+	assert.Equal(t, namedStringText("dec:enc:raw"), back.S)
+}
+
+// namedIntText and secretPtrText exercise the other TextMarshaler shapes that were
+// already honored, to pin the string-kind value receiver to the same behavior.
+type namedIntText int
+
+func (i namedIntText) MarshalText() ([]byte, error) { return []byte(fmt.Sprintf("i:%d", int(i))), nil }
+
+type secretPtrText string
+
+func (s *secretPtrText) MarshalText() ([]byte, error) { return []byte("enc:" + string(*s)), nil }
+
+func TestMarshalTextMarshalerConsistentAcrossShapes(t *testing.T) {
+	// The string-kind value receiver was the only TextMarshaler shape being
+	// skipped: a value-receiver int, a pointer receiver, and a map key of the same
+	// named string type were all already honored.
+	cases := []struct {
+		desc string
+		v    interface{}
+		want string
+	}{
+		{"value-receiver string", map[string]namedStringText{"a": "x"}, "a = 'enc:x'\n"},
+		{"value-receiver int", map[string]namedIntText{"a": 7}, "a = 'i:7'\n"},
+		{"pointer-receiver string", func() interface{} { s := secretPtrText("x"); return map[string]*secretPtrText{"a": &s} }(), "a = 'enc:x'\n"},
+		{"map key", map[namedStringText]int{"k": 1}, "'enc:k' = 1\n"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			b, err := toml.Marshal(c.v)
+			assert.NoError(t, err)
+			assert.Equal(t, c.want, string(b))
+		})
+	}
+}
+
+func TestMarshalTextMarshalerStringKindOmitempty(t *testing.T) {
+	// omitempty emptiness is decided on the raw value, consistent with
+	// encoding/json: an empty named string is omitted even though its MarshalText
+	// is non-empty. A non-empty value is emitted through MarshalText.
+	type doc struct {
+		S namedStringText `toml:"s,omitempty"`
+	}
+
+	empty, err := toml.Marshal(doc{S: ""})
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(empty))
+
+	set, err := toml.Marshal(doc{S: "x"})
+	assert.NoError(t, err)
+	assert.Equal(t, "s = 'enc:x'\n", string(set))
+}
+
+func TestMarshalInvalidUTF8ReplacementCharacter(t *testing.T) {
+	// Invalid UTF-8 bytes are replaced by U+FFFD (matching the encoder's own
+	// comment and encoding/json), producing valid TOML instead of Latin-1
+	// mojibake such as "ÿ" (= U+00FF) that used to round-trip corrupted.
+	cases := []struct {
+		desc string
+		in   string
+		want string
+	}{
+		{"single invalid byte", "a\xffb", "s = \"a\\uFFFDb\"\n"},
+		{"lone surrogate bytes", "x\xed\xa0\x80y", "s = \"x\\uFFFD\\uFFFD\\uFFFDy\"\n"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			b, err := toml.Marshal(map[string]string{"s": c.in})
+			assert.NoError(t, err)
+			assert.Equal(t, c.want, string(b))
+
+			var back map[string]string
+			err = toml.Unmarshal(b, &back)
+			assert.NoError(t, err)
+			assert.True(t, utf8.ValidString(back["s"]), "round-tripped value must be valid UTF-8, got %q", back["s"])
+		})
+	}
+}
+
+func TestMarshalInvalidUTF8ReplacementCharacterMultiline(t *testing.T) {
+	type doc struct {
+		S string `toml:"s,multiline"`
+	}
+
+	b, err := toml.Marshal(doc{S: "line1\na\xffb"})
+	assert.NoError(t, err)
+	assert.True(t, strings.Contains(string(b), "\\uFFFD"), "multiline output must contain U+FFFD, got %q", string(b))
+	assert.True(t, !strings.Contains(string(b), "\\u00FF"), "multiline output must not emit Latin-1 mojibake, got %q", string(b))
+
+	var back doc
+	err = toml.Unmarshal(b, &back)
+	assert.NoError(t, err)
+	assert.True(t, utf8.ValidString(back.S), "round-tripped value must be valid UTF-8, got %q", back.S)
+}
+
+// badUTF8Text returns invalid UTF-8 from MarshalText, exercising the interaction
+// between the two fixes: once the string kind is honored, its bytes flow through
+// the escaper and must be sanitized to U+FFFD.
+type badUTF8Text string
+
+func (b badUTF8Text) MarshalText() ([]byte, error) { return []byte("z\xffz"), nil }
+
+func TestMarshalTextMarshalerInvalidUTF8(t *testing.T) {
+	b, err := toml.Marshal(map[string]badUTF8Text{"k": "v"})
+	assert.NoError(t, err)
+	assert.Equal(t, "k = \"z\\uFFFDz\"\n", string(b))
+
+	var back map[string]string
+	err = toml.Unmarshal(b, &back)
+	assert.NoError(t, err)
+	assert.True(t, utf8.ValidString(back["k"]), "round-tripped value must be valid UTF-8, got %q", back["k"])
 }
