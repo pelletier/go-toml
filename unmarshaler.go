@@ -46,17 +46,15 @@ func (d *decoder) reset() {
 	d.captureIdx = -1
 	d.segIdx = d.segIdx[:0]
 	// Reuse the array-table counter slots across documents instead of
-	// deleting them: a zeroed slot is indistinguishable from an absent one,
-	// and keeping it alive means setArrayCount does not have to allocate a new
-	// *int every time the same path reappears. A safety valve bounds the table
-	// for adversarial inputs that introduce unboundedly many distinct paths.
+	// deleting them: bumping the generation makes every slot read as zero,
+	// and keeping slots alive means setArrayCount does not have to allocate
+	// a new one every time the same path reappears. A safety valve bounds
+	// the table for adversarial inputs that introduce unboundedly many
+	// distinct paths.
 	if len(d.arrayCounts) > 1<<14 {
 		d.arrayCounts = nil
-	} else {
-		for _, p := range d.arrayCounts {
-			*p = 0
-		}
 	}
+	d.acGen++
 	d.tableTarget = reflect.Value{}
 	d.tableTargetValid = false
 	d.tableFlush = d.tableFlush[:0]
@@ -169,7 +167,7 @@ func (d *Decoder) EnableUnmarshalerInterface() *Decoder {
 //	Inline Table     -> same as Table
 //	Array of Tables  -> same as Array and Table
 func (d *Decoder) Decode(v interface{}) error {
-	b, err := io.ReadAll(d.r)
+	b, err := readDocument(d.r)
 	if err != nil {
 		return fmt.Errorf("toml: %w", err)
 	}
@@ -178,6 +176,35 @@ func (d *Decoder) Decode(v interface{}) error {
 	err = dec.unmarshal(b, v)
 	putDecoder(dec)
 	return err
+}
+
+// readDocument reads the reader to its end. Readers that know their size
+// (bytes.Reader, strings.Reader, bytes.Buffer, ...) get a buffer of exactly
+// that size up front instead of io.ReadAll's growth sequence.
+func readDocument(r io.Reader) ([]byte, error) {
+	l, ok := r.(interface{ Len() int })
+	if !ok {
+		return io.ReadAll(r)
+	}
+	b := make([]byte, 0, l.Len())
+	for {
+		n, err := r.Read(b[len(b):cap(b)])
+		b = b[:len(b)+n]
+		if err != nil {
+			if err == io.EOF {
+				return b, nil
+			}
+			return b, err
+		}
+		if len(b) == cap(b) {
+			// The reader may have grown (or lied): finish with ReadAll.
+			rest, err := io.ReadAll(r)
+			if err != nil {
+				return b, err
+			}
+			return append(b, rest...), nil
+		}
+	}
 }
 
 // pathPart is one part of the key path leading to a value. Parts that come
@@ -256,8 +283,11 @@ type decoder struct {
 	// arrayCounts tracks the number of elements appended to fixed-size
 	// arrays used as array tables, keyed by the NUL-joined key parts.
 	// Values are pointer slots so that updating an existing path does not
-	// allocate a new key string.
-	arrayCounts map[string]*int
+	// allocate a new key string. Slots stamped with an older generation
+	// than acGen read as zero, which resets all counts in O(1) between
+	// documents.
+	arrayCounts map[string]*acSlot
+	acGen       uint64
 
 	// Cached target of the current table, so that key-values do not need to
 	// walk the document structure from the root for every expression.
@@ -287,6 +317,36 @@ type decoder struct {
 	// keyParts is the reusable buffer holding the decoded parts of the key of
 	// the current expression in the fused generic decode path.
 	keyParts [][]byte
+
+	// Small memo of struct plan lookups: the key-values of a table hit the
+	// same few struct types over and over, and the global cache lookup costs
+	// an interface hash every time. Hits swap the entry one slot toward the
+	// front (transpose heuristic); misses overwrite a rotating slot, so a
+	// document with more hot types than slots degrades to a handful of
+	// pointer comparisons instead of shifting the whole array per lookup.
+	planMemo [8]struct {
+		t reflect.Type
+		p *structPlan
+	}
+	planClock uint8
+}
+
+// planFor returns the struct plan of t, memoizing recent lookups.
+func (d *decoder) planFor(t reflect.Type) *structPlan {
+	if d.planMemo[0].t == t {
+		return d.planMemo[0].p
+	}
+	for i := 1; i < len(d.planMemo); i++ {
+		if d.planMemo[i].t == t {
+			d.planMemo[i-1], d.planMemo[i] = d.planMemo[i], d.planMemo[i-1]
+			return d.planMemo[i-1].p
+		}
+	}
+	p := planForType(t)
+	i := int(d.planClock) % len(d.planMemo)
+	d.planClock++
+	d.planMemo[i].t, d.planMemo[i].p = t, p
+	return p
 }
 
 // slotWriter remembers how to store a value at some location of the target
@@ -390,22 +450,28 @@ func (d *decoder) arrayCount(key []byte) int {
 	if d.arrayCounts == nil {
 		return 0
 	}
-	if p := d.arrayCounts[string(key)]; p != nil { // does not allocate
-		return *p
+	if p := d.arrayCounts[string(key)]; p != nil && p.gen == d.acGen { // does not allocate
+		return p.n
 	}
 	return 0
 }
 
 func (d *decoder) setArrayCount(key []byte, n int) {
 	if d.arrayCounts == nil {
-		d.arrayCounts = map[string]*int{}
+		d.arrayCounts = map[string]*acSlot{}
 	}
 	if p := d.arrayCounts[string(key)]; p != nil { // does not allocate
-		*p = n
+		p.gen = d.acGen
+		p.n = n
 		return
 	}
-	v := n
-	d.arrayCounts[string(key)] = &v
+	d.arrayCounts[string(key)] = &acSlot{gen: d.acGen, n: n}
+}
+
+// acSlot is an array-table element count, valid for one decode generation.
+type acSlot struct {
+	gen uint64
+	n   int
 }
 
 // resetChildArrayCounts forgets the counts of all the array tables under
@@ -420,7 +486,7 @@ func (d *decoder) resetChildArrayCounts(key []byte) {
 		if len(k) > len(key) && k[len(key)] == 0 && k[:len(key)] == string(key) {
 			// Zero instead of delete: the next element of the parent table
 			// will reuse the slot without allocating a new key.
-			*p = 0
+			p.n = 0
 		}
 	}
 }
@@ -939,7 +1005,7 @@ walk:
 			}
 			idx++
 		case reflect.Struct:
-			plan := planForType(v.Type())
+			plan := d.planFor(v.Type())
 			f, found := plan.lookup(name)
 			if !found {
 				d.strict.MissingTable(expr)
@@ -1227,7 +1293,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 
 	switch v.Kind() {
 	case reflect.Struct:
-		plan := planForType(v.Type())
+		plan := d.planFor(v.Type())
 		f, found := plan.lookup(name)
 		if !found {
 			return v, nil
@@ -1488,7 +1554,7 @@ func (d *decoder) descend(v reflect.Value, path []pathPart, idx int, expr *unsta
 		}
 		return v, nil
 	case reflect.Struct:
-		plan := planForType(v.Type())
+		plan := d.planFor(v.Type())
 		f, found := plan.lookupBytes(part.bytes())
 		if !found {
 			if part.node != nil {

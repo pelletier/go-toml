@@ -1,7 +1,10 @@
 package toml
 
 import (
+	"errors"
+	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2/internal/assert"
@@ -52,4 +55,64 @@ func TestResolveCaptureUnexportedEmbeddedPointer(t *testing.T) {
 	_, err := d.resolveCapture(root, &c, 0, false)
 	assert.Error(t, err)
 	assert.Equal(t, "toml: cannot set embedded pointer to unexported struct: toml.unexpCaptureInner", err.Error())
+}
+
+// lyingLenReader reports a Len smaller than the content it delivers,
+// exercising readDocument's fallback to io.ReadAll when a reader outgrows
+// its announced size.
+type lyingLenReader struct {
+	r io.Reader
+}
+
+func (l *lyingLenReader) Read(p []byte) (int, error) { return l.r.Read(p) }
+func (l *lyingLenReader) Len() int                   { return 2 }
+
+// TestReadDocumentGrowingReader covers readers whose Len underestimates the
+// actual content.
+func TestReadDocumentGrowingReader(t *testing.T) {
+	var m map[string]interface{}
+	d := NewDecoder(&lyingLenReader{r: strings.NewReader("key = 'longer than two bytes'")})
+	assert.NoError(t, d.Decode(&m))
+	assert.Equal(t, interface{}("longer than two bytes"), m["key"])
+}
+
+type errAfterReader struct{ n int }
+
+func (e *errAfterReader) Read(p []byte) (int, error) {
+	if e.n == 0 {
+		return 0, errors.New("boom")
+	}
+	p[0] = 'a'
+	e.n--
+	return 1, nil
+}
+
+func (e *errAfterReader) Len() int { return 8 }
+
+// noLenReader hides the Len method of its underlying reader, exercising
+// readDocument's io.ReadAll fallback for readers of unknown size.
+type noLenReader struct {
+	r io.Reader
+}
+
+func (n *noLenReader) Read(p []byte) (int, error) { return n.r.Read(p) }
+
+func TestReadDocumentReadError(t *testing.T) {
+	var m map[string]interface{}
+	d := NewDecoder(&errAfterReader{n: 1})
+	assert.Error(t, d.Decode(&m))
+
+	d = NewDecoder(&noLenReader{r: &errAfterReader{n: 1}})
+	assert.Error(t, d.Decode(&m))
+
+	// Error surfaced by the io.ReadAll finish after the buffer filled up.
+	d = NewDecoder(&lyingLenReader{r: &errAfterReader{n: 3}})
+	assert.Error(t, d.Decode(&m))
+}
+
+func TestReadDocumentNoLen(t *testing.T) {
+	var m map[string]interface{}
+	d := NewDecoder(&noLenReader{r: strings.NewReader("a = 1")})
+	assert.NoError(t, d.Decode(&m))
+	assert.Equal(t, interface{}(int64(1)), m["a"])
 }
