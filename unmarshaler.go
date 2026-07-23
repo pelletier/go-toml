@@ -169,6 +169,9 @@ func (d *Decoder) EnableUnmarshalerInterface() *Decoder {
 //	Inline Table     -> same as Table
 //	Array of Tables  -> same as Array and Table
 func (d *Decoder) Decode(v interface{}) error {
+	if d == nil || d.r == nil {
+		return fmt.Errorf("toml: Decoder reader is nil")
+	}
 	b, err := io.ReadAll(d.r)
 	if err != nil {
 		return fmt.Errorf("toml: %w", err)
