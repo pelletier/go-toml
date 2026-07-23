@@ -104,7 +104,7 @@ func (d *Decoder) DisallowUnknownFields() *Decoder {
 	return d
 }
 
-// EnableUnmarshalerInterface allows to enable unmarshaler interface.
+// EnableUnmarshalerInterface allows enabling the unmarshaler interface.
 //
 // With this feature enabled, types implementing the unstable.Unmarshaler
 // interface can be decoded from any structure of the document. It allows types
