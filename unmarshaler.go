@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"bytes"
 	"encoding"
 	"errors"
 	"fmt"
@@ -15,6 +16,9 @@ import (
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 	"github.com/pelletier/go-toml/v2/unstable"
 )
+
+// utf8BOM is the UTF-8 byte order mark some editors prepend to files.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
 // decoderPool recycles decoders (and their internal buffers: parser arena,
 // seen-tracker entries, scratch buffers) across calls to Unmarshal and
@@ -495,6 +499,11 @@ func (d *decoder) unmarshal(data []byte, v interface{}) error {
 	}
 	if r.IsNil() {
 		return errors.New("toml: decoding pointer target cannot be nil")
+	}
+
+	// Strip a leading UTF-8 BOM so files saved by Windows editors still parse.
+	if bytes.HasPrefix(data, utf8BOM) {
+		data = data[len(utf8BOM):]
 	}
 
 	root := r.Elem()

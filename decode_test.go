@@ -26,3 +26,11 @@ func TestParseDateTimeMissingTimezone(t *testing.T) {
 	_, err := parseDateTime([]byte("2021-01-01T00:00:00"))
 	assert.Error(t, err)
 }
+
+func TestUnmarshalUTF8BOM(t *testing.T) {
+	var m map[string]string
+	data := append([]byte{0xEF, 0xBB, 0xBF}, []byte("a = \"hello\"\n")...)
+	err := Unmarshal(data, &m)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", m["a"])
+}
