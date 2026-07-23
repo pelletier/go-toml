@@ -245,6 +245,9 @@ func (enc *Encoder) EnableMarshalerInterface() *Encoder {
 // inside inline tables. For array tables, the comment is only present before
 // the first element of the array.
 func (enc *Encoder) Encode(v interface{}) error {
+	if enc == nil || enc.w == nil {
+		return fmt.Errorf("toml: Encoder writer is nil")
+	}
 	e := encoderStatePool.Get().(*encoderState)
 	e.Encoder = enc
 	e.marshalerOn = enc.marshalerInterface
