@@ -507,6 +507,67 @@ B = [1, 2, 3, 4]
 `,
 		},
 		{
+			desc: "multiline pushed down to map array values",
+			v: struct {
+				A map[string][]string `toml:",multiline"`
+			}{
+				A: map[string][]string{"key": {"one", "two"}},
+			},
+			expected: `[A]
+key = [
+  'one',
+  'two'
+]
+`,
+		},
+		{
+			desc: "multiline pushed down keeps inner arrays inline",
+			v: struct {
+				A map[string][][]string `toml:",multiline"`
+			}{
+				A: map[string][][]string{"key": {{"x", "y"}, {"z"}}},
+			},
+			expected: `[A]
+key = [
+  ['x', 'y'],
+  ['z']
+]
+`,
+		},
+		{
+			desc: "multiline pushed down to map string values",
+			v: struct {
+				A map[string]string `toml:",multiline"`
+			}{
+				A: map[string]string{"key": "line1\nline2"},
+			},
+			expected: `[A]
+key = """
+line1
+line2"""
+`,
+		},
+		{
+			desc: "multiline pushed down to struct field values",
+			v: struct {
+				Inner struct {
+					Tags []string
+				} `toml:",multiline"`
+			}{
+				Inner: struct {
+					Tags []string
+				}{
+					Tags: []string{"a", "b"},
+				},
+			},
+			expected: `[Inner]
+Tags = [
+  'a',
+  'b'
+]
+`,
+		},
+		{
 			desc: "nil interface not supported at root",
 			v:    nil,
 			err:  true,
