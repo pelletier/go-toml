@@ -228,7 +228,10 @@ func (enc *Encoder) EnableMarshalerInterface() *Encoder {
 // The "multiline" option emits strings as quoted multi-line TOML strings, and
 // arrays with one element per line. For strings, it only takes effect when the
 // value contains a newline; single-line values are emitted as regular strings.
-// It has no effect on fields that would not be encoded as strings or arrays.
+// When set on a field that is encoded as a table (a map or struct), the option
+// is pushed down onto that table's values, so their strings and arrays follow
+// the same rule. Only the value held directly by each key is affected: a
+// map[string][][]string only makes its outer arrays multiline.
 //
 // The "inline" option turns fields that would be emitted as tables into
 // inline tables instead. It has no effect on other fields.
@@ -760,6 +763,20 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 		subEntries, err := e.collectEntries(tv)
 		if err != nil {
 			return err
+		}
+
+		// A "multiline" option on a table (a map or struct field) is pushed
+		// down onto that table's own entries. Without this it would be a no-op,
+		// since it only takes effect on strings and arrays: propagating it lets
+		// the values follow the multiline rule, so their arrays span multiple
+		// lines and their newline-containing strings use the """...""" form.
+		// Only the value directly held by each entry is affected; the elements
+		// of an array are not, so a map[string][][]string only makes its outer
+		// arrays multiline.
+		if ent.options.multiline {
+			for j := range subEntries {
+				subEntries[j].options.multiline = true
+			}
 		}
 
 		subIndent := indent + 1
