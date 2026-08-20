@@ -38,7 +38,7 @@ func (s *StrictMissingError) Error() string {
 	return "strict mode: fields in the document are missing in the target struct"
 }
 
-// String returns a human readable description of all errors.
+// String returns a human-readable description of all errors.
 func (s *StrictMissingError) String() string {
 	var buf strings.Builder
 
