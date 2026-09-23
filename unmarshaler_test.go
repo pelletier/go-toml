@@ -432,6 +432,21 @@ func TestUnmarshal_Floats(t *testing.T) {
 			input: `+0_0.0`,
 			err:   true,
 		},
+		{
+			desc:     "hexadecimal integer",
+			input:    `0x10`,
+			expected: 16,
+		},
+		{
+			desc:     "octal integer",
+			input:    `0o20`,
+			expected: 16,
+		},
+		{
+			desc:     "binary integer",
+			input:    `0b1_0000`,
+			expected: 16,
+		},
 	}
 
 	type doc struct {
@@ -2720,6 +2735,11 @@ func TestUnmarshalFloat32(t *testing.T) {
 		doc := "A = 4.40282346638528859811704183484516925440e+38"
 		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
 		assert.Error(t, err)
+	})
+	t.Run("hexadecimal integer", func(t *testing.T) {
+		var x struct{ A float32 }
+		assert.NoError(t, toml.Unmarshal([]byte("A = 0xff"), &x))
+		assert.Equal(t, float32(255), x.A)
 	})
 }
 
