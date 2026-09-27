@@ -1749,9 +1749,18 @@ func (d *decoder) assignString(v reflect.Value, value *unstable.Node) (reflect.V
 }
 
 func (d *decoder) assignInteger(v reflect.Value, value *unstable.Node) (reflect.Value, error) {
-	// Integer values targeting a float field are parsed as floats: they can
-	// represent (approximately) numbers beyond the int64 range.
+	// Integer values targeting a float field: prefer parseInteger so hex/oct/bin
+	// literals (0x/0o/0b) work. Fall back to parseFloat for decimals that do
+	// not fit in int64 (parseFloat can still approximate those).
 	if k := v.Kind(); k == reflect.Float32 || k == reflect.Float64 {
+		if i, err := parseInteger(value.Data); err == nil {
+			f := float64(i)
+			if v.OverflowFloat(f) {
+				return reflect.Value{}, unstable.NewParserError(value.Data, "float value %f cannot be stored in %s", f, v.Type())
+			}
+			v.SetFloat(f)
+			return v, nil
+		}
 		return d.assignFloat(v, value)
 	}
 
