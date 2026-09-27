@@ -432,6 +432,21 @@ func TestUnmarshal_Floats(t *testing.T) {
 			input: `+0_0.0`,
 			err:   true,
 		},
+		{
+			desc:     "hex integer into float",
+			input:    `0x10`,
+			expected: 16,
+		},
+		{
+			desc:     "octal integer into float",
+			input:    `0o20`,
+			expected: 16,
+		},
+		{
+			desc:     "binary integer into float",
+			input:    `0b10000`,
+			expected: 16,
+		},
 	}
 
 	type doc struct {
