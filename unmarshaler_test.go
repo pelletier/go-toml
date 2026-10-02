@@ -6132,3 +6132,75 @@ func TestIssue1109_TextUnmarshalerDateTimeKinds(t *testing.T) {
 		assert.Equal(t, time.Date(2021, 3, 30, 0, 0, 0, 0, time.Local), x.V)
 	})
 }
+
+// Issue #1131: encoding.TextUnmarshaler must be invoked for map key types
+// whose underlying kind is a scalar (named string, int, uint, float).
+func TestIssue1131_TextUnmarshalerMapKeys(t *testing.T) {
+	t.Run("string kind map key", func(t *testing.T) {
+		var m map[textScalarStr1109]string
+		assert.NoError(t, toml.Unmarshal([]byte(`raw = "val"`), &m))
+		assert.Equal(t, "val", m[textScalarStr1109("text:raw")])
+	})
+
+	t.Run("integer kind map key", func(t *testing.T) {
+		var m map[textScalarInt1109]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"42" = "val"`), &m))
+		assert.Equal(t, "val", m[textScalarInt1109(1042)])
+	})
+
+	t.Run("uint kind map key", func(t *testing.T) {
+		var m map[textScalarUint1109]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"3" = "val"`), &m))
+		assert.Equal(t, "val", m[textScalarUint1109(4)])
+	})
+
+	t.Run("float kind map key", func(t *testing.T) {
+		var m map[textScalarFloat1109]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"1.5" = "val"`), &m))
+		assert.Equal(t, "val", m[textScalarFloat1109(15)])
+	})
+
+	t.Run("struct with map key", func(t *testing.T) {
+		var x struct {
+			M map[textScalarStr1109]int
+		}
+		assert.NoError(t, toml.Unmarshal([]byte("[M]\nfoo = 1\n"), &x))
+		assert.Equal(t, 1, x.M[textScalarStr1109("text:foo")])
+	})
+
+	t.Run("pointer to named type map key", func(t *testing.T) {
+		var m map[*textScalarStr1109]string
+		assert.NoError(t, toml.Unmarshal([]byte(`raw = "val"`), &m))
+		assert.Equal(t, 1, len(m))
+		for k, v := range m {
+			assert.Equal(t, textScalarStr1109("text:raw"), *k)
+			assert.Equal(t, "val", v)
+		}
+	})
+
+	t.Run("UnmarshalText error is reported", func(t *testing.T) {
+		var m map[textScalarErr1109]string
+		err := toml.Unmarshal([]byte(`raw = "val"`), &m)
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "boom"), "error %q should mention the UnmarshalText failure", err)
+	})
+
+	// Guard: named scalar types without TextUnmarshaler must keep decoding natively into map keys.
+	t.Run("named types without TextUnmarshaler decode natively", func(t *testing.T) {
+		type PlainStr string
+		type PlainInt int
+		type PlainFloat float64
+
+		var ms map[PlainStr]string
+		assert.NoError(t, toml.Unmarshal([]byte(`raw = "val"`), &ms))
+		assert.Equal(t, "val", ms[PlainStr("raw")])
+
+		var mi map[PlainInt]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"123" = "val"`), &mi))
+		assert.Equal(t, "val", mi[PlainInt(123)])
+
+		var mf map[PlainFloat]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"2.5" = "val"`), &mf))
+		assert.Equal(t, "val", mf[PlainFloat(2.5)])
+	})
+}
