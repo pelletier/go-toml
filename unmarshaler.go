@@ -1294,6 +1294,27 @@ func hasUnmarshaler(v reflect.Value) bool {
 // makeMapKey converts a TOML key into a value usable as the given map key
 // type.
 func makeMapKey(kt reflect.Type, name string) (reflect.Value, error) {
+	if kt.Kind() == reflect.Ptr {
+		if kt.Implements(textUnmarshalerType) {
+			k := reflect.New(kt.Elem())
+			err := k.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(name))
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
+			}
+			return k, nil
+		}
+		return reflect.Value{}, fmt.Errorf("toml: cannot decode a key into a map with key type %s", kt)
+	}
+
+	if mayImplementTextUnmarshaler(kt) && reflect.PtrTo(kt).Implements(textUnmarshalerType) {
+		k := reflect.New(kt)
+		err := k.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(name))
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
+		}
+		return k.Elem(), nil
+	}
+
 	switch kt.Kind() {
 	case reflect.String:
 		return reflect.ValueOf(name).Convert(kt), nil
@@ -1327,24 +1348,6 @@ func makeMapKey(kt reflect.Type, name string) (reflect.Value, error) {
 		k := reflect.New(kt).Elem()
 		k.SetFloat(f)
 		return k, nil
-	case reflect.Ptr:
-		if kt.Implements(textUnmarshalerType) {
-			k := reflect.New(kt.Elem())
-			err := k.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(name))
-			if err != nil {
-				return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
-			}
-			return k, nil
-		}
-	default:
-		if reflect.PtrTo(kt).Implements(textUnmarshalerType) {
-			k := reflect.New(kt)
-			err := k.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(name))
-			if err != nil {
-				return reflect.Value{}, fmt.Errorf("toml: error unmarshaling map key %q: %w", name, err)
-			}
-			return k.Elem(), nil
-		}
 	}
 	return reflect.Value{}, fmt.Errorf("toml: cannot decode a key into a map with key type %s", kt)
 }
