@@ -432,6 +432,71 @@ func TestUnmarshal_Floats(t *testing.T) {
 			input: `+0_0.0`,
 			err:   true,
 		},
+		{
+			desc:     "hexadecimal integer",
+			input:    `0x10`,
+			expected: 16,
+		},
+		{
+			desc:     "octal integer",
+			input:    `0o20`,
+			expected: 16,
+		},
+		{
+			desc:     "binary integer",
+			input:    `0b10000`,
+			expected: 16,
+		},
+		{
+			desc:     "hexadecimal integer with underscores",
+			input:    `0x1_0`,
+			expected: 16,
+		},
+		{
+			desc:     "octal integer with underscores",
+			input:    `0o2_0`,
+			expected: 16,
+		},
+		{
+			desc:     "binary integer with underscores",
+			input:    `0b1_0000`,
+			expected: 16,
+		},
+		{
+			desc:     "hexadecimal integer zero",
+			input:    `0x0`,
+			expected: 0,
+		},
+		{
+			desc:     "octal integer zero",
+			input:    `0o0`,
+			expected: 0,
+		},
+		{
+			desc:     "binary integer zero",
+			input:    `0b0`,
+			expected: 0,
+		},
+		{
+			desc:     "hexadecimal integer max int64",
+			input:    `0x7fffffffffffffff`,
+			expected: float64(math.MaxInt64),
+		},
+		{
+			desc:  "hexadecimal integer overflow",
+			input: `0x8000000000000000`,
+			err:   true,
+		},
+		{
+			desc:  "octal integer overflow",
+			input: `0o1000000000000000000000`,
+			err:   true,
+		},
+		{
+			desc:  "binary integer overflow",
+			input: `0b1000000000000000000000000000000000000000000000000000000000000000`,
+			err:   true,
+		},
 	}
 
 	type doc struct {
@@ -2720,6 +2785,37 @@ func TestUnmarshalFloat32(t *testing.T) {
 		doc := "A = 4.40282346638528859811704183484516925440e+38"
 		err := toml.Unmarshal([]byte(doc), &map[string]float32{})
 		assert.Error(t, err)
+	})
+	t.Run("hexadecimal integer", func(t *testing.T) {
+		var x struct{ A float32 }
+		assert.NoError(t, toml.Unmarshal([]byte("A = 0x10"), &x))
+		assert.Equal(t, float32(16), x.A)
+	})
+	t.Run("octal integer", func(t *testing.T) {
+		var x struct{ A float32 }
+		assert.NoError(t, toml.Unmarshal([]byte("A = 0o20"), &x))
+		assert.Equal(t, float32(16), x.A)
+	})
+	t.Run("binary integer", func(t *testing.T) {
+		var x struct{ A float32 }
+		assert.NoError(t, toml.Unmarshal([]byte("A = 0b10000"), &x))
+		assert.Equal(t, float32(16), x.A)
+	})
+	t.Run("prefixed integers in slice", func(t *testing.T) {
+		var x struct{ A []float64 }
+		assert.NoError(t, toml.Unmarshal([]byte("A = [0x10, 0o20, 0b10000]"), &x))
+		assert.Equal(t, []float64{16, 16, 16}, x.A)
+	})
+	t.Run("prefixed integers into map of float64", func(t *testing.T) {
+		var x map[string]float64
+		assert.NoError(t, toml.Unmarshal([]byte("hex = 0x10\noct = 0o20\nbin = 0b10000"), &x))
+		assert.Equal(t, map[string]float64{"hex": 16, "oct": 16, "bin": 16}, x)
+	})
+	t.Run("prefixed integers into custom float type", func(t *testing.T) {
+		type CustomFloat float64
+		var x struct{ A CustomFloat }
+		assert.NoError(t, toml.Unmarshal([]byte("A = 0x10"), &x))
+		assert.Equal(t, CustomFloat(16), x.A)
 	})
 }
 

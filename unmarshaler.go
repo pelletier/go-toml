@@ -1841,7 +1841,11 @@ func (d *decoder) assignFloat(v reflect.Value, value *unstable.Node) (reflect.Va
 		}
 	}
 
-	f, err := parseFloat(value.Data)
+	parse := parseFloat
+	if value.Kind == unstable.Integer {
+		parse = parseIntegerAsFloat
+	}
+	f, err := parse(value.Data)
 	if err != nil {
 		return reflect.Value{}, err
 	}

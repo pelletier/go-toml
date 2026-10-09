@@ -113,6 +113,14 @@ func parseIntDec(b []byte) (int64, error) {
 	return int64(v), nil //nolint:gosec // v <= MaxInt64
 }
 
+func parseIntegerAsFloat(b []byte) (float64, error) {
+	if len(b) > 2 && b[0] == '0' && (b[1] == 'x' || b[1] == 'o' || b[1] == 'b') {
+		i, err := parseInteger(b)
+		return float64(i), err
+	}
+	return parseFloat(b)
+}
+
 func parseFloat(b []byte) (float64, error) {
 	i := 0
 	if len(b) > 0 && (b[0] == '+' || b[0] == '-') {
