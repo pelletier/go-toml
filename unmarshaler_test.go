@@ -6132,3 +6132,150 @@ func TestIssue1109_TextUnmarshalerDateTimeKinds(t *testing.T) {
 		assert.Equal(t, time.Date(2021, 3, 30, 0, 0, 0, 0, time.Local), x.V)
 	})
 }
+
+// Issue #1131: encoding.TextUnmarshaler was not called for named scalar types
+// used as map keys because makeMapKey checked kt.Kind() before checking
+// whether the type implements encoding.TextUnmarshaler.
+
+type textKeyStr1131 string
+
+func (s *textKeyStr1131) UnmarshalText(data []byte) error {
+	*s = textKeyStr1131("KEY:" + string(data))
+	return nil
+}
+
+type textKeyInt1131 int
+
+func (i *textKeyInt1131) UnmarshalText(data []byte) error {
+	v, err := strconv.Atoi(string(data))
+	if err != nil {
+		return err
+	}
+	*i = textKeyInt1131(v + 1000)
+	return nil
+}
+
+type textKeyUint1131 uint16
+
+func (u *textKeyUint1131) UnmarshalText(data []byte) error {
+	v, err := strconv.Atoi(string(data))
+	if err != nil {
+		return err
+	}
+	*u = textKeyUint1131(v + 10)
+	return nil
+}
+
+type textKeyFloat1131 float64
+
+func (f *textKeyFloat1131) UnmarshalText(data []byte) error {
+	v, err := strconv.ParseFloat(string(data), 64)
+	if err != nil {
+		return err
+	}
+	*f = textKeyFloat1131(v * 2)
+	return nil
+}
+
+type textKeyErr1131 string
+
+func (s *textKeyErr1131) UnmarshalText([]byte) error {
+	return errors.New("boom map key")
+}
+
+func TestIssue1131_TextUnmarshalerMapKeys(t *testing.T) {
+	t.Run("string kind map key", func(t *testing.T) {
+		var m map[textKeyStr1131]string
+		assert.NoError(t, toml.Unmarshal([]byte(`raw = "value"`), &m))
+		assert.Equal(t, map[textKeyStr1131]string{
+			"KEY:raw": "value",
+		}, m)
+	})
+
+	t.Run("int kind map key", func(t *testing.T) {
+		var m map[textKeyInt1131]string
+		assert.NoError(t, toml.Unmarshal([]byte(`42 = "value"`), &m))
+		assert.Equal(t, map[textKeyInt1131]string{
+			1042: "value",
+		}, m)
+	})
+
+	t.Run("uint kind map key", func(t *testing.T) {
+		var m map[textKeyUint1131]string
+		assert.NoError(t, toml.Unmarshal([]byte(`5 = "value"`), &m))
+		assert.Equal(t, map[textKeyUint1131]string{
+			15: "value",
+		}, m)
+	})
+
+	t.Run("float kind map key", func(t *testing.T) {
+		var m map[textKeyFloat1131]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"2.5" = "value"`), &m))
+		assert.Equal(t, map[textKeyFloat1131]string{
+			5.0: "value",
+		}, m)
+	})
+
+	t.Run("pointer to named scalar map key", func(t *testing.T) {
+		var m map[*textKeyStr1131]string
+		assert.NoError(t, toml.Unmarshal([]byte(`raw = "value"`), &m))
+		assert.Equal(t, 1, len(m))
+		for k, v := range m {
+			assert.Equal(t, textKeyStr1131("KEY:raw"), *k)
+			assert.Equal(t, "value", v)
+		}
+	})
+
+	t.Run("table header with named scalar map key", func(t *testing.T) {
+		var m map[textKeyStr1131]map[string]int
+		assert.NoError(t, toml.Unmarshal([]byte("[my_table]\nx = 1"), &m))
+		assert.Equal(t, map[textKeyStr1131]map[string]int{
+			"KEY:my_table": {"x": 1},
+		}, m)
+	})
+
+	t.Run("inline table with named scalar map key", func(t *testing.T) {
+		var x struct {
+			M map[textKeyStr1131]string
+		}
+		assert.NoError(t, toml.Unmarshal([]byte(`M = { raw = "value" }`), &x))
+		assert.Equal(t, map[textKeyStr1131]string{
+			"KEY:raw": "value",
+		}, x.M)
+	})
+
+	t.Run("nested map with named scalar key", func(t *testing.T) {
+		var m map[textKeyStr1131]map[textKeyStr1131]string
+		assert.NoError(t, toml.Unmarshal([]byte("a.b = \"nested\""), &m))
+		assert.Equal(t, map[textKeyStr1131]map[textKeyStr1131]string{
+			"KEY:a": {
+				"KEY:b": "nested",
+			},
+		}, m)
+	})
+
+	t.Run("error reported when UnmarshalText fails on map key", func(t *testing.T) {
+		var m map[textKeyErr1131]string
+		err := toml.Unmarshal([]byte(`raw = "value"`), &m)
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "boom map key"), "error %q should mention failure", err)
+	})
+
+	t.Run("named scalar types without TextUnmarshaler decode natively", func(t *testing.T) {
+		type plainStr string
+		type plainInt int
+		type plainFloat float64
+
+		var ms map[plainStr]string
+		assert.NoError(t, toml.Unmarshal([]byte(`hello = "world"`), &ms))
+		assert.Equal(t, map[plainStr]string{"hello": "world"}, ms)
+
+		var mi map[plainInt]string
+		assert.NoError(t, toml.Unmarshal([]byte(`42 = "answer"`), &mi))
+		assert.Equal(t, map[plainInt]string{42: "answer"}, mi)
+
+		var mf map[plainFloat]string
+		assert.NoError(t, toml.Unmarshal([]byte(`"3.14" = "pi"`), &mf))
+		assert.Equal(t, map[plainFloat]string{3.14: "pi"}, mf)
+	})
+}
