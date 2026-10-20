@@ -32,6 +32,7 @@ func Marshal(v interface{}) ([]byte, error) {
 	e.buf = e.buf[:0]
 	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
+	e.depth = 0
 
 	err := e.encodeRoot(v)
 	if err != nil {
@@ -251,6 +252,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 	e.buf = e.buf[:0]
 	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
+	e.depth = 0
 
 	err := e.encodeRoot(v)
 	if err != nil {
@@ -298,6 +300,10 @@ type encoderState struct {
 	// the per-value hot path checks a direct field instead of dereferencing the
 	// embedded *Encoder on every value.
 	marshalerOn bool
+
+	// depth tracks the nesting depth of tables, inline tables, and arrays to
+	// abort cyclic or excessively deep structures.
+	depth int
 }
 
 // valueOptions are the encoding options attached to one entry of a table.
@@ -338,6 +344,25 @@ const (
 	// shapeTable is one or more key-value lines, emitted as a `[key]` body.
 	shapeTable
 )
+
+// maxDepth is the deepest nesting of tables, inline tables, and arrays the
+// encoder accepts. Values nested beyond this limit indicate a cycle or
+// exceed realistic TOML document depth.
+const maxDepth = 1000
+
+// enter increments nesting depth and returns an error when exceeding maxDepth.
+// Every call to enter pairs with a call to leave.
+func (e *encoderState) enter() error {
+	e.depth++
+	if e.depth > maxDepth {
+		return fmt.Errorf("toml: encountered a cycle, or a value nested deeper than %d", maxDepth)
+	}
+	return nil
+}
+
+func (e *encoderState) leave() {
+	e.depth--
+}
 
 func (e *encoderState) encodeRoot(v interface{}) error {
 	if v == nil {
@@ -668,6 +693,11 @@ func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) 
 // encodeTableEntries writes the given table entries at the given key path,
 // and returns them to the pool.
 func (e *encoderState) encodeTableEntries(entries []entry, commented bool, indent int) error {
+	if err := e.enter(); err != nil {
+		return err
+	}
+	defer e.leave()
+
 	// Marshaler routing is hoisted behind a single local flag. When the (opt-in)
 	// interface is off, mOn is false and both passes run the exact baseline
 	// code, so the default Marshal path keeps its performance.
@@ -885,6 +915,10 @@ func (e *encoderState) putEntries(s []entry) {
 // encodeArrayTable writes all the elements of an array of tables.
 func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) error {
 	v, _ := resolve(ent.value)
+	if err := e.enter(); err != nil {
+		return err
+	}
+	defer e.leave()
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
 		// Elements are resolvable: isArrayOfTables already resolved them.
@@ -1665,6 +1699,11 @@ func (e *encoderState) appendTextMarshaler(b []byte, m encoding.TextMarshaler) (
 
 // appendArray encodes a slice or array value.
 func (e *encoderState) appendArray(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
+	if err := e.enter(); err != nil {
+		return nil, err
+	}
+	defer e.leave()
+
 	multiline := opts.multiline || e.arraysMultiline
 
 	b = append(b, '[')
@@ -1704,6 +1743,11 @@ func (e *encoderState) appendArray(b []byte, v reflect.Value, opts valueOptions,
 
 // appendInlineTable encodes a map or a struct as an inline table.
 func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) ([]byte, error) {
+	if err := e.enter(); err != nil {
+		return nil, err
+	}
+	defer e.leave()
+
 	entries, err := e.collectEntries(v)
 	if err != nil {
 		return nil, err

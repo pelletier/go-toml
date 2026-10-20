@@ -3256,3 +3256,147 @@ func TestMarshalTextMarshalerInvalidUTF8(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, utf8.ValidString(back["k"]), "round-tripped value must be valid UTF-8, got %q", back["k"])
 }
+
+func TestMarshalCyclicMap(t *testing.T) {
+	value := map[string]interface{}{"leaf": ""}
+	value["self"] = value
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(value)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on cyclic map")
+	}
+}
+
+func TestMarshalCyclicMapInline(t *testing.T) {
+	value := map[string]interface{}{"leaf": ""}
+	value["self"] = value
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetTablesInline(true)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- enc.Encode(value)
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Encoder.Encode hung on cyclic inline map")
+	}
+}
+
+func TestMarshalCyclicSlice(t *testing.T) {
+	s := make([]interface{}, 1)
+	s[0] = s
+	doc := map[string]interface{}{"s": s}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(doc)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on cyclic slice")
+	}
+}
+
+func TestMarshalCyclicSliceMultiline(t *testing.T) {
+	s := make([]interface{}, 1)
+	s[0] = s
+	doc := map[string]interface{}{"s": s}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetArraysMultiline(true)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- enc.Encode(doc)
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Encoder.Encode hung on cyclic multiline slice")
+	}
+}
+
+func TestMarshalCyclicPointerChain(t *testing.T) {
+	type node struct {
+		Next *node
+	}
+	n := &node{}
+	n.Next = n
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(n)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on cyclic pointer chain")
+	}
+}
+
+func TestMarshalCyclicPointerChainMultiNode(t *testing.T) {
+	type node struct {
+		Next *node
+	}
+	n1 := &node{}
+	n2 := &node{Next: n1}
+	n1.Next = n2
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(n1)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on multi-node cyclic pointer chain")
+	}
+}
+
+func TestMarshalDeepNestingBelowMaxDepth(t *testing.T) {
+	nested := map[string]interface{}{}
+	curr := nested
+	for i := 0; i < 50; i++ {
+		next := map[string]interface{}{}
+		curr["k"] = next
+		curr = next
+	}
+	curr["leaf"] = "value"
+
+	b, err := toml.Marshal(nested)
+	assert.NoError(t, err)
+	assert.True(t, len(b) > 0)
+}
