@@ -879,7 +879,7 @@ key5 = [ # Next to start of inline array.
 	// 18:1->18:15 (371->385)    | Comment [# Above array.]
 	// ---
 	// 19:1->19:20 (386->405)    | KeyValue []
-	// 1:1->1:1 (0->0)           |   Array []
+	// 19:9->19:10 (394->395)    |   Array []
 	// 19:11->19:12 (396->397)   |     Integer [1]
 	// 19:14->19:15 (399->400)   |     Integer [2]
 	// 19:17->19:18 (402->403)   |     Integer [3]
@@ -891,7 +891,7 @@ key5 = [ # Next to start of inline array.
 	// 22:1->22:26 (448->473)    | Comment [# Above multi-line array.]
 	// ---
 	// 23:1->31:2 (474->694)     | KeyValue []
-	// 1:1->1:1 (0->0)           |   Array []
+	// 23:8->23:9 (481->482)     |   Array []
 	// 23:10->23:42 (483->515)   |     Comment [# Next to start of inline array.]
 	// 24:3->24:38 (518->553)    |       Comment [# Second line before array content.]
 	// 25:3->25:4 (556->557)     |     Integer [1]

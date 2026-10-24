@@ -680,7 +680,7 @@ func scanKeyword(b []byte, kw string, kind Kind) (Kind, []byte, []byte, []byte, 
 
 // parseValArray parses an array value. b starts at '['.
 func (p *Parser) parseValArray(b []byte) (int32, []byte, error) {
-	arr := p.push(Node{Kind: Array})
+	arr := p.push(Node{Kind: Array, Raw: p.Range(b[:1])})
 	b = b[1:]
 
 	var lastChild int32
