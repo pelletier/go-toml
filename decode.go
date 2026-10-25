@@ -40,6 +40,8 @@ func parseIntHex(b []byte) (int64, error) {
 			d = c - 'a' + 10
 		case c >= 'A' && c <= 'F':
 			d = c - 'A' + 10
+		default:
+			return 0, unstable.NewParserError(b, "invalid hex digit %q", c)
 		}
 		if v > math.MaxInt64>>4 {
 			return 0, unstable.NewParserError(b, "hexadecimal number is too large to fit in a 64-bit signed integer")
@@ -55,6 +57,9 @@ func parseIntOct(b []byte) (int64, error) {
 		if c == '_' {
 			continue
 		}
+		if c < '0' || c > '7' {
+			return 0, unstable.NewParserError(b, "invalid octal digit %q", c)
+		}
 		if v > math.MaxInt64>>3 {
 			return 0, unstable.NewParserError(b, "octal number is too large to fit in a 64-bit signed integer")
 		}
@@ -68,6 +73,9 @@ func parseIntBin(b []byte) (int64, error) {
 	for _, c := range b[2:] {
 		if c == '_' {
 			continue
+		}
+		if c != '0' && c != '1' {
+			return 0, unstable.NewParserError(b, "invalid binary digit %q", c)
 		}
 		if v > math.MaxInt64>>1 {
 			return 0, unstable.NewParserError(b, "binary number is too large to fit in a 64-bit signed integer")
