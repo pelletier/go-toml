@@ -55,6 +55,7 @@ type Encoder struct {
 	arraysMultiline      bool
 	indentSymbol         string
 	indentTables         bool
+	indentCommented      bool
 	marshalJSONNumbers   bool
 	omitEmptySuperTables bool
 
@@ -104,6 +105,28 @@ func (enc *Encoder) SetIndentSymbol(s string) *Encoder {
 // SetIndentTables forces the encoder to intent tables and array tables.
 func (enc *Encoder) SetIndentTables(indent bool) *Encoder {
 	enc.indentTables = indent
+	return enc
+}
+
+// SetIndentCommented places the comment marker of values and tables using the
+// "commented" option after the table indentation, instead of at column zero.
+// It only has an effect when SetIndentTables is enabled. For example, instead
+// of:
+//
+//	[server]
+//	  # Port of the server.
+//	#   port = 4242
+//
+// the encoder emits:
+//
+//	[server]
+//	  # Port of the server.
+//	  # port = 4242
+//
+// This matches what most editors produce when commenting out an indented line,
+// and keeps commented-out values aligned with the comments that document them.
+func (enc *Encoder) SetIndentCommented(indent bool) *Encoder {
+	enc.indentCommented = indent
 	return enc
 }
 
@@ -238,7 +261,8 @@ func (enc *Encoder) EnableMarshalerInterface() *Encoder {
 // The "omitzero" option prevents zero values or groups from being emitted.
 //
 // The "commented" option prefixes the value and all its children with a
-// comment symbol.
+// comment symbol. In indented tables, the symbol is placed at column zero,
+// unless SetIndentCommented is enabled.
 //
 // In addition to the "toml" tag struct tag, a "comment" tag can be used to
 // emit a TOML comment before the value being annotated. Comments are ignored
@@ -930,13 +954,7 @@ func (e *encoderState) writeTableHeader(comment string, commented bool, array bo
 
 	e.writeComment(comment, headerIndent)
 
-	// The "commented" marker is emitted at column zero, ahead of any table
-	// indentation, so that the indentation appears inside the comment
-	// (e.g. `#   [a.b]`). This matches the historical v2.3 layout.
-	if commented {
-		e.buf = append(e.buf, "# "...)
-	}
-	e.writeIndent(headerIndent)
+	e.writeLineStart(commented, headerIndent)
 	e.buf = append(e.buf, '[')
 	if array {
 		e.buf = append(e.buf, '[')
@@ -964,6 +982,52 @@ func (e *encoderState) writeIndent(indent int) {
 	}
 }
 
+// writeLineStart emits the indentation of a key-value or table header line,
+// and the comment marker if the line is commented out.
+//
+// By default, the "commented" marker is emitted at column zero, ahead of any
+// table indentation, so that the indentation appears inside the comment
+// (e.g. `#   key = value`). This matches the historical v2.3 layout. With
+// SetIndentCommented, the marker follows the indentation instead
+// (e.g. `  # key = value`).
+func (e *encoderState) writeLineStart(commented bool, indent int) {
+	if commented && !e.indentCommented {
+		e.buf = append(e.buf, "# "...)
+	}
+	e.writeIndent(indent)
+	if commented && e.indentCommented {
+		e.buf = append(e.buf, "# "...)
+	}
+}
+
+// commentContinuationLines prefixes every line of e.buf[start:] but the first
+// one with the comment marker.
+//
+// With SetIndentCommented, the marker is placed after the given indentation
+// when the line starts with it, so that the elements of a multiline array stay
+// aligned with their key. Other lines keep the marker at column zero.
+func (e *encoderState) commentContinuationLines(start int, indent int) {
+	region := append([]byte(nil), e.buf[start:]...)
+	if !e.indentCommented || !e.indentTables || indent == 0 {
+		e.buf = append(e.buf[:start], bytes.ReplaceAll(region, []byte("\n"), []byte("\n# "))...)
+		return
+	}
+
+	prefix := []byte(strings.Repeat(e.indentSymbol, indent))
+	e.buf = e.buf[:start]
+	for i, line := range bytes.Split(region, []byte("\n")) {
+		if i > 0 {
+			e.buf = append(e.buf, '\n')
+			if bytes.HasPrefix(line, prefix) {
+				e.buf = append(e.buf, prefix...)
+				line = line[len(prefix):]
+			}
+			e.buf = append(e.buf, "# "...)
+		}
+		e.buf = append(e.buf, line...)
+	}
+}
+
 // writeComment emits the comment lines attached to an entry.
 func (e *encoderState) writeComment(comment string, indent int) {
 	if comment == "" {
@@ -983,16 +1047,11 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 
 	e.writeComment(ent.options.comment, indent)
 
-	// The "commented" marker is emitted at column zero, ahead of any table
-	// indentation, so that the indentation appears inside the comment
-	// (e.g. `#   key = value`). This matches the historical v2.3 layout.
 	lineStart := len(e.buf)
-	if commented {
-		e.buf = append(e.buf, "# "...)
-	}
-	e.writeIndent(indent)
+	e.writeLineStart(commented, indent)
 	e.buf = e.appendKey(e.buf, ent.key)
 	e.buf = append(e.buf, " = "...)
+	valueStart := len(e.buf)
 
 	// When tables are not indented, the key is emitted at column zero
 	// regardless of its nesting depth. Value continuation lines (most
@@ -1023,11 +1082,13 @@ func (e *encoderState) encodeKeyValue(ent entry, commented bool, indent int) err
 	// emitted as live, syntactically invalid TOML.
 	if commented {
 		if bytes.IndexByte(e.buf[lineStart:], '\n') >= 0 {
-			region := bytes.ReplaceAll(
-				append([]byte(nil), e.buf[lineStart:]...),
-				[]byte("\n"), []byte("\n# "),
-			)
-			e.buf = append(e.buf[:lineStart], region...)
+			// The continuation lines of a multiline string are its content,
+			// which is never indented.
+			alignIndent := indent
+			if v := e.buf[valueStart:]; bytes.HasPrefix(v, []byte(`"""`)) || bytes.HasPrefix(v, []byte(`'''`)) {
+				alignIndent = 0
+			}
+			e.commentContinuationLines(lineStart, alignIndent)
 		}
 	}
 	e.buf = append(e.buf, '\n')

@@ -918,6 +918,7 @@ var allFlags = flagsSetters{
 	{"arrays-multiline", (*toml.Encoder).SetArraysMultiline},
 	{"tables-inline", (*toml.Encoder).SetTablesInline},
 	{"indent-tables", (*toml.Encoder).SetIndentTables},
+	{"indent-commented", (*toml.Encoder).SetIndentCommented},
 	{"omit-empty-super-tables", (*toml.Encoder).SetOmitEmptySuperTables},
 }
 
@@ -1045,6 +1046,153 @@ func TestMarshalIndentTables(t *testing.T) {
 			err := enc.Encode(e.v)
 			assert.NoError(t, err)
 			assert.Equal(t, e.expected, buf.String())
+		})
+	}
+}
+
+func TestMarshalIndentCommented(t *testing.T) {
+	type Leaf struct {
+		A int    `comment:"doc A"`
+		B string `toml:"b,commented"`
+	}
+	type Mid struct {
+		Leaf Leaf `toml:"leaf"`
+	}
+	type Item struct {
+		X int `toml:"x" comment:"doc x"`
+	}
+
+	examples := []struct {
+		desc     string
+		v        interface{}
+		noIndent bool
+		symbol   string
+		expected string
+	}{
+		{
+			desc: "key-value in a table",
+			v: struct {
+				Server struct {
+					Port int `toml:"port,commented" comment:"Port of the server."`
+				} `toml:"server"`
+			}{},
+			expected: `[server]
+  # Port of the server.
+  # port = 0
+`,
+		},
+		{
+			desc: "commented table and its sub-tables",
+			v: struct {
+				Mid Mid `toml:"mid,commented"`
+				Y   int `toml:"y"`
+			}{Mid: Mid{Leaf: Leaf{A: 1, B: "x"}}, Y: 9},
+			expected: `y = 9
+
+# [mid]
+  # [mid.leaf]
+    # doc A
+    # A = 1
+    # b = 'x'
+`,
+		},
+		{
+			desc: "commented key next to a live one",
+			v: struct {
+				Leaf Leaf `toml:"leaf"`
+			}{Leaf: Leaf{A: 1, B: "x"}},
+			expected: `[leaf]
+  # doc A
+  A = 1
+  # b = 'x'
+`,
+		},
+		{
+			desc: "array table",
+			v: struct {
+				Items []Item `toml:"items,commented" comment:"doc items"`
+			}{Items: []Item{{X: 1}, {X: 2}}},
+			expected: `# doc items
+# [[items]]
+  # doc x
+  # x = 1
+
+# [[items]]
+  # doc x
+  # x = 2
+`,
+		},
+		{
+			desc: "multiline array aligned with its key",
+			v: struct {
+				T struct {
+					Arr []int `toml:"arr,multiline,commented"`
+				} `toml:"t"`
+			}{T: struct {
+				Arr []int `toml:"arr,multiline,commented"`
+			}{Arr: []int{1, 2}}},
+			expected: `[t]
+  # arr = [
+  #   1,
+  #   2
+  # ]
+`,
+		},
+		{
+			desc: "multiline string content keeps the marker at column zero",
+			v: struct {
+				T struct {
+					S string `toml:"s,multiline,commented"`
+				} `toml:"t"`
+			}{T: struct {
+				S string `toml:"s,multiline,commented"`
+			}{S: "l1\n  l2"}},
+			expected: `[t]
+  # s = """
+# l1
+#   l2"""
+`,
+		},
+		{
+			desc:   "custom indent symbol",
+			symbol: "\t",
+			v: struct {
+				Leaf Leaf `toml:"leaf"`
+			}{Leaf: Leaf{A: 1, B: "x"}},
+			expected: "[leaf]\n\t# doc A\n\tA = 1\n\t# b = 'x'\n",
+		},
+		{
+			desc:     "no effect without SetIndentTables",
+			noIndent: true,
+			v: struct {
+				Mid Mid `toml:"mid,commented"`
+			}{Mid: Mid{Leaf: Leaf{A: 1, B: "x"}}},
+			expected: `# [mid]
+# [mid.leaf]
+# doc A
+# A = 1
+# b = 'x'
+`,
+		},
+	}
+
+	for _, e := range examples {
+		e := e
+		t.Run(e.desc, func(t *testing.T) {
+			var buf strings.Builder
+			enc := toml.NewEncoder(&buf)
+			enc.SetIndentTables(!e.noIndent)
+			enc.SetIndentCommented(true)
+			if e.symbol != "" {
+				enc.SetIndentSymbol(e.symbol)
+			}
+			err := enc.Encode(e.v)
+			assert.NoError(t, err)
+			assert.Equal(t, e.expected, buf.String())
+
+			// make sure the output is always valid TOML
+			m := map[string]interface{}{}
+			assert.NoError(t, toml.Unmarshal([]byte(buf.String()), &m))
 		})
 	}
 }
@@ -2426,6 +2574,50 @@ func ExampleEncoder_SetOmitEmptySuperTables() {
 	// [Database.Credentials]
 	// User = 'root'
 	// Password = 'hunter2'
+}
+
+func ExampleEncoder_SetIndentCommented() {
+	type TLS struct {
+		Cipher  string `toml:"cipher"`
+		Version string `toml:"version"`
+	}
+	type Server struct {
+		Host string `toml:"host" comment:"Host IP to connect to."`
+		Port int    `toml:"port,commented" comment:"Port of the remote server."`
+		TLS  TLS    `toml:"TLS,commented" comment:"Encryption parameters (optional)"`
+	}
+	type Config struct {
+		Server Server `toml:"server"`
+	}
+
+	cfg := Config{
+		Server: Server{
+			Host: "127.0.0.1",
+			Port: 4242,
+			TLS:  TLS{Cipher: "AEAD-AES128-GCM-SHA256", Version: "TLS 1.3"},
+		},
+	}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetIndentTables(true)
+	enc.SetIndentCommented(true)
+	if err := enc.Encode(cfg); err != nil {
+		panic(err)
+	}
+	fmt.Println(buf.String())
+
+	// Output:
+	// [server]
+	//   # Host IP to connect to.
+	//   host = '127.0.0.1'
+	//   # Port of the remote server.
+	//   # port = 4242
+	//
+	//   # Encryption parameters (optional)
+	//   # [server.TLS]
+	//     # cipher = 'AEAD-AES128-GCM-SHA256'
+	//     # version = 'TLS 1.3'
 }
 
 // Example that uses the 'commented' field tag option to generate an example

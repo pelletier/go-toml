@@ -93,7 +93,13 @@ port = 4242
 # version = 'TLS 1.3'
 ```
 
+When tables are indented with `Encoder.SetIndentTables`,
+[`Encoder.SetIndentCommented`][indent-commented-example] places the comment
+marker of commented-out values after the indentation, the way most editors
+comment out a line.
+
 [comments-example]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#example-Marshal-Commented
+[indent-commented-example]: https://pkg.go.dev/github.com/pelletier/go-toml/v2#example-Encoder.SetIndentCommented
 
 ## Getting started
 
