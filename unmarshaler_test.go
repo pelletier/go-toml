@@ -432,6 +432,21 @@ func TestUnmarshal_Floats(t *testing.T) {
 			input: `+0_0.0`,
 			err:   true,
 		},
+		{
+			desc:     "hex integer into float",
+			input:    `0x10`,
+			expected: 16,
+		},
+		{
+			desc:     "octal integer into float",
+			input:    `0o20`,
+			expected: 16,
+		},
+		{
+			desc:     "binary integer into float",
+			input:    `0b10000`,
+			expected: 16,
+		},
 	}
 
 	type doc struct {
@@ -6046,6 +6061,12 @@ func TestIssue1109_TextUnmarshalerNamedScalarKinds(t *testing.T) {
 		var x struct{ V textScalarFloat1109 }
 		assert.NoError(t, toml.Unmarshal([]byte(`V = 2`), &x))
 		assert.Equal(t, textScalarFloat1109(20), x.V)
+	})
+
+	t.Run("hex integer into float kind", func(t *testing.T) {
+		// UnmarshalText gets the raw literal, and its error is returned.
+		var x struct{ V textScalarFloat1109 }
+		assert.Error(t, toml.Unmarshal([]byte(`V = 0x10`), &x))
 	})
 
 	t.Run("bool", func(t *testing.T) {
