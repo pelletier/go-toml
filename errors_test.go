@@ -367,6 +367,49 @@ func TestDecodeError_PositionAfterComments(t *testing.T) {
 	}
 }
 
+// TestDecodeError_NonASCIICharacter checks that error messages naming the
+// offending character decode the full UTF-8 sequence instead of
+// reinterpreting its first byte as a code point.
+func TestDecodeError_NonASCIICharacter(t *testing.T) {
+	examples := []struct {
+		doc     string
+		message string
+	}{
+		{doc: "é = 1", message: "invalid character at start of key: U+00E9 'é'"},
+		{doc: "a.é = 1", message: "invalid character at start of key: U+00E9 'é'"},
+		{doc: "[é]", message: "invalid character at start of key: U+00E9 'é'"},
+		{doc: "a = 1 é", message: "expected newline but got U+00E9 'é'"},
+		{doc: "[a] é", message: "expected newline but got U+00E9 'é'"},
+		{doc: "a = é", message: "unexpected character U+00E9 'é' at start of value"},
+		{doc: "a = [é]", message: "unexpected character U+00E9 'é' at start of value"},
+		{doc: "a = +é", message: "expected digit but got U+00E9 'é'"},
+		{doc: `a = "\é"`, message: "invalid escape character U+00E9 'é'"},
+		{doc: `a = """\é"""`, message: "invalid escape character U+00E9 'é'"},
+		{doc: "a = 1 €", message: "expected newline but got U+20AC '€'"},
+	}
+
+	for _, e := range examples {
+		t.Run(e.doc, func(t *testing.T) {
+			var v interface{}
+			err := Unmarshal([]byte(e.doc), &v)
+			var derr *DecodeError
+			if !errors.As(err, &derr) {
+				t.Fatalf("expected DecodeError, got %v", err)
+			}
+			assert.Equal(t, e.message, derr.Error()[len("toml: "):])
+
+			var s struct {
+				A interface{} `toml:"a"`
+			}
+			err = Unmarshal([]byte(e.doc), &s)
+			if !errors.As(err, &derr) {
+				t.Fatalf("expected DecodeError, got %v", err)
+			}
+			assert.Equal(t, e.message, derr.Error()[len("toml: "):])
+		})
+	}
+}
+
 func TestErrorPositionConsistency(t *testing.T) {
 	// Verify that the unstable parser API and the public Unmarshal API
 	// report the same error positions for identical documents.
