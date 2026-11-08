@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2/internal/parserbridge"
 	"github.com/pelletier/go-toml/v2/unstable"
@@ -338,7 +339,8 @@ func fusedConsumeEOL(b []byte) ([]byte, error) {
 			return b[2:], nil
 		}
 	}
-	return nil, unstable.NewParserError(b[:1], "expected newline but got %#U", b[0])
+	r, _ := utf8.DecodeRune(b)
+	return nil, unstable.NewParserError(b[:1], "expected newline but got %#U", r)
 }
 
 // fusedFinishLine consumes `ws [comment] (newline|eof)` after an expression.

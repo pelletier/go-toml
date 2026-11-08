@@ -307,7 +307,7 @@ func consumeEOL(b []byte) ([]byte, error) {
 			return b[2:], nil
 		}
 	}
-	return nil, NewParserError(b[:1], "expected newline but got %#U", b[0])
+	return nil, NewParserError(b[:1], "expected newline but got %#U", firstRune(b))
 }
 
 // finishLine handles `ws [comment] (newline|eof)` after a top-level
@@ -479,7 +479,7 @@ func (p *Parser) scanSimpleKey(b []byte) (raw, value, rest []byte, err error) {
 			i++
 		}
 		if i == 0 {
-			return nil, nil, nil, NewParserError(b[:1], "invalid character at start of key: %#U", b[0])
+			return nil, nil, nil, NewParserError(b[:1], "invalid character at start of key: %#U", firstRune(b))
 		}
 		return b[:i], b[:i], b[i:], nil
 	}
@@ -553,7 +553,7 @@ func (p *Parser) parseVal(b []byte) (int32, []byte, error) {
 		}
 		return p.parseIntOrFloat(b)
 	default:
-		return 0, nil, NewParserError(b[:1], "unexpected character %#U at start of value", c)
+		return 0, nil, NewParserError(b[:1], "unexpected character %#U at start of value", firstRune(b))
 	}
 }
 
@@ -603,7 +603,7 @@ func (p *Parser) scanScalar(b []byte) (kind Kind, raw, value, rest []byte, err e
 		}
 		return scanIntOrFloat(b)
 	default:
-		return Invalid, nil, nil, nil, NewParserError(b[:1], "unexpected character %#U at start of value", c)
+		return Invalid, nil, nil, nil, NewParserError(b[:1], "unexpected character %#U at start of value", firstRune(b))
 	}
 }
 
@@ -997,7 +997,7 @@ func scanIntOrFloat(b []byte) (Kind, []byte, []byte, []byte, error) {
 	}
 
 	if !isDigit(b[i]) {
-		return Invalid, nil, nil, nil, NewParserError(b[i:i+1], "expected digit but got %#U", b[i])
+		return Invalid, nil, nil, nil, NewParserError(b[i:i+1], "expected digit but got %#U", firstRune(b[i:]))
 	}
 
 	// radix prefixes
@@ -1407,7 +1407,7 @@ func unescape(buf []byte, b []byte, i int) ([]byte, int, error) {
 	case 'U':
 		return unescapeUnicode(buf, b, i+1, 8)
 	default:
-		return nil, 0, NewParserError(b[i-1:i+1], "invalid escape character %#U", c)
+		return nil, 0, NewParserError(b[i-1:i+1], "invalid escape character %#U", firstRune(b[i:]))
 	}
 }
 
@@ -1571,7 +1571,7 @@ func (p *Parser) parseMultilineBasicStringEscaped(b []byte, contentStart, i int)
 					j++
 				}
 				if j >= len(b) || b[j] != '\n' {
-					return nil, nil, nil, NewParserError(b[i-1:i+1], "invalid escape character %#U", b[i])
+					return nil, nil, nil, NewParserError(b[i-1:i+1], "invalid escape character %#U", firstRune(b[i:]))
 				}
 				j++
 				for j < len(b) && (b[j] == ' ' || b[j] == '\t' || b[j] == '\n' || b[j] == '\r') {
@@ -1683,4 +1683,11 @@ func scanUtf8Run(b []byte, i int) (int, bool) {
 		}
 	}
 	return i, true
+}
+
+// firstRune returns the first UTF-8 encoded rune of b, so that error messages
+// name the offending character rather than its first byte.
+func firstRune(b []byte) rune {
+	r, _ := utf8.DecodeRune(b)
+	return r
 }
