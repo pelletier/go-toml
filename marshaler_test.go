@@ -3256,3 +3256,56 @@ func TestMarshalTextMarshalerInvalidUTF8(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, utf8.ValidString(back["k"]), "round-tripped value must be valid UTF-8, got %q", back["k"])
 }
+
+func TestMarshalCycle(t *testing.T) {
+	check := func(t *testing.T, v any) {
+		t.Helper()
+		result := make(chan error, 1)
+		go func() {
+			_, err := toml.Marshal(v)
+			result <- err
+		}()
+		select {
+		case err := <-result:
+			if err == nil {
+				t.Fatal("toml.Marshal should return an error for a cyclic value")
+			}
+			if !strings.Contains(err.Error(), "cyclic") {
+				t.Fatalf("expected a cycle error, got %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("toml.Marshal did not finish within 5 seconds for a cyclic value")
+		}
+	}
+
+	t.Run("self-referencing map", func(t *testing.T) {
+		value := map[string]interface{}{"leaf": ""}
+		value["self"] = value
+		check(t, value)
+	})
+
+	t.Run("self-referencing slice", func(t *testing.T) {
+		value := map[string]interface{}{"leaf": ""}
+		s := []any{"x"}
+		s[0] = s
+		value["arr"] = s
+		check(t, value)
+	})
+
+	t.Run("pointer cycle", func(t *testing.T) {
+		type node struct {
+			Next *node
+		}
+		n := &node{}
+		n.Next = n
+		check(t, n)
+	})
+
+	t.Run("shared sibling is not a cycle", func(t *testing.T) {
+		shared := map[string]interface{}{"k": "v"}
+		value := map[string]interface{}{"a": shared, "b": shared}
+		if _, err := toml.Marshal(value); err != nil {
+			t.Fatalf("shared sibling maps should encode, got %v", err)
+		}
+	})
+}

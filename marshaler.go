@@ -32,6 +32,7 @@ func Marshal(v interface{}) ([]byte, error) {
 	e.buf = e.buf[:0]
 	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
+	clear(e.ptrSeen)
 
 	err := e.encodeRoot(v)
 	if err != nil {
@@ -251,6 +252,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 	e.buf = e.buf[:0]
 	e.keyStack = e.keyStack[:0]
 	e.lastWasHeader = false
+	clear(e.ptrSeen)
 
 	err := e.encodeRoot(v)
 	if err != nil {
@@ -298,6 +300,59 @@ type encoderState struct {
 	// the per-value hot path checks a direct field instead of dereferencing the
 	// embedded *Encoder on every value.
 	marshalerOn bool
+
+	// ptrSeen tracks in-flight maps, slices, and addressable structs so a
+	// self-referencing value returns an error instead of allocating forever.
+	ptrSeen map[cycleKey]struct{}
+}
+
+// cycleKey identifies a composite value while it is being encoded.
+type cycleKey struct {
+	p   uintptr
+	typ reflect.Type
+	n   int
+}
+
+func cycleKeyFor(v reflect.Value) (cycleKey, bool) {
+	switch v.Kind() {
+	case reflect.Map:
+		if v.IsNil() {
+			return cycleKey{}, false
+		}
+		return cycleKey{p: v.Pointer(), typ: v.Type()}, true
+	case reflect.Slice:
+		if v.IsNil() || (v.Pointer() == 0 && v.Len() == 0) {
+			return cycleKey{}, false
+		}
+		return cycleKey{p: v.Pointer(), typ: v.Type(), n: v.Len()}, true
+	case reflect.Ptr:
+		if v.IsNil() {
+			return cycleKey{}, false
+		}
+		return cycleKey{p: v.Pointer(), typ: v.Type()}, true
+	case reflect.Struct:
+		if !v.CanAddr() {
+			return cycleKey{}, false
+		}
+		return cycleKey{p: v.Addr().Pointer(), typ: v.Type()}, true
+	default:
+		return cycleKey{}, false
+	}
+}
+
+func (e *encoderState) enterValue(v reflect.Value) (func(), error) {
+	key, ok := cycleKeyFor(v)
+	if !ok {
+		return func() {}, nil
+	}
+	if e.ptrSeen == nil {
+		e.ptrSeen = make(map[cycleKey]struct{})
+	}
+	if _, seen := e.ptrSeen[key]; seen {
+		return nil, fmt.Errorf("toml: cannot encode a cyclic value of type %s", v.Type())
+	}
+	e.ptrSeen[key] = struct{}{}
+	return func() { delete(e.ptrSeen, key) }, nil
 }
 
 // valueOptions are the encoding options attached to one entry of a table.
@@ -658,6 +713,12 @@ func (e *encoderState) appendMarshalerInline(b []byte, v reflect.Value, t reflec
 
 // encodeTable writes the content of a table at the given key path.
 func (e *encoderState) encodeTable(v reflect.Value, commented bool, indent int) error {
+	done, err := e.enterValue(v)
+	if err != nil {
+		return err
+	}
+	defer done()
+
 	entries, err := e.collectEntries(v)
 	if err != nil {
 		return err
@@ -757,36 +818,44 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 		// The value is resolvable: entryIsTable already resolved it.
 		tv, _ := resolve(ent.value)
 
-		subEntries, err := e.collectEntries(tv)
-		if err != nil {
-			return err
-		}
-
-		subIndent := indent + 1
-		if e.omitEmptySuperTables && ent.options.comment == "" {
-			if mOn {
-				// The check below routes entries by their Marshaler shape,
-				// so classification cannot wait for encodeTableEntries.
-				// resolveMarshalerEntries skips already-classified entries,
-				// making the second call there a no-op.
-				if err := e.resolveMarshalerEntries(subEntries); err != nil {
-					return err
-				}
+		err := func() error {
+			done, err := e.enterValue(tv)
+			if err != nil {
+				return err
 			}
-			if e.onlySubTables(subEntries) {
-				// The table has no key-value of its own and at least one
-				// sub-table: emitting the sub-tables implicitly defines it,
-				// so its header can be omitted. Its children take its place
-				// in the indentation hierarchy.
-				subIndent = indent
+			defer done()
+
+			subEntries, err := e.collectEntries(tv)
+			if err != nil {
+				return err
+			}
+
+			subIndent := indent + 1
+			if e.omitEmptySuperTables && ent.options.comment == "" {
+				if mOn {
+					// The check below routes entries by their Marshaler shape,
+					// so classification cannot wait for encodeTableEntries.
+					// resolveMarshalerEntries skips already-classified entries,
+					// making the second call there a no-op.
+					if err := e.resolveMarshalerEntries(subEntries); err != nil {
+						return err
+					}
+				}
+				if e.onlySubTables(subEntries) {
+					// The table has no key-value of its own and at least one
+					// sub-table: emitting the sub-tables implicitly defines it,
+					// so its header can be omitted. Its children take its place
+					// in the indentation hierarchy.
+					subIndent = indent
+				} else {
+					e.writeTableHeader(ent.options.comment, entCommented, false, indent)
+				}
 			} else {
 				e.writeTableHeader(ent.options.comment, entCommented, false, indent)
 			}
-		} else {
-			e.writeTableHeader(ent.options.comment, entCommented, false, indent)
-		}
 
-		err = e.encodeTableEntries(subEntries, entCommented, subIndent)
+			return e.encodeTableEntries(subEntries, entCommented, subIndent)
+		}()
 		if err != nil {
 			return err
 		}
@@ -1665,6 +1734,12 @@ func (e *encoderState) appendTextMarshaler(b []byte, m encoding.TextMarshaler) (
 
 // appendArray encodes a slice or array value.
 func (e *encoderState) appendArray(b []byte, v reflect.Value, opts valueOptions, indent int) ([]byte, error) {
+	done, err := e.enterValue(v)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
 	multiline := opts.multiline || e.arraysMultiline
 
 	b = append(b, '[')
@@ -1704,6 +1779,12 @@ func (e *encoderState) appendArray(b []byte, v reflect.Value, opts valueOptions,
 
 // appendInlineTable encodes a map or a struct as an inline table.
 func (e *encoderState) appendInlineTable(b []byte, v reflect.Value, indent int) ([]byte, error) {
+	done, err := e.enterValue(v)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
 	entries, err := e.collectEntries(v)
 	if err != nil {
 		return nil, err
