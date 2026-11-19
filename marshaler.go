@@ -370,7 +370,10 @@ func (e *encoderState) encodeRoot(v interface{}) error {
 	}
 
 	rv := reflect.ValueOf(v)
-	rv, ok := resolve(rv)
+	rv, ok, err := resolve(rv)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		return errors.New("toml: cannot encode a nil pointer")
 	}
@@ -420,21 +423,40 @@ func (e *encoderState) encodeMarshalerRoot(rv reflect.Value) error {
 
 // resolve unwraps pointers and interfaces until a concrete value is found.
 // Returns false if it resolves to nil.
-func resolve(v reflect.Value) (reflect.Value, bool) {
+// If a pointer/interface recursion cycle or depth exceeding maxDepth is encountered, an error is returned.
+func resolve(v reflect.Value) (reflect.Value, bool, error) {
+	var ptrBuf [8]uintptr
+	seen := ptrBuf[:0]
+	depth := 0
 	for {
 		switch v.Kind() {
 		case reflect.Ptr:
 			if v.IsNil() {
-				return v, false
+				return v, false, nil
+			}
+			ptr := v.Pointer()
+			for _, p := range seen {
+				if p == ptr {
+					return reflect.Value{}, false, fmt.Errorf("toml: encountered a cycle, or a value nested deeper than %d", maxDepth)
+				}
+			}
+			seen = append(seen, ptr)
+			depth++
+			if depth > maxDepth {
+				return reflect.Value{}, false, fmt.Errorf("toml: encountered a cycle, or a value nested deeper than %d", maxDepth)
 			}
 			v = v.Elem()
 		case reflect.Interface:
 			if v.IsNil() {
-				return v, false
+				return v, false, nil
+			}
+			depth++
+			if depth > maxDepth {
+				return reflect.Value{}, false, fmt.Errorf("toml: encountered a cycle, or a value nested deeper than %d", maxDepth)
 			}
 			v = v.Elem()
 		default:
-			return v, true
+			return v, true, nil
 		}
 	}
 }
@@ -498,28 +520,34 @@ func isValueKind(v reflect.Value) bool {
 
 // isTableLike returns true when the value should be encoded as a table (or
 // an array of tables for slices).
-func (e *encoderState) isTableLike(v reflect.Value) bool {
-	v, ok := resolve(v)
+func (e *encoderState) isTableLike(v reflect.Value) (bool, error) {
+	v, ok, err := resolve(v)
+	if err != nil {
+		return false, err
+	}
 	if !ok {
 		// Unresolvable values (interface-held nil pointers) are encoded as
 		// the zero value of their element type by the value path.
-		return false
+		return false, nil
 	}
-	return !isValueKind(v)
+	return !isValueKind(v), nil
 }
 
 // isArrayOfTables returns true when the value is a non-empty slice or array
 // containing only table-like values.
-func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
-	v, ok := resolve(v)
+func (e *encoderState) isArrayOfTables(v reflect.Value) (bool, error) {
+	v, ok, err := resolve(v)
+	if err != nil {
+		return false, err
+	}
 	if !ok {
-		return false
+		return false, nil
 	}
 	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array {
-		return false
+		return false, nil
 	}
 	if v.Len() == 0 {
-		return false
+		return false, nil
 	}
 	// The Marshaler-aware classification lives in a separate method, hoisted out
 	// of this loop, so the default path keeps its exact original shape.
@@ -527,39 +555,45 @@ func (e *encoderState) isArrayOfTables(v reflect.Value) bool {
 		return e.isMarshalerArrayOfTables(v)
 	}
 	for i := 0; i < v.Len(); i++ {
-		elem, ok := resolve(v.Index(i))
+		elem, ok, err := resolve(v.Index(i))
+		if err != nil {
+			return false, err
+		}
 		if !ok || isValueKind(elem) {
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 // isMarshalerArrayOfTables is the EnableMarshalerInterface variant of
 // isArrayOfTables: a Marshaler element counts as a table only when its raw
 // content is table shaped (key-value lines); one holding a single value makes
 // the whole slice a plain array instead.
-func (e *encoderState) isMarshalerArrayOfTables(v reflect.Value) bool {
+func (e *encoderState) isMarshalerArrayOfTables(v reflect.Value) (bool, error) {
 	for i := 0; i < v.Len(); i++ {
-		elem, ok := resolve(v.Index(i))
+		elem, ok, err := resolve(v.Index(i))
+		if err != nil {
+			return false, err
+		}
 		if !ok {
-			return false
+			return false, nil
 		}
 		if encPropsForType(elem.Type()).marshaler != 0 {
 			raw, err := e.marshalerBytes(elem)
 			if err != nil {
-				return false
+				return false, nil
 			}
 			if shape, _ := e.classifyRaw(raw); shape != shapeTable {
-				return false
+				return false, nil
 			}
 			continue
 		}
 		if isValueKind(elem) {
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 // marshalerBytes returns the raw TOML produced by v's unstable.Marshaler
@@ -633,7 +667,10 @@ func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 			// entries early to route them by shape.
 			continue
 		}
-		v, ok := resolve(ent.value)
+		v, ok, err := resolve(ent.value)
+		if err != nil {
+			return err
+		}
 		if !ok || encPropsForType(v.Type()).marshaler == 0 {
 			continue
 		}
@@ -649,7 +686,10 @@ func (e *encoderState) resolveMarshalerEntries(entries []entry) error {
 // marshalerValue returns the trimmed bytes to splice for an entry already known
 // to be an unstable.Marshaler (ent.options.rawShape != shapeUnknown).
 func (e *encoderState) marshalerValue(ent *entry) ([]byte, error) {
-	v, _ := resolve(ent.value)
+	v, _, err := resolve(ent.value)
+	if err != nil {
+		return nil, err
+	}
 	raw, err := e.marshalerBytes(v)
 	if err != nil {
 		return nil, err
@@ -739,7 +779,11 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 				continue
 			}
 		}
-		if e.entryIsTable(ent) {
+		isTable, err := e.entryIsTable(ent)
+		if err != nil {
+			return err
+		}
+		if isTable {
 			continue
 		}
 		if err := e.encodeKeyValue(*ent, commented, indent); err != nil {
@@ -769,13 +813,21 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 				continue
 			}
 		}
-		if !e.entryIsTable(&ent) {
+		isTable, err := e.entryIsTable(&ent)
+		if err != nil {
+			return err
+		}
+		if !isTable {
 			continue
 		}
 		entCommented := commented || ent.options.commented
 		e.keyStack = append(e.keyStack, ent.key)
 
-		if e.isArrayOfTables(ent.value) {
+		isArray, err := e.isArrayOfTables(ent.value)
+		if err != nil {
+			return err
+		}
+		if isArray {
 			err := e.encodeArrayTable(ent, entCommented, indent)
 			if err != nil {
 				return err
@@ -785,7 +837,10 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 		}
 
 		// The value is resolvable: entryIsTable already resolved it.
-		tv, _ := resolve(ent.value)
+		tv, _, err := resolve(ent.value)
+		if err != nil {
+			return err
+		}
 
 		subEntries, err := e.collectEntries(tv)
 		if err != nil {
@@ -803,7 +858,11 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 					return err
 				}
 			}
-			if e.onlySubTables(subEntries) {
+			onlySub, err := e.onlySubTables(subEntries)
+			if err != nil {
+				return err
+			}
+			if onlySub {
 				// The table has no key-value of its own and at least one
 				// sub-table: emitting the sub-tables implicitly defines it,
 				// so its header can be omitted. Its children take its place
@@ -831,9 +890,9 @@ func (e *encoderState) encodeTableEntries(entries []entry, commented bool, inden
 // and nothing else. A table made only of sub-tables is a "super-table": every
 // one of its entries emits a header that implicitly defines it, so its own
 // header carries no information.
-func (e *encoderState) onlySubTables(entries []entry) bool {
+func (e *encoderState) onlySubTables(entries []entry) (bool, error) {
 	if len(entries) == 0 {
-		return false
+		return false, nil
 	}
 	for i := range entries {
 		ent := &entries[i]
@@ -841,15 +900,19 @@ func (e *encoderState) onlySubTables(entries []entry) bool {
 			// Classified unstable.Marshaler entry: only a table-shaped one
 			// that is not forced inline is guaranteed to emit a header.
 			if ent.options.rawShape != shapeTable || e.tablesInline || ent.options.inline {
-				return false
+				return false, nil
 			}
 			continue
 		}
-		if !e.entryIsTable(ent) {
-			return false
+		isTable, err := e.entryIsTable(ent)
+		if err != nil {
+			return false, err
+		}
+		if !isTable {
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 // encodeMarshalerTable emits a table-shaped unstable.Marshaler entry: the
@@ -891,8 +954,18 @@ func (e *encoderState) spliceRawTableBody(raw []byte, commented bool) {
 // entryIsTable reports whether the entry is emitted as a (sub-)table rather
 // than a key-value. Marshaler entries are routed by encodeTable before this is
 // reached, so it carries no marshaler-specific cost.
-func (e *encoderState) entryIsTable(ent *entry) bool {
-	return !e.tablesInline && !ent.options.inline && (e.isTableLike(ent.value) || e.isArrayOfTables(ent.value))
+func (e *encoderState) entryIsTable(ent *entry) (bool, error) {
+	if e.tablesInline || ent.options.inline {
+		return false, nil
+	}
+	tableLike, err := e.isTableLike(ent.value)
+	if err != nil {
+		return false, err
+	}
+	if tableLike {
+		return true, nil
+	}
+	return e.isArrayOfTables(ent.value)
 }
 
 // getEntries returns a reusable entry slice.
@@ -914,7 +987,10 @@ func (e *encoderState) putEntries(s []entry) {
 
 // encodeArrayTable writes all the elements of an array of tables.
 func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) error {
-	v, _ := resolve(ent.value)
+	v, _, err := resolve(ent.value)
+	if err != nil {
+		return err
+	}
 	if err := e.enter(); err != nil {
 		return err
 	}
@@ -922,7 +998,10 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 	comment := ent.options.comment
 	for i := 0; i < v.Len(); i++ {
 		// Elements are resolvable: isArrayOfTables already resolved them.
-		elem, _ := resolve(v.Index(i))
+		elem, _, err := resolve(v.Index(i))
+		if err != nil {
+			return err
+		}
 
 		e.writeTableHeader(comment, commented, true, indent)
 		// The comment is only present before the first element.
@@ -944,7 +1023,7 @@ func (e *encoderState) encodeArrayTable(ent entry, commented bool, indent int) e
 			continue
 		}
 
-		err := e.encodeTable(elem, commented, indent+1)
+		err = e.encodeTable(elem, commented, indent+1)
 		if err != nil {
 			return err
 		}
@@ -1157,7 +1236,10 @@ func (e *encoderState) collectMapEntries(v reflect.Value) ([]entry, error) {
 
 // mapKeyString converts a map key to its string representation.
 func mapKeyString(k reflect.Value) (string, error) {
-	kr, ok := resolve(k)
+	kr, ok, err := resolve(k)
+	if err != nil {
+		return "", err
+	}
 	if !ok {
 		return "", errors.New("toml: cannot encode a nil map key")
 	}
@@ -1611,12 +1693,22 @@ func (e *encoderState) appendValue(b []byte, v reflect.Value, opts valueOptions,
 			// type.
 			return e.appendValue(b, reflect.Zero(t.Elem()), opts, indent)
 		}
-		return e.appendValue(b, v.Elem(), opts, indent)
+		if err := e.enter(); err != nil {
+			return nil, err
+		}
+		b, err := e.appendValue(b, v.Elem(), opts, indent)
+		e.leave()
+		return b, err
 	case reflect.Interface:
 		if v.IsNil() {
 			return nil, errors.New("toml: cannot encode a nil interface")
 		}
-		return e.appendValue(b, v.Elem(), opts, indent)
+		if err := e.enter(); err != nil {
+			return nil, err
+		}
+		b, err := e.appendValue(b, v.Elem(), opts, indent)
+		e.leave()
+		return b, err
 	case reflect.String:
 		s := v.String()
 		// The "multiline" option only takes effect when the string actually

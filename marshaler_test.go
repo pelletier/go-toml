@@ -3400,3 +3400,152 @@ func TestMarshalDeepNestingBelowMaxDepth(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, len(b) > 0)
 }
+
+func TestMarshalCyclicPointerInterfaceMap(t *testing.T) {
+	var value interface{}
+	value = &value
+	doc := map[string]interface{}{"self": value}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(doc)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on pointer/interface cycle in map value")
+	}
+}
+
+func TestMarshalCyclicPointerInterfaceInline(t *testing.T) {
+	var value interface{}
+	value = &value
+	doc := map[string]interface{}{"self": value}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetTablesInline(true)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- enc.Encode(doc)
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Encoder.Encode hung on inline pointer/interface cycle")
+	}
+}
+
+func TestMarshalCyclicPointerInterfaceRoot(t *testing.T) {
+	var value interface{}
+	value = &value
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(value)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on root pointer/interface cycle")
+	}
+}
+
+func TestMarshalCyclicPointerInterfaceSlice(t *testing.T) {
+	var value interface{}
+	value = &value
+	doc := map[string]interface{}{"arr": []interface{}{value}}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(doc)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on pointer/interface cycle in slice")
+	}
+}
+
+func TestMarshalCyclicPointerInterfaceMultiHop(t *testing.T) {
+	var a, b interface{}
+	a = &b
+	b = &a
+	doc := map[string]interface{}{"cycle": a}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := toml.Marshal(doc)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "encountered a cycle"), "error should report cycle, got: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("toml.Marshal hung on multi-hop pointer/interface cycle")
+	}
+}
+
+func TestMarshalSharedAcyclicPointers(t *testing.T) {
+	shared := 42
+	doc := map[string]interface{}{
+		"a": &shared,
+		"b": &shared,
+	}
+
+	b, err := toml.Marshal(doc)
+	assert.NoError(t, err)
+	assert.True(t, strings.Contains(string(b), "a = 42"))
+	assert.True(t, strings.Contains(string(b), "b = 42"))
+}
+
+func TestMarshalSharedAcyclicStructPointers(t *testing.T) {
+	type item struct {
+		Name string
+	}
+	it := &item{Name: "widget"}
+	doc := map[string]interface{}{
+		"first":  it,
+		"second": it,
+	}
+
+	b, err := toml.Marshal(doc)
+	assert.NoError(t, err)
+	assert.True(t, strings.Contains(string(b), "[first]"))
+	assert.True(t, strings.Contains(string(b), "[second]"))
+}
+
+func TestMarshalSharedAcyclicPointersInline(t *testing.T) {
+	shared := 42
+	doc := map[string]interface{}{
+		"a": &shared,
+		"b": &shared,
+	}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	enc.SetTablesInline(true)
+
+	err := enc.Encode(doc)
+	assert.NoError(t, err)
+	assert.True(t, strings.Contains(buf.String(), "a = 42"))
+	assert.True(t, strings.Contains(buf.String(), "b = 42"))
+}
