@@ -380,19 +380,22 @@ func (d *Document) eol() []byte {
 
 // renderKVLine renders a complete `key = value` line (terminated by '\n')
 // with the toml encoder, so that key quoting and value formatting follow
-// Marshal conventions exactly. Values render in inline form; a value that
-// cannot render to a single line is an error.
-func renderKVLine(name string, value interface{}) ([]byte, error) {
+// Marshal conventions exactly. Only wrapper tables containing a RawMessage
+// allow a multiline value and enable the encoder's raw-value handling.
+func renderKVLine(name string, value interface{}, wrappedRaw bool) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := toml.NewEncoder(&buf)
 	enc.SetTablesInline(true)
+	if wrappedRaw {
+		enc.EnableMarshalerInterface()
+	}
 	if err := enc.Encode(map[string]interface{}{name: value}); err != nil {
 		return nil, fmt.Errorf("toml/edit: cannot render value: %w", err)
 	}
 	line := buf.Bytes()
 	// A value the encoder omits instead of erroring on (e.g. a nil map
 	// value) renders to nothing.
-	if len(line) == 0 || line[len(line)-1] != '\n' || bytes.IndexByte(line, '\n') != len(line)-1 {
+	if len(line) == 0 || line[len(line)-1] != '\n' || (!wrappedRaw && bytes.IndexByte(line, '\n') != len(line)-1) {
 		return nil, fmt.Errorf("toml/edit: cannot render value of type %T as a single key-value line", value)
 	}
 	return line, nil
@@ -408,7 +411,11 @@ func (d *Document) renderValue(value interface{}) ([]byte, error) {
 		}
 		return bytes.Clone(raw), nil
 	}
-	line, err := renderKVLine("v", value)
+	return renderEncodedValue(value, false)
+}
+
+func renderEncodedValue(value interface{}, wrappedRaw bool) ([]byte, error) {
+	line, err := renderKVLine("v", value, wrappedRaw)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +459,7 @@ func (d *Document) renderDottedKV(parts []string, value interface{}) ([]byte, er
 func (d *Document) renderKeyPath(parts []string) (string, error) {
 	rendered := make([]string, len(parts))
 	for i, part := range parts {
-		line, err := renderKVLine(part, 0)
+		line, err := renderKVLine(part, 0, false)
 		if err != nil {
 			return "", err
 		}
