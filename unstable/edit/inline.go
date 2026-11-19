@@ -221,7 +221,14 @@ func (d *Document) inlineSetSplice(n *unstable.Node, ns span, key []string, from
 			for j := len(rest) - 1; j >= 0; j-- {
 				v = map[string]interface{}{rest[j]: v}
 			}
-			raw, err := d.renderValue(v)
+			var raw []byte
+			var err error
+			if _, isRaw := value.(unstable.RawMessage); isRaw && len(rest) > 0 {
+				// The only leaf in our wrapper tables is a RawMessage.
+				raw, err = renderEncodedValue(v, true)
+			} else {
+				raw, err = d.renderValue(v)
+			}
 			if err != nil {
 				return splice{}, err
 			}

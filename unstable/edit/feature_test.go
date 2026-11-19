@@ -632,6 +632,83 @@ func TestRawMessage(t *testing.T) {
 	}
 }
 
+type inlineArrayTestMarshaler int
+
+func (inlineArrayTestMarshaler) MarshalTOML() ([]byte, error) {
+	return []byte("99"), nil
+}
+
+func TestSetAppendInlineArrayMember(t *testing.T) {
+	const original = "a = [{u = \"1\"}]\n"
+	tests := []struct {
+		name  string
+		key   []string
+		value interface{}
+		want  string
+	}{
+		{
+			name:  "raw string",
+			key:   []string{"a", "1", "u"},
+			value: unstable.RawMessage(`"x"`),
+			want:  "a = [{u = \"1\"}, {u = \"x\"}]\n",
+		},
+		{
+			name:  "raw numeric syntax under quoted keys",
+			key:   []string{"a", "1", "a.b", "c d"},
+			value: unstable.RawMessage(" 0x2A "),
+			want:  "a = [{u = \"1\"}, {'a.b' = {'c d' = 0x2A}}]\n",
+		},
+		{
+			name:  "multiline raw string",
+			key:   []string{"a", "1", "u"},
+			value: unstable.RawMessage("\"\"\"one\ntwo\"\"\""),
+			want:  "a = [{u = \"1\"}, {u = \"\"\"one\ntwo\"\"\"}]\n",
+		},
+		{
+			name:  "ordinary byte slice",
+			key:   []string{"a", "1", "u"},
+			value: []byte{1, 2},
+			want:  "a = [{u = \"1\"}, {u = [1, 2]}]\n",
+		},
+		{
+			name:  "ordinary encoding of custom marshaler",
+			key:   []string{"a", "1", "u"},
+			value: inlineArrayTestMarshaler(7),
+			want:  "a = [{u = \"1\"}, {u = 7}]\n",
+		},
+		{
+			name:  "raw message inside a caller supplied map",
+			key:   []string{"a", "1", "u"},
+			value: map[string]interface{}{"v": unstable.RawMessage("7")},
+			want:  "a = [{u = \"1\"}, {u = {v = [55]}}]\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := mustParse(t, original)
+			if err := d.Set(tt.key, tt.value); err != nil {
+				t.Fatal(err)
+			}
+			if got := d.String(); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("invalid raw values leave document intact", func(t *testing.T) {
+		d := mustParse(t, original)
+		key := []string{"a", "1", "u"}
+		for _, raw := range []unstable.RawMessage{nil, []byte("  "), []byte("["), []byte("1, v = 2")} {
+			if err := d.Set(key, raw); err == nil {
+				t.Errorf("Set with raw value %q succeeded, want error", raw)
+			}
+			if got := d.String(); got != original {
+				t.Fatalf("document changed after invalid raw edit: %q", got)
+			}
+		}
+	})
+}
+
 func TestGetIndexes(t *testing.T) {
 	d := mustParse(t, "arr = [1, [2, 3]]\n\n[[s]]\nv = 'a'\n\n[[s]]\nv = 'b'\n")
 	tests := []struct {
