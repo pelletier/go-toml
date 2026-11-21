@@ -5354,6 +5354,45 @@ func TestUnmarshalerInterfaceCaptureThroughInterface(t *testing.T) {
 	})
 }
 
+type captureCallback func()
+
+func (f captureCallback) UnmarshalTOML([]byte) error {
+	f()
+	return nil
+}
+
+func TestUnmarshalerInterfaceCaptureAfterCallback(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		replacement interface{}
+	}{
+		{"nil pointer", (*map[string]unstable.RawMessage)(nil)},
+		{"struct without target", struct{}{}},
+		{"pointer to struct without target", &struct{}{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := struct {
+				First   captureCallback
+				Plugins interface{}
+			}{Plugins: map[string]unstable.RawMessage{}}
+			cfg.First = func() { cfg.Plugins = tc.replacement }
+
+			err := decodeRaw(t, "[first]\n[plugins.task]\nenabled = true", &cfg)
+			assert.Error(t, err)
+			assert.True(t, strings.Contains(err.Error(), "plugins.task"))
+		})
+	}
+}
+
+func TestUnmarshalerInterfaceCaptureThroughMapPointer(t *testing.T) {
+	entry := &struct{ Task unstable.RawMessage }{}
+	cfg := map[string]interface{}{"plugins": entry}
+
+	err := decodeRaw(t, "[plugins.task]\nenabled = true", &cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, unstable.RawMessage("enabled = true\n"), entry.Task)
+}
+
 func TestUnmarshalerInterfaceBehindPointer(t *testing.T) {
 	doc := `
 [outer]
