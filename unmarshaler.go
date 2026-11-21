@@ -1230,7 +1230,7 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		plan := planForType(v.Type())
 		f, found := plan.lookup(name)
 		if !found {
-			return v, nil
+			break
 		}
 		fv, err := fieldByIndexAlloc(v, f.index)
 		if err != nil {
@@ -1265,15 +1265,17 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		}
 		return v, nil
 	case reflect.Interface:
-		elem := elemOrNewMap(v)
-		nv, err := d.resolveCapture(elem, c, idx, indexed)
-		if err != nil || !nv.IsValid() {
-			return reflect.Value{}, err
+		// Follow the concrete container selected by the table walk. An
+		// earlier UnmarshalTOML call may have replaced it since then.
+		elem := v.Elem()
+		k := elem.Kind()
+		if k == reflect.Map || k == reflect.Slice || (k == reflect.Ptr && !elem.IsNil()) {
+			return d.resolveCapture(elem, c, idx, indexed)
 		}
-		return nv, nil
 	default:
 		return reflect.Value{}, fmt.Errorf("toml: internal error: cannot resolve capture target through %s", v.Kind())
 	}
+	return reflect.Value{}, fmt.Errorf("toml: destination for captured table %q changed during decoding", strings.Join(c.names, "."))
 }
 
 // captureKeyValue appends the raw bytes of a key-value expression to the
