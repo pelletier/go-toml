@@ -5333,6 +5333,27 @@ a = 1
 	_ = x
 }
 
+func TestUnmarshalerInterfaceCaptureThroughInterface(t *testing.T) {
+	t.Run("typed map", func(t *testing.T) {
+		plugins := map[string]unstable.RawMessage{}
+		cfg := struct{ Plugins interface{} }{plugins}
+
+		err := decodeRaw(t, "[plugins.task]\nenabled = true", &cfg)
+		assert.NoError(t, err)
+		assert.Equal(t, unstable.RawMessage("enabled = true\n"), plugins["task"])
+	})
+
+	t.Run("typed slice", func(t *testing.T) {
+		type entry struct{ Task unstable.RawMessage }
+		plugins := []entry{{}}
+		cfg := struct{ Plugins interface{} }{plugins}
+
+		err := decodeRaw(t, "[plugins.task]\nenabled = true", &cfg)
+		assert.NoError(t, err)
+		assert.Equal(t, unstable.RawMessage("enabled = true\n"), plugins[0].Task)
+	})
+}
+
 func TestUnmarshalerInterfaceBehindPointer(t *testing.T) {
 	doc := `
 [outer]

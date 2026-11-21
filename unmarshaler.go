@@ -1265,12 +1265,8 @@ func (d *decoder) resolveCapture(v reflect.Value, c *rawCapture, idx int, indexe
 		}
 		return v, nil
 	case reflect.Interface:
-		elem := elemOrNewMap(v)
-		nv, err := d.resolveCapture(elem, c, idx, indexed)
-		if err != nil || !nv.IsValid() {
-			return reflect.Value{}, err
-		}
-		return nv, nil
+		// The table walk already selected a capture target in this value.
+		return d.resolveCapture(v.Elem(), c, idx, indexed)
 	default:
 		return reflect.Value{}, fmt.Errorf("toml: internal error: cannot resolve capture target through %s", v.Kind())
 	}
