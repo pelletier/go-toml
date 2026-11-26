@@ -3,6 +3,7 @@ package edit_test
 import (
 	"fmt"
 
+	"github.com/pelletier/go-toml/v2/unstable"
 	"github.com/pelletier/go-toml/v2/unstable/edit"
 )
 
@@ -120,4 +121,26 @@ func ExampleDocument_Set() {
 	//
 	// [servers.alpha]
 	// ip = '10.0.0.1'
+}
+
+func ExampleDocument_Set_rawMessage() {
+	d, err := edit.Parse([]byte("mask = 0xff # permission bits\n"))
+	if err != nil {
+		panic(err)
+	}
+
+	// RawMessage preserves TOML syntax such as a hexadecimal integer instead
+	// of formatting the value using the encoder's default representation.
+	if err := d.Set([]string{"mask"}, unstable.RawMessage("0x1ff")); err != nil {
+		panic(err)
+	}
+
+	// Invalid TOML is rejected without changing the document.
+	if err := d.Set([]string{"mask"}, unstable.RawMessage("0x")); err == nil {
+		panic("expected invalid TOML to be rejected")
+	}
+
+	fmt.Print(d.String())
+	// Output:
+	// mask = 0x1ff # permission bits
 }
