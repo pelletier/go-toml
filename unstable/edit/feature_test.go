@@ -618,6 +618,24 @@ func TestRawMessage(t *testing.T) {
 		t.Errorf("Get(p.x) = %q", v)
 	}
 
+	// A RawMessage appended to an inline array below a key path is used
+	// verbatim, not encoded as a byte array (issue #1144).
+	d2 := mustParse(t, `a = [{u = "1"}]`+"\n")
+	if err := d2.Set([]string{"a", "1", "u"}, unstable.RawMessage(`"x"`)); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := d2.String(), `a = [{u = "1"}, {u = "x"}]`+"\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	// The same applies through several levels of implied tables.
+	if err := d2.Set([]string{"a", "2", "b", "c"}, unstable.RawMessage("1.5")); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := d2.String(), `a = [{u = "1"}, {u = "x"}, {b = {c = 1.5}}]`+"\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
 	// Invalid and empty raw values are rejected and leave the document
 	// unchanged.
 	before := d.String()
