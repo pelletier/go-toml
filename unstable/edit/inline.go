@@ -215,15 +215,27 @@ func (d *Document) inlineSetSplice(n *unstable.Node, ns span, key []string, from
 				pathString(key), idx, pathString(key[:from]), len(elems))
 		}
 		if idx == len(elems) {
-			// Append; the remaining key parts wrap the value in tables.
-			v := value
+			// Append; the remaining key parts wrap the value in inline
+			// tables. The tables are rendered textually around the value
+			// rather than as nested maps through the encoder, so that an
+			// unstable.RawMessage value is still used verbatim.
 			rest := key[from+1:]
-			for j := len(rest) - 1; j >= 0; j-- {
-				v = map[string]interface{}{rest[j]: v}
-			}
-			raw, err := d.renderValue(v)
+			raw, err := d.renderValue(value)
 			if err != nil {
 				return splice{}, err
+			}
+			for j := len(rest) - 1; j >= 0; j-- {
+				k, err := d.renderKeyPath(rest[j : j+1])
+				if err != nil {
+					return splice{}, err
+				}
+				wrapped := make([]byte, 0, len(k)+len(raw)+6)
+				wrapped = append(wrapped, '{')
+				wrapped = append(wrapped, k...)
+				wrapped = append(wrapped, " = "...)
+				wrapped = append(wrapped, raw...)
+				wrapped = append(wrapped, '}')
+				raw = wrapped
 			}
 			return d.containerInsert(ns, elemSpans(elems), raw), nil
 		}
