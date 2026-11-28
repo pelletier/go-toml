@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml/v2/internal/assert"
 )
@@ -1232,4 +1233,107 @@ func TestUnquotedStringValueRequiresQuotes(t *testing.T) {
 	if perr.Message != "strings must be quoted" {
 		t.Fatalf("expected %q, got %q", "strings must be quoted", perr.Message)
 	}
+}
+
+func TestShapePositionMatchesIndependentScan(t *testing.T) {
+	docs := []string{
+		"a = 1\nb = 2\n",
+		"a = 1\r\nb = 2\r\n",
+		"\n\nk = 'x'\n",
+		"a = 1",
+		"# c\n[table]\nk = 1\n",
+	}
+	for _, doc := range docs {
+		raw := []byte(doc)
+		p := &Parser{KeepComments: true}
+		p.Reset(raw)
+		var ranges []Range
+		for p.NextExpression() {
+			ranges = append(ranges, p.Expression().Raw)
+		}
+		if err := p.Error(); err != nil {
+			t.Fatal(err)
+		}
+		orders := [][]int{nil, nil}
+		orders[0] = make([]int, len(ranges))
+		orders[1] = make([]int, len(ranges))
+		for i := range ranges {
+			orders[0][i] = i
+			orders[1][i] = len(ranges) - 1 - i
+		}
+		for _, order := range orders {
+			q := &Parser{}
+			q.Reset(raw)
+			for _, i := range order {
+				sh := q.Shape(ranges[i])
+				end := int(ranges[i].Offset + ranges[i].Length)
+				wantLine, wantCol := scanLineCol(raw, int(ranges[i].Offset))
+				if sh.Start.Line != wantLine || sh.Start.Column != wantCol || sh.Start.Offset != int(ranges[i].Offset) {
+					t.Fatalf("start %q off %d: got %d:%d, want %d:%d", doc, ranges[i].Offset, sh.Start.Line, sh.Start.Column, wantLine, wantCol)
+				}
+				wantLine, wantCol = scanLineCol(raw, end)
+				if sh.End.Line != wantLine || sh.End.Column != wantCol || sh.End.Offset != end {
+					t.Fatalf("end %q off %d: got %d:%d, want %d:%d", doc, end, sh.End.Line, sh.End.Column, wantLine, wantCol)
+				}
+			}
+		}
+	}
+}
+
+func scanLineCol(doc []byte, offset int) (int, int) {
+	line := 1
+	lineStart := 0
+	for i := 0; i < offset; i++ {
+		if doc[i] == '\n' {
+			line++
+			lineStart = i + 1
+		}
+	}
+	return line, offset - lineStart + 1
+}
+
+func TestShapeOverExpressionsScalesLinearly(t *testing.T) {
+	best := func(n int) time.Duration {
+		var shortest time.Duration
+		for attempt := 0; attempt < 3; attempt++ {
+			d := timeShape(t, n)
+			if attempt == 0 || d < shortest {
+				shortest = d
+			}
+		}
+		return shortest
+	}
+	small := best(2000)
+	large := best(8000)
+	if large > small*8 {
+		t.Fatalf("Shape over every expression scaled superlinearly: 2000 lines %s, 8000 lines %s", small, large)
+	}
+}
+
+func timeShape(t *testing.T, n int) time.Duration {
+	t.Helper()
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, "k%06d = %d\n", i, i)
+	}
+	doc := []byte(b.String())
+	p := &Parser{}
+	p.Reset(doc)
+	ranges := make([]Range, 0, n)
+	for p.NextExpression() {
+		ranges = append(ranges, p.Expression().Raw)
+	}
+	if len(ranges) != n {
+		t.Fatalf("expressions: got %d, want %d", len(ranges), n)
+	}
+	start := time.Now()
+	var sink int
+	for _, r := range ranges {
+		sh := p.Shape(r)
+		sink += sh.Start.Line + sh.End.Column
+	}
+	if sink == 0 {
+		t.Fatal("sink")
+	}
+	return time.Since(start)
 }
