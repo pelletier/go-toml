@@ -61,6 +61,10 @@ type Parser struct {
 	// unbounded mutual recursion, which would otherwise let a deeply nested
 	// document overflow the goroutine stack (an unrecoverable fatal error).
 	nesting int
+
+	posOff       int
+	posLine      int
+	posLineStart int
 }
 
 // maxValueNesting is the maximum depth of nested arrays and inline tables the
@@ -106,6 +110,9 @@ func (p *Parser) Reset(b []byte) {
 	p.nodes = p.nodes[:0]
 	p.err = nil
 	p.nesting = 0
+	p.posOff = 0
+	p.posLine = 0
+	p.posLineStart = 0
 }
 
 // Error returns any error that has occurred during parsing.
@@ -136,22 +143,33 @@ type Shape struct {
 }
 
 func (p *Parser) position(offset int) Position {
-	pos := Position{
-		Offset: offset,
-		Line:   1,
-		Column: 1,
+	line := 1
+	lineStart := 0
+	from := 0
+	if p.posLine > 0 && offset >= p.posOff {
+		line = p.posLine
+		lineStart = p.posLineStart
+		from = p.posOff
 	}
-	b := p.data[:offset]
+	b := p.data[from:offset]
 	for {
 		idx := bytes.IndexByte(b, '\n')
 		if idx < 0 {
 			break
 		}
-		pos.Line++
+		line++
+		lineStart = from + idx + 1
+		from += idx + 1
 		b = b[idx+1:]
 	}
-	pos.Column = len(b) + 1
-	return pos
+	p.posOff = offset
+	p.posLine = line
+	p.posLineStart = lineStart
+	return Position{
+		Offset: offset,
+		Line:   line,
+		Column: offset - lineStart + 1,
+	}
 }
 
 // Shape returns the shape of the given range in the input.  Will
